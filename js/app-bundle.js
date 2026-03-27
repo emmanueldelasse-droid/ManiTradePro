@@ -4097,7 +4097,7 @@ async function boot() {
   window.__MTP.AnalysisEngine = AnalysisEngine;
 
   // 6. Router
-  const router = new Router();
+  const router = Router;
   router.register('dashboard',     renderDashboard);
   router.register('opportunities', renderOpportunities);
   router.register('asset-detail',  renderAssetDetail);
@@ -4114,7 +4114,7 @@ async function boot() {
 
   // 9. Sync
   const interval = (settings.refreshInterval || 30) * 1000;
-  Sync.init({ interval, onTick: _onSyncTick });
+  Sync.init();
   window.__MTP.Sync = Sync;
 
   // 10. Navigate
