@@ -1,4 +1,3 @@
-
 // ── Capture toutes les erreurs JS ──
 window.addEventListener('error', function(e) {
   const diag = document.getElementById('main-content');
@@ -12,10 +11,37 @@ window.addEventListener('error', function(e) {
   }
 });
 
+// ── Diagnostic immédiat (avant tout le reste) ──
+(function() {
+  function showDiag(msg, color) {
+    var el = document.getElementById('main-content');
+    if (!el) return;
+    el.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;line-height:2;color:' + (color||'#00e5a0') + '"><b>🔍 Diagnostic</b><br>' + msg + '</div>';
+  }
+  window.__showDiag = showDiag;
+  // Affiche immédiatement si le DOM est prêt
+  if (document.readyState !== 'loading') {
+    showDiag('✅ JS chargé — boot() en attente...');
+  } else {
+    document.addEventListener('DOMContentLoaded', function() {
+      showDiag('✅ JS chargé — boot() en attente...');
+    });
+  }
+})();
+
 // ============================================================
 // ManiTradePro V1 — App Bundle (standalone, no ES modules)
 // ============================================================
 'use strict';
+
+// ── AbortSignal.timeout polyfill (iOS 15 and below) ──
+if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout !== 'function') {
+  AbortSignal.timeout = function(ms) {
+    var ctrl = new AbortController();
+    setTimeout(function() { ctrl.abort(); }, ms);
+    return ctrl.signal;
+  };
+}
 
 // Global namespace
 window.__MTP = {};
@@ -3418,6 +3444,7 @@ async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
 
   // ── DIAGNOSTIC VISUEL TEMPORAIRE ──
+  window.__showDiag && window.__showDiag('⏳ boot() démarré...');
   const _diag = document.getElementById('main-content');
   if (_diag) {
     _diag.innerHTML = '<div style="padding:20px;color:#00e5a0;font-family:monospace;font-size:13px;line-height:1.8;">' +
