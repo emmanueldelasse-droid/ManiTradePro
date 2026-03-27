@@ -521,9 +521,21 @@ const RealDataClient = (() => {
   const COINGECKO_IDS = { 'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana', 'BNB': 'binancecoin' };
   const YAHOO_TICKERS = { 'AAPL': 'AAPL', 'MSFT': 'MSFT', 'NVDA': 'NVDA', 'TSLA': 'TSLA', 'AMZN': 'AMZN', 'SPY': 'SPY', 'GOLD': 'GC=F', 'EURUSD': 'EURUSD=X', 'GBPUSD': 'GBPUSD=X' };
   const CORS_PROXIES = ['https://api.allorigins.win/raw?url=', 'https://corsproxy.io/?url='];
+  const YAHOO_PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/yahoo';
 
   async function _fetchWithProxy(url) {
+    // Use our Cloudflare proxy for Yahoo Finance
+    if (url.includes('finance.yahoo.com')) {
+      try {
+        const yahooPath = url.replace('https://query1.finance.yahoo.com', '');
+        const proxyUrl = YAHOO_PROXY + yahooPath;
+        const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+        if (r.ok) return r;
+      } catch(e) {}
+    }
+    // Fallback: direct fetch
     try { const r = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (r.ok) return r; } catch(e) {}
+    // Fallback: public proxies
     for (const proxy of CORS_PROXIES) {
       try { const r = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(8000) }); if (r.ok) return r; } catch(e) {}
     }
@@ -1546,7 +1558,18 @@ const Router = (() => {
         const group = btn.dataset.filterGroup;
         document.querySelectorAll(`[data-filter-group="${group}"]`).forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        document.dispatchEvent(new CustomEvent('filter-change', { detail: { group, value: btn.dataset.filter } }));
+        const filterVal = btn.dataset.filter;
+        // Apply filter to opportunity cards
+        document.querySelectorAll('[data-asset-class]').forEach(card => {
+          const cls = card.dataset.assetClass || '';
+          const classMap = { 'crypto': 'crypto', 'stock': 'stock', 'forex': 'forex', 'commodity': 'commodity', 'etf': 'etf' };
+          if (filterVal === 'all') {
+            card.style.display = '';
+          } else {
+            card.style.display = cls === filterVal ? '' : 'none';
+          }
+        });
+        document.dispatchEvent(new CustomEvent('filter-change', { detail: { group, value: filterVal } }));
       });
     });
   }
@@ -1865,7 +1888,10 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false) {
       </div>
       <div class="opp-trend-arrow">${_trendArrow(a.change24h, a.direction)}</div>
       <div class="opp-price-col">
-        <div class="opp-price" style="font-family:var(--font-mono);">${Fmt.price(a.price)}</div>
+        <div style="display:flex;align-items:center;gap:4px;">
+          <div class="opp-price" style="font-family:var(--font-mono);">${Fmt.price(a.price)}</div>
+          ${a.dataWarning ? '<span style="font-size:0.6rem;background:var(--bg-elevated);color:var(--text-muted);padding:1px 4px;border-radius:3px;border:1px solid var(--border-subtle);">SIM</span>' : '<span style="font-size:0.6rem;background:rgba(0,229,160,0.12);color:var(--profit);padding:1px 4px;border-radius:3px;border:1px solid rgba(0,229,160,0.25);">LIVE</span>'}
+        </div>
         <div class="opp-change ${change.cls}">${change.text}</div>
       </div>
       <div style="flex-shrink:0;display:flex;flex-direction:column;gap:var(--space-1);align-items:flex-end;">
@@ -1873,17 +1899,15 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false) {
         ${a.rrRatio ? `<span class="opp-rr">R/R ${a.rrRatio}:1</span>` : ''}
       </div>
       ${a.stopLoss && a.takeProfit ? `
-      <div class="opp-sltp-full">
-        <div class="opp-sltp-item sl">
-          <span class="opp-sltp-label">Stop-loss</span>
-          <span class="opp-sltp-val">${Fmt.price(a.stopLoss)}</span>
-          <span class="opp-sltp-pct">-${a.indicators?.atr ? ((Math.abs(a.price - a.stopLoss) / a.price) * 100).toFixed(1) : '?'}%</span>
+      <div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border-subtle);">
+        <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:var(--space-2);">
+          <span style="color:var(--loss);font-weight:700;">🔴 ${Fmt.price(a.stopLoss)} <span style="color:var(--text-muted);font-weight:400;">-${((Math.abs(a.price - a.stopLoss) / a.price) * 100).toFixed(1)}%</span></span>
+          <span style="color:var(--text-muted);font-size:0.65rem;">R/R ${a.rrRatio}:1</span>
+          <span style="color:var(--profit);font-weight:700;">🟢 ${Fmt.price(a.takeProfit)} <span style="color:var(--text-muted);font-weight:400;">+${((Math.abs(a.takeProfit - a.price) / a.price) * 100).toFixed(1)}%</span></span>
         </div>
-        <div class="opp-sltp-sep">→</div>
-        <div class="opp-sltp-item tp">
-          <span class="opp-sltp-label">Take profit</span>
-          <span class="opp-sltp-val">${Fmt.price(a.takeProfit)}</span>
-          <span class="opp-sltp-pct">+${((Math.abs(a.takeProfit - a.price) / a.price) * 100).toFixed(1)}%</span>
+        <div style="position:relative;height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden;">
+          <div style="position:absolute;left:0;top:0;height:100%;width:50%;background:linear-gradient(90deg,var(--loss),var(--profit));border-radius:3px;opacity:0.4;"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:var(--text-primary);border:2px solid var(--bg-card);z-index:2;"></div>
         </div>
       </div>` : ''}
     </div>`;
@@ -2664,7 +2688,7 @@ function _renderPortefeuilleCard(pos, mode) {
           </div>
         </div>
         <div class="pf-card-pnl">
-          <div class="pf-pnl-big ${pnlCls}" data-position-pnl="${pos.id}">${Fmt.signedCurrency(pos.pnl)}</div>
+          <div class="pf-pnl-big ${pnlCls}" data-position-pnl="${pos.id}" style="font-size:clamp(var(--text-lg),4vw,var(--text-2xl));">${Fmt.signedCurrency(pos.pnl)}</div>
           <div class="pf-pnl-pct ${pnlCls}" data-position-pnlpct="${pos.id}">${Fmt.signedPct(pos.pnlPct)}</div>
         </div>
       </div>
@@ -3435,6 +3459,10 @@ function _attachSettingsEvents(settings) {
       if (alertThreshEl?.value) s.alertScoreThreshold = parseInt(alertThreshEl.value);
       Storage.saveSettings(s);
       UI.toast('Paramètres enregistrés ✅', 'success');
+      // Refresh dashboard si ouvert
+      const cur = Router.getCurrent();
+      if (cur === 'dashboard') Router.navigate('dashboard');
+      if (cur === 'portefeuille') renderPortefeuille();
     });
   }
 }
