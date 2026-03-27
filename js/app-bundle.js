@@ -35,23 +35,19 @@ const MOCK_DATA = {
   // 55 bougies daily fictives par actif
   generateOHLC: function(symbol, currentPrice, trend = 'up', volatility = 0.02) {
     const candles = [];
-    // Start further back so EMA100 + Donchian55 have enough data
-    let price = currentPrice * (trend === 'up' ? 0.75 : 1.25);
+    let price = currentPrice * (trend === 'up' ? 0.85 : 1.15);
     const now = Date.now();
 
-    for (let i = 130; i >= 0; i--) {
+    for (let i = 55; i >= 0; i--) {
       const dayAgo = now - i * 86400000;
       const noise = (Math.random() - 0.5) * volatility;
-      // Stronger trend bias so ADX picks it up
-      const trendBias = trend === 'up' ? 0.007 : (trend === 'down' ? -0.007 : 0.001);
+      const trendBias = trend === 'up' ? 0.003 : (trend === 'down' ? -0.003 : 0);
       const open = price;
       const move = noise + trendBias;
       const close = price * (1 + move);
-      const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.3);
-      const low  = Math.min(open, close) * (1 - Math.random() * volatility * 0.3);
-      // Volume spikes on big moves to signal momentum
-      const volMult = Math.abs(move) > volatility ? 2.5 : 1;
-      const volume = 1_000_000 * (1 + Math.random() * 2) * volMult;
+      const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.5);
+      const low  = Math.min(open, close) * (1 - Math.random() * volatility * 0.5);
+      const volume = 1_000_000 * (1 + Math.random() * 2);
       candles.push({ ts: dayAgo, open, high, low, close, volume });
       price = close;
     }
@@ -153,7 +149,7 @@ const MOCK_DATA = {
     stopAtrMultiplier: 2,
     trailAtrMultiplier: 3,
     minAdx: 20,
-    minScore: 30,
+    minScore: 50,
   },
 
   // ── RÉGIME MARCHÉ GLOBAL (mock)
@@ -243,10 +239,8 @@ const Storage = (() => {
   // ── SIMULATION
   function getSimCapital() {
     const stored = get(KEYS.SIM_CAPITAL);
-    if (stored === null) return MOCK_DATA.defaultSettings.simulationCapital || 10000;
-    // Handle legacy object format {initial, current}
-    if (typeof stored === 'object' && stored !== null) return stored.current || stored.initial || 10000;
-    return typeof stored === 'number' ? stored : 10000;
+    if (stored === null) return { initial: MOCK_DATA.defaultSettings.simulationCapital, current: MOCK_DATA.defaultSettings.simulationCapital };
+    return stored;
   }
 
   function saveSimCapital(capital) {
@@ -313,7 +307,7 @@ const Storage = (() => {
   // ── RESET SIMULATION
   function resetSimulation() {
     const settings = getSettings();
-    saveSimCapital(settings.simulationCapital || 10000);
+    saveSimCapital({ initial: settings.simulationCapital, current: settings.simulationCapital });
     saveSimPositions([]);
     saveSimHistory([]);
     return true;
@@ -326,7 +320,10 @@ const Storage = (() => {
 
     const simCap = get(KEYS.SIM_CAPITAL);
     if (!simCap) {
-      saveSimCapital(MOCK_DATA.defaultSettings.simulationCapital || 10000);
+      saveSimCapital({
+        initial: MOCK_DATA.defaultSettings.simulationCapital,
+        current: MOCK_DATA.defaultSettings.simulationCapital,
+      });
     }
 
     // Pré-charge positions de démo si vide
@@ -346,8 +343,8 @@ const Storage = (() => {
   // ── INTERFACE PUBLIQUE
   return {
     init,
-    getSettings, saveSettings, setSettings: saveSettings,
-    getSimCapital, saveSimCapital, setSimCapital: saveSimCapital,
+    getSettings, saveSettings,
+    getSimCapital, saveSimCapital,
     getSimPositions, saveSimPositions,
     getSimHistory, saveSimHistory,
     getRealPositions, saveRealPositions,
@@ -766,634 +763,6 @@ const RiskCalculator = (() => {
 
 })();
 
-
-
-// ============================================================
-// BinanceClient — Données marché + ordres réels
-// API publique (données) : gratuite, illimitée, pas de clé
-// API privée (ordres) : nécessite clé + secret + signature HMAC
-// ============================================================
-
-const BinanceClient = (() => {
-
-  const BASE = 'https://api.binance.com';
-  const BASE_DATA = 'https://api.binance.com'; // Pas de CORS sur les endpoints publics
-
-  // ── MAPPING SYMBOLES → Binance pairs
-  const BINANCE_PAIRS = {
-    'BTC'  : 'BTCEUR',
-    'ETH'  : 'ETHEUR',
-    'SOL'  : 'SOLEUR',
-    'BNB'  : 'BNBEUR',
-  };
-
-  // Binance ne propose pas EUR pour tous - fallback USDT avec taux EUR
-  const BINANCE_USDT_PAIRS = {
-    'BTC'  : 'BTCUSDT',
-    'ETH'  : 'ETHUSDT',
-    'SOL'  : 'SOLUSDT',
-  };
-
-  let _apiKey    = '';
-  let _secretKey = '';
-  let _eurUsdRate = 1.08; // Taux EUR/USD approximatif, mis à jour au démarrage
-
-  function init(apiKey = '', secretKey = '') {
-    _apiKey    = apiKey;
-    _secretKey = secretKey;
-    // Récupérer le taux EUR/USD (silencieux si CORS bloqué)
-    _fetchEurUsdRate().catch(() => {});
-    console.log('[Binance] Client initialisé —', _apiKey ? 'clé configurée' : 'mode public uniquement');
-  }
-
-  async function _fetchEurUsdRate() {
-    try {
-      const res = await fetch(`${BASE}/api/v3/ticker/price?symbol=EURUSDT`, { mode: 'cors' });
-      if (res.ok) {
-        const data = await res.json();
-        _eurUsdRate = parseFloat(data.price);
-      }
-    } catch(e) {}
-  }
-
-  // ── SIGNATURE HMAC pour les endpoints privés
-  async function _sign(queryString) {
-    const encoder = new TextEncoder();
-    const keyData  = encoder.encode(_secretKey);
-    const msgData  = encoder.encode(queryString);
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
-    );
-    const sig = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
-    return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
-  }
-
-  async function _privateRequest(method, path, params = {}) {
-    if (!_apiKey || !_secretKey) {
-      return { error: 'Clé API Binance non configurée' };
-    }
-    const timestamp = Date.now();
-    const queryString = new URLSearchParams({ ...params, timestamp }).toString();
-    const signature   = await _sign(queryString);
-    const url = `${BASE}${path}?${queryString}&signature=${signature}`;
-
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'X-MBX-APIKEY': _apiKey },
-      });
-      return await res.json();
-    } catch(e) {
-      return { error: e.message };
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // DONNÉES PUBLIQUES (pas de clé nécessaire)
-  // ──────────────────────────────────────────────────────────
-
-  /**
-   * Prix spot en EUR
-   */
-  async function getPrice(symbol) {
-    const pairEur  = BINANCE_PAIRS[symbol];
-    const pairUsdt = BINANCE_USDT_PAIRS[symbol];
-
-    if (!pairEur && !pairUsdt) return null;
-
-    try {
-      // Essayer d'abord la paire EUR directe
-      if (pairEur) {
-        const res = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pairEur}`,
-          { signal: AbortSignal.timeout(6000), mode: 'cors' });
-        if (res.ok) {
-          const d = await res.json();
-          return {
-            price    : parseFloat(d.lastPrice),
-            change24h: parseFloat(d.priceChangePercent),
-            volume24h: parseFloat(d.quoteVolume),
-            source   : 'Binance',
-          };
-        }
-      }
-
-      // Fallback paire USDT → conversion EUR
-      if (pairUsdt) {
-        const res = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pairUsdt}`,
-          { signal: AbortSignal.timeout(6000), mode: 'cors' });
-        if (res.ok) {
-          const d = await res.json();
-          const priceUsdt = parseFloat(d.lastPrice);
-          return {
-            price    : priceUsdt / _eurUsdRate,
-            change24h: parseFloat(d.priceChangePercent),
-            volume24h: parseFloat(d.quoteVolume) / _eurUsdRate,
-            source   : 'Binance',
-          };
-        }
-      }
-    } catch(e) {}
-    return null;
-  }
-
-  /**
-   * Bougies OHLCV (130 jours, interval 1d)
-   */
-  async function getOHLC(symbol) {
-    const pairEur  = BINANCE_PAIRS[symbol];
-    const pairUsdt = BINANCE_USDT_PAIRS[symbol];
-    const pair     = pairEur || pairUsdt;
-    if (!pair) return null;
-
-    try {
-      const url = `${BASE}/api/v3/klines?symbol=${pair}&interval=1d&limit=130`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000), mode: 'cors' });
-      if (!res.ok) return null;
-      const raw = await res.json();
-      if (!Array.isArray(raw) || raw.length < 20) return null;
-
-      const useUsdt = !pairEur && pairUsdt;
-      return raw.map(k => ({
-        ts    : k[0],
-        open  : parseFloat(k[1]) / (useUsdt ? _eurUsdRate : 1),
-        high  : parseFloat(k[2]) / (useUsdt ? _eurUsdRate : 1),
-        low   : parseFloat(k[3]) / (useUsdt ? _eurUsdRate : 1),
-        close : parseFloat(k[4]) / (useUsdt ? _eurUsdRate : 1),
-        volume: parseFloat(k[5]),
-      }));
-    } catch(e) {
-      return null;
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // DONNÉES COMPTE (clé nécessaire)
-  // ──────────────────────────────────────────────────────────
-
-  async function getBalance() {
-    const data = await _privateRequest('GET', '/api/v3/account');
-    if (data.error) return { error: data.error };
-
-    const balances = (data.balances || [])
-      .filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
-      .map(b => ({
-        asset : b.asset,
-        free  : parseFloat(b.free),
-        locked: parseFloat(b.locked),
-        total : parseFloat(b.free) + parseFloat(b.locked),
-      }));
-
-    return { balances, connected: true };
-  }
-
-  async function getOpenOrders(symbol) {
-    const pair = BINANCE_PAIRS[symbol] || BINANCE_USDT_PAIRS[symbol];
-    const data = await _privateRequest('GET', '/api/v3/openOrders', pair ? { symbol: pair } : {});
-    return data;
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // ORDRES RÉELS (clé + secret nécessaires)
-  // ──────────────────────────────────────────────────────────
-
-  /**
-   * Passer un ordre market
-   * @param {string} symbol - ex: 'BTC'
-   * @param {string} side - 'BUY' ou 'SELL'
-   * @param {number} quantity - quantité en crypto
-   */
-  async function placeMarketOrder(symbol, side, quantity) {
-    const pair = BINANCE_PAIRS[symbol] || BINANCE_USDT_PAIRS[symbol];
-    if (!pair) return { error: 'Symbole non supporté sur Binance' };
-
-    const data = await _privateRequest('POST', '/api/v3/order', {
-      symbol,
-      side        : side.toUpperCase(),
-      type        : 'MARKET',
-      quantity    : quantity.toFixed(6),
-    });
-
-    if (data.code) return { error: `Binance erreur ${data.code}: ${data.msg}` };
-
-    return {
-      success  : true,
-      orderId  : data.orderId,
-      symbol   : data.symbol,
-      side     : data.side,
-      quantity : parseFloat(data.executedQty),
-      price    : parseFloat(data.fills?.[0]?.price || 0),
-      status   : data.status,
-    };
-  }
-
-  /**
-   * Annuler un ordre
-   */
-  async function cancelOrder(symbol, orderId) {
-    const pair = BINANCE_PAIRS[symbol] || BINANCE_USDT_PAIRS[symbol];
-    if (!pair) return { error: 'Symbole non supporté' };
-    return await _privateRequest('DELETE', '/api/v3/order', { symbol: pair, orderId });
-  }
-
-  /**
-   * Test de connexion
-   */
-  async function testConnection() {
-    if (!_apiKey) return { connected: false, error: 'Pas de clé API' };
-    const data = await _privateRequest('GET', '/api/v3/account');
-    if (data.error || data.code) return { connected: false, error: data.error || data.msg };
-    return { connected: true, balances: data.balances?.length || 0 };
-  }
-
-  function isConfigured() {
-    return _apiKey.length > 0 && _secretKey.length > 0;
-  }
-
-  return {
-    init,
-    getPrice,
-    getOHLC,
-    getBalance,
-    getOpenOrders,
-    placeMarketOrder,
-    cancelOrder,
-    testConnection,
-    isConfigured,
-  };
-
-})();
-
-// ============================================================
-// RealDataClient — Prix et OHLCV réels, zéro mock
-// Sources : CoinGecko (crypto) + Yahoo Finance (actions/ETF/forex/or)
-// Fallback automatique entre sources
-// Cache 5 minutes pour éviter les rate limits
-// ============================================================
-
-const RealDataClient = (() => {
-
-  // ── CACHE
-  const _cache = new Map();
-  const PRICE_TTL = 4 * 60 * 1000;   // 4 minutes pour les prix spot (refresh toutes les 5min)
-  const OHLC_TTL  = 60 * 60 * 1000;  // 1 heure pour les bougies OHLCV
-
-  function _cacheGet(key) {
-    const entry = _cache.get(key);
-    if (!entry) return null;
-    const ttl = key.startsWith('ohlc_') || key.startsWith('cg_ohlc_') || key.startsWith('yf_ohlc_')
-      ? OHLC_TTL : PRICE_TTL;
-    if (Date.now() - entry.ts > ttl) { _cache.delete(key); return null; }
-    return entry.data;
-  }
-  function _cacheSet(key, data) {
-    _cache.set(key, { data, ts: Date.now() });
-  }
-
-  // ── MAPPING SYMBOLES
-  // CoinGecko ids
-  const COINGECKO_IDS = {
-    'BTC' : 'bitcoin',
-    'ETH' : 'ethereum',
-    'SOL' : 'solana',
-    'BNB' : 'binancecoin',
-  };
-
-  // Yahoo Finance tickers
-  const YAHOO_TICKERS = {
-    'AAPL'  : 'AAPL',
-    'MSFT'  : 'MSFT',
-    'NVDA'  : 'NVDA',
-    'TSLA'  : 'TSLA',
-    'AMZN'  : 'AMZN',
-    'SPY'   : 'SPY',
-    'GOLD'  : 'GC=F',      // Gold Futures
-    'EURUSD': 'EURUSD=X',
-    'GBPUSD': 'GBPUSD=X',
-  };
-
-  // ── PROXIES CORS (nécessaires en browser pour Yahoo)
-  const CORS_PROXIES = [
-    'https://api.allorigins.win/raw?url=',
-    'https://corsproxy.io/?url=',
-    'https://proxy.cors.sh/',
-  ];
-
-  async function _fetchWithProxy(url) {
-    // Try direct first (works if API supports CORS)
-    try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
-      if (res.ok) return res;
-    } catch(e) {}
-
-    // Try each CORS proxy
-    for (const proxy of CORS_PROXIES) {
-      try {
-        const proxyUrl = proxy + encodeURIComponent(url);
-        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-        if (res.ok) return res;
-      } catch(e) { continue; }
-    }
-    return null;
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // COINGECKO — Prix spot crypto
-  // ──────────────────────────────────────────────────────────
-
-  async function _getCoinGeckoPrice(symbol) {
-    const id = COINGECKO_IDS[symbol];
-    if (!id) return null;
-
-    const cacheKey = 'cg_price_' + symbol;
-    const cached = _cacheGet(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=eur&include_24hr_change=true&include_24hr_vol=true`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000), mode: 'cors' });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (!data[id]) return null;
-
-      const result = {
-        price    : data[id].eur,
-        change24h: data[id].eur_24h_change || 0,
-        volume24h: data[id].eur_24h_vol || 0,
-        source   : 'CoinGecko',
-      };
-      _cacheSet(cacheKey, result);
-      return result;
-    } catch(e) {
-      return null;
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // COINGECKO — OHLCV crypto (90 jours gratuit)
-  // ──────────────────────────────────────────────────────────
-
-  async function _getCoinGeckoOHLC(symbol) {
-    const id = COINGECKO_IDS[symbol];
-    if (!id) return null;
-
-    const cacheKey = 'cg_ohlc_' + symbol;
-    const cached = _cacheGet(cacheKey);
-    if (cached) return cached;
-
-    try {
-      // CoinGecko OHLC endpoint - returns [timestamp, open, high, low, close]
-      const url = `https://api.coingecko.com/api/v3/coins/${id}/ohlc?vs_currency=eur&days=90`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
-      if (!res.ok) return null;
-      const raw = await res.json();
-      if (!Array.isArray(raw) || raw.length < 20) return null;
-
-      // Also get volume from market_chart
-      const volUrl = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=eur&days=90&interval=daily`;
-      let volumes = [];
-      try {
-        const volRes = await fetch(volUrl, { signal: AbortSignal.timeout(8000), mode: 'cors' });
-        if (volRes.ok) {
-          const volData = await volRes.json();
-          volumes = volData.total_volumes || [];
-        }
-      } catch(e) {}
-
-      const candles = raw.map((c, i) => ({
-        ts    : c[0],
-        open  : c[1],
-        high  : c[2],
-        low   : c[3],
-        close : c[4],
-        volume: volumes[i] ? volumes[i][1] : 1000000,
-      }));
-
-      _cacheSet(cacheKey, candles);
-      return candles;
-    } catch(e) {
-      return null;
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // YAHOO FINANCE — Prix spot (actions, ETF, forex, or)
-  // ──────────────────────────────────────────────────────────
-
-  async function _getYahooPrice(symbol) {
-    const ticker = YAHOO_TICKERS[symbol];
-    if (!ticker) return null;
-
-    const cacheKey = 'yf_price_' + symbol;
-    const cached = _cacheGet(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`;
-      const res = await _fetchWithProxy(url);
-      if (!res) return null;
-      const data = await res.json();
-
-      const meta   = data?.chart?.result?.[0]?.meta;
-      if (!meta) return null;
-
-      const price     = meta.regularMarketPrice;
-      const prevClose = meta.previousClose || meta.chartPreviousClose;
-      const change24h = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
-      const volume24h = meta.regularMarketVolume || 0;
-
-      // Convert to EUR if needed (Yahoo returns in native currency)
-      // For US stocks: USD → EUR (approximate, we'll use a fixed rate for now)
-      // For forex pairs like EURUSD=X, price IS the rate
-      let priceEur = price;
-      if (!ticker.includes('=X') && ticker !== 'GC=F') {
-        // US stock in USD → convert to EUR (approx 0.92)
-        priceEur = price * 0.92;
-      }
-
-      const result = {
-        price    : priceEur,
-        change24h,
-        volume24h,
-        source   : 'Yahoo Finance',
-      };
-      _cacheSet(cacheKey, result);
-      return result;
-    } catch(e) {
-      return null;
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // YAHOO FINANCE — OHLCV historique (130 jours)
-  // ──────────────────────────────────────────────────────────
-
-  async function _getYahooOHLC(symbol) {
-    const ticker = YAHOO_TICKERS[symbol];
-    if (!ticker) return null;
-
-    const cacheKey = 'yf_ohlc_' + symbol;
-    const cached = _cacheGet(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=6mo`;
-      const res = await _fetchWithProxy(url);
-      if (!res) return null;
-      const data = await res.json();
-
-      const result = data?.chart?.result?.[0];
-      if (!result) return null;
-
-      const timestamps = result.timestamp || [];
-      const ohlcv      = result.indicators?.quote?.[0] || {};
-      if (timestamps.length < 20) return null;
-
-      const candles = timestamps.map((ts, i) => ({
-        ts    : ts * 1000,
-        open  : ohlcv.open?.[i]  || 0,
-        high  : ohlcv.high?.[i]  || 0,
-        low   : ohlcv.low?.[i]   || 0,
-        close : ohlcv.close?.[i] || 0,
-        volume: ohlcv.volume?.[i] || 1000000,
-      })).filter(c => c.close > 0);
-
-      // Convert USD → EUR for US stocks
-      if (!ticker.includes('=X') && ticker !== 'GC=F') {
-        candles.forEach(c => {
-          c.open  *= 0.92;
-          c.high  *= 0.92;
-          c.low   *= 0.92;
-          c.close *= 0.92;
-        });
-      }
-
-      _cacheSet(cacheKey, candles);
-      return candles;
-    } catch(e) {
-      return null;
-    }
-  }
-
-  // ──────────────────────────────────────────────────────────
-  // API PUBLIQUE
-  // ──────────────────────────────────────────────────────────
-
-  /**
-   * Récupère le prix spot d'un actif
-   * Retourne { price, change24h, volume24h, source } ou null
-   */
-  async function getPrice(symbol) {
-    const cacheKey = 'price_' + symbol;
-    const cached = _cacheGet(cacheKey);
-    if (cached) return cached;
-
-    let result = null;
-
-    // 1. Binance pour les cryptos (illimité, temps réel, pas de quota)
-    if (COINGECKO_IDS[symbol] && BinanceClient) {
-      result = await BinanceClient.getPrice(symbol);
-      if (result && result.price) { _cacheSet(cacheKey, result); return result; }
-    }
-
-    // 2. Twelve Data (4 clés en rotation) pour tout le reste
-    if (TwelveDataClient && typeof TwelveDataClient.getPrice === 'function') {
-      result = await TwelveDataClient.getPrice(symbol);
-      if (result && result.price) { _cacheSet(cacheKey, result); return result; }
-    }
-
-    // 3. CoinGecko en backup crypto
-    if (COINGECKO_IDS[symbol]) {
-      result = await _getCoinGeckoPrice(symbol);
-      if (result) { _cacheSet(cacheKey, result); return result; }
-    }
-
-    // 4. Yahoo Finance en backup actions/ETF/forex/or
-    if (YAHOO_TICKERS[symbol]) {
-      result = await _getYahooPrice(symbol);
-      if (result) { _cacheSet(cacheKey, result); return result; }
-    }
-
-    console.warn(`[RealData] Aucune source disponible pour ${symbol}`);
-    return null;
-  }
-
-  /**
-   * Récupère les bougies OHLCV (130 jours)
-   * Retourne un tableau de candles ou null
-   */
-  async function getOHLC(symbol) {
-    const cacheKey = 'ohlc_' + symbol;
-    const cached = _cacheGet(cacheKey);
-    if (cached) return cached;
-
-    let candles = null;
-
-    // 1. Binance pour les cryptos (illimité, 130 bougies précises)
-    if (COINGECKO_IDS[symbol] && BinanceClient) {
-      candles = await BinanceClient.getOHLC(symbol);
-      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
-    }
-
-    // 2. Twelve Data pour actions/ETF/forex/or (4 clés)
-    if (TwelveDataClient && typeof TwelveDataClient.getTimeSeries === 'function') {
-      candles = await TwelveDataClient.getTimeSeries(symbol);
-      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
-    }
-
-    // 3. CoinGecko backup crypto
-    if (COINGECKO_IDS[symbol]) {
-      candles = await _getCoinGeckoOHLC(symbol);
-      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
-    }
-
-    // 4. Yahoo Finance backup actions/ETF/forex/or
-    if (YAHOO_TICKERS[symbol]) {
-      candles = await _getYahooOHLC(symbol);
-      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
-    }
-
-    console.warn(`[RealData] OHLC indisponible pour ${symbol}`);
-    return null;
-  }
-
-  /**
-   * Rafraîchit les prix de tous les actifs de la watchlist
-   * Met à jour window.__prices
-   */
-  async function refreshAllPrices(watchlist) {
-    // Prioriser les actifs en position ouverte → refresh en premier
-    const openSymbols = new Set([
-      ...Storage.getSimPositions().map(p => p.symbol),
-      ...Storage.getRealPositions().map(p => p.symbol),
-    ]);
-
-    // Trier : positions ouvertes d'abord, puis le reste
-    const sorted = [
-      ...watchlist.filter(a => openSymbols.has(a.symbol)),
-      ...watchlist.filter(a => !openSymbols.has(a.symbol)),
-    ];
-
-    // Séquencer à 300ms entre chaque appel (comfortable pour toutes les sources)
-    const results = [];
-    for (const asset of sorted) {
-      const data = await getPrice(asset.symbol);
-      if (data && data.price) {
-        window.__prices[asset.symbol] = data.price;
-        if (openSymbols.has(asset.symbol)) {
-          console.log(`[RealData] 📍 ${asset.symbol} = ${data.price.toFixed(2)} € (${data.source}) [position]`);
-        }
-      }
-      results.push(data);
-      await new Promise(r => setTimeout(r, 300));
-    }
-    return results;
-  }
-
-  return { getPrice, getOHLC, refreshAllPrices };
-
-})();
-
-
 // ═══ analysisEngine.js ═══
 /* ============================================
    MANITRADEPRO — Moteur d'Analyse Principal
@@ -1410,22 +779,18 @@ const AnalysisEngine = (() => {
     const reasons = [];
     let pass = true;
 
-    // ADX > 15 → tendance mesurable (seuil abaissé pour données simulées)
-    if (ind.adx === null) {
-      reasons.push({ label: 'ADX non calculable — données insuffisantes', pass: true });
-      // Ne pas bloquer si ADX non calculable (données mock courtes)
-    } else if (ind.adx < 15) {
-      reasons.push({ label: `ADX = ${ind.adx.toFixed(1)} (tendance trop faible)`, pass: false });
+    // ADX > 20 → tendance mesurable
+    if (ind.adx === null || ind.adx < 20) {
+      reasons.push({ label: 'ADX insuffisant (pas de tendance claire)', pass: false });
       pass = false;
     } else {
       reasons.push({ label: `ADX = ${ind.adx.toFixed(1)} (tendance présente)`, pass: true });
     }
 
-    // Volatilité réalisée dans plage normale (1% – 120% annualisé)
+    // Volatilité réalisée dans plage normale (5% – 80% annualisé)
     if (ind.vol20 === null) {
-      reasons.push({ label: 'Volatilité non calculable', pass: true });
-      // Ne pas bloquer si vol non calculable
-    } else if (ind.vol20 < 1) {
+      reasons.push({ label: 'Volatilité non calculable', pass: false });
+    } else if (ind.vol20 < 3) {
       reasons.push({ label: `Vol. réalisée trop basse (${ind.vol20.toFixed(1)}%) — marché plat`, pass: false });
       pass = false;
     } else if (ind.vol20 > 120) {
@@ -1460,10 +825,10 @@ const AnalysisEngine = (() => {
     const longScore  = longConditions.filter(Boolean).length;
     const shortScore = shortConditions.filter(Boolean).length;
 
-    if (longScore >= 2) return 'long';
-    if (shortScore >= 2) return 'short';
-    if (longScore === 1 && shortScore === 0) return 'long';
-    if (shortScore === 1 && longScore === 0) return 'short';
+    if (longScore === 3) return 'long';
+    if (shortScore === 3) return 'short';
+    if (longScore === 2) return 'long';
+    if (shortScore === 2) return 'short';
     return 'neutral';
   }
 
@@ -1606,52 +971,17 @@ const AnalysisEngine = (() => {
    * Entrée : { symbol, name, class, candles[] }
    * Retourne un rapport complet
    */
-  async function analyzeAsset(asset) {
+  function analyzeAsset(asset) {
     const { symbol, name, assetClass } = asset;
-
-    // Fetch real data - no mock fallback
-    let candles = null;
-    let priceData = null;
-    try {
-      [candles, priceData] = await Promise.all([
-        RealDataClient.getOHLC(symbol),
-        RealDataClient.getPrice(symbol),
-      ]);
-    } catch(e) {
-      console.warn('[Analysis] Erreur fetch', symbol, e.message);
-    }
+    const candles = MOCK_DATA.getOHLC(symbol);
+    const priceData = MOCK_DATA.prices[symbol];
 
     if (!candles || candles.length < 20 || !priceData) {
-      // Fallback sur les données mock pour l'affichage si données réelles indisponibles
-      const mockPrice = MOCK_DATA.prices[symbol];
-      const mockCandles = MOCK_DATA.getOHLC(symbol);
-      if (mockPrice && mockCandles && mockCandles.length >= 20) {
-        console.warn(`[Analysis] ${symbol} — données réelles indisponibles, utilisation des données simulées temporairement`);
-        // Continuer avec mock data mais le signaler
-        const ind2 = Indicators.computeAll(mockCandles);
-        if (ind2) {
-          return {
-            symbol, name, assetClass,
-            price: mockPrice.price,
-            change24h: mockPrice.change24h || 0,
-            error: null,
-            dataWarning: 'Données simulées (API indisponible)',
-            direction: 'neutral',
-            score: 0,
-            adjScore: 0,
-            strength: 'weak',
-            riskLevel: 'medium',
-            isSolid: false,
-            indicators: ind2,
-            regime: { pass: false, reasons: [{ label: 'Données API indisponibles', pass: false }] },
-          };
-        }
-      }
       return {
         symbol, name, assetClass,
         price: 0,
         change24h: 0,
-        error: 'Données indisponibles — vérifiez votre connexion internet',
+        error: 'Données insuffisantes',
         direction: 'neutral',
         score: 0,
         adjScore: 0,
@@ -1675,13 +1005,13 @@ const AnalysisEngine = (() => {
     // Phase 2 : Signal
     const direction = detectSignal(ind);
 
-    // Si signal neutre ET régime échoue → score 0
-    if (direction === 'neutral' && !regime.pass) {
+    // Si régime échoue ou signal neutre → score 0
+    if (!regime.pass || direction === 'neutral') {
       return {
         symbol, name, assetClass,
         price: priceData.price,
         change24h: priceData.change24h,
-        direction: 'neutral',
+        direction: direction === 'neutral' ? 'neutral' : direction,
         regime,
         indicators: ind,
         score: 0,
@@ -1693,12 +1023,10 @@ const AnalysisEngine = (() => {
         takeProfit: null,
         rrRatio: 0,
         confidence: { score: 0, criteria: [] },
-        recommendation: 'Régime défavorable — ne pas trader cet actif actuellement.',
+        recommendation: !regime.pass
+          ? 'Régime défavorable — ne pas trader cet actif actuellement.'
+          : 'Pas de signal clair — attendre.',
       };
-    }
-    // Signal présent mais régime dégradé → calcul du score quand même, pénalité appliquée
-    if (!regime.pass && direction !== 'neutral') {
-      // continuer l'analyse avec pénalité de régime
     }
 
     // Phase 3 : Score confiance
@@ -1755,11 +1083,11 @@ const AnalysisEngine = (() => {
    * ANALYSE DE TOUTE LA WATCHLIST
    * Retourne les actifs classés par score ajusté
    */
-  async function analyzeAll() {
+  function analyzeAll() {
     const watchlist = Storage.getWatchlist();
-    const results = await Promise.all(watchlist.map(async asset => {
+    const results = watchlist.map(asset => {
       try {
-        return await analyzeAsset({
+        return analyzeAsset({
           symbol: asset.symbol,
           name: asset.name,
           assetClass: asset.class,
@@ -1768,7 +1096,7 @@ const AnalysisEngine = (() => {
         console.error('[AnalysisEngine] Erreur analyse', asset.symbol, e);
         return { symbol: asset.symbol, name: asset.name, error: e.message, adjScore: 0 };
       }
-    }));
+    });
 
     // Filtre et trie par score ajusté décroissant
     const tradeable = results
@@ -1785,54 +1113,9 @@ const AnalysisEngine = (() => {
     return { tradeable, neutral, inactive, all: results };
   }
 
-  // Version synchrone utilisant uniquement les données mock (affichage immédiat)
-  function analyzeAllSync() {
-    const watchlist = Storage.getWatchlist();
-    const results = watchlist.map(asset => {
-      try {
-        const candles  = MOCK_DATA.getOHLC(asset.symbol);
-        const price    = MOCK_DATA.prices[asset.symbol];
-        if (!candles || !price) return { symbol: asset.symbol, adjScore: 0, error: 'No data' };
-        const ind       = Indicators.computeAll(candles);
-        if (!ind) return { symbol: asset.symbol, adjScore: 0 };
-        const settings  = Storage.getSettings();
-        const regime    = checkRegime(ind);
-        const direction = detectSignal(ind);
-        const conf      = computeConfidenceScore(ind, direction);
-        const riskLvl   = RiskCalculator.riskLevel(ind.atrPct, ind.vol20, ind.adx);
-        const adjScoreVal = adjustedScore(conf.score, riskLvl);
-        return {
-          symbol   : asset.symbol,
-          name     : asset.name,
-          assetClass: asset.class,
-          price    : price.price,
-          change24h: price.change24h || 0,
-          direction, regime, indicators: ind,
-          score    : conf.score,
-          adjScore : adjScoreVal,
-          strength : signalStrength(adjScoreVal),
-          riskLevel: riskLvl,
-          isSolid  : isSolidTrade(regime, adjScoreVal, riskLvl, 0),
-          confidence: conf,
-          dataWarning: 'Données simulées',
-        };
-      } catch(e) {
-        return { symbol: asset.symbol, adjScore: 0, error: e.message };
-      }
-    });
-    const sorted = results.filter(r => !r.error).sort((a, b) => b.adjScore - a.adjScore);
-    return {
-      all      : sorted,
-      tradeable: sorted.filter(r => r.adjScore >= 30),
-      neutral  : sorted.filter(r => r.adjScore > 0 && r.adjScore < 30),
-      inactive : results.filter(r => r.error || r.adjScore === 0),
-    };
-  }
-
   return {
     analyzeAsset,
     analyzeAll,
-    analyzeAllSync,
     computeConfidenceScore,
     detectSignal,
     checkRegime,
@@ -1857,30 +1140,16 @@ const TwelveDataClient = (() => {
   let keyStates = [];
 
   function initKeys() {
-    const _stored = Storage.getApiKeys();
-    // Normalize: always work with array of {key, label} objects
-    let keyList;
-    if (Array.isArray(_stored)) {
-      keyList = _stored.map((k, i) => ({ key: k || '', label: 'Clé ' + (i + 1) }));
-    } else {
-      keyList = (_stored.twelveData || []);
-    }
-    keyStates = keyList.map((k, i) => ({
-      key:       k.key || k || '',
-      label:     k.label || ('Clé ' + (i + 1)),
+    const stored = Storage.getApiKeys();
+    keyStates = stored.twelveData.map((k, i) => ({
+      key:       k.key,
+      label:     k.label,
       callsMin:  0,
       callsDay:  0,
-      status:    (k.key || k) ? 'active' : 'unconfigured',
+      status:    k.key ? 'active' : 'unconfigured',
       lastReset: Date.now(),
       lastCall:  0,
     }));
-    // Si aucune clé configurée, ajouter 4 slots vides
-    if (keyStates.length === 0) {
-      keyStates = [1,2,3,4].map(i => ({
-        key: '', label: 'Clé ' + i, callsMin: 0, callsDay: 0,
-        status: 'unconfigured', lastReset: Date.now(), lastCall: 0,
-      }));
-    }
   }
 
   // ── SÉLECTION DE LA MEILLEURE CLÉ
@@ -1952,38 +1221,38 @@ const TwelveDataClient = (() => {
    * Prix temps réel d'un symbole
    */
   async function getPrice(symbol) {
-    // Retourne null si pas de clé — RealDataClient prendra le relais
-    const _stored = Storage.getApiKeys();
-    const keyList = Array.isArray(_stored) ? _stored : (_stored.twelveData || []).map(k => k.key);
-    const hasKey = keyList.some(k => k && k.length > 0);
-    if (!hasKey) return null;
-
-    const data = await call('price', { symbol }, 30000);
-    if (!data) return null;
-    return { price: parseFloat(data.price), change24h: 0, volume24h: 0, source: 'TwelveData' };
+    // V1 : retourne prix mock si pas de clé
+    const keys = Storage.getApiKeys();
+    const hasKey = keys.twelveData.some(k => k.key);
+    if (!hasKey) {
+      const mock = MOCK_DATA.prices[symbol];
+      return mock || null;
+    }
+    const data = await call('price', { symbol }, 30000); // TTL 30s
+    return data ? { price: parseFloat(data.price) } : MOCK_DATA.prices[symbol];
   }
 
   /**
    * OHLCV historique
    */
-  async function getTimeSeries(symbol, interval = '1day', outputsize = 130) {
-    // Retourne null si pas de clé — RealDataClient prendra le relais
-    const _stored = Storage.getApiKeys();
-    const keyList = Array.isArray(_stored) ? _stored : (_stored.twelveData || []).map(k => k.key);
-    const hasKey = keyList.some(k => k && k.length > 0);
-    if (!hasKey) return null;
+  async function getTimeSeries(symbol, interval = '1day', outputsize = 60) {
+    const keys = Storage.getApiKeys();
+    const hasKey = keys.twelveData.some(k => k.key);
+    if (!hasKey) {
+      // Retourne données mock
+      return MOCK_DATA.getOHLC(symbol);
+    }
+    const data = await call('time_series', { symbol, interval, outputsize }, 300000); // TTL 5min
+    if (!data || !data.values) return MOCK_DATA.getOHLC(symbol);
 
-    const data = await call('time_series', { symbol, interval, outputsize }, 3600000); // TTL 1h
-    if (!data || !data.values) return null;
-
-    return data.values.map(v => ({
-      ts    : new Date(v.datetime).getTime(),
-      open  : parseFloat(v.open),
-      high  : parseFloat(v.high),
-      low   : parseFloat(v.low),
-      close : parseFloat(v.close),
-      volume: parseFloat(v.volume) || 1000000,
-    })).reverse();
+    return data.values.reverse().map(v => ({
+      ts:    new Date(v.datetime).getTime(),
+      open:  parseFloat(v.open),
+      high:  parseFloat(v.high),
+      low:   parseFloat(v.low),
+      close: parseFloat(v.close),
+      volume: parseFloat(v.volume || 0),
+    }));
   }
 
   /**
@@ -2129,54 +1398,34 @@ const BrokerAdapter = (() => {
   const BinanceAdapter = {
     name: 'Binance',
     type: 'binance',
-    connected: BinanceClient.isConfigured(),
+    connected: false,
 
-    async placeOrder(order) {
-      if (!BinanceClient.isConfigured()) {
-        return { success: false, error: 'Clé API Binance non configurée dans les Paramètres' };
-      }
-      const side = (order.direction || '').toUpperCase() === 'LONG' ? 'BUY' : 'SELL';
-      const result = await BinanceClient.placeMarketOrder(order.symbol, side, order.quantity);
-      if (result.error) return { success: false, error: result.error };
-      // Sauvegarder en positions réelles
-      const pos = {
-        id        : 'real_' + Date.now(),
-        mode      : 'real',
-        symbol    : order.symbol,
-        direction : order.direction,
-        entryPrice: result.price,
-        quantity  : result.quantity,
-        invested  : result.price * result.quantity,
-        stopLoss  : order.stopLoss || null,
-        takeProfit: order.takeProfit || null,
-        openedAt  : Date.now(),
-        orderId   : result.orderId,
-      };
-      const existing = Storage.getRealPositions();
-      Storage.saveRealPositions([...existing, pos]);
-      return { success: true, position: pos };
-    },
-
-    async closePosition(positionId) {
-      const positions = Storage.getRealPositions();
-      const pos = positions.find(p => p.id === positionId);
-      if (!pos) return { success: false, error: 'Position introuvable' };
-      const side = (pos.direction || '').toUpperCase() === 'LONG' ? 'SELL' : 'BUY';
-      const result = await BinanceClient.placeMarketOrder(pos.symbol, side, pos.quantity);
-      if (result.error) return { success: false, error: result.error };
-      const pnl = (pos.direction || '').toUpperCase() === 'LONG'
-        ? (result.price - pos.entryPrice) * pos.quantity
-        : (pos.entryPrice - result.price) * pos.quantity;
-      Storage.saveRealPositions(positions.filter(p => p.id !== positionId));
-      return { success: true, pnl, exitPrice: result.price };
+    async connect(apiKey, secret) {
+      // TODO V2 : Vérifier la clé API Binance
+      // const resp = await fetch('https://api.binance.com/api/v3/account', {
+      //   headers: { 'X-MBX-APIKEY': apiKey }
+      // });
+      console.log('[Binance] Connexion à implémenter en V2');
+      return { success: false, error: 'Binance non disponible en V1' };
     },
 
     async getBalance() {
-      return await BinanceClient.getBalance();
+      // TODO V2 : GET /api/v3/account
+      return { available: 0, total: 0, currency: 'USDT' };
     },
 
-    async testConnection() {
-      return await BinanceClient.testConnection();
+    async placeOrder(order) {
+      // TODO V2 : POST /api/v3/order
+      return { success: false, error: 'Binance non disponible en V1' };
+    },
+
+    async closePosition(positionId) {
+      return { success: false, error: 'Binance non disponible en V1' };
+    },
+
+    async cancelOrder(orderId) {
+      // TODO V2 : DELETE /api/v3/order
+      return { success: false, error: 'Non implémenté' };
     },
   };
 
@@ -2319,23 +1568,14 @@ const Fmt = (() => {
 
   // ── DURÉE (depuis timestamp)
   function duration(fromTs) {
-    if (!fromTs) return '—';
     const diff = Date.now() - fromTs;
     const days  = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);
     const mins  = Math.floor((diff % 3600000) / 60000);
+
     if (days > 0) return `${days}j ${hours}h`;
     if (hours > 0) return `${hours}h ${mins}m`;
     return `${mins}m`;
-  }
-
-  function durationMs(ms) {
-    if (!ms || ms <= 0) return '—';
-    const days  = Math.floor(ms / 86400000);
-    const hours = Math.floor((ms % 86400000) / 3600000);
-    if (days > 0) return `${days}j ${hours}h`;
-    if (hours > 0) return `${hours}h`;
-    return '< 1h';
   }
 
   // ── DATE
@@ -2391,7 +1631,7 @@ const Fmt = (() => {
 
   return {
     price, currency, pct, pnlClass, change,
-    duration, durationMs, date, volume, directionIcon, directionLabel,
+    duration, date, volume, directionIcon, directionLabel,
     riskLabel, profileLabel, assetIcon,
   };
 
@@ -2408,51 +1648,34 @@ const Sync = (() => {
   let lastSyncTime = Date.now();
 
   function init() {
-    // Prix spot toutes les 5 minutes (profil consultation ponctuelle)
-    setInterval(() => { refreshPrices(); }, 5 * 60 * 1000);
+    // V1 : Rafraîchissement local toutes les 30s
+    setInterval(() => {
+      refreshPrices();
+    }, 30000);
 
-    // Analyse complète (OHLCV + scores) toutes les heures
-    setInterval(() => { refreshAnalysis(); }, 60 * 60 * 1000);
+    // TODO V2 : Firebase listener
+    // firebase.database().ref('users/' + userId).on('value', (snapshot) => {
+    //   const data = snapshot.val();
+    //   applyRemoteData(data);
+    //   lastSyncTime = Date.now();
+    // });
 
-    // Refresh immédiat au focus (quand l'utilisateur revient sur l'app)
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) {
-        const now = Date.now();
-        // Refresh prix uniquement si plus de 2 minutes depuis le dernier
-        if (now - lastSyncTime > 2 * 60 * 1000) {
-          refreshPrices();
-        }
-      }
+    console.log('[Sync] V1 local — rafraîchissement toutes les 30s');
+  }
+
+  function refreshPrices() {
+    // En V1 : légère variation aléatoire des prix mock pour simuler le live
+    Object.keys(MOCK_DATA.prices).forEach(sym => {
+      const p = MOCK_DATA.prices[sym];
+      const variation = (Math.random() - 0.5) * 0.002; // ±0.1%
+      p.price = p.price * (1 + variation);
+      p.change24h += (Math.random() - 0.5) * 0.05;
     });
 
-    console.log('[Sync] Prix toutes les 5min — Analyse toutes les 1h — Refresh au focus');
-  }
-
-  async function refreshAnalysis() {
-    console.log('[Sync] Rafraîchissement analyse complète…');
-    // Vider le cache OHLCV pour forcer un rechargement
-    for (const key of [...window.__priceCache?.keys?.() || []]) {
-      if (key.startsWith('ohlc_') || key.startsWith('cg_ohlc_') || key.startsWith('yf_ohlc_')) {
-        window.__priceCache.delete(key);
-      }
-    }
-    if (window.__MTP?.Router) {
-      const screen = window.__MTP.Router.getCurrent();
-      if (['dashboard', 'opportunities', 'asset-detail'].includes(screen)) {
-        window.__MTP.Router.navigate(screen);
-      }
-    }
-  }
-
-  async function refreshPrices() {
-    try {
-      const watchlist = Storage.getWatchlist();
-      await RealDataClient.refreshAllPrices(watchlist);
-      if (Router.getCurrent() === 'positions' || Router.getCurrent() === 'dashboard') {
-        updateLivePnL();
-      }
-    } catch(e) {
-      // Silencieux — réseau indisponible, l'app continue avec les données en cache
+    // Met à jour l'affichage des positions si on est sur l'écran positions
+    if (Router.getCurrent() === 'positions' || Router.getCurrent() === 'dashboard') {
+      // Rafraîchit les P&L dynamiquement
+      updateLivePnL();
     }
     lastSyncTime = Date.now();
   }
@@ -2572,9 +1795,7 @@ const UI = (() => {
       const price = MOCK_DATA.prices[symbol]?.price || 0;
       const stop  = analysis.stopLoss || (price * 0.98);
       const tp    = analysis.takeProfit || (price * 1.05);
-      const _cap = Storage.getSimCapital();
-      const _capNum = typeof _cap === 'object' ? (_cap.current || 10000) : (parseFloat(_cap) || 10000);
-      const riskAmount = _capNum * settings.riskPerTrade;
+      const riskAmount = simCap.current * settings.riskPerTrade;
       const qty   = analysis.sizing?.units || (riskAmount / Math.abs(price - stop));
       const invested = qty * price;
 
@@ -2608,7 +1829,7 @@ const UI = (() => {
               <label class="input-label">Montant investi (€)</label>
               <input type="number" class="input-field" id="order-amount"
                 value="${invested.toFixed(2)}" min="1" step="0.01" />
-              <div class="input-hint">Capital disponible : ${Fmt.currency(_capNum)}</div>
+              <div class="input-hint">Capital disponible : ${Fmt.currency(simCap.current)}</div>
             </div>
 
             <div class="grid-2" style="gap: var(--space-3);">
@@ -2765,16 +1986,6 @@ const Router = (() => {
     screens[name] = renderFn;
   }
 
-  function attachNavClicks() {
-    document.querySelectorAll('.nav-item, .bnav-item').forEach(el => {
-      el.addEventListener('click', (e) => {
-        e.preventDefault();
-        const target = el.dataset.screen;
-        if (target) navigate(target);
-      });
-    });
-  }
-
   function navigate(screenName, params = null) {
     if (screenName === 'asset-detail') {
       assetDetailParam = params;
@@ -2902,14 +2113,16 @@ const Router = (() => {
   }
 
   async function handleOpenPosition(symbol, mode) {
-    const cached   = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
-    const analysis = cached || { symbol, name: MOCK_DATA.watchlist.find(a => a.symbol === symbol)?.name || symbol };
+    const analysis = AnalysisEngine.analyzeAsset({
+      symbol,
+      name: MOCK_DATA.watchlist.find(a => a.symbol === symbol)?.name || symbol,
+    });
     navigate('asset-detail', { symbol, analysis, mode });
   }
 
   function getCurrent() { return currentScreen; }
 
-  return { register, navigate, render, getCurrent, attachNavClicks };
+  return { register, navigate, render, getCurrent };
 
 })();
 
@@ -2924,12 +2137,6 @@ function renderDashboard() {
   const simPos   = Storage.getSimPositions();
   const realPos  = Storage.getRealPositions();
 
-  // Utiliser l'analyse en cache si disponible, sinon données mock immédiates
-  if (!window.__MTP.lastAnalysis) {
-    window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
-  }
-  const _cachedAnalysis = window.__MTP.lastAnalysis;
-
   // Calcule P&L total des positions sim ouvertes
   let totalPnL = 0, totalInvested = 0;
   simPos.forEach(p => {
@@ -2939,18 +2146,11 @@ function renderDashboard() {
     totalInvested += p.invested;
   });
 
-  // Normalize simCap - may be number or {current, initial} object
-  const _simCapNum = typeof simCap === 'object' && simCap !== null
-    ? (simCap.current || simCap.initial || 10000)
-    : (parseFloat(simCap) || 10000);
-  const _simCapInit = typeof simCap === 'object' && simCap !== null
-    ? (simCap.initial || simCap.current || 10000)
-    : _simCapNum;
-  const capitalTotal = _simCapNum + totalInvested;
-  const globalReturn = _simCapInit > 0 ? ((capitalTotal - _simCapInit) / _simCapInit) * 100 : 0;
+  const capitalTotal = simCap.current + totalInvested;
+  const globalReturn = ((capitalTotal - simCap.initial) / simCap.initial) * 100;
 
   // Analyse rapide du marché
-  const analysis = _cachedAnalysis || AnalysisEngine.analyzeAllSync();
+  const analysis = AnalysisEngine.analyzeAll();
   const top5 = analysis.tradeable.slice(0, 5);
   const regime = MOCK_DATA.marketRegime;
 
@@ -2985,7 +2185,7 @@ function renderDashboard() {
       <div class="grid-4" style="margin-bottom:var(--space-8);">
         <div class="stat-card">
           <div class="stat-label">Capital disponible</div>
-          <div class="stat-value">${Fmt.currency(_simCapNum)}</div>
+          <div class="stat-value">${Fmt.currency(simCap.current)}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Positions ouvertes</div>
@@ -3133,7 +2333,7 @@ Router.register('dashboard', renderDashboard);
    ============================================ */
 
 function renderOpportunities() {
-  const analysis = (window.__MTP?.lastAnalysis) || AnalysisEngine.analyzeAllSync();
+  const analysis = AnalysisEngine.analyzeAll();
 
   return `
     <div class="screen">
@@ -3298,21 +2498,11 @@ function renderAssetDetail(params) {
     return `<div class="screen"><p>Actif "${symbol}" inconnu.</p></div>`;
   }
 
-  // Use cached analysis or build minimal object
-  const _cachedAsset = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
-  const analysis = _cachedAsset || {
+  const analysis = AnalysisEngine.analyzeAsset({
     symbol,
     name: asset.name,
     assetClass: asset.class,
-    price: priceData?.price || 0,
-    change24h: priceData?.change24h || 0,
-    direction: 'neutral',
-    adjScore: 0,
-    score: 0,
-    regime: { pass: false, reasons: [] },
-    indicators: {},
-    isSolid: false,
-  };
+  });
 
   const ind = analysis.indicators || {};
   const change = Fmt.change(analysis.change24h);
@@ -3486,8 +2676,8 @@ function renderAssetDetail(params) {
         <div class="mode-zone sim-zone">
           <div class="mode-zone-title">⚡ Mode Simulation</div>
           <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:var(--space-4);line-height:1.6;">
-            Capital fictif disponible : <strong>${Fmt.currency(_capNum)}</strong><br/>
-            Risque par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(_capNum * settings.riskPerTrade)}
+            Capital fictif disponible : <strong>${Fmt.currency(simCap.current)}</strong><br/>
+            Risque par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(simCap.current * settings.riskPerTrade)}
           </div>
           ${analysis.direction !== 'neutral' ? `
             <button class="btn btn-sim btn-block" id="btn-open-sim"
@@ -3581,14 +2771,11 @@ document.addEventListener('click', async (e) => {
   if (!symbol) return;
 
   const asset = MOCK_DATA.watchlist.find(a => a.symbol === symbol);
-  const _cachedAsset2 = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
-  const analysis = _cachedAsset2 || {
+  const analysis = AnalysisEngine.analyzeAsset({
     symbol,
     name: asset?.name || symbol,
     assetClass: asset?.class,
-    price: 0, adjScore: 0, direction: 'neutral',
-    regime: { pass: false, reasons: [] }, indicators: {},
-  };
+  });
 
   const order = await UI.openOrderModal(symbol, 'sim', analysis);
   if (!order) return;
@@ -3936,7 +3123,7 @@ function _attachPositionEvents() {
       if (!confirmed) return;
 
       try {
-        const adapter  = BrokerAdapter;
+        const adapter  = BrokerAdapterFactory.get(mode === 'real' ? Storage.getSettings().broker : 'mock');
         const result   = await adapter.closePosition(id);
 
         if (result.success) {
@@ -4074,7 +3261,7 @@ function renderSimulation() {
       </div>
       <div class="sim-stat-card">
         <span class="stat-label">Durée moy. trade</span>
-        <span class="stat-value">${fmt.durationMs ? fmt.durationMs(stats.avgDuration) : fmt.duration(stats.avgDuration)}</span>
+        <span class="stat-value">${fmt.duration(stats.avgDuration)}</span>
       </div>
     </div>
 
@@ -4176,25 +3363,17 @@ function renderSimulation() {
 // -----------------------------------------------------------
 
 function _computeStats(capital, history, openPos, settings) {
-  // Normalize capital — guard against object, string, NaN
-  let _cap = capital;
-  if (typeof _cap === 'object' && _cap !== null) _cap = _cap.current || _cap.initial || 10000;
-  _cap = parseFloat(_cap);
-  if (isNaN(_cap) || _cap <= 0) _cap = 10000;
-  capital = _cap;
-
-  const initialCapital = parseFloat(settings.simInitialCapital) || 10000;
+  const initialCapital = settings.simInitialCapital || 10000;
 
   // Open P&L
   let openPnl = 0;
   openPos.forEach(pos => {
     const current = (window.__prices && window.__prices[pos.symbol]) || pos.entryPrice;
-    const dir = (pos.direction || '').toUpperCase();
-    const diff    = dir === 'LONG' ? current - pos.entryPrice : pos.entryPrice - current;
+    const diff    = pos.direction === 'LONG' ? current - pos.entryPrice : pos.entryPrice - current;
     openPnl += diff * pos.quantity;
   });
 
-  const totalCapital = capital + (isNaN(openPnl) ? 0 : openPnl);
+  const totalCapital = capital + openPnl;
   const totalPnl     = totalCapital - initialCapital;
   const totalPnlPct  = ((totalCapital / initialCapital) - 1) * 100;
 
@@ -4214,10 +3393,9 @@ function _computeStats(capital, history, openPos, settings) {
   const avgRR       = history.length > 0
     ? history.reduce((s, t) => s + (t.rr || 0), 0) / history.length : 0;
 
-  const avgDurationMs = history.length > 0
-    ? history.reduce((s, t) => s + (t.duration || 86400000), 0) / history.length
+  const avgDuration = history.length > 0
+    ? Date.now() - (Date.now() - history.reduce((s, t) => s + (t.duration || 3600000), 0) / history.length)
     : 0;
-  const avgDuration = avgDurationMs;
 
   // Equity curve
   const equityCurve = _buildEquityCurve(initialCapital, history);
@@ -4419,8 +3597,7 @@ function renderSettings() {
   if (!screen) return;
 
   const settings = Storage.getSettings();
-  const _apiKeysRaw = Storage.getApiKeys();
-  const apiKeys = Array.isArray(_apiKeysRaw) ? _apiKeysRaw : (_apiKeysRaw.twelveData || []).map(k => k.key);
+  const apiKeys  = Storage.getApiKeys();
 
   screen.innerHTML = `
     <div class="screen-header">
@@ -4735,8 +3912,7 @@ function _attachSettingsEvents(settings) {
         return;
       }
 
-      const _keysRaw = Storage.getApiKeys();
-      const keys = Array.isArray(_keysRaw) ? _keysRaw : (_keysRaw.twelveData || []).map(k => k.key);
+      const keys  = Storage.getApiKeys();
       keys[i]     = val;
       Storage.saveApiKeys(keys);
 
@@ -4773,40 +3949,8 @@ function _attachSettingsEvents(settings) {
   // Connect Binance
   const binanceBtn = document.getElementById('btn-connect-binance');
   if (binanceBtn) {
-    binanceBtn.addEventListener('click', async () => {
-      const keyEl    = document.getElementById('binance-api-key');
-      const secretEl = document.getElementById('binance-secret');
-      if (!keyEl || !secretEl) return;
-
-      const apiKey = keyEl.value.trim();
-      const secret = secretEl.value.trim();
-
-      if (!apiKey || apiKey.includes('•') || !secret || secret.includes('•')) {
-        showToast('Entrez votre clé API et votre secret Binance', 'error');
-        return;
-      }
-
-      binanceBtn.textContent = 'Test en cours…';
-      binanceBtn.disabled = true;
-
-      BinanceClient.init(apiKey, secret);
-      const test = await BinanceClient.testConnection();
-
-      if (test.connected) {
-        const s = Storage.getSettings();
-        s.broker         = 'binance';
-        s.binanceApiKey  = apiKey;
-        s.binanceSecret  = secret;
-        Storage.setSettings(s);
-        showToast(`✅ Binance connecté — ${test.balances} actifs détectés`, 'success');
-        renderSettings();
-      } else {
-        showToast(`❌ Connexion échouée : ${test.error || 'Vérifiez vos clés'}`, 'error');
-        BinanceClient.init('', '');
-      }
-
-      binanceBtn.textContent = 'Connecter Binance';
-      binanceBtn.disabled = false;
+    binanceBtn.addEventListener('click', () => {
+      showToast('Intégration Binance disponible en V2. La structure est prête.', 'info');
     });
   }
 
@@ -4906,19 +4050,6 @@ const showConfirmModal  = (opts)       => Sync.confirm(opts.title, opts.message,
 async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
 
-  // Fix: clear corrupted sim capital if it's an object
-  try {
-    const rawCap = localStorage.getItem('mtp_v1_sim_capital');
-    if (rawCap) {
-      const parsed = JSON.parse(rawCap);
-      if (typeof parsed === 'object' && parsed !== null) {
-        const num = parsed.current || parsed.initial || 10000;
-        localStorage.setItem('mtp_v1_sim_capital', JSON.stringify(num));
-        console.log('[Boot] Capital fictif migré vers', num);
-      }
-    }
-  } catch(e) {}
-
   // 1. Storage
   Storage.init();
 
@@ -4926,29 +4057,20 @@ async function boot() {
   window.__prices = {};
 
   // 3. Twelve Data
-  const _apiKeysObj = Storage.getApiKeys();
-  const apiKeys = Array.isArray(_apiKeysObj) ? _apiKeysObj.filter(Boolean) : (_apiKeysObj.twelveData || []).map(k => k.key).filter(Boolean);
+  const apiKeys = Storage.getApiKeys().filter(Boolean);
   TwelveDataClient.init(apiKeys);
   window.__MTP.TwelveDataClient = TwelveDataClient;
 
-  // 3b. Binance (données marché illimitées + ordres réels si clé configurée)
-  const _binanceSettings = Storage.getSettings();
-  BinanceClient.init(
-    _binanceSettings.binanceApiKey || '',
-    _binanceSettings.binanceSecret || ''
-  );
-  window.__MTP.BinanceClient = BinanceClient;
-
   // 4. Broker
   const settings = Storage.getSettings();
-  const adapter  = BrokerAdapter;
+  const adapter  = BrokerAdapterFactory.get(settings.broker || 'mock');
   window.__MTP.BrokerAdapter = adapter;
 
   // 5. Analysis Engine
   window.__MTP.AnalysisEngine = AnalysisEngine;
 
   // 6. Router
-  const router = Router;
+  const router = new Router();
   router.register('dashboard',     renderDashboard);
   router.register('opportunities', renderOpportunities);
   router.register('asset-detail',  renderAssetDetail);
@@ -4960,24 +4082,21 @@ async function boot() {
   // 7. Theme
   document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
 
-  // 8. Sync
-  Sync.init();
+  // 8. Initial analysis
+  _runAnalysis();
+
+  // 9. Sync
+  const interval = (settings.refreshInterval || 30) * 1000;
+  Sync.init({ interval, onTick: _onSyncTick });
   window.__MTP.Sync = Sync;
 
-  // 9. Navigate IMMÉDIATEMENT — jamais bloquer l'UI sur le réseau
+  // 10. Navigate
   router.navigate('dashboard');
-  router.attachNavClicks();
 
-  // 10. SW
+  // 11. SW
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
-
-  // 11. Données en arrière-plan (après affichage UI) — silencieux si réseau indispo
-  setTimeout(() => {
-    try { _runAnalysis(); } catch(e) {}
-    try { RealDataClient.refreshAllPrices(Storage.getWatchlist()).catch(() => {}); } catch(e) {}
-  }, 500);
 
   console.log('✅ ManiTradePro V1 prêt');
 }
@@ -4985,15 +4104,11 @@ async function boot() {
 async function _runAnalysis() {
   try {
     const watchlist = Storage.getWatchlist();
-    const results   = await AnalysisEngine.analyzeAll();
+    const results   = await AnalysisEngine.analyzeAll(watchlist);
     window.__MTP.lastAnalysis = results;
     window.__MTP.analysisTime = Date.now();
     results.all.forEach(r => { if (r.price) window.__prices[r.symbol] = r.price; });
-    // Refresh current screen with new data
-    const screen = window.__MTP.Router && window.__MTP.Router.getCurrent();
-    if (screen && ['dashboard', 'opportunities'].includes(screen)) {
-      window.__MTP.Router.navigate(screen);
-    }
+    _refreshCurrentScreen();
   } catch (err) {
     console.warn('⚠️ Erreur analyse :', err);
   }
