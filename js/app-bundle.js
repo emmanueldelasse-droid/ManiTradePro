@@ -149,7 +149,7 @@ const MOCK_DATA = {
     stopAtrMultiplier: 2,
     trailAtrMultiplier: 3,
     minAdx: 20,
-    minScore: 50,
+    minScore: 30,
   },
 
   // ── RÉGIME MARCHÉ GLOBAL (mock)
@@ -239,8 +239,10 @@ const Storage = (() => {
   // ── SIMULATION
   function getSimCapital() {
     const stored = get(KEYS.SIM_CAPITAL);
-    if (stored === null) return { initial: MOCK_DATA.defaultSettings.simulationCapital, current: MOCK_DATA.defaultSettings.simulationCapital };
-    return stored;
+    if (stored === null) return MOCK_DATA.defaultSettings.simulationCapital || 10000;
+    // Handle legacy object format {initial, current}
+    if (typeof stored === 'object' && stored !== null) return stored.current || stored.initial || 10000;
+    return typeof stored === 'number' ? stored : 10000;
   }
 
   function saveSimCapital(capital) {
@@ -779,18 +781,22 @@ const AnalysisEngine = (() => {
     const reasons = [];
     let pass = true;
 
-    // ADX > 20 → tendance mesurable
-    if (ind.adx === null || ind.adx < 20) {
-      reasons.push({ label: 'ADX insuffisant (pas de tendance claire)', pass: false });
+    // ADX > 15 → tendance mesurable (seuil abaissé pour données simulées)
+    if (ind.adx === null) {
+      reasons.push({ label: 'ADX non calculable — données insuffisantes', pass: true });
+      // Ne pas bloquer si ADX non calculable (données mock courtes)
+    } else if (ind.adx < 15) {
+      reasons.push({ label: `ADX = ${ind.adx.toFixed(1)} (tendance trop faible)`, pass: false });
       pass = false;
     } else {
       reasons.push({ label: `ADX = ${ind.adx.toFixed(1)} (tendance présente)`, pass: true });
     }
 
-    // Volatilité réalisée dans plage normale (5% – 80% annualisé)
+    // Volatilité réalisée dans plage normale (1% – 120% annualisé)
     if (ind.vol20 === null) {
-      reasons.push({ label: 'Volatilité non calculable', pass: false });
-    } else if (ind.vol20 < 3) {
+      reasons.push({ label: 'Volatilité non calculable', pass: true });
+      // Ne pas bloquer si vol non calculable
+    } else if (ind.vol20 < 1) {
       reasons.push({ label: `Vol. réalisée trop basse (${ind.vol20.toFixed(1)}%) — marché plat`, pass: false });
       pass = false;
     } else if (ind.vol20 > 120) {
@@ -825,10 +831,10 @@ const AnalysisEngine = (() => {
     const longScore  = longConditions.filter(Boolean).length;
     const shortScore = shortConditions.filter(Boolean).length;
 
-    if (longScore === 3) return 'long';
-    if (shortScore === 3) return 'short';
-    if (longScore === 2) return 'long';
-    if (shortScore === 2) return 'short';
+    if (longScore >= 2) return 'long';
+    if (shortScore >= 2) return 'short';
+    if (longScore === 1 && shortScore === 0) return 'long';
+    if (shortScore === 1 && longScore === 0) return 'short';
     return 'neutral';
   }
 
@@ -1582,14 +1588,23 @@ const Fmt = (() => {
 
   // ── DURÉE (depuis timestamp)
   function duration(fromTs) {
+    if (!fromTs) return '—';
     const diff = Date.now() - fromTs;
     const days  = Math.floor(diff / 86400000);
     const hours = Math.floor((diff % 86400000) / 3600000);
     const mins  = Math.floor((diff % 3600000) / 60000);
-
     if (days > 0) return `${days}j ${hours}h`;
     if (hours > 0) return `${hours}h ${mins}m`;
     return `${mins}m`;
+  }
+
+  function durationMs(ms) {
+    if (!ms || ms <= 0) return '—';
+    const days  = Math.floor(ms / 86400000);
+    const hours = Math.floor((ms % 86400000) / 3600000);
+    if (days > 0) return `${days}j ${hours}h`;
+    if (hours > 0) return `${hours}h`;
+    return '< 1h';
   }
 
   // ── DATE
@@ -1645,7 +1660,7 @@ const Fmt = (() => {
 
   return {
     price, currency, pct, pnlClass, change,
-    duration, date, volume, directionIcon, directionLabel,
+    duration, durationMs, date, volume, directionIcon, directionLabel,
     riskLabel, profileLabel, assetIcon,
   };
 
@@ -3285,7 +3300,7 @@ function renderSimulation() {
       </div>
       <div class="sim-stat-card">
         <span class="stat-label">Durée moy. trade</span>
-        <span class="stat-value">${fmt.duration(stats.avgDuration)}</span>
+        <span class="stat-value">${fmt.durationMs ? fmt.durationMs(stats.avgDuration) : fmt.duration(stats.avgDuration)}</span>
       </div>
     </div>
 
@@ -3417,9 +3432,10 @@ function _computeStats(capital, history, openPos, settings) {
   const avgRR       = history.length > 0
     ? history.reduce((s, t) => s + (t.rr || 0), 0) / history.length : 0;
 
-  const avgDuration = history.length > 0
-    ? Date.now() - (Date.now() - history.reduce((s, t) => s + (t.duration || 3600000), 0) / history.length)
+  const avgDurationMs = history.length > 0
+    ? history.reduce((s, t) => s + (t.duration || 86400000), 0) / history.length
     : 0;
+  const avgDuration = avgDurationMs;
 
   // Equity curve
   const equityCurve = _buildEquityCurve(initialCapital, history);
