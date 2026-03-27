@@ -1785,6 +1785,50 @@ const AnalysisEngine = (() => {
     return { tradeable, neutral, inactive, all: results };
   }
 
+  // Version synchrone utilisant uniquement les données mock (affichage immédiat)
+  function analyzeAllSync() {
+    const watchlist = Storage.getWatchlist();
+    const results = watchlist.map(asset => {
+      try {
+        const candles  = MOCK_DATA.getOHLC(asset.symbol);
+        const price    = MOCK_DATA.prices[asset.symbol];
+        if (!candles || !price) return { symbol: asset.symbol, adjScore: 0, error: 'No data' };
+        const ind       = Indicators.computeAll(candles);
+        if (!ind) return { symbol: asset.symbol, adjScore: 0 };
+        const settings  = Storage.getSettings();
+        const regime    = checkRegime(ind);
+        const direction = detectSignal(ind);
+        const conf      = computeConfidenceScore(ind, direction);
+        const riskLvl   = RiskCalculator.riskLevel(ind.atrPct, ind.vol20, ind.adx);
+        const adjScoreVal = adjustedScore(conf.score, riskLvl);
+        return {
+          symbol   : asset.symbol,
+          name     : asset.name,
+          assetClass: asset.class,
+          price    : price.price,
+          change24h: price.change24h || 0,
+          direction, regime, indicators: ind,
+          score    : conf.score,
+          adjScore : adjScoreVal,
+          strength : signalStrength(adjScoreVal),
+          riskLevel: riskLvl,
+          isSolid  : isSolidTrade(regime, adjScoreVal, riskLvl, 0),
+          confidence: conf,
+          dataWarning: 'Données simulées',
+        };
+      } catch(e) {
+        return { symbol: asset.symbol, adjScore: 0, error: e.message };
+      }
+    });
+    const sorted = results.filter(r => !r.error).sort((a, b) => b.adjScore - a.adjScore);
+    return {
+      all      : sorted,
+      tradeable: sorted.filter(r => r.adjScore >= 30),
+      neutral  : sorted.filter(r => r.adjScore > 0 && r.adjScore < 30),
+      inactive : results.filter(r => r.error || r.adjScore === 0),
+    };
+  }
+
   return {
     analyzeAsset,
     analyzeAll,
@@ -2859,10 +2903,8 @@ const Router = (() => {
   }
 
   async function handleOpenPosition(symbol, mode) {
-    const analysis = await AnalysisEngine.analyzeAsset({
-      symbol,
-      name: MOCK_DATA.watchlist.find(a => a.symbol === symbol)?.name || symbol,
-    });
+    const cached   = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
+    const analysis = cached || { symbol, name: MOCK_DATA.watchlist.find(a => a.symbol === symbol)?.name || symbol };
     navigate('asset-detail', { symbol, analysis, mode });
   }
 
@@ -2877,11 +2919,17 @@ const Router = (() => {
    MANITRADEPRO — Écran Dashboard
    ============================================ */
 
-async function renderDashboard() {
+function renderDashboard() {
   const settings = Storage.getSettings();
   const simCap   = Storage.getSimCapital();
   const simPos   = Storage.getSimPositions();
   const realPos  = Storage.getRealPositions();
+
+  // Utiliser l'analyse en cache si disponible, sinon données mock immédiates
+  if (!window.__MTP.lastAnalysis) {
+    window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
+  }
+  const _cachedAnalysis = window.__MTP.lastAnalysis;
 
   // Calcule P&L total des positions sim ouvertes
   let totalPnL = 0, totalInvested = 0;
@@ -2903,7 +2951,7 @@ async function renderDashboard() {
   const globalReturn = _simCapInit > 0 ? ((capitalTotal - _simCapInit) / _simCapInit) * 100 : 0;
 
   // Analyse rapide du marché
-  const analysis = await AnalysisEngine.analyzeAll();
+  const analysis = _cachedAnalysis || AnalysisEngine.analyzeAllSync();
   const top5 = analysis.tradeable.slice(0, 5);
   const regime = MOCK_DATA.marketRegime;
 
@@ -3085,8 +3133,8 @@ Router.register('dashboard', renderDashboard);
    MANITRADEPRO — Écran Opportunités
    ============================================ */
 
-async function renderOpportunities() {
-  const analysis = await AnalysisEngine.analyzeAll();
+function renderOpportunities() {
+  const analysis = (window.__MTP?.lastAnalysis) || AnalysisEngine.analyzeAllSync();
 
   return `
     <div class="screen">
@@ -3238,7 +3286,7 @@ Router.register('opportunities', renderOpportunities);
    MANITRADEPRO — Fiche Détail Actif
    ============================================ */
 
-async function renderAssetDetail(params) {
+function renderAssetDetail(params) {
   if (!params || !params.symbol) {
     return `<div class="screen"><p>Actif non trouvé.</p></div>`;
   }
@@ -3251,11 +3299,21 @@ async function renderAssetDetail(params) {
     return `<div class="screen"><p>Actif "${symbol}" inconnu.</p></div>`;
   }
 
-  const analysis = await AnalysisEngine.analyzeAsset({
+  // Use cached analysis or build minimal object
+  const _cachedAsset = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
+  const analysis = _cachedAsset || {
     symbol,
     name: asset.name,
     assetClass: asset.class,
-  });
+    price: priceData?.price || 0,
+    change24h: priceData?.change24h || 0,
+    direction: 'neutral',
+    adjScore: 0,
+    score: 0,
+    regime: { pass: false, reasons: [] },
+    indicators: {},
+    isSolid: false,
+  };
 
   const ind = analysis.indicators || {};
   const change = Fmt.change(analysis.change24h);
@@ -3524,11 +3582,14 @@ document.addEventListener('click', async (e) => {
   if (!symbol) return;
 
   const asset = MOCK_DATA.watchlist.find(a => a.symbol === symbol);
-  const analysis = await AnalysisEngine.analyzeAsset({
+  const _cachedAsset2 = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
+  const analysis = _cachedAsset2 || {
     symbol,
     name: asset?.name || symbol,
     assetClass: asset?.class,
-  });
+    price: 0, adjScore: 0, direction: 'neutral',
+    regime: { pass: false, reasons: [] }, indicators: {},
+  };
 
   const order = await UI.openOrderModal(symbol, 'sim', analysis);
   if (!order) return;
@@ -4900,23 +4961,24 @@ async function boot() {
   // 7. Theme
   document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
 
-  // 8. Chargement initial — prix d'abord, puis analyse complète
-  await RealDataClient.refreshAllPrices(Storage.getWatchlist());
-  _runAnalysis();
-
-  // 9. Sync
-  const interval = (settings.refreshInterval || 30) * 1000;
+  // 8. Sync
   Sync.init();
   window.__MTP.Sync = Sync;
 
-  // 10. Navigate
+  // 9. Navigate IMMÉDIATEMENT — jamais bloquer l'UI sur le réseau
   router.navigate('dashboard');
   router.attachNavClicks();
 
-  // 11. SW
+  // 10. SW
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
+
+  // 11. Données en arrière-plan (après affichage UI)
+  setTimeout(() => {
+    _runAnalysis();
+    RealDataClient.refreshAllPrices(Storage.getWatchlist()).catch(() => {});
+  }, 100);
 
   console.log('✅ ManiTradePro V1 prêt');
 }
@@ -4928,7 +4990,11 @@ async function _runAnalysis() {
     window.__MTP.lastAnalysis = results;
     window.__MTP.analysisTime = Date.now();
     results.all.forEach(r => { if (r.price) window.__prices[r.symbol] = r.price; });
-    _refreshCurrentScreen();
+    // Refresh current screen with new data
+    const screen = window.__MTP.Router && window.__MTP.Router.getCurrent();
+    if (screen && ['dashboard', 'opportunities'].includes(screen)) {
+      window.__MTP.Router.navigate(screen);
+    }
   } catch (err) {
     console.warn('⚠️ Erreur analyse :', err);
   }
