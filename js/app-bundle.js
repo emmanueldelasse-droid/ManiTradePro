@@ -1140,7 +1140,8 @@ const TwelveDataClient = (() => {
   let keyStates = [];
 
   function initKeys() {
-    const stored = Storage.getApiKeys();
+    const _stored = Storage.getApiKeys();
+    const stored = Array.isArray(_stored) ? _stored : (_stored.twelveData || []).map(k => k.key);
     keyStates = stored.twelveData.map((k, i) => ({
       key:       k.key,
       label:     k.label,
@@ -3597,7 +3598,8 @@ function renderSettings() {
   if (!screen) return;
 
   const settings = Storage.getSettings();
-  const apiKeys  = Storage.getApiKeys();
+  const _apiKeysRaw = Storage.getApiKeys();
+  const apiKeys = Array.isArray(_apiKeysRaw) ? _apiKeysRaw : (_apiKeysRaw.twelveData || []).map(k => k.key);
 
   screen.innerHTML = `
     <div class="screen-header">
@@ -3912,7 +3914,8 @@ function _attachSettingsEvents(settings) {
         return;
       }
 
-      const keys  = Storage.getApiKeys();
+      const _keysRaw = Storage.getApiKeys();
+      const keys = Array.isArray(_keysRaw) ? _keysRaw : (_keysRaw.twelveData || []).map(k => k.key);
       keys[i]     = val;
       Storage.saveApiKeys(keys);
 
@@ -4057,7 +4060,8 @@ async function boot() {
   window.__prices = {};
 
   // 3. Twelve Data
-  const apiKeys = Storage.getApiKeys().filter(Boolean);
+  const _apiKeysObj = Storage.getApiKeys();
+  const apiKeys = Array.isArray(_apiKeysObj) ? _apiKeysObj.filter(Boolean) : (_apiKeysObj.twelveData || []).map(k => k.key).filter(Boolean);
   TwelveDataClient.init(apiKeys);
   window.__MTP.TwelveDataClient = TwelveDataClient;
 
