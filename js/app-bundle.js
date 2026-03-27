@@ -309,7 +309,7 @@ const Storage = (() => {
   // ── RESET SIMULATION
   function resetSimulation() {
     const settings = getSettings();
-    saveSimCapital({ initial: settings.simulationCapital, current: settings.simulationCapital });
+    saveSimCapital(settings.simulationCapital || 10000);
     saveSimPositions([]);
     saveSimHistory([]);
     return true;
@@ -322,10 +322,7 @@ const Storage = (() => {
 
     const simCap = get(KEYS.SIM_CAPITAL);
     if (!simCap) {
-      saveSimCapital({
-        initial: MOCK_DATA.defaultSettings.simulationCapital,
-        current: MOCK_DATA.defaultSettings.simulationCapital,
-      });
+      saveSimCapital(MOCK_DATA.defaultSettings.simulationCapital || 10000);
     }
 
     // Pré-charge positions de démo si vide
@@ -4091,6 +4088,19 @@ const showConfirmModal  = (opts)       => Sync.confirm(opts.title, opts.message,
 
 async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
+
+  // Fix: clear corrupted sim capital if it's an object
+  try {
+    const rawCap = localStorage.getItem('mtp_v1_sim_capital');
+    if (rawCap) {
+      const parsed = JSON.parse(rawCap);
+      if (typeof parsed === 'object' && parsed !== null) {
+        const num = parsed.current || parsed.initial || 10000;
+        localStorage.setItem('mtp_v1_sim_capital', JSON.stringify(num));
+        console.log('[Boot] Capital fictif migré vers', num);
+      }
+    }
+  } catch(e) {}
 
   // 1. Storage
   Storage.init();
