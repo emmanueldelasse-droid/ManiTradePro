@@ -3516,13 +3516,27 @@ async function boot() {
   window.__MTP.Sync = Sync;
 
   // 9. Affichage immédiat (jamais bloquer sur réseau)
-  window._diagStep && _diagStep('⏳ Analyse en cours...');
-  window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
-  window._diagStep && _diagStep('✅ Analyse OK');
-  window._diagStep && _diagStep('⏳ Navigation dashboard...');
-  Router.navigate('dashboard');
-  window._diagStep && _diagStep('✅ Navigation OK');
-  Router.attachNavClicks();
+  window._diagStep && _diagStep('⏳ analyzeAllSync() démarré...');
+  try {
+    window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
+    window._diagStep && _diagStep('✅ analyzeAllSync() OK — ' + (window.__MTP.lastAnalysis?.all?.length || 0) + ' actifs');
+  } catch(e) {
+    window._diagStep && _diagStep('❌ analyzeAllSync() ERREUR: ' + e.message + ' — ligne: ' + (e.stack ? e.stack.split('\n')[1] : '?'));
+    window.__MTP.lastAnalysis = { all: [], tradeable: [], neutral: [], inactive: [] };
+  }
+  window._diagStep && _diagStep('⏳ Router.navigate() démarré...');
+  try {
+    Router.navigate('dashboard');
+    window._diagStep && _diagStep('✅ Router.navigate() OK');
+  } catch(e) {
+    window._diagStep && _diagStep('❌ Router.navigate() ERREUR: ' + e.message);
+  }
+  try {
+    Router.attachNavClicks();
+    window._diagStep && _diagStep('✅ NavClicks OK');
+  } catch(e) {
+    window._diagStep && _diagStep('❌ NavClicks ERREUR: ' + e.message);
+  }
 
   // 10. Service Worker — désactivé V1
   // if ('serviceWorker' in navigator) {
