@@ -1193,7 +1193,7 @@ const AlertManager = (() => {
   // ── INITIALISATION
   async function init() {
     // Ne demande pas la permission immédiatement — attendre un clic utilisateur
-    _notifPermission = Notification?.permission || 'default';
+    _notifPermission = (typeof Notification !== 'undefined') ? Notification.permission : 'default';
     console.log('[Alerts] Init — permission:', _notifPermission);
   }
 
