@@ -1,5 +1,3 @@
-
-
 // ============================================================
 // ManiTradePro V1 — App Bundle (standalone, no ES modules)
 // ============================================================
@@ -3507,4 +3505,3 @@ if (document.readyState === 'loading') {
 } else {
   boot();
 }
-
