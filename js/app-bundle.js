@@ -1141,16 +1141,29 @@ const TwelveDataClient = (() => {
 
   function initKeys() {
     const _stored = Storage.getApiKeys();
-    const stored = Array.isArray(_stored) ? _stored : (_stored.twelveData || []).map(k => k.key);
-    keyStates = stored.twelveData.map((k, i) => ({
-      key:       k.key,
-      label:     k.label,
+    // Normalize: always work with array of {key, label} objects
+    let keyList;
+    if (Array.isArray(_stored)) {
+      keyList = _stored.map((k, i) => ({ key: k || '', label: 'Clé ' + (i + 1) }));
+    } else {
+      keyList = (_stored.twelveData || []);
+    }
+    keyStates = keyList.map((k, i) => ({
+      key:       k.key || k || '',
+      label:     k.label || ('Clé ' + (i + 1)),
       callsMin:  0,
       callsDay:  0,
-      status:    k.key ? 'active' : 'unconfigured',
+      status:    (k.key || k) ? 'active' : 'unconfigured',
       lastReset: Date.now(),
       lastCall:  0,
     }));
+    // Si aucune clé configurée, ajouter 4 slots vides
+    if (keyStates.length === 0) {
+      keyStates = [1,2,3,4].map(i => ({
+        key: '', label: 'Clé ' + i, callsMin: 0, callsDay: 0,
+        status: 'unconfigured', lastReset: Date.now(), lastCall: 0,
+      }));
+    }
   }
 
   // ── SÉLECTION DE LA MEILLEURE CLÉ
@@ -1987,6 +2000,16 @@ const Router = (() => {
     screens[name] = renderFn;
   }
 
+  function attachNavClicks() {
+    document.querySelectorAll('.nav-item, .bnav-item').forEach(el => {
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        const target = el.dataset.screen;
+        if (target) navigate(target);
+      });
+    });
+  }
+
   function navigate(screenName, params = null) {
     if (screenName === 'asset-detail') {
       assetDetailParam = params;
@@ -2123,7 +2146,7 @@ const Router = (() => {
 
   function getCurrent() { return currentScreen; }
 
-  return { register, navigate, render, getCurrent };
+  return { register, navigate, render, getCurrent, attachNavClicks };
 
 })();
 
@@ -4096,6 +4119,7 @@ async function boot() {
 
   // 10. Navigate
   router.navigate('dashboard');
+  router.attachNavClicks();
 
   // 11. SW
   if ('serviceWorker' in navigator) {
