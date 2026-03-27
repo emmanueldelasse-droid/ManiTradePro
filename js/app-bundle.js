@@ -165,12 +165,24 @@ const Storage = (() => {
   const setSettings = saveSettings;
 
   function getSimCapital() {
+    // Single source of truth — always a clean number
     const stored = get(KEYS.SIM_CAPITAL);
-    if (stored === null) return MOCK_DATA.defaultSettings.simInitialCapital || 10000;
-    if (typeof stored === 'object' && stored !== null) return stored.current || stored.initial || 10000;
-    return typeof stored === 'number' ? stored : 10000;
+    if (stored === null) {
+      const s = get(KEYS.SETTINGS);
+      return parseFloat(s?.simInitialCapital) || 10000;
+    }
+    if (typeof stored === 'object' && stored !== null) {
+      const v = stored.current || stored.initial || 10000;
+      // Auto-fix corrupted object
+      set(KEYS.SIM_CAPITAL, parseFloat(v) || 10000);
+      return parseFloat(v) || 10000;
+    }
+    return parseFloat(stored) || 10000;
   }
-  function saveSimCapital(v) { return set(KEYS.SIM_CAPITAL, typeof v === 'object' ? (v.current || 10000) : v); }
+  function saveSimCapital(v) {
+    const num = typeof v === 'object' ? (v.current || v.initial || 10000) : parseFloat(v) || 10000;
+    return set(KEYS.SIM_CAPITAL, num);
+  }
   const setSimCapital = saveSimCapital;
 
   function getSimPositions() { const s = get(KEYS.SIM_POSITIONS); return s === null ? [...MOCK_DATA.sampleSimPositions] : s; }
@@ -1661,9 +1673,9 @@ function renderDashboard() {
     totalInvested += p.invested;
   });
 
-  const simCapNum  = typeof simCap === 'object' ? (simCap.current || simCap.initial || 10000) : (parseFloat(simCap) || 10000);
-  const simCapInit = parseFloat(settings.simInitialCapital) || simCapNum;
-  const capitalTotal = simCapNum + totalInvested;
+  const simCapNum    = Storage.getSimCapital();
+  const simCapInit   = parseFloat(settings.simInitialCapital) || 10000;
+  const capitalTotal = simCapNum + totalInvested + totalPnL;
   const globalReturn = simCapInit > 0 ? ((capitalTotal - simCapInit) / simCapInit) * 100 : 0;
   const top5 = analysis.tradeable.slice(0, 5);
   const regime = MOCK_DATA.marketRegime;
@@ -1868,46 +1880,43 @@ function renderOpportunities() {
 
 function renderOppCard(a, rank, isSolid = false, isNeutral = false) {
   const change = Fmt.change(a.change24h);
+  const slPct = a.stopLoss ? ((Math.abs(a.price - a.stopLoss) / a.price) * 100).toFixed(1) : null;
+  const tpPct = a.takeProfit ? ((Math.abs(a.takeProfit - a.price) / a.price) * 100).toFixed(1) : null;
+  const scoreColor = a.adjScore >= 70 ? 'var(--signal-strong)' : a.adjScore >= 50 ? 'var(--signal-medium)' : 'var(--signal-weak)';
+
   return `
-    <div class="opp-row ${isSolid ? 'card' : ''}" style="${isSolid ? 'border-color:rgba(0,229,160,0.25);' : ''}"
+    <div style="background:var(--bg-card);border:1px solid ${isSolid ? 'rgba(0,229,160,0.3)' : 'var(--border-subtle)'};border-radius:var(--card-radius);padding:var(--space-4);margin-bottom:var(--space-3);cursor:pointer;transition:all var(--transition-fast);"
       data-screen="asset-detail" data-symbol="${a.symbol}" data-asset-class="${a.assetClass || ''}">
-      <div class="opp-rank" style="color:${isNeutral ? 'var(--text-muted)' : 'var(--text-secondary)'};">#${rank}</div>
-      ${UI.scoreRing(a.adjScore, 44)}
-      <div class="asset-icon">${Fmt.assetIcon(a.symbol)}</div>
-      <div class="opp-asset">
-        <div class="opp-asset-line1">
-          <span class="asset-symbol">${a.symbol}</span>
-          ${_assetClassBadge(a.assetClass)}
-          ${isSolid ? '<span class="solid-badge">★ Solide</span>' : ''}
-          ${a.direction !== 'neutral' ? `<span class="direction-tag ${a.direction}">${Fmt.directionIcon(a.direction)} ${Fmt.directionLabel(a.direction)}</span>` : ''}
+
+      <!-- Ligne 1: Score + Symbole + Prix -->
+      <div style="display:flex;align-items:center;gap:var(--space-3);margin-bottom:var(--space-3);">
+        ${UI.scoreRing(a.adjScore, 40)}
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;">
+            <span style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${a.symbol}</span>
+            <span style="font-size:0.65rem;font-weight:700;padding:1px 5px;border-radius:3px;background:${a.direction === 'long' ? 'rgba(0,229,160,0.12)' : 'rgba(224,90,90,0.12)'};color:${a.direction === 'long' ? 'var(--profit)' : 'var(--loss)'};">${a.direction === 'long' ? '↑ Long' : a.direction === 'short' ? '↓ Short' : '— Neutre'}</span>
+            ${isSolid ? '<span style="font-size:0.65rem;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(0,229,160,0.12);color:var(--profit);">★ Solide</span>' : ''}
+            ${a.dataWarning ? '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:var(--bg-elevated);color:var(--text-muted);">SIM</span>' : '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:rgba(0,229,160,0.10);color:var(--profit);">LIVE</span>'}
+          </div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">${a.name}</div>
         </div>
-        <div class="opp-asset-line2">
-          <span style="font-size:var(--text-xs);color:var(--text-muted);">${a.name}</span>
-          ${!isNeutral && a.recommendation ? `<span style="font-size:var(--text-xs);color:var(--text-secondary);margin-left:var(--space-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px;">${a.recommendation}</span>` : ''}
+        <div style="text-align:right;flex-shrink:0;">
+          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.price(a.price)}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;" class="${change.cls}">${change.text}</div>
         </div>
       </div>
-      <div class="opp-trend-arrow">${_trendArrow(a.change24h, a.direction)}</div>
-      <div class="opp-price-col">
-        <div style="display:flex;align-items:center;gap:4px;">
-          <div class="opp-price" style="font-family:var(--font-mono);">${Fmt.price(a.price)}</div>
-          ${a.dataWarning ? '<span style="font-size:0.6rem;background:var(--bg-elevated);color:var(--text-muted);padding:1px 4px;border-radius:3px;border:1px solid var(--border-subtle);">SIM</span>' : '<span style="font-size:0.6rem;background:rgba(0,229,160,0.12);color:var(--profit);padding:1px 4px;border-radius:3px;border:1px solid rgba(0,229,160,0.25);">LIVE</span>'}
-        </div>
-        <div class="opp-change ${change.cls}">${change.text}</div>
-      </div>
-      <div style="flex-shrink:0;display:flex;flex-direction:column;gap:var(--space-1);align-items:flex-end;">
-        <span class="risk-badge ${a.riskLevel}">${Fmt.riskLabel(a.riskLevel)}</span>
-        ${a.rrRatio ? `<span class="opp-rr">R/R ${a.rrRatio}:1</span>` : ''}
-      </div>
+
+      <!-- Ligne 2: Barre SL → TP -->
       ${a.stopLoss && a.takeProfit ? `
-      <div style="margin-top:var(--space-3);padding-top:var(--space-3);border-top:1px solid var(--border-subtle);">
-        <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:var(--space-2);">
-          <span style="color:var(--loss);font-weight:700;">🔴 ${Fmt.price(a.stopLoss)} <span style="color:var(--text-muted);font-weight:400;">-${((Math.abs(a.price - a.stopLoss) / a.price) * 100).toFixed(1)}%</span></span>
-          <span style="color:var(--text-muted);font-size:0.65rem;">R/R ${a.rrRatio}:1</span>
-          <span style="color:var(--profit);font-weight:700;">🟢 ${Fmt.price(a.takeProfit)} <span style="color:var(--text-muted);font-weight:400;">+${((Math.abs(a.takeProfit - a.price) / a.price) * 100).toFixed(1)}%</span></span>
+      <div style="background:var(--bg-elevated);border-radius:6px;padding:var(--space-3);">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2);">
+          <span style="font-size:var(--text-xs);color:var(--loss);font-weight:700;">SL ${Fmt.price(a.stopLoss)}<span style="color:var(--text-muted);font-weight:400;"> -${slPct}%</span></span>
+          <span style="font-size:0.65rem;color:var(--text-muted);font-weight:700;">R/R ${a.rrRatio}:1</span>
+          <span style="font-size:var(--text-xs);color:var(--profit);font-weight:700;">TP ${Fmt.price(a.takeProfit)}<span style="color:var(--text-muted);font-weight:400;"> +${tpPct}%</span></span>
         </div>
-        <div style="position:relative;height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden;">
-          <div style="position:absolute;left:0;top:0;height:100%;width:50%;background:linear-gradient(90deg,var(--loss),var(--profit));border-radius:3px;opacity:0.4;"></div>
-          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:10px;height:10px;border-radius:50%;background:var(--text-primary);border:2px solid var(--bg-card);z-index:2;"></div>
+        <div style="position:relative;height:5px;background:var(--border-subtle);border-radius:3px;">
+          <div style="position:absolute;left:0;top:0;height:100%;width:100%;background:linear-gradient(90deg,rgba(224,90,90,0.4),rgba(0,229,160,0.4));border-radius:3px;"></div>
+          <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:9px;height:9px;border-radius:50%;background:var(--text-primary);border:2px solid var(--bg-card);"></div>
         </div>
       </div>` : ''}
     </div>`;
@@ -3461,18 +3470,18 @@ function _attachSettingsEvents(settings) {
       const capEl2 = document.getElementById('settings-sim-capital');
       if (capEl2?.value) {
         const newCap = parseFloat(capEl2.value);
-        if (newCap >= 1000) {
+        if (newCap >= 100) {
           s.simInitialCapital = newCap;
           Storage.saveSimCapital(newCap);
         }
       }
       Storage.saveSettings(s);
+      // Re-analyze with new settings
+      window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
       UI.toast('Paramètres enregistrés ✅', 'success');
-      // Refresh all screens
+      // Refresh current screen
       const cur = Router.getCurrent();
-      if (cur === 'dashboard') Router.navigate('dashboard');
-      else if (cur === 'portefeuille') renderPortefeuille();
-      else if (cur === 'simulation') renderSimulation();
+      Router.navigate(cur === 'settings' ? 'dashboard' : cur);
     });
   }
 }
