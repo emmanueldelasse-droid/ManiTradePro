@@ -1254,44 +1254,102 @@ const UI = (() => {
       const overlay = document.getElementById('modal-overlay');
       const content = document.getElementById('modal-content');
       const settings = Storage.getSettings();
-      const price = window.__prices[symbol] || MOCK_DATA.prices[symbol]?.price || 0;
-      const stop  = analysis.stopLoss  || (price * 0.98);
-      const tp    = analysis.takeProfit || (price * 1.05);
-      const capNum = Storage.getSimCapital();
+      const price    = window.__prices[symbol] || MOCK_DATA.prices[symbol]?.price || 0;
+      const stop     = analysis.stopLoss   || (price * 0.98);
+      const tp       = analysis.takeProfit || (price * 1.05);
+      const capNum   = Storage.getSimCapital();
       const riskAmount = capNum * settings.riskPerTrade;
-      const qty = riskAmount / Math.abs(price - stop) || 1;
+      const qty      = stop > 0 ? riskAmount / Math.abs(price - stop) : 1;
       const invested = qty * price;
-      const isSim = mode === 'sim';
+      const isSim    = mode === 'sim';
+      const rrRatio  = analysis.rrRatio || '—';
+      const slPct    = price > 0 ? ((Math.abs(price - stop) / price) * 100).toFixed(1) : '?';
+      const tpPct    = price > 0 ? ((Math.abs(tp - price) / price) * 100).toFixed(1) : '?';
+      const direction = analysis.direction || 'neutral';
 
       content.innerHTML = `
         <div style="padding:var(--space-6);">
+
+          <!-- En-tête -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-5);">
-            <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;">
-              ${symbol} <span class="direction-tag ${analysis.direction}" style="margin-left:var(--space-2);">${Fmt.directionIcon(analysis.direction)} ${Fmt.directionLabel(analysis.direction)}</span>
+            <div style="display:flex;align-items:center;gap:var(--space-3);">
+              <div style="width:42px;height:42px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border-medium);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;color:var(--accent);">${Fmt.assetIcon(symbol)}</div>
+              <div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;">${symbol}</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);">${MOCK_DATA.watchlist.find(a=>a.symbol===symbol)?.name || ''}</div>
+              </div>
             </div>
-            <span class="hero-mode-tag ${isSim ? 'sim' : 'real'}">${isSim ? '⚡ SIMULATION' : '⚠️ RÉEL'}</span>
-          </div>
-          <div class="mode-zone ${isSim ? 'sim-zone' : 'real-zone'}">
-            <div class="mode-zone-title">${isSim ? '⚡ Position fictive' : '⚠️ Position réelle'}</div>
-            <div class="input-group">
-              <label class="input-label">Montant investi (€)</label>
-              <input type="number" class="input-field" id="order-amount" value="${invested.toFixed(2)}" min="1" step="0.01"/>
-              <div class="input-hint">Capital disponible : ${Fmt.currency(capNum)}</div>
-            </div>
-            <div class="grid-2" style="gap:var(--space-3);">
-              <div class="input-group"><label class="input-label">Stop-loss</label><input type="number" class="input-field" id="order-stop" value="${stop.toFixed(4)}" step="0.0001"/></div>
-              <div class="input-group"><label class="input-label">Take profit</label><input type="number" class="input-field" id="order-tp" value="${tp.toFixed(4)}" step="0.0001"/></div>
-            </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);background:var(--bg-elevated);border-radius:8px;padding:var(--space-3);margin-top:var(--space-2);">
-              <div><div class="pos-detail-label">Prix d'entrée</div><div class="pos-detail-value">${Fmt.price(price)}</div></div>
-              <div><div class="pos-detail-label">Quantité</div><div class="pos-detail-value">${qty.toFixed(4)}</div></div>
-              <div><div class="pos-detail-label">R/R estimé</div><div class="pos-detail-value">${analysis.rrRatio || '—'}:1</div></div>
+            <div style="display:flex;align-items:center;gap:var(--space-2);">
+              <span class="direction-tag ${direction}">${Fmt.directionIcon(direction)} ${Fmt.directionLabel(direction)}</span>
+              <span class="hero-mode-tag ${isSim ? 'sim' : 'real'}">${isSim ? '⚡ SIM' : '⚠️ RÉEL'}</span>
             </div>
           </div>
-          <div style="display:flex;gap:var(--space-3);margin-top:var(--space-5);">
+
+          <!-- Résumé visuel du trade — lecture seule -->
+          <div style="background:var(--bg-elevated);border-radius:var(--card-radius);padding:var(--space-4);margin-bottom:var(--space-4);">
+
+            <!-- Prix + direction -->
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4);padding-bottom:var(--space-3);border-bottom:1px solid var(--border-subtle);">
+              <div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Prix d'entrée</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;">${Fmt.price(price)}</div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Ratio R/R</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:${rrRatio >= 2 ? 'var(--profit)' : 'var(--signal-medium)'};">${rrRatio}:1</div>
+              </div>
+            </div>
+
+            <!-- SL / TP côte à côte -->
+            <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:var(--space-3);align-items:center;margin-bottom:var(--space-4);">
+              <div style="background:rgba(224,90,90,0.08);border:1px solid var(--real-border);border-radius:8px;padding:var(--space-3);">
+                <div style="font-size:var(--text-xs);color:var(--loss);font-weight:700;margin-bottom:4px;">🔴 STOP-LOSS</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--loss);">${Fmt.price(stop)}</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">-${slPct}% · ${Fmt.currency(riskAmount)} max</div>
+              </div>
+              <div style="text-align:center;color:var(--text-muted);font-size:var(--text-sm);">→</div>
+              <div style="background:rgba(0,229,160,0.08);border:1px solid var(--accent-glow);border-radius:8px;padding:var(--space-3);">
+                <div style="font-size:var(--text-xs);color:var(--profit);font-weight:700;margin-bottom:4px;">🟢 TAKE PROFIT</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--profit);">${Fmt.price(tp)}</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">+${tpPct}% · ${Fmt.currency(riskAmount * parseFloat(rrRatio) || 0)} potentiel</div>
+              </div>
+            </div>
+
+            <!-- Sizing -->
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);">
+              <div style="text-align:center;">
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Montant investi</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.currency(invested)}</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Quantité</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.qty(qty, symbol)}</div>
+              </div>
+              <div style="text-align:center;">
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Capital dispo.</div>
+                <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.currency(capNum)}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Avertissement si capital insuffisant -->
+          ${invested > capNum ? `<div style="background:var(--real-bg);border:1px solid var(--real-border);border-radius:8px;padding:var(--space-3);margin-bottom:var(--space-4);font-size:var(--text-xs);color:var(--loss);">⚠️ Capital insuffisant. Réduisez le montant ou ajustez le risque par trade dans les paramètres.</div>` : ''}
+
+          <!-- Note algo -->
+          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-5);line-height:1.6;text-align:center;">
+            📐 SL calculé par l'algo : <strong>2×ATR(14)</strong> · TP : ratio R/R <strong>2.5:1</strong> · Risque : <strong>${(settings.riskPerTrade * 100).toFixed(2)}% du capital</strong>
+          </div>
+
+          <!-- Champs cachés (valeurs utilisées à la confirmation) -->
+          <input type="hidden" id="order-amount" value="${invested.toFixed(2)}"/>
+          <input type="hidden" id="order-stop"   value="${stop.toFixed(6)}"/>
+          <input type="hidden" id="order-tp"     value="${tp.toFixed(6)}"/>
+
+          <!-- Boutons -->
+          <div style="display:flex;gap:var(--space-3);">
             <button class="btn btn-ghost" id="order-cancel" style="flex:1;">Annuler</button>
             <button class="btn ${isSim ? 'btn-sim' : 'btn-real'}" id="order-confirm" style="flex:2;" ${!isSim ? 'disabled' : ''}>
-              ${isSim ? '⚡ Ouvrir en simulation' : '⚠️ Non disponible en V1'}
+              ${isSim ? '⚡ Confirmer & Ouvrir le trade' : '⚠️ Non disponible en V1'}
             </button>
           </div>
         </div>`;
@@ -1694,6 +1752,10 @@ function renderOpportunityRow(a, rank) {
       <div class="opp-price-col">
         <div class="opp-price">${Fmt.price(a.price)}</div>
         <div class="opp-change ${change.cls}">${change.text}</div>
+        ${a.stopLoss && a.takeProfit ? `<div class="opp-sltp">
+          <span class="opp-sl">SL&nbsp;${Fmt.price(a.stopLoss)}</span>
+          <span class="opp-tp">TP&nbsp;${Fmt.price(a.takeProfit)}</span>
+        </div>` : ''}
       </div>
     </div>`;
 }
@@ -1799,8 +1861,22 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false) {
       </div>
       <div style="flex-shrink:0;display:flex;flex-direction:column;gap:var(--space-1);align-items:flex-end;">
         <span class="risk-badge ${a.riskLevel}">${Fmt.riskLabel(a.riskLevel)}</span>
-        ${a.rrRatio ? `<span style="font-size:var(--text-xs);color:var(--text-muted);">R/R ${a.rrRatio}:1</span>` : ''}
+        ${a.rrRatio ? `<span class="opp-rr">R/R ${a.rrRatio}:1</span>` : ''}
       </div>
+      ${a.stopLoss && a.takeProfit ? `
+      <div class="opp-sltp-full">
+        <div class="opp-sltp-item sl">
+          <span class="opp-sltp-label">Stop-loss</span>
+          <span class="opp-sltp-val">${Fmt.price(a.stopLoss)}</span>
+          <span class="opp-sltp-pct">-${a.indicators?.atr ? ((Math.abs(a.price - a.stopLoss) / a.price) * 100).toFixed(1) : '?'}%</span>
+        </div>
+        <div class="opp-sltp-sep">→</div>
+        <div class="opp-sltp-item tp">
+          <span class="opp-sltp-label">Take profit</span>
+          <span class="opp-sltp-val">${Fmt.price(a.takeProfit)}</span>
+          <span class="opp-sltp-pct">+${((Math.abs(a.takeProfit - a.price) / a.price) * 100).toFixed(1)}%</span>
+        </div>
+      </div>` : ''}
     </div>`;
 }
 
@@ -1985,7 +2061,7 @@ function renderAssetDetail(params) {
         </div>
         ${analysis.direction !== 'neutral' ? `
           <button class="btn btn-sim btn-block" id="btn-open-sim" data-open-position="${symbol}" data-mode="sim">
-            ⚡ Ouvrir position fictive ${Fmt.directionLabel(analysis.direction)}
+            ⚡ Trader maintenant — ${Fmt.directionLabel(analysis.direction)}
           </button>` : `
           <button class="btn btn-ghost btn-block" disabled>Signal neutre — attendre</button>`
         }
@@ -2266,6 +2342,242 @@ function renderPortefeuille() {
   _attachPortefeuilleEvents();
 }
 
+
+// ═══ Position Detail Screen ═══
+function renderPositionDetail(posId) {
+  const screen = document.getElementById('screen-portefeuille');
+  if (!screen) return;
+
+  // Find position in sim + real
+  const allPos = [...Storage.getSimPositions(), ...Storage.getRealPositions()];
+  const pos = allPos.find(p => p.id === posId);
+  if (!pos) { renderPortefeuille(); return; }
+
+  const enriched = _enrichPosition(pos);
+  const mode     = pos.mode || 'sim';
+  const isLong   = (pos.direction || '').toLowerCase() === 'long';
+  const pnlCls   = Fmt.pnlClass(enriched.pnl);
+
+  // Get analysis for this symbol
+  const analysis = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === pos.symbol);
+  const priceData = MOCK_DATA.prices[pos.symbol];
+
+  // Progress bar SL → current → TP
+  let progress = 50, barHtml = '';
+  if (pos.stopLoss && pos.takeProfit) {
+    const range = Math.abs(pos.takeProfit - pos.stopLoss);
+    progress = range > 0 ? Math.min(100, Math.max(0,
+      isLong
+        ? ((enriched.currentPrice - pos.stopLoss) / range) * 100
+        : ((pos.stopLoss - enriched.currentPrice) / range) * 100
+    )) : 50;
+  }
+
+  // Risk calculations
+  const riskOnTrade   = pos.stopLoss ? Math.abs(pos.entryPrice - pos.stopLoss) * pos.quantity : 0;
+  const rewardOnTrade = pos.takeProfit ? Math.abs(pos.takeProfit - pos.entryPrice) * pos.quantity : 0;
+  const rrRatio       = riskOnTrade > 0 ? (rewardOnTrade / riskOnTrade).toFixed(1) : '—';
+  const slDistPct     = pos.stopLoss ? ((Math.abs(enriched.currentPrice - pos.stopLoss) / enriched.currentPrice) * 100).toFixed(1) : '—';
+  const tpDistPct     = pos.takeProfit ? ((Math.abs(pos.takeProfit - enriched.currentPrice) / enriched.currentPrice) * 100).toFixed(1) : '—';
+  const stopWarn      = pos.stopLoss && parseFloat(slDistPct) < 3;
+
+  // Duration
+  const durationMs  = Date.now() - pos.openedAt;
+  const durationDays = Math.floor(durationMs / 86400000);
+  const durationHrs  = Math.floor((durationMs % 86400000) / 3600000);
+
+  // Capital impact
+  const simCap    = Storage.getSimCapital();
+  const pctOfCap  = simCap > 0 ? ((pos.invested / (simCap + pos.invested)) * 100).toFixed(1) : '—';
+
+  screen.innerHTML = `
+    <!-- Back -->
+    <div class="back-btn" id="btn-back-to-portfolio" style="cursor:pointer;display:inline-flex;align-items:center;gap:var(--space-2);font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-6);padding:var(--space-2) 0;">
+      ← Retour au portefeuille
+    </div>
+
+    <!-- Header -->
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:var(--space-4);margin-bottom:var(--space-6);">
+      <div style="display:flex;align-items:center;gap:var(--space-4);">
+        <div style="width:56px;height:56px;border-radius:14px;background:var(--bg-elevated);border:1px solid var(--border-medium);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--accent);">${Fmt.assetIcon(pos.symbol)}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap;">
+            <span style="font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;">${pos.symbol}</span>
+            <span class="direction-tag ${pos.direction}">${Fmt.directionIcon(pos.direction)} ${Fmt.directionLabel(pos.direction)}</span>
+            <span class="mode-badge-sm ${mode}">${mode === 'sim' ? 'SIM' : 'RÉEL'}</span>
+            ${stopWarn ? '<span style="background:rgba(224,90,90,0.15);color:var(--loss);font-size:var(--text-xs);font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid var(--real-border);">⚠️ STOP PROCHE</span>' : ''}
+          </div>
+          <div style="font-size:var(--text-sm);color:var(--text-muted);margin-top:2px;">${pos.name || pos.symbol} · Ouvert ${Fmt.duration(pos.openedAt)}</div>
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;">${Fmt.price(enriched.currentPrice)}</div>
+        ${priceData ? `<div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;" class="${Fmt.change(priceData.change24h).cls}">${Fmt.change(priceData.change24h).text} (24h)</div>` : ''}
+      </div>
+    </div>
+
+    <!-- P&L Hero -->
+    <div style="background:linear-gradient(135deg,var(--bg-card) 0%,var(--bg-elevated) 100%);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-6) var(--space-8);margin-bottom:var(--space-5);position:relative;overflow:hidden;">
+      <div style="position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,${enriched.pnl >= 0 ? 'rgba(0,229,160,0.12)' : 'rgba(224,90,90,0.10)'} 0%,transparent 70%);pointer-events:none;"></div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:var(--space-2);">P&L en cours</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-4xl);font-weight:700;letter-spacing:-0.03em;" class="${pnlCls}" data-position-pnl="${pos.id}">${Fmt.signedCurrency(enriched.pnl)}</div>
+      <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:600;margin-top:var(--space-2);" class="${pnlCls}" data-position-pnlpct="${pos.id}">${Fmt.signedPct(enriched.pnlPct)}</div>
+      <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-3);">
+        Depuis ${Fmt.date(pos.openedAt)} · ${durationDays}j ${durationHrs}h · ${Fmt.currency(pos.invested)} investi
+      </div>
+    </div>
+
+    <!-- Barre SL → Actuel → TP -->
+    ${pos.stopLoss && pos.takeProfit ? `
+    <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">
+      <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">Progression du trade</div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:var(--space-3);">
+        <div style="text-align:left;">
+          <div style="font-size:var(--text-xs);color:var(--loss);font-weight:700;">🔴 Stop-loss</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--loss);">${Fmt.price(pos.stopLoss)}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">-${slDistPct}% du prix actuel</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:var(--text-xs);color:var(--text-muted);font-weight:700;">◎ Entrée</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.price(pos.entryPrice)}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">prix d'entrée</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:var(--text-xs);color:var(--profit);font-weight:700;">🟢 Take profit</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:var(--profit);">${Fmt.price(pos.takeProfit)}</div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">+${tpDistPct}% du prix actuel</div>
+        </div>
+      </div>
+      <div style="position:relative;height:10px;background:var(--bg-elevated);border-radius:5px;overflow:visible;margin-top:var(--space-2);">
+        <div style="position:absolute;top:0;left:0;height:100%;width:${progress}%;background:${enriched.pnl >= 0 ? 'linear-gradient(90deg,var(--bg-elevated),var(--profit))' : 'linear-gradient(90deg,var(--loss),var(--bg-elevated))'};border-radius:5px;transition:width 0.5s ease;"></div>
+        <div style="position:absolute;top:50%;left:${progress}%;transform:translate(-50%,-50%);width:16px;height:16px;border-radius:50%;background:var(--text-primary);border:2px solid var(--bg-card);z-index:2;"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);">
+        <span>Perte max : ${Fmt.currency(riskOnTrade)}</span>
+        <span>Progression : ${progress.toFixed(0)}%</span>
+        <span>Gain cible : ${Fmt.currency(rewardOnTrade)}</span>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Grille détails complets -->
+    <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">
+      <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">Détails du trade</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-5);">
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Prix d'entrée</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.price(pos.entryPrice)}</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Prix actuel</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;" data-position-price="${pos.id}">${Fmt.price(enriched.currentPrice)}</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Variation depuis entrée</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;" class="${pnlCls}">${Fmt.signedPct(enriched.pnlPct)}</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Quantité</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.qty(pos.quantity, pos.symbol)}</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Montant investi</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.currency(pos.invested)}</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">% du capital</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${pctOfCap}%</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Ratio R/R</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:${parseFloat(rrRatio) >= 2 ? 'var(--profit)' : 'var(--signal-medium)'};">${rrRatio}:1</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Durée</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${durationDays > 0 ? durationDays + 'j ' + durationHrs + 'h' : durationHrs + 'h'}</div></div>
+
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Ouvert le</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.date(pos.openedAt)}</div></div>
+      </div>
+    </div>
+
+    <!-- Risque actuel -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-bottom:var(--space-5);">
+      <div style="background:rgba(224,90,90,0.06);border:1px solid var(--real-border);border-radius:var(--card-radius);padding:var(--space-4);">
+        <div style="font-size:var(--text-xs);color:var(--loss);font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">🔴 Risque</div>
+        <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:var(--loss);">${pos.stopLoss ? Fmt.price(pos.stopLoss) : '—'}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2);">Stop-loss · perte max ${Fmt.currency(riskOnTrade)}</div>
+        ${stopWarn ? '<div style="font-size:var(--text-xs);color:var(--loss);font-weight:700;margin-top:var(--space-2);">⚠️ À moins de 3% du prix actuel !</div>' : `<div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2);">Distance : ${slDistPct}%</div>`}
+      </div>
+      <div style="background:rgba(0,229,160,0.06);border:1px solid var(--accent-glow);border-radius:var(--card-radius);padding:var(--space-4);">
+        <div style="font-size:var(--text-xs);color:var(--profit);font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">🟢 Objectif</div>
+        <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:var(--profit);">${pos.takeProfit ? Fmt.price(pos.takeProfit) : '—'}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2);">Take profit · gain cible ${Fmt.currency(rewardOnTrade)}</div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-2);">Distance : ${tpDistPct}%</div>
+      </div>
+    </div>
+
+    <!-- Score algo si dispo -->
+    ${analysis ? `
+    <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">
+      <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">Analyse algo actuelle</div>
+      <div style="display:flex;align-items:center;gap:var(--space-5);">
+        ${UI.scoreRing(analysis.adjScore, 56)}
+        <div style="flex:1;">
+          <div style="font-size:var(--text-md);font-weight:700;margin-bottom:var(--space-2);">Score : <span style="color:${analysis.adjScore >= 70 ? 'var(--signal-strong)' : analysis.adjScore >= 50 ? 'var(--signal-medium)' : 'var(--signal-weak)'};">${analysis.adjScore}/100</span></div>
+          <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5;">${analysis.recommendation || ''}</div>
+          <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);flex-wrap:wrap;">
+            <span class="risk-badge ${analysis.riskLevel}">Risque ${Fmt.riskLabel(analysis.riskLevel)}</span>
+            <span class="direction-tag ${analysis.direction}">${Fmt.directionIcon(analysis.direction)} ${Fmt.directionLabel(analysis.direction)}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Actions -->
+    <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-6);">
+      <button class="btn btn-ghost" style="flex:1;" data-screen="asset-detail" data-symbol="${pos.symbol}">
+        📊 Voir l'analyse complète
+      </button>
+      <button class="btn ${mode === 'real' ? 'btn-danger' : 'btn-sim'}" style="flex:1;" id="btn-close-from-detail" data-mode="${mode}" data-id="${pos.id}" data-symbol="${pos.symbol}">
+        ${mode === 'real' ? '🔴 Clôturer (RÉEL)' : '⬛ Clôturer cette position'}
+      </button>
+    </div>
+
+    <div class="warning-box">
+      ⚠️ ManiTradePro est un outil d'aide à la décision. Les niveaux suggérés ne constituent pas des conseils financiers.
+    </div>
+  `;
+
+  // Events
+  document.getElementById('btn-back-to-portfolio')?.addEventListener('click', () => {
+    window.__portfolioTab = 'positions';
+    renderPortefeuille();
+  });
+
+  document.getElementById('btn-close-from-detail')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-close-from-detail');
+    const { mode, id, symbol } = btn.dataset;
+    const ok = await UI.confirm(
+      mode === 'real' ? '⚠️ Clôture RÉELLE' : 'Clôturer la position',
+      mode === 'real'
+        ? `Clôturer la position réelle sur ${symbol} ? Action IRRÉVERSIBLE.`
+        : `Clôturer la position fictive sur ${symbol} ?`,
+      mode === 'real'
+    );
+    if (!ok) return;
+    const result = await BrokerAdapter.closePosition(id, mode);
+    if (result.success) {
+      UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
+      window.__portfolioTab = 'positions';
+      renderPortefeuille();
+    } else {
+      UI.toast(`Erreur : ${result.error}`, 'error');
+    }
+  });
+
+  document.querySelectorAll('[data-screen]').forEach(el => {
+    el.addEventListener('click', () => {
+      const s = el.dataset.screen, sym = el.dataset.symbol;
+      if (s) Router.navigate(s, sym ? { symbol: sym } : null);
+    });
+  });
+}
+
 function _renderPortefeuilleCard(pos, mode) {
   const pnlCls = Fmt.pnlClass(pos.pnl);
   const isLong = (pos.direction||'').toLowerCase() === 'long';
@@ -2296,7 +2608,7 @@ function _renderPortefeuilleCard(pos, mode) {
   }
 
   return `
-    <div class="pf-card ${mode}-card ${stopWarn ? 'stop-warning' : ''}" data-id="${pos.id}">
+    <div class="pf-card ${mode}-card ${stopWarn ? 'stop-warning' : ''}" data-id="${pos.id}" data-pos-detail="${pos.id}" style="cursor:pointer;" title="Cliquer pour voir le détail">
       <div class="pf-card-header">
         <div class="pf-card-left">
           <span class="asset-icon-sm">${Fmt.assetIcon(pos.symbol)}</span>
@@ -2346,6 +2658,16 @@ function _renderPfHistoryRow(t) {
 }
 
 function _attachPortefeuilleEvents() {
+  // Click on card → detail
+  document.querySelectorAll('[data-pos-detail]').forEach(card => {
+    card.addEventListener('click', (e) => {
+      // Don't trigger if clicking a button inside the card
+      if (e.target.closest('button')) return;
+      const posId = card.dataset.posDetail;
+      renderPositionDetail(posId);
+    });
+  });
+
   // Tab switch
   document.querySelectorAll('[data-pftab]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2482,7 +2804,7 @@ function _attachPositionEvents() {
         const result = await BrokerAdapter.closePosition(id, mode);
         if (result.success) {
           UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
-          renderPositions();
+          renderPortefeuille();
         } else {
           UI.toast(`Erreur : ${result.error}`, 'error');
         }
@@ -2514,7 +2836,7 @@ function updatePositionPrices() {
   });
 }
 
-Router.register('positions', () => { renderPositions(); });
+Router.register('positions', () => { renderPortefeuille(); }); // alias → portefeuille
 
 // ═══ simulation.js ═══
 function renderSimulation() {
