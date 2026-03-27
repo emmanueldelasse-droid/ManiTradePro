@@ -35,19 +35,23 @@ const MOCK_DATA = {
   // 55 bougies daily fictives par actif
   generateOHLC: function(symbol, currentPrice, trend = 'up', volatility = 0.02) {
     const candles = [];
-    let price = currentPrice * (trend === 'up' ? 0.85 : 1.15);
+    // Start further back so EMA100 + Donchian55 have enough data
+    let price = currentPrice * (trend === 'up' ? 0.75 : 1.25);
     const now = Date.now();
 
-    for (let i = 55; i >= 0; i--) {
+    for (let i = 130; i >= 0; i--) {
       const dayAgo = now - i * 86400000;
       const noise = (Math.random() - 0.5) * volatility;
-      const trendBias = trend === 'up' ? 0.003 : (trend === 'down' ? -0.003 : 0);
+      // Stronger trend bias so ADX picks it up
+      const trendBias = trend === 'up' ? 0.007 : (trend === 'down' ? -0.007 : 0.001);
       const open = price;
       const move = noise + trendBias;
       const close = price * (1 + move);
-      const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.5);
-      const low  = Math.min(open, close) * (1 - Math.random() * volatility * 0.5);
-      const volume = 1_000_000 * (1 + Math.random() * 2);
+      const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.3);
+      const low  = Math.min(open, close) * (1 - Math.random() * volatility * 0.3);
+      // Volume spikes on big moves to signal momentum
+      const volMult = Math.abs(move) > volatility ? 2.5 : 1;
+      const volume = 1_000_000 * (1 + Math.random() * 2) * volMult;
       candles.push({ ts: dayAgo, open, high, low, close, volume });
       price = close;
     }
@@ -1008,13 +1012,13 @@ const AnalysisEngine = (() => {
     // Phase 2 : Signal
     const direction = detectSignal(ind);
 
-    // Si régime échoue ou signal neutre → score 0
-    if (!regime.pass || direction === 'neutral') {
+    // Si signal neutre ET régime échoue → score 0
+    if (direction === 'neutral' && !regime.pass) {
       return {
         symbol, name, assetClass,
         price: priceData.price,
         change24h: priceData.change24h,
-        direction: direction === 'neutral' ? 'neutral' : direction,
+        direction: 'neutral',
         regime,
         indicators: ind,
         score: 0,
@@ -1026,10 +1030,12 @@ const AnalysisEngine = (() => {
         takeProfit: null,
         rrRatio: 0,
         confidence: { score: 0, criteria: [] },
-        recommendation: !regime.pass
-          ? 'Régime défavorable — ne pas trader cet actif actuellement.'
-          : 'Pas de signal clair — attendre.',
+        recommendation: 'Régime défavorable — ne pas trader cet actif actuellement.',
       };
+    }
+    // Signal présent mais régime dégradé → calcul du score quand même, pénalité appliquée
+    if (!regime.pass && direction !== 'neutral') {
+      // continuer l'analyse avec pénalité de régime
     }
 
     // Phase 3 : Score confiance
@@ -3399,17 +3405,25 @@ function renderSimulation() {
 // -----------------------------------------------------------
 
 function _computeStats(capital, history, openPos, settings) {
-  const initialCapital = settings.simInitialCapital || 10000;
+  // Normalize capital — guard against object, string, NaN
+  let _cap = capital;
+  if (typeof _cap === 'object' && _cap !== null) _cap = _cap.current || _cap.initial || 10000;
+  _cap = parseFloat(_cap);
+  if (isNaN(_cap) || _cap <= 0) _cap = 10000;
+  capital = _cap;
+
+  const initialCapital = parseFloat(settings.simInitialCapital) || 10000;
 
   // Open P&L
   let openPnl = 0;
   openPos.forEach(pos => {
     const current = (window.__prices && window.__prices[pos.symbol]) || pos.entryPrice;
-    const diff    = pos.direction === 'LONG' ? current - pos.entryPrice : pos.entryPrice - current;
+    const dir = (pos.direction || '').toUpperCase();
+    const diff    = dir === 'LONG' ? current - pos.entryPrice : pos.entryPrice - current;
     openPnl += diff * pos.quantity;
   });
 
-  const totalCapital = capital + openPnl;
+  const totalCapital = capital + (isNaN(openPnl) ? 0 : openPnl);
   const totalPnl     = totalCapital - initialCapital;
   const totalPnlPct  = ((totalCapital / initialCapital) - 1) * 100;
 
