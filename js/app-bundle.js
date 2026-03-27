@@ -1,34 +1,3 @@
-// ── Capture toutes les erreurs JS ──
-window.addEventListener('error', function(e) {
-  const diag = document.getElementById('main-content');
-  if (diag) {
-    diag.innerHTML += '<div style="padding:20px;color:#e05a5a;font-family:monospace;font-size:13px;background:rgba(224,90,90,0.1);margin:10px;border-radius:8px;border:1px solid rgba(224,90,90,0.3);">' +
-      '<div style="font-weight:700;">❌ ERREUR JS DETECTÉE</div>' +
-      '<div>Message : ' + e.message + '</div>' +
-      '<div>Fichier : ' + (e.filename || '?') + '</div>' +
-      '<div>Ligne : ' + e.lineno + '</div>' +
-      '</div>';
-  }
-});
-
-// ── Diagnostic immédiat (avant tout le reste) ──
-(function() {
-  function showDiag(msg, color) {
-    var el = document.getElementById('main-content');
-    if (!el) return;
-    el.innerHTML = '<div style="padding:20px;font-family:monospace;font-size:13px;line-height:2;color:' + (color||'#00e5a0') + '"><b>🔍 Diagnostic</b><br>' + msg + '</div>';
-  }
-  window.__showDiag = showDiag;
-  // Affiche immédiatement si le DOM est prêt
-  if (document.readyState !== 'loading') {
-    showDiag('✅ JS chargé — boot() en attente...');
-  } else {
-    document.addEventListener('DOMContentLoaded', function() {
-      showDiag('✅ JS chargé — boot() en attente...');
-    });
-  }
-})();
-
 // ============================================================
 // ManiTradePro V1 — App Bundle (standalone, no ES modules)
 // ============================================================
@@ -325,8 +294,8 @@ const Indicators = (() => {
   function donchian(candles, period) {
     if (candles.length < period) return null;
     const slice = candles.slice(candles.length - period);
-    const upper = Math.max(...slice.map(c => c.high));
-    const lower = Math.min(...slice.map(c => c.low));
+    const upper = slice.map(c => c.high).reduce(function(a,b){return a>b?a:b;});
+    const lower = slice.map(c => c.low).reduce(function(a,b){return a<b?a:b;});
     return { upper, lower, mid: (upper + lower) / 2 };
   }
   function rsi(closes, period = 14) {
@@ -368,12 +337,12 @@ const Indicators = (() => {
   function isDonchianBreakoutUp(candles, period) {
     if (candles.length < period + 1) return false;
     const prev = candles.slice(candles.length - period - 1, candles.length - 1);
-    return candles[candles.length - 1].close > Math.max(...prev.map(c => c.high));
+    return candles[candles.length - 1].close > prev.map(c => c.high).reduce(function(a,b){return a>b?a:b;});
   }
   function isDonchianBreakoutDown(candles, period) {
     if (candles.length < period + 1) return false;
     const prev = candles.slice(candles.length - period - 1, candles.length - 1);
-    return candles[candles.length - 1].close < Math.min(...prev.map(c => c.low));
+    return candles[candles.length - 1].close < prev.map(c => c.low).reduce(function(a,b){return a<b?a:b;});
   }
   function relativeVolume(candles, period = 20) {
     if (candles.length < period) return 1;
@@ -1426,7 +1395,7 @@ const UI = (() => {
   function sparkline(candles, width = 80, height = 30) {
     if (!candles || candles.length < 2) return `<div style="width:${width}px;height:${height}px;"></div>`;
     const closes = candles.map(c => c.close);
-    const min = Math.min(...closes), max = Math.max(...closes), range = max - min || 1;
+    const min = closes.reduce(function(a,b){return a<b?a:b;}), max = closes.reduce(function(a,b){return a>b?a:b;}), range = max - min || 1;
     const pts = closes.map((v, i) => `${(i / (closes.length - 1)) * width},${height - ((v - min) / range) * height}`).join(' ');
     const color = closes[closes.length - 1] >= closes[0] ? 'var(--profit)' : 'var(--loss)';
     return `<svg width="${width}" height="${height}" style="display:block;"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
@@ -2146,7 +2115,7 @@ function renderPriceChart(symbol) {
   const candles = MOCK_DATA.getOHLC(symbol);
   if (!candles || candles.length < 5) return '<div style="height:120px;background:var(--bg-elevated);border-radius:8px;"></div>';
   const closes = candles.map(c => c.close);
-  const min = Math.min(...closes), max = Math.max(...closes), range = max - min || 1;
+  const min = closes.reduce(function(a,b){return a<b?a:b;}), max = closes.reduce(function(a,b){return a>b?a:b;}), range = max - min || 1;
   const W = 600, H = 120;
   const pts = closes.map((v, i) => `${(i / (closes.length - 1)) * W},${H - ((v - min) / range) * (H - 10) - 5}`).join(' ');
   const color = closes[closes.length - 1] >= closes[0] ? 'var(--profit)' : 'var(--loss)';
@@ -3016,7 +2985,7 @@ function _calcMaxDrawdown(curve) {
 function _renderEquityCurve(curve, initial) {
   if (curve.length < 2) return `<div class="chart-placeholder">Pas encore assez de données</div>`;
   const W = 340, H = 120;
-  const vals = curve.map(p => p.v), minV = Math.min(...vals), maxV = Math.max(...vals), rangeV = maxV - minV || 1;
+  const vals = curve.map(p => p.v), minV = vals.reduce(function(a,b){return a<b?a:b;}), maxV = vals.reduce(function(a,b){return a>b?a:b;}), rangeV = maxV - minV || 1;
   const pts = curve.map((p, i) => `${(i / (curve.length - 1)) * W},${H - ((p.v - minV) / rangeV) * (H - 16) - 8}`);
   const lineColor = curve[curve.length - 1].v >= initial ? '#22c55e' : '#ef4444';
   const zeroY = H - ((initial - minV) / rangeV) * (H - 16) - 8;
@@ -3443,25 +3412,7 @@ Router.register('settings', () => { renderSettings(); });
 async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
 
-  // ── DIAGNOSTIC VISUEL TEMPORAIRE ──
-  window.__showDiag && window.__showDiag('⏳ boot() démarré...');
-  const _diag = document.getElementById('main-content');
-  if (_diag) {
-    _diag.innerHTML = '<div style="padding:20px;color:#00e5a0;font-family:monospace;font-size:13px;line-height:1.8;">' +
-      '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">🔍 Diagnostic ManiTradePro</div>' +
-      '<div>✅ JS exécuté</div>' +
-      '<div>📱 iOS : ' + (navigator.userAgent.match(/OS (\d+)_(\d+)/) || ['','?','?'])[0] + '</div>' +
-      '<div>🌐 URL : ' + location.href + '</div>' +
-      '<div>💾 localStorage : ' + (function(){ try { localStorage.setItem('t','1'); localStorage.removeItem('t'); return 'OK'; } catch(e) { return 'BLOQUÉ: '+e.message; }})() + '</div>' +
-      '<div id="diag-step">⏳ Initialisation Storage...</div>' +
-      '</div>';
-  }
-  function _diagStep(msg) {
-    const el = document.getElementById('diag-step');
-    if (el) el.innerHTML += '<br>' + msg;
-  }
-  window._diagStep = _diagStep;
-  // ── FIN DIAGNOSTIC ──
+
 
 
   // Migration capital corrompu
@@ -3478,12 +3429,10 @@ async function boot() {
   // 1. Storage
   Storage.init();
   window.__prices = {};
-  window._diagStep && _diagStep('✅ Storage OK');
 
   // 2. Twelve Data
   const apiKeysRaw = Storage.getApiKeys();
   TwelveDataClient.init(apiKeysRaw);
-  window._diagStep && _diagStep('✅ TwelveData OK');
   window.__MTP.TwelveDataClient = TwelveDataClient;
 
   // 3. Binance
@@ -3516,27 +3465,14 @@ async function boot() {
   window.__MTP.Sync = Sync;
 
   // 9. Affichage immédiat (jamais bloquer sur réseau)
-  window._diagStep && _diagStep('⏳ analyzeAllSync() démarré...');
   try {
     window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
-    window._diagStep && _diagStep('✅ analyzeAllSync() OK — ' + (window.__MTP.lastAnalysis?.all?.length || 0) + ' actifs');
   } catch(e) {
-    window._diagStep && _diagStep('❌ analyzeAllSync() ERREUR: ' + e.message + ' — ligne: ' + (e.stack ? e.stack.split('\n')[1] : '?'));
+    console.warn('analyzeAllSync error:', e);
     window.__MTP.lastAnalysis = { all: [], tradeable: [], neutral: [], inactive: [] };
   }
-  window._diagStep && _diagStep('⏳ Router.navigate() démarré...');
-  try {
-    Router.navigate('dashboard');
-    window._diagStep && _diagStep('✅ Router.navigate() OK');
-  } catch(e) {
-    window._diagStep && _diagStep('❌ Router.navigate() ERREUR: ' + e.message);
-  }
-  try {
-    Router.attachNavClicks();
-    window._diagStep && _diagStep('✅ NavClicks OK');
-  } catch(e) {
-    window._diagStep && _diagStep('❌ NavClicks ERREUR: ' + e.message);
-  }
+  Router.navigate('dashboard');
+  Router.attachNavClicks();
 
   // 10. Service Worker — désactivé V1
   // if ('serviceWorker' in navigator) {
@@ -3560,7 +3496,6 @@ async function boot() {
   }, 600);
 
   console.log('✅ ManiTradePro V1 prêt');
-  window._diagStep && _diagStep('✅ Boot complet !');
 }
 
 window.addEventListener('unhandledrejection', e => console.error('❌', e.reason));
