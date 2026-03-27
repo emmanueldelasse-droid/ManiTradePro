@@ -1,3 +1,17 @@
+
+// ── Capture toutes les erreurs JS ──
+window.addEventListener('error', function(e) {
+  const diag = document.getElementById('main-content');
+  if (diag) {
+    diag.innerHTML += '<div style="padding:20px;color:#e05a5a;font-family:monospace;font-size:13px;background:rgba(224,90,90,0.1);margin:10px;border-radius:8px;border:1px solid rgba(224,90,90,0.3);">' +
+      '<div style="font-weight:700;">❌ ERREUR JS DETECTÉE</div>' +
+      '<div>Message : ' + e.message + '</div>' +
+      '<div>Fichier : ' + (e.filename || '?') + '</div>' +
+      '<div>Ligne : ' + e.lineno + '</div>' +
+      '</div>';
+  }
+});
+
 // ============================================================
 // ManiTradePro V1 — App Bundle (standalone, no ES modules)
 // ============================================================
@@ -3403,6 +3417,26 @@ Router.register('settings', () => { renderSettings(); });
 async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
 
+  // ── DIAGNOSTIC VISUEL TEMPORAIRE ──
+  const _diag = document.getElementById('main-content');
+  if (_diag) {
+    _diag.innerHTML = '<div style="padding:20px;color:#00e5a0;font-family:monospace;font-size:13px;line-height:1.8;">' +
+      '<div style="font-size:16px;font-weight:700;margin-bottom:12px;">🔍 Diagnostic ManiTradePro</div>' +
+      '<div>✅ JS exécuté</div>' +
+      '<div>📱 iOS : ' + (navigator.userAgent.match(/OS (\d+)_(\d+)/) || ['','?','?'])[0] + '</div>' +
+      '<div>🌐 URL : ' + location.href + '</div>' +
+      '<div>💾 localStorage : ' + (function(){ try { localStorage.setItem('t','1'); localStorage.removeItem('t'); return 'OK'; } catch(e) { return 'BLOQUÉ: '+e.message; }})() + '</div>' +
+      '<div id="diag-step">⏳ Initialisation Storage...</div>' +
+      '</div>';
+  }
+  function _diagStep(msg) {
+    const el = document.getElementById('diag-step');
+    if (el) el.innerHTML += '<br>' + msg;
+  }
+  window._diagStep = _diagStep;
+  // ── FIN DIAGNOSTIC ──
+
+
   // Migration capital corrompu
   try {
     const rawCap = localStorage.getItem('mtp_sim_capital');
@@ -3417,10 +3451,12 @@ async function boot() {
   // 1. Storage
   Storage.init();
   window.__prices = {};
+  window._diagStep && _diagStep('✅ Storage OK');
 
   // 2. Twelve Data
   const apiKeysRaw = Storage.getApiKeys();
   TwelveDataClient.init(apiKeysRaw);
+  window._diagStep && _diagStep('✅ TwelveData OK');
   window.__MTP.TwelveDataClient = TwelveDataClient;
 
   // 3. Binance
@@ -3453,8 +3489,12 @@ async function boot() {
   window.__MTP.Sync = Sync;
 
   // 9. Affichage immédiat (jamais bloquer sur réseau)
+  window._diagStep && _diagStep('⏳ Analyse en cours...');
   window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
+  window._diagStep && _diagStep('✅ Analyse OK');
+  window._diagStep && _diagStep('⏳ Navigation dashboard...');
   Router.navigate('dashboard');
+  window._diagStep && _diagStep('✅ Navigation OK');
   Router.attachNavClicks();
 
   // 10. Service Worker — désactivé V1
@@ -3479,6 +3519,7 @@ async function boot() {
   }, 600);
 
   console.log('✅ ManiTradePro V1 prêt');
+  window._diagStep && _diagStep('✅ Boot complet !');
 }
 
 window.addEventListener('unhandledrejection', e => console.error('❌', e.reason));
