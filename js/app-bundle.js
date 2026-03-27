@@ -1827,7 +1827,9 @@ const UI = (() => {
       const price = MOCK_DATA.prices[symbol]?.price || 0;
       const stop  = analysis.stopLoss || (price * 0.98);
       const tp    = analysis.takeProfit || (price * 1.05);
-      const riskAmount = simCap.current * settings.riskPerTrade;
+      const _cap = Storage.getSimCapital();
+      const _capNum = typeof _cap === 'object' ? (_cap.current || 10000) : (parseFloat(_cap) || 10000);
+      const riskAmount = _capNum * settings.riskPerTrade;
       const qty   = analysis.sizing?.units || (riskAmount / Math.abs(price - stop));
       const invested = qty * price;
 
@@ -1861,7 +1863,7 @@ const UI = (() => {
               <label class="input-label">Montant investi (€)</label>
               <input type="number" class="input-field" id="order-amount"
                 value="${invested.toFixed(2)}" min="1" step="0.01" />
-              <div class="input-hint">Capital disponible : ${Fmt.currency(simCap.current)}</div>
+              <div class="input-hint">Capital disponible : ${Fmt.currency(_capNum)}</div>
             </div>
 
             <div class="grid-2" style="gap: var(--space-3);">
@@ -2188,8 +2190,15 @@ function renderDashboard() {
     totalInvested += p.invested;
   });
 
-  const capitalTotal = simCap.current + totalInvested;
-  const globalReturn = ((capitalTotal - simCap.initial) / simCap.initial) * 100;
+  // Normalize simCap - may be number or {current, initial} object
+  const _simCapNum = typeof simCap === 'object' && simCap !== null
+    ? (simCap.current || simCap.initial || 10000)
+    : (parseFloat(simCap) || 10000);
+  const _simCapInit = typeof simCap === 'object' && simCap !== null
+    ? (simCap.initial || simCap.current || 10000)
+    : _simCapNum;
+  const capitalTotal = _simCapNum + totalInvested;
+  const globalReturn = _simCapInit > 0 ? ((capitalTotal - _simCapInit) / _simCapInit) * 100 : 0;
 
   // Analyse rapide du marché
   const analysis = AnalysisEngine.analyzeAll();
@@ -2227,7 +2236,7 @@ function renderDashboard() {
       <div class="grid-4" style="margin-bottom:var(--space-8);">
         <div class="stat-card">
           <div class="stat-label">Capital disponible</div>
-          <div class="stat-value">${Fmt.currency(simCap.current)}</div>
+          <div class="stat-value">${Fmt.currency(_simCapNum)}</div>
         </div>
         <div class="stat-card">
           <div class="stat-label">Positions ouvertes</div>
@@ -2718,8 +2727,8 @@ function renderAssetDetail(params) {
         <div class="mode-zone sim-zone">
           <div class="mode-zone-title">⚡ Mode Simulation</div>
           <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:var(--space-4);line-height:1.6;">
-            Capital fictif disponible : <strong>${Fmt.currency(simCap.current)}</strong><br/>
-            Risque par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(simCap.current * settings.riskPerTrade)}
+            Capital fictif disponible : <strong>${Fmt.currency(_capNum)}</strong><br/>
+            Risque par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(_capNum * settings.riskPerTrade)}
           </div>
           ${analysis.direction !== 'neutral' ? `
             <button class="btn btn-sim btn-block" id="btn-open-sim"
