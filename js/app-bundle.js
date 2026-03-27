@@ -801,8 +801,8 @@ const BinanceClient = (() => {
   function init(apiKey = '', secretKey = '') {
     _apiKey    = apiKey;
     _secretKey = secretKey;
-    // Récupérer le taux EUR/USD au démarrage
-    _fetchEurUsdRate();
+    // Récupérer le taux EUR/USD (silencieux si CORS bloqué)
+    _fetchEurUsdRate().catch(() => {});
     console.log('[Binance] Client initialisé —', _apiKey ? 'clé configurée' : 'mode public uniquement');
   }
 
@@ -1832,6 +1832,7 @@ const AnalysisEngine = (() => {
   return {
     analyzeAsset,
     analyzeAll,
+    analyzeAllSync,
     computeConfidenceScore,
     detectSignal,
     checkRegime,
@@ -2424,9 +2425,6 @@ const Sync = (() => {
       }
     });
 
-    // Premier chargement immédiat
-    refreshPrices();
-
     console.log('[Sync] Prix toutes les 5min — Analyse toutes les 1h — Refresh au focus');
   }
 
@@ -2447,13 +2445,14 @@ const Sync = (() => {
   }
 
   async function refreshPrices() {
-    // Rafraîchit les prix réels depuis CoinGecko / Yahoo Finance
-    const watchlist = Storage.getWatchlist();
-    await RealDataClient.refreshAllPrices(watchlist);
-
-    // Met à jour l'affichage des positions si on est sur l'écran positions
-    if (Router.getCurrent() === 'positions' || Router.getCurrent() === 'dashboard') {
-      updateLivePnL();
+    try {
+      const watchlist = Storage.getWatchlist();
+      await RealDataClient.refreshAllPrices(watchlist);
+      if (Router.getCurrent() === 'positions' || Router.getCurrent() === 'dashboard') {
+        updateLivePnL();
+      }
+    } catch(e) {
+      // Silencieux — réseau indisponible, l'app continue avec les données en cache
     }
     lastSyncTime = Date.now();
   }
@@ -4974,11 +4973,11 @@ async function boot() {
     navigator.serviceWorker.register('/sw.js').catch(() => {});
   }
 
-  // 11. Données en arrière-plan (après affichage UI)
+  // 11. Données en arrière-plan (après affichage UI) — silencieux si réseau indispo
   setTimeout(() => {
-    _runAnalysis();
-    RealDataClient.refreshAllPrices(Storage.getWatchlist()).catch(() => {});
-  }, 100);
+    try { _runAnalysis(); } catch(e) {}
+    try { RealDataClient.refreshAllPrices(Storage.getWatchlist()).catch(() => {}); } catch(e) {}
+  }, 500);
 
   console.log('✅ ManiTradePro V1 prêt');
 }
