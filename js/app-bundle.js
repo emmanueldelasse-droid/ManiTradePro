@@ -434,7 +434,7 @@ const RiskCalculator = (() => {
 
 // ═══ BinanceClient ═══
 const BinanceClient = (() => {
-  const BASE = 'https://aged-bar-257a.emmanueldelasse.workers.dev/binance';
+  const BASE = 'https://api.binance.com';
   const BINANCE_PAIRS = { 'BTC': 'BTCEUR', 'ETH': 'ETHEUR', 'SOL': 'SOLEUR', 'BNB': 'BNBEUR' };
   const BINANCE_USDT  = { 'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'SOL': 'SOLUSDT' };
   let _apiKey = '', _secretKey = '', _eurUsdRate = 1.08;
@@ -2082,6 +2082,23 @@ function renderAssetDetail(params) {
       </div>
     </div>
 
+    <!-- Boutons brokers -->
+    <div class="section-sep"><span class="sep-label">Accès rapide broker</span><div class="sep-line"></div></div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5);">
+      ${['BTC','ETH','SOL','GOLD','EURUSD','GBPUSD'].includes(symbol) ? `
+      <a href="https://www.binance.com/fr/trade/${{
+        'BTC':'BTC_USDT','ETH':'ETH_USDT','SOL':'SOL_USDT',
+        'GOLD':'XAU_USDT','EURUSD':'EUR_USDT','GBPUSD':'GBP_USDT'
+      }[symbol]}" target="_blank" rel="noopener"
+        style="display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);border-radius:var(--btn-radius);color:var(--sim-color);font-size:var(--text-sm);font-weight:600;text-decoration:none;transition:all var(--transition-fast);">
+        🟡 Ouvrir sur Binance
+      </a>` : `<div></div>`}
+      <button id="btn-tr-open-${symbol}"
+        style="display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:var(--btn-radius);color:var(--accent);font-size:var(--text-sm);font-weight:600;cursor:pointer;transition:all var(--transition-fast);">
+        🟢 Trader sur Trade Republic
+      </button>
+    </div>
+
     <div class="warning-box" style="margin-top:var(--space-5);">
       ⚠️ Ce score est une suggestion algorithmique. Il ne constitue pas un conseil financier.
     </div>`;
@@ -2136,6 +2153,22 @@ function renderPriceChart(symbol) {
 
 // ── Événements asset-detail (bouton sim + alertes)
 document.addEventListener('click', async e => {
+
+  // Bouton Trade Republic — copie le symbole + ouvre l'app
+  const trBtn = e.target.closest('[id^="btn-tr-open-"]');
+  if (trBtn) {
+    const sym = trBtn.id.replace('btn-tr-open-', '');
+    const trUrl = 'https://app.traderepublic.com/instrument/' + sym;
+    try {
+      await navigator.clipboard.writeText(sym);
+      UI.toast('📋 ' + sym + ' copié — collez dans Trade Republic', 'success');
+    } catch(err) {
+      UI.toast('Ouverture Trade Republic...', 'info');
+    }
+    window.open(trUrl, '_blank');
+    return;
+  }
+
   // Bouton open sim
   const simBtn = e.target.closest('#btn-open-sim');
   if (simBtn) {
