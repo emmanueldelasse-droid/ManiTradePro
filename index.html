@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>ManiTradePro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+  <!-- APP SHELL -->
+  <div id="app">
+
+    <!-- SIDEBAR NAV (web) -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-logo">
+        <span class="logo-icon">◈</span>
+        <span class="logo-text">ManiTrade<strong>Pro</strong></span>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="#dashboard" class="nav-item active" data-view="dashboard">
+          <span class="nav-icon">⬡</span>
+          <span>Tableau de bord</span>
+        </a>
+        <a href="#opportunities" class="nav-item" data-view="opportunities">
+          <span class="nav-icon">◎</span>
+          <span>Opportunités</span>
+        </a>
+        <a href="#positions" class="nav-item" data-view="positions">
+          <span class="nav-icon">⊕</span>
+          <span>Positions</span>
+        </a>
+        <a href="#simulation" class="nav-item" data-view="simulation">
+          <span class="nav-icon">⬙</span>
+          <span>Simulation</span>
+          <span class="nav-badge sim-badge">SIM</span>
+        </a>
+        <a href="#settings" class="nav-item" data-view="settings">
+          <span class="nav-icon">⊛</span>
+          <span>Paramètres</span>
+        </a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="market-status" id="market-status">
+          <span class="status-dot"></span>
+          <span class="status-text">Marchés actifs</span>
+        </div>
+        <div class="last-update" id="last-update">Mise à jour: --:--</div>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="main-content" id="main-content">
+
+      <!-- TOP BAR -->
+      <header class="topbar">
+        <button class="menu-btn" id="menu-btn">☰</button>
+        <div class="topbar-title" id="topbar-title">Tableau de bord</div>
+        <div class="topbar-right">
+          <div class="mode-indicator" id="mode-indicator">
+            <span class="mode-badge sim">SIMULATION</span>
+          </div>
+          <button class="refresh-btn" id="refresh-btn" title="Actualiser">↻</button>
+        </div>
+      </header>
+
+      <!-- VIEWS CONTAINER -->
+      <div class="views-container" id="views-container">
+        <!-- Injected by JS -->
+      </div>
+    </main>
+
+    <!-- MOBILE BOTTOM NAV -->
+    <nav class="bottom-nav" id="bottom-nav">
+      <a class="bn-item active" data-view="dashboard">
+        <span class="bn-icon">⬡</span>
+        <span>Board</span>
+      </a>
+      <a class="bn-item" data-view="opportunities">
+        <span class="bn-icon">◎</span>
+        <span>Signaux</span>
+      </a>
+      <a class="bn-item" data-view="positions">
+        <span class="bn-icon">⊕</span>
+        <span>Positions</span>
+      </a>
+      <a class="bn-item" data-view="simulation">
+        <span class="bn-icon">⬙</span>
+        <span>Sim</span>
+      </a>
+      <a class="bn-item" data-view="settings">
+        <span class="bn-icon">⊛</span>
+        <span>Config</span>
+      </a>
+    </nav>
+
+  </div><!-- /#app -->
+
+  <!-- MODAL OVERLAY -->
+  <div class="modal-overlay" id="modal-overlay"></div>
+  <div class="modal" id="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">Confirmation</span>
+      <button class="modal-close" id="modal-close">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+
+  <!-- TOAST NOTIFICATIONS -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- SCRIPTS -->
+  <script src="assets/js/utils/format.js"></script>
+  <script src="assets/js/utils/storage.js"></script>
+  <script src="assets/js/data/mock-data.js"></script>
+  <script src="assets/js/data/market-state.js"></script>
+  <script src="assets/js/engine/indicators.js"></script>
+  <script src="assets/js/engine/regime.js"></script>
+  <script src="assets/js/engine/scoring.js"></script>
+  <script src="assets/js/engine/analysis.js"></script>
+  <script src="assets/js/api/twelve-data.js"></script>
+  <script src="assets/js/api/binance.js"></script>
+  <script src="assets/js/api/trade-republic.js"></script>
+  <script src="assets/js/simulation/portfolio.js"></script>
+  <script src="assets/js/simulation/simulator.js"></script>
+  <script src="assets/js/views/dashboard.js"></script>
+  <script src="assets/js/views/opportunities.js"></script>
+  <script src="assets/js/views/asset-detail.js"></script>
+  <script src="assets/js/views/positions.js"></script>
+  <script src="assets/js/views/simulation-view.js"></script>
+  <script src="assets/js/views/settings.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
