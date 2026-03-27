@@ -3457,12 +3457,22 @@ function _attachSettingsEvents(settings) {
       if (themeEl) { s.theme = themeEl.value; document.documentElement.setAttribute('data-theme', themeEl.value); }
       const alertThreshEl = document.getElementById('alert-score-threshold');
       if (alertThreshEl?.value) s.alertScoreThreshold = parseInt(alertThreshEl.value);
+      // Sync simCapital with simInitialCapital
+      const capEl2 = document.getElementById('settings-sim-capital');
+      if (capEl2?.value) {
+        const newCap = parseFloat(capEl2.value);
+        if (newCap >= 1000) {
+          s.simInitialCapital = newCap;
+          Storage.saveSimCapital(newCap);
+        }
+      }
       Storage.saveSettings(s);
       UI.toast('Paramètres enregistrés ✅', 'success');
-      // Refresh dashboard si ouvert
+      // Refresh all screens
       const cur = Router.getCurrent();
       if (cur === 'dashboard') Router.navigate('dashboard');
-      if (cur === 'portefeuille') renderPortefeuille();
+      else if (cur === 'portefeuille') renderPortefeuille();
+      else if (cur === 'simulation') renderSimulation();
     });
   }
 }
