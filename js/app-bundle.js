@@ -808,7 +808,7 @@ const BinanceClient = (() => {
 
   async function _fetchEurUsdRate() {
     try {
-      const res = await fetch(`${BASE}/api/v3/ticker/price?symbol=EURUSDT`);
+      const res = await fetch(`${BASE}/api/v3/ticker/price?symbol=EURUSDT`, { mode: 'cors' });
       if (res.ok) {
         const data = await res.json();
         _eurUsdRate = parseFloat(data.price);
@@ -865,7 +865,7 @@ const BinanceClient = (() => {
       // Essayer d'abord la paire EUR directe
       if (pairEur) {
         const res = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pairEur}`,
-          { signal: AbortSignal.timeout(6000) });
+          { signal: AbortSignal.timeout(6000), mode: 'cors' });
         if (res.ok) {
           const d = await res.json();
           return {
@@ -880,7 +880,7 @@ const BinanceClient = (() => {
       // Fallback paire USDT → conversion EUR
       if (pairUsdt) {
         const res = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pairUsdt}`,
-          { signal: AbortSignal.timeout(6000) });
+          { signal: AbortSignal.timeout(6000), mode: 'cors' });
         if (res.ok) {
           const d = await res.json();
           const priceUsdt = parseFloat(d.lastPrice);
@@ -907,7 +907,7 @@ const BinanceClient = (() => {
 
     try {
       const url = `${BASE}/api/v3/klines?symbol=${pair}&interval=1d&limit=130`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000), mode: 'cors' });
       if (!res.ok) return null;
       const raw = await res.json();
       if (!Array.isArray(raw) || raw.length < 20) return null;
@@ -1073,14 +1073,23 @@ const RealDataClient = (() => {
 
   // ── PROXIES CORS (nécessaires en browser pour Yahoo)
   const CORS_PROXIES = [
-    'https://corsproxy.io/?',
     'https://api.allorigins.win/raw?url=',
+    'https://corsproxy.io/?url=',
+    'https://proxy.cors.sh/',
   ];
 
   async function _fetchWithProxy(url) {
+    // Try direct first (works if API supports CORS)
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+      if (res.ok) return res;
+    } catch(e) {}
+
+    // Try each CORS proxy
     for (const proxy of CORS_PROXIES) {
       try {
-        const res = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(8000) });
+        const proxyUrl = proxy + encodeURIComponent(url);
+        const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
         if (res.ok) return res;
       } catch(e) { continue; }
     }
@@ -1101,7 +1110,7 @@ const RealDataClient = (() => {
 
     try {
       const url = `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=eur&include_24hr_change=true&include_24hr_vol=true`;
-      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000), mode: 'cors' });
       if (!res.ok) return null;
       const data = await res.json();
       if (!data[id]) return null;
@@ -1143,7 +1152,7 @@ const RealDataClient = (() => {
       const volUrl = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=eur&days=90&interval=daily`;
       let volumes = [];
       try {
-        const volRes = await fetch(volUrl, { signal: AbortSignal.timeout(8000) });
+        const volRes = await fetch(volUrl, { signal: AbortSignal.timeout(8000), mode: 'cors' });
         if (volRes.ok) {
           const volData = await volRes.json();
           volumes = volData.total_volumes || [];
@@ -1613,11 +1622,36 @@ const AnalysisEngine = (() => {
     }
 
     if (!candles || candles.length < 20 || !priceData) {
+      // Fallback sur les données mock pour l'affichage si données réelles indisponibles
+      const mockPrice = MOCK_DATA.prices[symbol];
+      const mockCandles = MOCK_DATA.getOHLC(symbol);
+      if (mockPrice && mockCandles && mockCandles.length >= 20) {
+        console.warn(`[Analysis] ${symbol} — données réelles indisponibles, utilisation des données simulées temporairement`);
+        // Continuer avec mock data mais le signaler
+        const ind2 = Indicators.computeAll(mockCandles);
+        if (ind2) {
+          return {
+            symbol, name, assetClass,
+            price: mockPrice.price,
+            change24h: mockPrice.change24h || 0,
+            error: null,
+            dataWarning: 'Données simulées (API indisponible)',
+            direction: 'neutral',
+            score: 0,
+            adjScore: 0,
+            strength: 'weak',
+            riskLevel: 'medium',
+            isSolid: false,
+            indicators: ind2,
+            regime: { pass: false, reasons: [{ label: 'Données API indisponibles', pass: false }] },
+          };
+        }
+      }
       return {
         symbol, name, assetClass,
         price: 0,
         change24h: 0,
-        error: 'Données de marché indisponibles — vérifiez votre connexion',
+        error: 'Données indisponibles — vérifiez votre connexion internet',
         direction: 'neutral',
         score: 0,
         adjScore: 0,
