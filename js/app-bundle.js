@@ -3147,7 +3147,7 @@ function _attachPositionEvents() {
       if (!confirmed) return;
 
       try {
-        const adapter  = BrokerAdapterFactory.get(mode === 'real' ? Storage.getSettings().broker : 'mock');
+        const adapter  = BrokerAdapter;
         const result   = await adapter.closePosition(id);
 
         if (result.success) {
@@ -4090,7 +4090,7 @@ async function boot() {
 
   // 4. Broker
   const settings = Storage.getSettings();
-  const adapter  = BrokerAdapterFactory.get(settings.broker || 'mock');
+  const adapter  = BrokerAdapter;
   window.__MTP.BrokerAdapter = adapter;
 
   // 5. Analysis Engine
