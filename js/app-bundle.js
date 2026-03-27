@@ -434,7 +434,7 @@ const RiskCalculator = (() => {
 
 // ═══ BinanceClient ═══
 const BinanceClient = (() => {
-  const BASE = 'https://bar-aged-257a.emmanueldelasse.workers.dev/binance';
+  const BASE = 'https://aged-bar-257a.emmanueldelasse.workers.dev/binance';
   const BINANCE_PAIRS = { 'BTC': 'BTCEUR', 'ETH': 'ETHEUR', 'SOL': 'SOLEUR', 'BNB': 'BNBEUR' };
   const BINANCE_USDT  = { 'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'SOL': 'SOLUSDT' };
   let _apiKey = '', _secretKey = '', _eurUsdRate = 1.08;
