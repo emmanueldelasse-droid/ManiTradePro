@@ -3457,10 +3457,10 @@ async function boot() {
   Router.navigate('dashboard');
   Router.attachNavClicks();
 
-  // 10. Service Worker
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  }
+  // 10. Service Worker — désactivé V1
+  // if ('serviceWorker' in navigator) {
+  //   navigator.serviceWorker.register('/sw.js').catch(() => {});
+  // }
 
   // 11. Analyse + données réelles en arrière-plan
   setTimeout(async () => {
