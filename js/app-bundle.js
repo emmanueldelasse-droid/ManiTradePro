@@ -343,8 +343,8 @@ const Storage = (() => {
   // ── INTERFACE PUBLIQUE
   return {
     init,
-    getSettings, saveSettings,
-    getSimCapital, saveSimCapital,
+    getSettings, saveSettings, setSettings: saveSettings,
+    getSimCapital, saveSimCapital, setSimCapital: saveSimCapital,
     getSimPositions, saveSimPositions,
     getSimHistory, saveSimHistory,
     getRealPositions, saveRealPositions,
