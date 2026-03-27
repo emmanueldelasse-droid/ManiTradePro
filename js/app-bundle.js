@@ -766,6 +766,625 @@ const RiskCalculator = (() => {
 
 })();
 
+
+
+// ============================================================
+// BinanceClient — Données marché + ordres réels
+// API publique (données) : gratuite, illimitée, pas de clé
+// API privée (ordres) : nécessite clé + secret + signature HMAC
+// ============================================================
+
+const BinanceClient = (() => {
+
+  const BASE = 'https://api.binance.com';
+  const BASE_DATA = 'https://api.binance.com'; // Pas de CORS sur les endpoints publics
+
+  // ── MAPPING SYMBOLES → Binance pairs
+  const BINANCE_PAIRS = {
+    'BTC'  : 'BTCEUR',
+    'ETH'  : 'ETHEUR',
+    'SOL'  : 'SOLEUR',
+    'BNB'  : 'BNBEUR',
+  };
+
+  // Binance ne propose pas EUR pour tous - fallback USDT avec taux EUR
+  const BINANCE_USDT_PAIRS = {
+    'BTC'  : 'BTCUSDT',
+    'ETH'  : 'ETHUSDT',
+    'SOL'  : 'SOLUSDT',
+  };
+
+  let _apiKey    = '';
+  let _secretKey = '';
+  let _eurUsdRate = 1.08; // Taux EUR/USD approximatif, mis à jour au démarrage
+
+  function init(apiKey = '', secretKey = '') {
+    _apiKey    = apiKey;
+    _secretKey = secretKey;
+    // Récupérer le taux EUR/USD au démarrage
+    _fetchEurUsdRate();
+    console.log('[Binance] Client initialisé —', _apiKey ? 'clé configurée' : 'mode public uniquement');
+  }
+
+  async function _fetchEurUsdRate() {
+    try {
+      const res = await fetch(`${BASE}/api/v3/ticker/price?symbol=EURUSDT`);
+      if (res.ok) {
+        const data = await res.json();
+        _eurUsdRate = parseFloat(data.price);
+      }
+    } catch(e) {}
+  }
+
+  // ── SIGNATURE HMAC pour les endpoints privés
+  async function _sign(queryString) {
+    const encoder = new TextEncoder();
+    const keyData  = encoder.encode(_secretKey);
+    const msgData  = encoder.encode(queryString);
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']
+    );
+    const sig = await crypto.subtle.sign('HMAC', cryptoKey, msgData);
+    return Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  async function _privateRequest(method, path, params = {}) {
+    if (!_apiKey || !_secretKey) {
+      return { error: 'Clé API Binance non configurée' };
+    }
+    const timestamp = Date.now();
+    const queryString = new URLSearchParams({ ...params, timestamp }).toString();
+    const signature   = await _sign(queryString);
+    const url = `${BASE}${path}?${queryString}&signature=${signature}`;
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: { 'X-MBX-APIKEY': _apiKey },
+      });
+      return await res.json();
+    } catch(e) {
+      return { error: e.message };
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // DONNÉES PUBLIQUES (pas de clé nécessaire)
+  // ──────────────────────────────────────────────────────────
+
+  /**
+   * Prix spot en EUR
+   */
+  async function getPrice(symbol) {
+    const pairEur  = BINANCE_PAIRS[symbol];
+    const pairUsdt = BINANCE_USDT_PAIRS[symbol];
+
+    if (!pairEur && !pairUsdt) return null;
+
+    try {
+      // Essayer d'abord la paire EUR directe
+      if (pairEur) {
+        const res = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pairEur}`,
+          { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          const d = await res.json();
+          return {
+            price    : parseFloat(d.lastPrice),
+            change24h: parseFloat(d.priceChangePercent),
+            volume24h: parseFloat(d.quoteVolume),
+            source   : 'Binance',
+          };
+        }
+      }
+
+      // Fallback paire USDT → conversion EUR
+      if (pairUsdt) {
+        const res = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pairUsdt}`,
+          { signal: AbortSignal.timeout(6000) });
+        if (res.ok) {
+          const d = await res.json();
+          const priceUsdt = parseFloat(d.lastPrice);
+          return {
+            price    : priceUsdt / _eurUsdRate,
+            change24h: parseFloat(d.priceChangePercent),
+            volume24h: parseFloat(d.quoteVolume) / _eurUsdRate,
+            source   : 'Binance',
+          };
+        }
+      }
+    } catch(e) {}
+    return null;
+  }
+
+  /**
+   * Bougies OHLCV (130 jours, interval 1d)
+   */
+  async function getOHLC(symbol) {
+    const pairEur  = BINANCE_PAIRS[symbol];
+    const pairUsdt = BINANCE_USDT_PAIRS[symbol];
+    const pair     = pairEur || pairUsdt;
+    if (!pair) return null;
+
+    try {
+      const url = `${BASE}/api/v3/klines?symbol=${pair}&interval=1d&limit=130`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return null;
+      const raw = await res.json();
+      if (!Array.isArray(raw) || raw.length < 20) return null;
+
+      const useUsdt = !pairEur && pairUsdt;
+      return raw.map(k => ({
+        ts    : k[0],
+        open  : parseFloat(k[1]) / (useUsdt ? _eurUsdRate : 1),
+        high  : parseFloat(k[2]) / (useUsdt ? _eurUsdRate : 1),
+        low   : parseFloat(k[3]) / (useUsdt ? _eurUsdRate : 1),
+        close : parseFloat(k[4]) / (useUsdt ? _eurUsdRate : 1),
+        volume: parseFloat(k[5]),
+      }));
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // DONNÉES COMPTE (clé nécessaire)
+  // ──────────────────────────────────────────────────────────
+
+  async function getBalance() {
+    const data = await _privateRequest('GET', '/api/v3/account');
+    if (data.error) return { error: data.error };
+
+    const balances = (data.balances || [])
+      .filter(b => parseFloat(b.free) > 0 || parseFloat(b.locked) > 0)
+      .map(b => ({
+        asset : b.asset,
+        free  : parseFloat(b.free),
+        locked: parseFloat(b.locked),
+        total : parseFloat(b.free) + parseFloat(b.locked),
+      }));
+
+    return { balances, connected: true };
+  }
+
+  async function getOpenOrders(symbol) {
+    const pair = BINANCE_PAIRS[symbol] || BINANCE_USDT_PAIRS[symbol];
+    const data = await _privateRequest('GET', '/api/v3/openOrders', pair ? { symbol: pair } : {});
+    return data;
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // ORDRES RÉELS (clé + secret nécessaires)
+  // ──────────────────────────────────────────────────────────
+
+  /**
+   * Passer un ordre market
+   * @param {string} symbol - ex: 'BTC'
+   * @param {string} side - 'BUY' ou 'SELL'
+   * @param {number} quantity - quantité en crypto
+   */
+  async function placeMarketOrder(symbol, side, quantity) {
+    const pair = BINANCE_PAIRS[symbol] || BINANCE_USDT_PAIRS[symbol];
+    if (!pair) return { error: 'Symbole non supporté sur Binance' };
+
+    const data = await _privateRequest('POST', '/api/v3/order', {
+      symbol,
+      side        : side.toUpperCase(),
+      type        : 'MARKET',
+      quantity    : quantity.toFixed(6),
+    });
+
+    if (data.code) return { error: `Binance erreur ${data.code}: ${data.msg}` };
+
+    return {
+      success  : true,
+      orderId  : data.orderId,
+      symbol   : data.symbol,
+      side     : data.side,
+      quantity : parseFloat(data.executedQty),
+      price    : parseFloat(data.fills?.[0]?.price || 0),
+      status   : data.status,
+    };
+  }
+
+  /**
+   * Annuler un ordre
+   */
+  async function cancelOrder(symbol, orderId) {
+    const pair = BINANCE_PAIRS[symbol] || BINANCE_USDT_PAIRS[symbol];
+    if (!pair) return { error: 'Symbole non supporté' };
+    return await _privateRequest('DELETE', '/api/v3/order', { symbol: pair, orderId });
+  }
+
+  /**
+   * Test de connexion
+   */
+  async function testConnection() {
+    if (!_apiKey) return { connected: false, error: 'Pas de clé API' };
+    const data = await _privateRequest('GET', '/api/v3/account');
+    if (data.error || data.code) return { connected: false, error: data.error || data.msg };
+    return { connected: true, balances: data.balances?.length || 0 };
+  }
+
+  function isConfigured() {
+    return _apiKey.length > 0 && _secretKey.length > 0;
+  }
+
+  return {
+    init,
+    getPrice,
+    getOHLC,
+    getBalance,
+    getOpenOrders,
+    placeMarketOrder,
+    cancelOrder,
+    testConnection,
+    isConfigured,
+  };
+
+})();
+
+// ============================================================
+// RealDataClient — Prix et OHLCV réels, zéro mock
+// Sources : CoinGecko (crypto) + Yahoo Finance (actions/ETF/forex/or)
+// Fallback automatique entre sources
+// Cache 5 minutes pour éviter les rate limits
+// ============================================================
+
+const RealDataClient = (() => {
+
+  // ── CACHE
+  const _cache = new Map();
+  const PRICE_TTL = 4 * 60 * 1000;   // 4 minutes pour les prix spot (refresh toutes les 5min)
+  const OHLC_TTL  = 60 * 60 * 1000;  // 1 heure pour les bougies OHLCV
+
+  function _cacheGet(key) {
+    const entry = _cache.get(key);
+    if (!entry) return null;
+    const ttl = key.startsWith('ohlc_') || key.startsWith('cg_ohlc_') || key.startsWith('yf_ohlc_')
+      ? OHLC_TTL : PRICE_TTL;
+    if (Date.now() - entry.ts > ttl) { _cache.delete(key); return null; }
+    return entry.data;
+  }
+  function _cacheSet(key, data) {
+    _cache.set(key, { data, ts: Date.now() });
+  }
+
+  // ── MAPPING SYMBOLES
+  // CoinGecko ids
+  const COINGECKO_IDS = {
+    'BTC' : 'bitcoin',
+    'ETH' : 'ethereum',
+    'SOL' : 'solana',
+    'BNB' : 'binancecoin',
+  };
+
+  // Yahoo Finance tickers
+  const YAHOO_TICKERS = {
+    'AAPL'  : 'AAPL',
+    'MSFT'  : 'MSFT',
+    'NVDA'  : 'NVDA',
+    'TSLA'  : 'TSLA',
+    'AMZN'  : 'AMZN',
+    'SPY'   : 'SPY',
+    'GOLD'  : 'GC=F',      // Gold Futures
+    'EURUSD': 'EURUSD=X',
+    'GBPUSD': 'GBPUSD=X',
+  };
+
+  // ── PROXIES CORS (nécessaires en browser pour Yahoo)
+  const CORS_PROXIES = [
+    'https://corsproxy.io/?',
+    'https://api.allorigins.win/raw?url=',
+  ];
+
+  async function _fetchWithProxy(url) {
+    for (const proxy of CORS_PROXIES) {
+      try {
+        const res = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(8000) });
+        if (res.ok) return res;
+      } catch(e) { continue; }
+    }
+    return null;
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // COINGECKO — Prix spot crypto
+  // ──────────────────────────────────────────────────────────
+
+  async function _getCoinGeckoPrice(symbol) {
+    const id = COINGECKO_IDS[symbol];
+    if (!id) return null;
+
+    const cacheKey = 'cg_price_' + symbol;
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const url = `https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=eur&include_24hr_change=true&include_24hr_vol=true`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data[id]) return null;
+
+      const result = {
+        price    : data[id].eur,
+        change24h: data[id].eur_24h_change || 0,
+        volume24h: data[id].eur_24h_vol || 0,
+        source   : 'CoinGecko',
+      };
+      _cacheSet(cacheKey, result);
+      return result;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // COINGECKO — OHLCV crypto (90 jours gratuit)
+  // ──────────────────────────────────────────────────────────
+
+  async function _getCoinGeckoOHLC(symbol) {
+    const id = COINGECKO_IDS[symbol];
+    if (!id) return null;
+
+    const cacheKey = 'cg_ohlc_' + symbol;
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+
+    try {
+      // CoinGecko OHLC endpoint - returns [timestamp, open, high, low, close]
+      const url = `https://api.coingecko.com/api/v3/coins/${id}/ohlc?vs_currency=eur&days=90`;
+      const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!res.ok) return null;
+      const raw = await res.json();
+      if (!Array.isArray(raw) || raw.length < 20) return null;
+
+      // Also get volume from market_chart
+      const volUrl = `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=eur&days=90&interval=daily`;
+      let volumes = [];
+      try {
+        const volRes = await fetch(volUrl, { signal: AbortSignal.timeout(8000) });
+        if (volRes.ok) {
+          const volData = await volRes.json();
+          volumes = volData.total_volumes || [];
+        }
+      } catch(e) {}
+
+      const candles = raw.map((c, i) => ({
+        ts    : c[0],
+        open  : c[1],
+        high  : c[2],
+        low   : c[3],
+        close : c[4],
+        volume: volumes[i] ? volumes[i][1] : 1000000,
+      }));
+
+      _cacheSet(cacheKey, candles);
+      return candles;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // YAHOO FINANCE — Prix spot (actions, ETF, forex, or)
+  // ──────────────────────────────────────────────────────────
+
+  async function _getYahooPrice(symbol) {
+    const ticker = YAHOO_TICKERS[symbol];
+    if (!ticker) return null;
+
+    const cacheKey = 'yf_price_' + symbol;
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=2d`;
+      const res = await _fetchWithProxy(url);
+      if (!res) return null;
+      const data = await res.json();
+
+      const meta   = data?.chart?.result?.[0]?.meta;
+      if (!meta) return null;
+
+      const price     = meta.regularMarketPrice;
+      const prevClose = meta.previousClose || meta.chartPreviousClose;
+      const change24h = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+      const volume24h = meta.regularMarketVolume || 0;
+
+      // Convert to EUR if needed (Yahoo returns in native currency)
+      // For US stocks: USD → EUR (approximate, we'll use a fixed rate for now)
+      // For forex pairs like EURUSD=X, price IS the rate
+      let priceEur = price;
+      if (!ticker.includes('=X') && ticker !== 'GC=F') {
+        // US stock in USD → convert to EUR (approx 0.92)
+        priceEur = price * 0.92;
+      }
+
+      const result = {
+        price    : priceEur,
+        change24h,
+        volume24h,
+        source   : 'Yahoo Finance',
+      };
+      _cacheSet(cacheKey, result);
+      return result;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // YAHOO FINANCE — OHLCV historique (130 jours)
+  // ──────────────────────────────────────────────────────────
+
+  async function _getYahooOHLC(symbol) {
+    const ticker = YAHOO_TICKERS[symbol];
+    if (!ticker) return null;
+
+    const cacheKey = 'yf_ohlc_' + symbol;
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${ticker}?interval=1d&range=6mo`;
+      const res = await _fetchWithProxy(url);
+      if (!res) return null;
+      const data = await res.json();
+
+      const result = data?.chart?.result?.[0];
+      if (!result) return null;
+
+      const timestamps = result.timestamp || [];
+      const ohlcv      = result.indicators?.quote?.[0] || {};
+      if (timestamps.length < 20) return null;
+
+      const candles = timestamps.map((ts, i) => ({
+        ts    : ts * 1000,
+        open  : ohlcv.open?.[i]  || 0,
+        high  : ohlcv.high?.[i]  || 0,
+        low   : ohlcv.low?.[i]   || 0,
+        close : ohlcv.close?.[i] || 0,
+        volume: ohlcv.volume?.[i] || 1000000,
+      })).filter(c => c.close > 0);
+
+      // Convert USD → EUR for US stocks
+      if (!ticker.includes('=X') && ticker !== 'GC=F') {
+        candles.forEach(c => {
+          c.open  *= 0.92;
+          c.high  *= 0.92;
+          c.low   *= 0.92;
+          c.close *= 0.92;
+        });
+      }
+
+      _cacheSet(cacheKey, candles);
+      return candles;
+    } catch(e) {
+      return null;
+    }
+  }
+
+  // ──────────────────────────────────────────────────────────
+  // API PUBLIQUE
+  // ──────────────────────────────────────────────────────────
+
+  /**
+   * Récupère le prix spot d'un actif
+   * Retourne { price, change24h, volume24h, source } ou null
+   */
+  async function getPrice(symbol) {
+    const cacheKey = 'price_' + symbol;
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+
+    let result = null;
+
+    // 1. Binance pour les cryptos (illimité, temps réel, pas de quota)
+    if (COINGECKO_IDS[symbol] && BinanceClient) {
+      result = await BinanceClient.getPrice(symbol);
+      if (result && result.price) { _cacheSet(cacheKey, result); return result; }
+    }
+
+    // 2. Twelve Data (4 clés en rotation) pour tout le reste
+    if (TwelveDataClient && typeof TwelveDataClient.getPrice === 'function') {
+      result = await TwelveDataClient.getPrice(symbol);
+      if (result && result.price) { _cacheSet(cacheKey, result); return result; }
+    }
+
+    // 3. CoinGecko en backup crypto
+    if (COINGECKO_IDS[symbol]) {
+      result = await _getCoinGeckoPrice(symbol);
+      if (result) { _cacheSet(cacheKey, result); return result; }
+    }
+
+    // 4. Yahoo Finance en backup actions/ETF/forex/or
+    if (YAHOO_TICKERS[symbol]) {
+      result = await _getYahooPrice(symbol);
+      if (result) { _cacheSet(cacheKey, result); return result; }
+    }
+
+    console.warn(`[RealData] Aucune source disponible pour ${symbol}`);
+    return null;
+  }
+
+  /**
+   * Récupère les bougies OHLCV (130 jours)
+   * Retourne un tableau de candles ou null
+   */
+  async function getOHLC(symbol) {
+    const cacheKey = 'ohlc_' + symbol;
+    const cached = _cacheGet(cacheKey);
+    if (cached) return cached;
+
+    let candles = null;
+
+    // 1. Binance pour les cryptos (illimité, 130 bougies précises)
+    if (COINGECKO_IDS[symbol] && BinanceClient) {
+      candles = await BinanceClient.getOHLC(symbol);
+      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
+    }
+
+    // 2. Twelve Data pour actions/ETF/forex/or (4 clés)
+    if (TwelveDataClient && typeof TwelveDataClient.getTimeSeries === 'function') {
+      candles = await TwelveDataClient.getTimeSeries(symbol);
+      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
+    }
+
+    // 3. CoinGecko backup crypto
+    if (COINGECKO_IDS[symbol]) {
+      candles = await _getCoinGeckoOHLC(symbol);
+      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
+    }
+
+    // 4. Yahoo Finance backup actions/ETF/forex/or
+    if (YAHOO_TICKERS[symbol]) {
+      candles = await _getYahooOHLC(symbol);
+      if (candles && candles.length >= 20) { _cacheSet(cacheKey, candles); return candles; }
+    }
+
+    console.warn(`[RealData] OHLC indisponible pour ${symbol}`);
+    return null;
+  }
+
+  /**
+   * Rafraîchit les prix de tous les actifs de la watchlist
+   * Met à jour window.__prices
+   */
+  async function refreshAllPrices(watchlist) {
+    // Prioriser les actifs en position ouverte → refresh en premier
+    const openSymbols = new Set([
+      ...Storage.getSimPositions().map(p => p.symbol),
+      ...Storage.getRealPositions().map(p => p.symbol),
+    ]);
+
+    // Trier : positions ouvertes d'abord, puis le reste
+    const sorted = [
+      ...watchlist.filter(a => openSymbols.has(a.symbol)),
+      ...watchlist.filter(a => !openSymbols.has(a.symbol)),
+    ];
+
+    // Séquencer à 300ms entre chaque appel (comfortable pour toutes les sources)
+    const results = [];
+    for (const asset of sorted) {
+      const data = await getPrice(asset.symbol);
+      if (data && data.price) {
+        window.__prices[asset.symbol] = data.price;
+        if (openSymbols.has(asset.symbol)) {
+          console.log(`[RealData] 📍 ${asset.symbol} = ${data.price.toFixed(2)} € (${data.source}) [position]`);
+        }
+      }
+      results.push(data);
+      await new Promise(r => setTimeout(r, 300));
+    }
+    return results;
+  }
+
+  return { getPrice, getOHLC, refreshAllPrices };
+
+})();
+
+
 // ═══ analysisEngine.js ═══
 /* ============================================
    MANITRADEPRO — Moteur d'Analyse Principal
@@ -978,17 +1597,27 @@ const AnalysisEngine = (() => {
    * Entrée : { symbol, name, class, candles[] }
    * Retourne un rapport complet
    */
-  function analyzeAsset(asset) {
+  async function analyzeAsset(asset) {
     const { symbol, name, assetClass } = asset;
-    const candles = MOCK_DATA.getOHLC(symbol);
-    const priceData = MOCK_DATA.prices[symbol];
+
+    // Fetch real data - no mock fallback
+    let candles = null;
+    let priceData = null;
+    try {
+      [candles, priceData] = await Promise.all([
+        RealDataClient.getOHLC(symbol),
+        RealDataClient.getPrice(symbol),
+      ]);
+    } catch(e) {
+      console.warn('[Analysis] Erreur fetch', symbol, e.message);
+    }
 
     if (!candles || candles.length < 20 || !priceData) {
       return {
         symbol, name, assetClass,
         price: 0,
         change24h: 0,
-        error: 'Données insuffisantes',
+        error: 'Données de marché indisponibles — vérifiez votre connexion',
         direction: 'neutral',
         score: 0,
         adjScore: 0,
@@ -1092,11 +1721,11 @@ const AnalysisEngine = (() => {
    * ANALYSE DE TOUTE LA WATCHLIST
    * Retourne les actifs classés par score ajusté
    */
-  function analyzeAll() {
+  async function analyzeAll() {
     const watchlist = Storage.getWatchlist();
-    const results = watchlist.map(asset => {
+    const results = await Promise.all(watchlist.map(async asset => {
       try {
-        return analyzeAsset({
+        return await analyzeAsset({
           symbol: asset.symbol,
           name: asset.name,
           assetClass: asset.class,
@@ -1105,7 +1734,7 @@ const AnalysisEngine = (() => {
         console.error('[AnalysisEngine] Erreur analyse', asset.symbol, e);
         return { symbol: asset.symbol, name: asset.name, error: e.message, adjScore: 0 };
       }
-    });
+    }));
 
     // Filtre et trie par score ajusté décroissant
     const tradeable = results
@@ -1244,38 +1873,38 @@ const TwelveDataClient = (() => {
    * Prix temps réel d'un symbole
    */
   async function getPrice(symbol) {
-    // V1 : retourne prix mock si pas de clé
-    const keys = Storage.getApiKeys();
-    const hasKey = keys.twelveData.some(k => k.key);
-    if (!hasKey) {
-      const mock = MOCK_DATA.prices[symbol];
-      return mock || null;
-    }
-    const data = await call('price', { symbol }, 30000); // TTL 30s
-    return data ? { price: parseFloat(data.price) } : MOCK_DATA.prices[symbol];
+    // Retourne null si pas de clé — RealDataClient prendra le relais
+    const _stored = Storage.getApiKeys();
+    const keyList = Array.isArray(_stored) ? _stored : (_stored.twelveData || []).map(k => k.key);
+    const hasKey = keyList.some(k => k && k.length > 0);
+    if (!hasKey) return null;
+
+    const data = await call('price', { symbol }, 30000);
+    if (!data) return null;
+    return { price: parseFloat(data.price), change24h: 0, volume24h: 0, source: 'TwelveData' };
   }
 
   /**
    * OHLCV historique
    */
-  async function getTimeSeries(symbol, interval = '1day', outputsize = 60) {
-    const keys = Storage.getApiKeys();
-    const hasKey = keys.twelveData.some(k => k.key);
-    if (!hasKey) {
-      // Retourne données mock
-      return MOCK_DATA.getOHLC(symbol);
-    }
-    const data = await call('time_series', { symbol, interval, outputsize }, 300000); // TTL 5min
-    if (!data || !data.values) return MOCK_DATA.getOHLC(symbol);
+  async function getTimeSeries(symbol, interval = '1day', outputsize = 130) {
+    // Retourne null si pas de clé — RealDataClient prendra le relais
+    const _stored = Storage.getApiKeys();
+    const keyList = Array.isArray(_stored) ? _stored : (_stored.twelveData || []).map(k => k.key);
+    const hasKey = keyList.some(k => k && k.length > 0);
+    if (!hasKey) return null;
 
-    return data.values.reverse().map(v => ({
-      ts:    new Date(v.datetime).getTime(),
-      open:  parseFloat(v.open),
-      high:  parseFloat(v.high),
-      low:   parseFloat(v.low),
-      close: parseFloat(v.close),
-      volume: parseFloat(v.volume || 0),
-    }));
+    const data = await call('time_series', { symbol, interval, outputsize }, 3600000); // TTL 1h
+    if (!data || !data.values) return null;
+
+    return data.values.map(v => ({
+      ts    : new Date(v.datetime).getTime(),
+      open  : parseFloat(v.open),
+      high  : parseFloat(v.high),
+      low   : parseFloat(v.low),
+      close : parseFloat(v.close),
+      volume: parseFloat(v.volume) || 1000000,
+    })).reverse();
   }
 
   /**
@@ -1421,34 +2050,54 @@ const BrokerAdapter = (() => {
   const BinanceAdapter = {
     name: 'Binance',
     type: 'binance',
-    connected: false,
-
-    async connect(apiKey, secret) {
-      // TODO V2 : Vérifier la clé API Binance
-      // const resp = await fetch('https://api.binance.com/api/v3/account', {
-      //   headers: { 'X-MBX-APIKEY': apiKey }
-      // });
-      console.log('[Binance] Connexion à implémenter en V2');
-      return { success: false, error: 'Binance non disponible en V1' };
-    },
-
-    async getBalance() {
-      // TODO V2 : GET /api/v3/account
-      return { available: 0, total: 0, currency: 'USDT' };
-    },
+    connected: BinanceClient.isConfigured(),
 
     async placeOrder(order) {
-      // TODO V2 : POST /api/v3/order
-      return { success: false, error: 'Binance non disponible en V1' };
+      if (!BinanceClient.isConfigured()) {
+        return { success: false, error: 'Clé API Binance non configurée dans les Paramètres' };
+      }
+      const side = (order.direction || '').toUpperCase() === 'LONG' ? 'BUY' : 'SELL';
+      const result = await BinanceClient.placeMarketOrder(order.symbol, side, order.quantity);
+      if (result.error) return { success: false, error: result.error };
+      // Sauvegarder en positions réelles
+      const pos = {
+        id        : 'real_' + Date.now(),
+        mode      : 'real',
+        symbol    : order.symbol,
+        direction : order.direction,
+        entryPrice: result.price,
+        quantity  : result.quantity,
+        invested  : result.price * result.quantity,
+        stopLoss  : order.stopLoss || null,
+        takeProfit: order.takeProfit || null,
+        openedAt  : Date.now(),
+        orderId   : result.orderId,
+      };
+      const existing = Storage.getRealPositions();
+      Storage.saveRealPositions([...existing, pos]);
+      return { success: true, position: pos };
     },
 
     async closePosition(positionId) {
-      return { success: false, error: 'Binance non disponible en V1' };
+      const positions = Storage.getRealPositions();
+      const pos = positions.find(p => p.id === positionId);
+      if (!pos) return { success: false, error: 'Position introuvable' };
+      const side = (pos.direction || '').toUpperCase() === 'LONG' ? 'SELL' : 'BUY';
+      const result = await BinanceClient.placeMarketOrder(pos.symbol, side, pos.quantity);
+      if (result.error) return { success: false, error: result.error };
+      const pnl = (pos.direction || '').toUpperCase() === 'LONG'
+        ? (result.price - pos.entryPrice) * pos.quantity
+        : (pos.entryPrice - result.price) * pos.quantity;
+      Storage.saveRealPositions(positions.filter(p => p.id !== positionId));
+      return { success: true, pnl, exitPrice: result.price };
     },
 
-    async cancelOrder(orderId) {
-      // TODO V2 : DELETE /api/v3/order
-      return { success: false, error: 'Non implémenté' };
+    async getBalance() {
+      return await BinanceClient.getBalance();
+    },
+
+    async testConnection() {
+      return await BinanceClient.testConnection();
     },
   };
 
@@ -1680,33 +2329,52 @@ const Sync = (() => {
   let lastSyncTime = Date.now();
 
   function init() {
-    // V1 : Rafraîchissement local toutes les 30s
-    setInterval(() => {
-      refreshPrices();
-    }, 30000);
+    // Prix spot toutes les 5 minutes (profil consultation ponctuelle)
+    setInterval(() => { refreshPrices(); }, 5 * 60 * 1000);
 
-    // TODO V2 : Firebase listener
-    // firebase.database().ref('users/' + userId).on('value', (snapshot) => {
-    //   const data = snapshot.val();
-    //   applyRemoteData(data);
-    //   lastSyncTime = Date.now();
-    // });
+    // Analyse complète (OHLCV + scores) toutes les heures
+    setInterval(() => { refreshAnalysis(); }, 60 * 60 * 1000);
 
-    console.log('[Sync] V1 local — rafraîchissement toutes les 30s');
+    // Refresh immédiat au focus (quand l'utilisateur revient sur l'app)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        const now = Date.now();
+        // Refresh prix uniquement si plus de 2 minutes depuis le dernier
+        if (now - lastSyncTime > 2 * 60 * 1000) {
+          refreshPrices();
+        }
+      }
+    });
+
+    // Premier chargement immédiat
+    refreshPrices();
+
+    console.log('[Sync] Prix toutes les 5min — Analyse toutes les 1h — Refresh au focus');
   }
 
-  function refreshPrices() {
-    // En V1 : légère variation aléatoire des prix mock pour simuler le live
-    Object.keys(MOCK_DATA.prices).forEach(sym => {
-      const p = MOCK_DATA.prices[sym];
-      const variation = (Math.random() - 0.5) * 0.002; // ±0.1%
-      p.price = p.price * (1 + variation);
-      p.change24h += (Math.random() - 0.5) * 0.05;
-    });
+  async function refreshAnalysis() {
+    console.log('[Sync] Rafraîchissement analyse complète…');
+    // Vider le cache OHLCV pour forcer un rechargement
+    for (const key of [...window.__priceCache?.keys?.() || []]) {
+      if (key.startsWith('ohlc_') || key.startsWith('cg_ohlc_') || key.startsWith('yf_ohlc_')) {
+        window.__priceCache.delete(key);
+      }
+    }
+    if (window.__MTP?.Router) {
+      const screen = window.__MTP.Router.getCurrent();
+      if (['dashboard', 'opportunities', 'asset-detail'].includes(screen)) {
+        window.__MTP.Router.navigate(screen);
+      }
+    }
+  }
+
+  async function refreshPrices() {
+    // Rafraîchit les prix réels depuis CoinGecko / Yahoo Finance
+    const watchlist = Storage.getWatchlist();
+    await RealDataClient.refreshAllPrices(watchlist);
 
     // Met à jour l'affichage des positions si on est sur l'écran positions
     if (Router.getCurrent() === 'positions' || Router.getCurrent() === 'dashboard') {
-      // Rafraîchit les P&L dynamiquement
       updateLivePnL();
     }
     lastSyncTime = Date.now();
@@ -2157,7 +2825,7 @@ const Router = (() => {
   }
 
   async function handleOpenPosition(symbol, mode) {
-    const analysis = AnalysisEngine.analyzeAsset({
+    const analysis = await AnalysisEngine.analyzeAsset({
       symbol,
       name: MOCK_DATA.watchlist.find(a => a.symbol === symbol)?.name || symbol,
     });
@@ -2175,7 +2843,7 @@ const Router = (() => {
    MANITRADEPRO — Écran Dashboard
    ============================================ */
 
-function renderDashboard() {
+async function renderDashboard() {
   const settings = Storage.getSettings();
   const simCap   = Storage.getSimCapital();
   const simPos   = Storage.getSimPositions();
@@ -2201,7 +2869,7 @@ function renderDashboard() {
   const globalReturn = _simCapInit > 0 ? ((capitalTotal - _simCapInit) / _simCapInit) * 100 : 0;
 
   // Analyse rapide du marché
-  const analysis = AnalysisEngine.analyzeAll();
+  const analysis = await AnalysisEngine.analyzeAll();
   const top5 = analysis.tradeable.slice(0, 5);
   const regime = MOCK_DATA.marketRegime;
 
@@ -2383,8 +3051,8 @@ Router.register('dashboard', renderDashboard);
    MANITRADEPRO — Écran Opportunités
    ============================================ */
 
-function renderOpportunities() {
-  const analysis = AnalysisEngine.analyzeAll();
+async function renderOpportunities() {
+  const analysis = await AnalysisEngine.analyzeAll();
 
   return `
     <div class="screen">
@@ -2536,7 +3204,7 @@ Router.register('opportunities', renderOpportunities);
    MANITRADEPRO — Fiche Détail Actif
    ============================================ */
 
-function renderAssetDetail(params) {
+async function renderAssetDetail(params) {
   if (!params || !params.symbol) {
     return `<div class="screen"><p>Actif non trouvé.</p></div>`;
   }
@@ -2549,7 +3217,7 @@ function renderAssetDetail(params) {
     return `<div class="screen"><p>Actif "${symbol}" inconnu.</p></div>`;
   }
 
-  const analysis = AnalysisEngine.analyzeAsset({
+  const analysis = await AnalysisEngine.analyzeAsset({
     symbol,
     name: asset.name,
     assetClass: asset.class,
@@ -2822,7 +3490,7 @@ document.addEventListener('click', async (e) => {
   if (!symbol) return;
 
   const asset = MOCK_DATA.watchlist.find(a => a.symbol === symbol);
-  const analysis = AnalysisEngine.analyzeAsset({
+  const analysis = await AnalysisEngine.analyzeAsset({
     symbol,
     name: asset?.name || symbol,
     assetClass: asset?.class,
@@ -4011,8 +4679,40 @@ function _attachSettingsEvents(settings) {
   // Connect Binance
   const binanceBtn = document.getElementById('btn-connect-binance');
   if (binanceBtn) {
-    binanceBtn.addEventListener('click', () => {
-      showToast('Intégration Binance disponible en V2. La structure est prête.', 'info');
+    binanceBtn.addEventListener('click', async () => {
+      const keyEl    = document.getElementById('binance-api-key');
+      const secretEl = document.getElementById('binance-secret');
+      if (!keyEl || !secretEl) return;
+
+      const apiKey = keyEl.value.trim();
+      const secret = secretEl.value.trim();
+
+      if (!apiKey || apiKey.includes('•') || !secret || secret.includes('•')) {
+        showToast('Entrez votre clé API et votre secret Binance', 'error');
+        return;
+      }
+
+      binanceBtn.textContent = 'Test en cours…';
+      binanceBtn.disabled = true;
+
+      BinanceClient.init(apiKey, secret);
+      const test = await BinanceClient.testConnection();
+
+      if (test.connected) {
+        const s = Storage.getSettings();
+        s.broker         = 'binance';
+        s.binanceApiKey  = apiKey;
+        s.binanceSecret  = secret;
+        Storage.setSettings(s);
+        showToast(`✅ Binance connecté — ${test.balances} actifs détectés`, 'success');
+        renderSettings();
+      } else {
+        showToast(`❌ Connexion échouée : ${test.error || 'Vérifiez vos clés'}`, 'error');
+        BinanceClient.init('', '');
+      }
+
+      binanceBtn.textContent = 'Connecter Binance';
+      binanceBtn.disabled = false;
     });
   }
 
@@ -4137,6 +4837,14 @@ async function boot() {
   TwelveDataClient.init(apiKeys);
   window.__MTP.TwelveDataClient = TwelveDataClient;
 
+  // 3b. Binance (données marché illimitées + ordres réels si clé configurée)
+  const _binanceSettings = Storage.getSettings();
+  BinanceClient.init(
+    _binanceSettings.binanceApiKey || '',
+    _binanceSettings.binanceSecret || ''
+  );
+  window.__MTP.BinanceClient = BinanceClient;
+
   // 4. Broker
   const settings = Storage.getSettings();
   const adapter  = BrokerAdapter;
@@ -4158,7 +4866,8 @@ async function boot() {
   // 7. Theme
   document.documentElement.setAttribute('data-theme', settings.theme || 'dark');
 
-  // 8. Initial analysis
+  // 8. Chargement initial — prix d'abord, puis analyse complète
+  await RealDataClient.refreshAllPrices(Storage.getWatchlist());
   _runAnalysis();
 
   // 9. Sync
@@ -4181,7 +4890,7 @@ async function boot() {
 async function _runAnalysis() {
   try {
     const watchlist = Storage.getWatchlist();
-    const results   = await AnalysisEngine.analyzeAll(watchlist);
+    const results   = await AnalysisEngine.analyzeAll();
     window.__MTP.lastAnalysis = results;
     window.__MTP.analysisTime = Date.now();
     results.all.forEach(r => { if (r.price) window.__prices[r.symbol] = r.price; });
