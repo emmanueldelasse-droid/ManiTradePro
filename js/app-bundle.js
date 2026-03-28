@@ -3740,10 +3740,42 @@ async function boot() {
   Router.navigate('dashboard');
   Router.attachNavClicks();
 
-  // 10. Service Worker — désactivé V1
-  // if ('serviceWorker' in navigator) {
-  //   navigator.serviceWorker.register('/sw.js').catch(() => {});
-  // }
+  // 10. Service Worker — avec détection de mise à jour
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.register('/ManiTradePro/sw.js');
+      
+      // Vérifie les mises à jour
+      reg.addEventListener('updatefound', () => {
+        const newSW = reg.installing;
+        newSW.addEventListener('statechange', () => {
+          if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+            // Nouvelle version disponible — afficher bouton
+            _showUpdateBanner(reg);
+          }
+        });
+      });
+
+      // Vérifier si une mise à jour est disponible au chargement
+      reg.update().catch(() => {});
+    } catch(e) {
+      console.warn('[SW] Erreur enregistrement:', e);
+    }
+  }
+
+  function _showUpdateBanner(reg) {
+    const existing = document.getElementById('update-banner');
+    if (existing) return;
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:var(--accent);color:var(--bg-primary);padding:12px 20px;border-radius:999px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 20px rgba(0,229,160,0.4);display:flex;align-items:center;gap:8px;white-space:nowrap;';
+    banner.innerHTML = '🔄 Mise à jour disponible — Appuyer pour recharger';
+    banner.onclick = () => {
+      reg.waiting?.postMessage('SKIP_WAITING');
+      window.location.reload();
+    };
+    document.body.appendChild(banner);
+  }
 
   // 11. Analyse + données réelles en arrière-plan
   setTimeout(async () => {
