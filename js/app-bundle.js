@@ -72,18 +72,6 @@ const MOCK_DATA = {
     'GLD':   { price: 214.80,   change24h: 0.62,  volume24h: 820000000   },
     'TLT':   { price: 92.40,    change24h: -0.42, volume24h: 420000000   },
   },
-    'ETH':   { price: 3528.20,  change24h: 1.87,  volume24h: 14_200_000_000 },
-    'AAPL':  { price: 213.45,   change24h: 0.62,  volume24h: 3_800_000_000  },
-    'MSFT':  { price: 421.80,   change24h: 0.44,  volume24h: 2_100_000_000  },
-    'TSLA':  { price: 176.30,   change24h: -1.23, volume24h: 5_600_000_000  },
-    'NVDA':  { price: 875.60,   change24h: 3.12,  volume24h: 8_900_000_000  },
-    'EURUSD':{ price: 1.0842,   change24h: 0.18,  volume24h: 0 },
-    'GBPUSD':{ price: 1.2714,   change24h: -0.12, volume24h: 0 },
-    'GOLD':  { price: 2318.40,  change24h: 0.75,  volume24h: 0 },
-    'SPY':   { price: 523.80,   change24h: 0.51,  volume24h: 4_200_000_000  },
-    'SOL':   { price: 172.40,   change24h: 4.21,  volume24h: 3_100_000_000  },
-    'AMZN':  { price: 196.20,   change24h: 0.88,  volume24h: 2_800_000_000  },
-  },
 
   generateOHLC: function(symbol, currentPrice, trend = 'up', volatility = 0.02) {
     const candles = [];
@@ -1868,18 +1856,18 @@ function renderDashboard() {
     </div>
 
     <!-- Message contextuel -->
-    <div style="background:${analysis.tradeable.filter(a=>a.isSolid).length > 0 ? 'rgba(0,229,160,0.08)' : analysis.tradeable.length > 3 ? 'rgba(245,166,35,0.08)' : 'var(--bg-elevated)'};border:1px solid ${analysis.tradeable.filter(a=>a.isSolid).length > 0 ? 'rgba(0,229,160,0.25)' : 'var(--border-subtle)'};border-radius:var(--card-radius);padding:var(--space-4);margin-bottom:var(--space-6);display:flex;align-items:center;gap:var(--space-3);">
-      <span style="font-size:1.4rem;">${analysis.tradeable.filter(a=>a.isSolid).length > 0 ? '🟢' : analysis.tradeable.length > 3 ? '🟡' : '🔴'}</span>
-      <div>
-        <div style="font-size:var(--text-sm);font-weight:700;color:var(--text-primary);">
-          ${analysis.tradeable.filter(a=>a.isSolid).length > 0
-            ? `${analysis.tradeable.filter(a=>a.isSolid).length} signal${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} fort${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} détecté${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} — Bonne opportunité`
-            : analysis.tradeable.length > 3 ? 'Marché actif — Quelques opportunités'
-            : 'Marché calme — Peu de signaux aujourd'hui'}
-        </div>
-        <div style="font-size:var(--text-xs);color:var(--text-muted);">${analysis.tradeable.length} opportunité${analysis.tradeable.length > 1 ? 's' : ''} · ${analysis.tradeable.filter(a=>a.isSolid).length} signal${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} fort${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''}</div>
-      </div>
-    </div>
+    ${(function() {
+      const nbSolid = analysis.tradeable.filter(a=>a.isSolid).length;
+      const nbTrade = analysis.tradeable.length;
+      const emoji = nbSolid > 0 ? '🟢' : nbTrade > 3 ? '🟡' : '🔴';
+      const bg    = nbSolid > 0 ? 'rgba(0,229,160,0.08)' : nbTrade > 3 ? 'rgba(245,166,35,0.08)' : 'var(--bg-elevated)';
+      const border= nbSolid > 0 ? 'rgba(0,229,160,0.25)' : 'var(--border-subtle)';
+      const title = nbSolid > 0 ? nbSolid + ' signal' + (nbSolid > 1 ? 's' : '') + ' fort' + (nbSolid > 1 ? 's' : '') + ' — Bonne opportunité'
+                  : nbTrade > 3 ? 'Marché actif — Quelques opportunités'
+                  : 'Marché calme — Peu de signaux aujourd\'hui';
+      const sub   = nbTrade + ' opportunité' + (nbTrade > 1 ? 's' : '') + ' · ' + nbSolid + ' signal' + (nbSolid > 1 ? 's' : '') + ' fort' + (nbSolid > 1 ? 's' : '');
+      return '<div style="background:' + bg + ';border:1px solid ' + border + ';border-radius:var(--card-radius);padding:var(--space-4);margin-bottom:var(--space-6);display:flex;align-items:center;gap:var(--space-3);"><span style=\"font-size:1.4rem;\">' + emoji + '</span><div><div style=\"font-size:var(--text-sm);font-weight:700;color:var(--text-primary);\">' + title + '</div><div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' + sub + '</div></div></div>';
+    })()}
 
     <div class="dashboard-hero">
       <div class="hero-label">Mon capital d'entraînement</div>
@@ -2492,7 +2480,7 @@ document.addEventListener('click', async e => {
 Router.register('asset-detail', renderAssetDetail);
 
 // ═══ portefeuille.js — écran unifié Positions + Simulation ═══
-function renderMes trades() {
+function renderPortefeuille() {
   const screen = document.getElementById('screen-portefeuille');
   if (!screen) return;
 
@@ -2553,11 +2541,11 @@ function renderMes trades() {
       ` : `
         ${simWithPnl.length > 0 ? `
           <div class="pf-section-label"><span class="sim-dot-label">⚡ SIMULATION</span><span>${simWithPnl.length} position(s) — Capital ${Fmt.currency(simCapNum)}</span></div>
-          ${simWithPnl.map(p => _renderMes tradesCard(p, 'sim')).join('')}
+          ${simWithPnl.map(p => _renderPortefeuilleCard(p, 'sim')).join('')}
         ` : ''}
         ${realPos.length > 0 ? `
           <div class="pf-section-label" style="margin-top:var(--space-6);"><span class="real-dot-label">⚠️ RÉEL</span></div>
-          ${realPos.map(p => _enrichPosition(p)).map(p => _renderMes tradesCard(p, 'real')).join('')}
+          ${realPos.map(p => _enrichPosition(p)).map(p => _renderPortefeuilleCard(p, 'real')).join('')}
         ` : `
           <div class="card" style="margin-top:var(--space-5);border:1px dashed var(--real-border);background:var(--real-bg);padding:var(--space-5);">
             <div style="display:flex;align-items:center;gap:var(--space-3);">
@@ -2612,7 +2600,7 @@ function renderMes trades() {
 
     <div class="warning-box" style="margin-top:var(--space-6);">⚠️ Les positions réelles engagent votre capital. ManiTradePro est un outil d'aide à la décision uniquement.</div>`;
 
-  _attachMes tradesEvents();
+  _attachPortefeuilleEvents();
 }
 
 
@@ -2624,7 +2612,7 @@ function renderPositionDetail(posId) {
   // Find position in sim + real
   const allPos = [...Storage.getSimPositions(), ...Storage.getRealPositions()];
   const pos = allPos.find(p => p.id === posId);
-  if (!pos) { renderMes trades(); return; }
+  if (!pos) { renderPortefeuille(); return; }
 
   const enriched = _enrichPosition(pos);
   const mode     = pos.mode || 'sim';
@@ -2819,7 +2807,7 @@ function renderPositionDetail(posId) {
   // Events
   document.getElementById('btn-back-to-portfolio')?.addEventListener('click', () => {
     window.__portfolioTab = 'positions';
-    renderMes trades();
+    renderPortefeuille();
   });
 
   document.getElementById('btn-close-from-detail')?.addEventListener('click', async () => {
@@ -2837,7 +2825,7 @@ function renderPositionDetail(posId) {
     if (result.success) {
       UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
       window.__portfolioTab = 'positions';
-      renderMes trades();
+      renderPortefeuille();
     } else {
       UI.toast(`Erreur : ${result.error}`, 'error');
     }
@@ -2851,7 +2839,7 @@ function renderPositionDetail(posId) {
   });
 }
 
-function _renderMes tradesCard(pos, mode) {
+function _renderPortefeuilleCard(pos, mode) {
   const pnlCls = Fmt.pnlClass(pos.pnl);
   const isLong = (pos.direction||'').toLowerCase() === 'long';
   const stopDistPct = pos.stopLoss ? Math.abs(pos.currentPrice - pos.stopLoss) / pos.currentPrice * 100 : null;
@@ -2930,7 +2918,7 @@ function _renderPfHistoryRow(t) {
     </div>`;
 }
 
-function _attachMes tradesEvents() {
+function _attachPortefeuilleEvents() {
   // Click on card → detail
   document.querySelectorAll('[data-pos-detail]').forEach(card => {
     card.addEventListener('click', (e) => {
@@ -2945,7 +2933,7 @@ function _attachMes tradesEvents() {
   document.querySelectorAll('[data-pftab]').forEach(btn => {
     btn.addEventListener('click', () => {
       window.__portfolioTab = btn.dataset.pftab;
-      renderMes trades();
+      renderPortefeuille();
     });
   });
   // Navigate
@@ -2970,7 +2958,7 @@ function _attachMes tradesEvents() {
         const result = await BrokerAdapter.closePosition(id, mode);
         if (result.success) {
           UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
-          renderMes trades();
+          renderPortefeuille();
         } else {
           UI.toast(`Erreur : ${result.error}`, 'error');
         }
@@ -2988,12 +2976,12 @@ function _attachMes tradesEvents() {
       Storage.saveSimPositions([]);
       Storage.saveSimHistory([]);
       UI.toast('Simulation réinitialisée', 'success');
-      renderMes trades();
+      renderPortefeuille();
     });
   }
 }
 
-Router.register('portefeuille', () => { renderMes trades(); });
+Router.register('portefeuille', () => { renderPortefeuille(); });
 function _renderPositionCard(pos, mode) {
   const isLong = (pos.direction || '').toLowerCase() === 'long';
   const pnlCls = Fmt.pnlClass(pos.pnl);
@@ -3077,7 +3065,7 @@ function _attachPositionEvents() {
         const result = await BrokerAdapter.closePosition(id, mode);
         if (result.success) {
           UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
-          renderMes trades();
+          renderPortefeuille();
         } else {
           UI.toast(`Erreur : ${result.error}`, 'error');
         }
@@ -3109,7 +3097,7 @@ function updatePositionPrices() {
   });
 }
 
-Router.register('positions', () => { renderMes trades(); }); // alias → portefeuille
+Router.register('positions', () => { renderPortefeuille(); }); // alias → portefeuille
 
 // ═══ simulation.js ═══
 function renderSimulation() {
@@ -3729,9 +3717,9 @@ async function boot() {
   Router.register('dashboard',    renderDashboard);
   Router.register('opportunities',renderOpportunities);
   Router.register('asset-detail', renderAssetDetail);
-  Router.register('portefeuille', () => { renderMes trades(); });
-  Router.register('positions',    () => { renderMes trades(); }); // alias
-  Router.register('simulation',   () => { renderMes trades(); }); // alias
+  Router.register('portefeuille', () => { renderPortefeuille(); });
+  Router.register('positions',    () => { renderPortefeuille(); }); // alias
+  Router.register('simulation',   () => { renderPortefeuille(); }); // alias
   Router.register('settings',     () => { renderSettings(); });
   window.__MTP.Router = Router;
 
