@@ -2252,6 +2252,20 @@ const Router = (() => {
     if (screenName === 'dashboard') {
       setTimeout(() => _loadTrendingSection(), 100);
     }
+    // Search handler for opportunities
+    if (screenName === 'opportunities') {
+      const searchInput = document.getElementById('opp-search');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          const q = searchInput.value.toLowerCase().trim();
+          document.querySelectorAll('[data-asset-class]').forEach(card => {
+            const sym = (card.dataset.symbol || '').toLowerCase();
+            const name = (card.querySelector('.asset-symbol')?.textContent || '').toLowerCase();
+            card.style.display = (!q || sym.includes(q) || name.includes(q)) ? '' : 'none';
+          });
+        });
+      }
+    }
     // Navigation interne
     document.querySelectorAll('[data-screen]').forEach(el => {
       if (el.closest('.nav-item') || el.closest('.bnav-item')) return;
@@ -2552,6 +2566,21 @@ function renderDashboard() {
       ${simPos.slice(0, 3).map(p => renderPositionCardMini(p)).join('')}
     ` : ''}
 
+    <!-- Activité récente -->
+    ${(function() {
+      const history = Storage.getSimHistory().slice(0, 5);
+      if (!history.length) return '';
+      return '<div class=\"section-title\" style=\"margin-top:var(--space-8);\"><span>Activité récente</span></div>' +
+        history.map(t => '<div style=\"display:flex;align-items:center;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border-subtle);\">' +
+          '<div style=\"display:flex;align-items:center;gap:var(--space-3);\">' +
+          '<span style=\"font-size:1rem;\">' + (t.pnl > 0 ? '✅' : '❌') + '</span>' +
+          '<div><div style=\"font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;\">' + t.symbol + '</div>' +
+          '<div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' + Fmt.dateShort(t.closedAt) + ' · ' + (t.direction === 'long' ? '↑ Hausse' : '↓ Baisse') + '</div></div>' +
+          '</div>' +
+          '<div style=\"font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;\" class=\"' + Fmt.pnlClass(t.pnl) + '\">' + Fmt.signedCurrency(t.pnl) + '</div>' +
+          '</div>').join('');
+    })()}
+
     <div class="warning-box" style="margin-top:var(--space-8);">
       📊 ManiTradePro est un outil d'aide à la décision. Les scores et signaux ne constituent pas des conseils financiers.
     </div>`;
@@ -2728,6 +2757,10 @@ function renderOpportunities() {
       <div class="screen-subtitle">Actifs classés par score de confiance ajusté</div>
     </div>
 
+    <!-- Recherche par symbole -->
+    <div style="margin-bottom:var(--space-4);">
+      <input type="text" id="opp-search" class="input-field" placeholder="🔍 Rechercher un actif (BTC, AAPL...)" style="width:100%;"/>
+    </div>
     <div class="filter-row">
       <button class="filter-btn active" data-filter-group="class" data-filter="all">Tous (${analysis.all.length})</button>
       <button class="filter-btn" data-filter-group="class" data-filter="crypto">Crypto</button>
@@ -2912,9 +2945,100 @@ function renderAssetDetail(params) {
       </div>
     </div>
 
+    <!-- Pourquoi cette opportunité -->
+    <div class="card" style="margin-bottom:var(--space-5);">
+      <div class="card-header">
+        <span class="card-title">💡 Pourquoi cette opportunité ?</span>
+      </div>
+      <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.8;">
+        ${(function() {
+          const ind = analysis.indicators || {};
+          const dir = analysis.direction;
+          const lines = [];
+          if (ind.adx > 25) lines.push('✅ <strong>Tendance forte</strong> — Le marché a une direction claire (ADX ' + ind.adx?.toFixed(0) + ')');
+          else if (ind.adx > 20) lines.push('⚠️ <strong>Tendance modérée</strong> — Signal présent mais pas très fort');
+          else lines.push('❌ <strong>Tendance faible</strong> — Marché sans direction claire');
+          if (dir === 'long' ? ind.breakoutUp : ind.breakoutDown)
+            lines.push('✅ <strong>Cassure confirmée</strong> — Le prix vient de dépasser un niveau clé sur 55 jours');
+          if (dir === 'long' ? ind.mom3m > 5 : ind.mom3m < -5)
+            lines.push('✅ <strong>Momentum favorable</strong> — Performance positive sur 3 mois');
+          if (ind.rsi > 30 && ind.rsi < 70)
+            lines.push('✅ <strong>RSI équilibré</strong> — Pas suracheté ni survendu (' + ind.rsi?.toFixed(0) + ')');
+          else if (ind.rsi >= 70) lines.push('⚠️ <strong>RSI élevé</strong> — Actif potentiellement suracheté');
+          else lines.push('⚠️ <strong>RSI bas</strong> — Actif potentiellement survendu');
+          if (ind.vol20 < 30) lines.push('✅ <strong>Volatilité normale</strong> — Risque maîtrisable');
+          else lines.push('⚠️ <strong>Volatilité élevée</strong> — Mouvements brusques possibles');
+          if (ind.macd?.bullishCross && dir === 'long') lines.push('✅ <strong>MACD croisé à la hausse</strong> — Signal technique supplémentaire');
+          if (ind.ichimoku?.bullish && dir === 'long') lines.push('✅ <strong>Au-dessus du nuage Ichimoku</strong> — Tendance haussière confirmée');
+          if (ind.candles?.bullish && dir === 'long') lines.push('✅ <strong>Pattern de retournement haussier</strong> — Chandeliers favorables');
+          return lines.map(l => '<div style=\"margin-bottom:4px;\">' + l + '</div>').join('');
+        })()}
+      </div>
+
+      <!-- Style de setup + Horizon + Conditions de prudence -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-subtle);">
+        <div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);">
+            Style de setup ${UI.tooltip('?', 'Le type de stratégie utilisée pour ce signal')}
+          </div>
+          <div style="font-size:var(--text-sm);font-weight:700;">
+            ${(function() {
+              const ind = analysis.indicators || {};
+              if (ind.breakoutUp || ind.breakoutDown) return '🚀 Cassure de niveau';
+              if (ind.adx > 25 && (ind.slope100 > 0.05 || ind.slope100 < -0.05)) return '📈 Suivi de tendance';
+              if (ind.macd?.bullishCross || ind.macd?.bearishCross) return '⚡ Signal MACD';
+              if (ind.ichimoku?.bullish || ind.ichimoku?.bearish) return '☁️ Ichimoku';
+              return '🔍 Multi-critères';
+            })()}
+          </div>
+        </div>
+        <div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);">
+            Horizon estimé ${UI.tooltip('?', 'Durée approximative pendant laquelle ce signal reste valide')}
+          </div>
+          <div style="font-size:var(--text-sm);font-weight:700;">
+            ${(function() {
+              const ind = analysis.indicators || {};
+              if (ind.vol20 > 40) return '⚡ Court terme (1-5 jours)';
+              if (ind.adx > 30) return '📅 Moyen terme (1-3 semaines)';
+              return '🗓️ Moyen/Long terme (2-6 semaines)';
+            })()}
+          </div>
+        </div>
+      </div>
+
+      <!-- Conditions de prudence -->
+      <div style="margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--border-subtle);">
+        <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);">
+          ⚠️ Conditions qui invalideraient ce signal ${UI.tooltip('?', 'Si ces evenements se produisent, le signal n\'est plus valide')}
+        </div>
+        <div style="font-size:var(--text-xs);color:var(--text-secondary);line-height:1.8;">
+          ${(function() {
+            const ind = analysis.indicators || {};
+            const dir = analysis.direction;
+            const conditions = [];
+            conditions.push('\u2022 Prix passe sous le stop-loss (' + Fmt.price(analysis.stopLoss) + ')');
+            if (ind.adx > 20) conditions.push('\u2022 ADX repasse sous 20 (tendance s affaiblit)');
+            if (dir === 'long') conditions.push('\u2022 EMA 50 repasse sous EMA 100 (tendance inversee)');
+            else conditions.push('\u2022 EMA 50 repasse au-dessus de EMA 100 (tendance inversee)');
+            conditions.push('\u2022 Volume chute significativement (< 0.7x la moyenne)');
+            return conditions.join('<br>');
+          })()}
+        </div>
+      </div>
+    </div>
+
+    <!-- Recommandation textuelle -->
+    <div style="background:${analysis.adjScore >= 70 ? 'rgba(0,229,160,0.06)' : analysis.adjScore >= 50 ? 'rgba(245,166,35,0.06)' : 'rgba(224,90,90,0.06)'};border:1px solid ${analysis.adjScore >= 70 ? 'rgba(0,229,160,0.2)' : analysis.adjScore >= 50 ? 'rgba(245,166,35,0.2)' : 'rgba(224,90,90,0.2)'};border-radius:var(--card-radius);padding:var(--space-4);margin-bottom:var(--space-5);">
+      <div style="font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-2);">
+        ${analysis.adjScore >= 70 ? '🟢 Très solide' : analysis.adjScore >= 60 ? '🟡 Solide mais à surveiller' : analysis.adjScore >= 50 ? '🟠 Intéressant mais prudence' : analysis.adjScore >= 35 ? '🔴 Trop fragile' : '⛔ À éviter'}
+      </div>
+      <div style="font-size:var(--text-sm);color:var(--text-secondary);">${analysis.recommendation}</div>
+    </div>
+
     ${analysis.confidence?.criteria?.length > 0 ? `
       <div class="card" style="margin-bottom:var(--space-5);">
-        <div class="card-header"><span class="card-title">Détail des 8 critères</span><span style="font-size:var(--text-xs);color:var(--text-muted);">Brut : ${analysis.confidence.rawScore}/${analysis.confidence.maxScore}</span></div>
+        <div class="card-header"><span class="card-title">Détail des critères</span><span style="font-size:var(--text-xs);color:var(--text-muted);">Score brut : ${analysis.confidence.rawScore}/${analysis.confidence.maxScore}</span></div>
         <div class="criteria-list">
           ${analysis.confidence.criteria.map(c => `
             <div class="criteria-item">
