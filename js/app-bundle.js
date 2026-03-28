@@ -5594,24 +5594,100 @@ const ClaudeAI = (() => {
   let _callDate = '';
   const MAX_CALLS_DAY = 50;
 
-  function _getCallCount() {
-    const today = new Date().toISOString().split('T')[0];
-    const stored = localStorage.getItem('mtp_claude_calls');
-    if (!stored) return { count: 0, date: today };
-    try { return JSON.parse(stored); } catch(e) { return { count: 0, date: today }; }
+  const SUPABASE_URL = 'https://ukgfyhdzbfhxpmnhdlgq.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrZ2Z5aGR6YmZoeHBtbmhkbGdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NTI3NDYsImV4cCI6MjA5MDIyODc0Nn0.BJ1yb-5bCam0MLR2tjOp3JN56MJeK22HxqGbJpJM1w0';
+  const SB_HEADERS = { 'Content-Type': 'application/json', 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY };
+
+  // Local cache pour éviter trop d'appels Supabase
+  let _localCount = null;
+  let _localDate = '';
+  let _lastSbSync = 0;
+  const SB_SYNC_INTERVAL = 60 * 1000; // sync Supabase max toutes les 60s
+
+  function _getToday() { return new Date().toISOString().split('T')[0]; }
+
+  // Lire le compteur depuis Supabase (avec fallback localStorage)
+  async function _fetchCallCount() {
+    try {
+      const r = await fetch(SUPABASE_URL + '/rest/v1/claude_usage?id=eq.1', {
+        headers: SB_HEADERS, signal: AbortSignal.timeout(5000)
+      });
+      if (!r.ok) throw new Error('Supabase error');
+      const data = await r.json();
+      const row = data?.[0];
+      if (!row) return { count: 0, date: _getToday() };
+      // Si nouvelle journée, reset
+      if (row.date !== _getToday()) return { count: 0, date: _getToday() };
+      return { count: row.count || 0, date: row.date };
+    } catch(e) {
+      // Fallback localStorage
+      const stored = localStorage.getItem('mtp_claude_calls');
+      if (!stored) return { count: 0, date: _getToday() };
+      try { return JSON.parse(stored); } catch(e2) { return { count: 0, date: _getToday() }; }
+    }
   }
 
-  function _incrementCalls() {
-    const today = new Date().toISOString().split('T')[0];
-    const data = _getCallCount();
-    const count = data.date === today ? data.count + 1 : 1;
-    localStorage.setItem('mtp_claude_calls', JSON.stringify({ count, date: today }));
-    return count;
+  // Sauvegarder le compteur dans Supabase + localStorage
+  async function _saveCallCount(count, date) {
+    // localStorage immédiat
+    localStorage.setItem('mtp_claude_calls', JSON.stringify({ count, date }));
+    // Supabase async (non-bloquant)
+    try {
+      await fetch(SUPABASE_URL + '/rest/v1/claude_usage?id=eq.1', {
+        method: 'PATCH',
+        headers: { ...SB_HEADERS, 'Prefer': 'return=minimal' },
+        body: JSON.stringify({ count, date, updated_at: new Date().toISOString() }),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch(e) {} // Silencieux — localStorage suffit en cas d'erreur
+  }
+
+  function _getCallCount() {
+    const today = _getToday();
+    // Utilise le cache local si disponible et même jour
+    if (_localCount !== null && _localDate === today) {
+      return { count: _localCount, date: today };
+    }
+    // Fallback localStorage synchrone
+    const stored = localStorage.getItem('mtp_claude_calls');
+    if (!stored) return { count: 0, date: today };
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed.date !== today) return { count: 0, date: today };
+      _localCount = parsed.count;
+      _localDate = today;
+      return parsed;
+    } catch(e) { return { count: 0, date: today }; }
+  }
+
+  async function _incrementCalls() {
+    const today = _getToday();
+    // Sync Supabase si nécessaire
+    if (Date.now() - _lastSbSync > SB_SYNC_INTERVAL) {
+      const sbData = await _fetchCallCount();
+      _localCount = sbData.count;
+      _localDate = sbData.date;
+      _lastSbSync = Date.now();
+    }
+    const current = _localCount !== null && _localDate === today ? _localCount : 0;
+    const newCount = current + 1;
+    _localCount = newCount;
+    _localDate = today;
+    await _saveCallCount(newCount, today);
+    return newCount;
+  }
+
+  async function _syncFromSupabase() {
+    const data = await _fetchCallCount();
+    _localCount = data.count;
+    _localDate = data.date;
+    _lastSbSync = Date.now();
+    localStorage.setItem('mtp_claude_calls', JSON.stringify(data));
   }
 
   function _isLimited() {
     const data = _getCallCount();
-    const today = new Date().toISOString().split('T')[0];
+    const today = _getToday();
     return data.date === today && data.count >= MAX_CALLS_DAY;
   }
 
@@ -5646,7 +5722,7 @@ const ClaudeAI = (() => {
 
       const data = await r.json();
       const text = data.content?.[0]?.text || 'Analyse indisponible';
-      _incrementCalls();
+      await _incrementCalls();
 
       if (cacheKey) _cache.set(cacheKey, { text, ts: Date.now() });
       return text;
@@ -5775,7 +5851,7 @@ const ClaudeAI = (() => {
     return { count, max: MAX_CALLS_DAY, remaining: MAX_CALLS_DAY - count };
   }
 
-  return { summarizeNews, analyzeSignal, analyzeHistory, getCoaching, interpretMacroEvent, weeklyReport, getCallStats };
+  return { summarizeNews, analyzeSignal, analyzeHistory, getCoaching, interpretMacroEvent, weeklyReport, getCallStats, _syncFromSupabase };
 })();
 
 
@@ -5890,6 +5966,11 @@ async function boot() {
 
   // Init smart signal alerts
   SmartAlerts.init();
+
+  // Sync compteur Claude depuis Supabase au démarrage
+  if (typeof ClaudeAI._syncFromSupabase === 'function') {
+    ClaudeAI._syncFromSupabase().catch(() => {});
+  }
 
   Router.navigate('dashboard');
   Router.attachNavClicks();
