@@ -1,5 +1,3 @@
-
-
 // ============================================================
 // ManiTradePro V1 — App Bundle (standalone, no ES modules)
 // ============================================================
@@ -5846,6 +5844,7 @@ async function boot() {
   Router.register('positions',    () => { renderPortefeuille(); }); // alias
   Router.register('simulation',   () => { renderPortefeuille(); }); // alias
   Router.register('settings',     () => { renderSettings(); });
+  Router.register('news',         () => { renderInfoScreen(); });
   window.__MTP.Router = Router;
 
   // 7. Theme
