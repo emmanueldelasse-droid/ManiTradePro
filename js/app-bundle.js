@@ -934,6 +934,109 @@ const RiskCalculator = (() => {
     if (!atr || !entryPrice) return null;
     return direction === 'long' ? entryPrice - multiplier * atr : entryPrice + multiplier * atr;
   }
+
+  // Optimal SL based on real support/resistance + ATR
+  function optimalStop(entryPrice, atr, direction, indicators) {
+    if (!atr || !entryPrice) return null;
+    const minStop = direction === 'long'
+      ? entryPrice - Math.max(1.5 * atr, entryPrice * 0.02)
+      : entryPrice + Math.max(1.5 * atr, entryPrice * 0.02);
+
+    // Use real support/resistance if available
+    if (indicators?.sr) {
+      if (direction === 'long' && indicators.sr.support > 0) {
+        const srStop = indicators.sr.support * 0.995; // just below support
+        return srStop < entryPrice && srStop > entryPrice * 0.85 ? srStop : minStop;
+      }
+      if (direction === 'short' && indicators.sr.resistance > 0) {
+        const srStop = indicators.sr.resistance * 1.005; // just above resistance
+        return srStop > entryPrice && srStop < entryPrice * 1.15 ? srStop : minStop;
+      }
+    }
+
+    // Use Bollinger bands as secondary confirmation
+    if (indicators?.bollinger) {
+      if (direction === 'long') {
+        const bbStop = indicators.bollinger.lower * 0.998;
+        if (bbStop < entryPrice && bbStop > entryPrice * 0.85) return Math.max(bbStop, minStop);
+      } else {
+        const bbStop = indicators.bollinger.upper * 1.002;
+        if (bbStop > entryPrice && bbStop < entryPrice * 1.15) return Math.min(bbStop, minStop);
+      }
+    }
+    return minStop;
+  }
+
+  // Dynamic R/R based on score
+  function dynamicRR(score) {
+    if (score >= 75) return 3.0;
+    if (score >= 65) return 2.5;
+    if (score >= 55) return 2.0;
+    return 1.5;
+  }
+
+  // Optimal position size based on volatility
+  function optimalPositionSize(capital, riskPct, entryPrice, stopPrice, atrPct) {
+    if (!entryPrice || !stopPrice || !capital) return null;
+    // Reduce size for high volatility assets
+    let adjustedRisk = riskPct;
+    if (atrPct > 4) adjustedRisk *= 0.5;      // Very volatile: half size
+    else if (atrPct > 2.5) adjustedRisk *= 0.75; // Volatile: 75% size
+
+    // Cap at 5% of capital per position
+    const maxInvested = capital * 0.05;
+    const riskAmount = capital * adjustedRisk;
+    const riskPerUnit = Math.abs(entryPrice - stopPrice);
+    if (riskPerUnit <= 0) return null;
+    const units = riskAmount / riskPerUnit;
+    const invested = Math.min(units * entryPrice, maxInvested);
+    const finalUnits = invested / entryPrice;
+    return { units: Math.floor(finalUnits * 10000) / 10000, invested, riskAmount, riskPerUnit, adjustedRisk };
+  }
+
+  // Check if timing is optimal for entry
+  function isOptimalTiming(symbol, assetClass) {
+    const now = new Date();
+    const hour = now.getHours();
+    const minute = now.getMinutes();
+    const day = now.getDay();
+    const reasons = [];
+    let score = 100;
+
+    // Never on weekends for non-crypto
+    if (assetClass !== 'crypto' && (day === 0 || day === 6)) {
+      return { optimal: false, score: 0, reasons: ['Marché fermé le weekend'] };
+    }
+
+    // Avoid Friday afternoon for stocks
+    if (assetClass === 'stock' && day === 5 && hour >= 16) {
+      score -= 30; reasons.push('⚠️ Vendredi après-midi — liquidité réduite');
+    }
+
+    // Avoid first 30min of US market open (15h30 Paris)
+    if (assetClass === 'stock' && hour === 15 && minute < 30) {
+      score -= 25; reasons.push('⚠️ Ouverture US — spreads larges (attendre 16h00)');
+    }
+
+    // Avoid last 15min before close
+    if (assetClass === 'stock' && hour === 21 && minute >= 45) {
+      score -= 25; reasons.push('⚠️ Proche fermeture US — éviter');
+    }
+
+    // Best hours for stocks: 10h-12h and 15h-17h Paris time
+    if (assetClass === 'stock') {
+      if ((hour >= 10 && hour <= 12) || (hour >= 15 && hour <= 17)) {
+        reasons.push('✅ Heure optimale — liquidité maximale');
+      }
+    }
+
+    // Crypto: avoid 00h-06h (low volume)
+    if (assetClass === 'crypto' && (hour < 6 || hour > 22)) {
+      score -= 15; reasons.push('⚠️ Faible volume nocturne');
+    }
+
+    return { optimal: score >= 70, score, reasons };
+  }
   function trailingStop(currentPrice, atr, direction, multiplier = 3) {
     if (!atr || !currentPrice) return null;
     return direction === 'long' ? currentPrice - multiplier * atr : currentPrice + multiplier * atr;
@@ -2591,6 +2694,23 @@ function renderDashboard() {
           '</div>').join('');
     })()}
 
+    <!-- Alertes optimales récentes -->
+    ${(function() {
+      const smartAlerts = SmartAlerts.getRecentAlerts().slice(0, 3);
+      if (!smartAlerts.length) return '';
+      return '<div class=\"section-title\" style=\"margin-top:var(--space-6);\"><span>🎯 Derniers signaux optimaux</span></div>' +
+        '<div style=\"display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-6);\">' +
+        smartAlerts.map(a => {
+          const dir = a.direction === 'long' ? '↑ Hausse' : '↓ Baisse';
+          const ago = Math.round((Date.now() - a.firedAt) / 60000);
+          return '<div style=\"background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:var(--card-radius);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;\">' +
+            '<div><div style=\"font-family:var(--font-mono);font-weight:700;\">' + a.symbol + ' ' + dir + '</div>' +
+            '<div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' + 'Il y a ' + ago + ' min · Score ' + a.score + '/100</div></div>' +
+            '<div style=\"font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--profit);\">' + 'R/R ' + a.rrRatio + ':1</div>' +
+            '</div>';
+        }).join('') + '</div>';
+    })()}
+
     <div class="warning-box" style="margin-top:var(--space-8);">
       📊 ManiTradePro est un outil d'aide à la décision. Les scores et signaux ne constituent pas des conseils financiers.
     </div>`;
@@ -3117,6 +3237,36 @@ function renderAssetDetail(params) {
     <!-- Prendre une position -->
     <div class="section-sep"><span class="sep-label">Prendre une position</span><div class="sep-line"></div></div>
     <div class="order-zones">
+      <!-- Analyse timing optimal -->
+      ${(function() {
+        const timing = RiskCalculator.isOptimalTiming(symbol, analysis.assetClass);
+        const check = SmartAlerts._allFactorsGreen(analysis);
+        const optSL = RiskCalculator.optimalStop(analysis.price, analysis.indicators?.atr, analysis.direction, analysis.indicators);
+        const rrRatio = RiskCalculator.dynamicRR(analysis.adjScore);
+        const optTP = RiskCalculator.takeProfitEstimate(analysis.price, optSL, analysis.direction, rrRatio);
+        const sizing = RiskCalculator.optimalPositionSize(_capNum, settings.riskPerTrade, analysis.price, optSL, analysis.indicators?.atrPct || 2);
+
+        const allGreen = check.green;
+        const bg = allGreen ? 'rgba(0,229,160,0.06)' : 'rgba(245,166,35,0.06)';
+        const border = allGreen ? 'rgba(0,229,160,0.2)' : 'rgba(245,166,35,0.2)';
+
+        return '<div style=\"background:' + bg + ';border:1px solid ' + border + ';border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);\">' +
+          '<div style=\"font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-4);\">' +
+          (allGreen ? '🟢 Tous les facteurs au vert — Moment optimal' : '🟡 Conditions partiellement remplies') + '</div>' +
+          '<div style=\"display:flex;flex-direction:column;gap:var(--space-2);margin-bottom:var(--space-4);\">' +
+          check.reasons.map(r => '<div style=\"font-size:var(--text-xs);color:var(--text-secondary);\">' + r + '</div>').join('') +
+          check.issues.map(r => '<div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' + r + '</div>').join('') +
+          '</div>' +
+          '<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);padding:var(--space-3);background:var(--bg-elevated);border-radius:8px;margin-bottom:var(--space-4);\">' +
+          '<div style=\"text-align:center;\"><div style=\"font-size:0.65rem;color:var(--text-muted);\">' + 'SL OPTIMAL' + '</div><div style=\"font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--loss);\">' + Fmt.price(optSL) + '</div></div>' +
+          '<div style=\"text-align:center;\"><div style=\"font-size:0.65rem;color:var(--text-muted);\">' + 'R/R' + '</div><div style=\"font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--signal-medium);\">' + rrRatio + ':1</div></div>' +
+          '<div style=\"text-align:center;\"><div style=\"font-size:0.65rem;color:var(--text-muted);\">' + 'TP OPTIMAL' + '</div><div style=\"font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--profit);\">' + Fmt.price(optTP) + '</div></div>' +
+          '</div>' +
+          (sizing ? '<div style=\"font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);\">' +
+          'Position recommandée : ' + Fmt.currency(sizing.invested) + ' · Risque réel : ' + Fmt.currency(sizing.riskAmount) + '</div>' : '') +
+          '</div>';
+      })()}
+
       <!-- Trade d'entraînement -->
       <div class="mode-zone sim-zone">
         <div class="mode-zone-title">🎯 Trade d'entraînement</div>
@@ -5152,6 +5302,158 @@ async function _loadInfoContent() {
   }
 }
 
+
+// ═══ SmartAlerts — Détection automatique de conditions optimales ═══
+const SmartAlerts = (() => {
+  const CHECK_INTERVAL_CRYPTO = 15 * 60 * 1000;  // 15 min
+  const CHECK_INTERVAL_STOCKS = 30 * 60 * 1000;  // 30 min
+  let _lastCheck = {};
+  let _firedAlerts = new Set();
+
+  function _allFactorsGreen(asset) {
+    if (!asset || asset.error) return { green: false, reasons: [] };
+
+    const reasons = [];
+    const issues = [];
+    const ind = asset.indicators;
+
+    // Score minimum
+    if (asset.adjScore >= 70) reasons.push('✅ Score fort (' + asset.adjScore + '/100)');
+    else { issues.push('❌ Score insuffisant (' + asset.adjScore + '/100)'); }
+
+    // Direction claire
+    if (asset.direction !== 'neutral') reasons.push('✅ Direction claire (' + (asset.direction === 'long' ? '↑ Hausse' : '↓ Baisse') + ')');
+    else issues.push('❌ Signal neutre');
+
+    // RSI zone idéale
+    if (ind?.rsi) {
+      if (ind.rsi > 35 && ind.rsi < 65) reasons.push('✅ RSI équilibré (' + ind.rsi.toFixed(0) + ')');
+      else issues.push('⚠️ RSI extrême (' + ind.rsi.toFixed(0) + ')');
+    }
+
+    // Volume
+    if (ind?.relVol > 1.0) reasons.push('✅ Volume supérieur à la moyenne');
+    else issues.push('⚠️ Volume faible');
+
+    // Tendance ADX
+    if (ind?.adx > 20) reasons.push('✅ Tendance confirmée (ADX ' + ind.adx?.toFixed(0) + ')');
+    else issues.push('⚠️ Tendance faible');
+
+    // Marché ouvert
+    const marketOpen = MarketHours.isOpen(asset.symbol);
+    if (marketOpen) reasons.push('✅ Marché ouvert');
+    else issues.push('❌ Marché fermé');
+
+    // Timing optimal
+    const timing = RiskCalculator.isOptimalTiming(asset.symbol, asset.assetClass);
+    if (timing.optimal) reasons.push('✅ Moment optimal pour entrer');
+    else if (timing.score > 50) reasons.push('⚠️ ' + timing.reasons[0]);
+    else issues.push('❌ Mauvais timing');
+
+    // Ichimoku si disponible
+    if (ind?.ichimoku) {
+      const ichOk = asset.direction === 'long' ? ind.ichimoku.bullish : ind.ichimoku.bearish;
+      if (ichOk) reasons.push('✅ Ichimoku favorable');
+    }
+
+    // MACD
+    if (ind?.macd) {
+      const macdOk = asset.direction === 'long' ? ind.macd.aboveZero : !ind.macd.aboveZero;
+      if (macdOk) reasons.push('✅ MACD aligné');
+    }
+
+    const green = issues.filter(i => i.startsWith('❌')).length === 0 && asset.adjScore >= 70 && marketOpen;
+    return { green, reasons, issues, score: asset.adjScore };
+  }
+
+  function _isAlreadyInPosition(symbol) {
+    const positions = [...Storage.getSimPositions(), ...Storage.getRealPositions()];
+    return positions.some(p => p.symbol === symbol);
+  }
+
+  async function checkAllAssets() {
+    const analysis = window.__MTP?.lastAnalysis;
+    if (!analysis?.tradeable) return;
+
+    const candidates = analysis.tradeable.filter(a =>
+      a.adjScore >= 70 &&
+      a.direction !== 'neutral' &&
+      !_isAlreadyInPosition(a.symbol) &&
+      !_firedAlerts.has(a.symbol + '_' + a.direction)
+    );
+
+    for (const asset of candidates) {
+      const check = _allFactorsGreen(asset);
+      if (!check.green) continue;
+
+      // Throttle: don't re-alert same asset for 4 hours
+      const key = asset.symbol + '_' + asset.direction;
+      const lastFired = _lastCheck[key] || 0;
+      if (Date.now() - lastFired < 4 * 60 * 60 * 1000) continue;
+
+      // Calculate optimal SL/TP
+      const capital = Storage.getSimCapital();
+      const settings = Storage.getSettings();
+      const ind = asset.indicators;
+      const optSL = RiskCalculator.optimalStop(asset.price, ind?.atr, asset.direction, ind);
+      const rrRatio = RiskCalculator.dynamicRR(asset.adjScore);
+      const optTP = RiskCalculator.takeProfitEstimate(asset.price, optSL, asset.direction, rrRatio);
+      const sizing = RiskCalculator.optimalPositionSize(capital, settings.riskPerTrade, asset.price, optSL, ind?.atrPct || 2);
+
+      // Fire notification
+      const dir = asset.direction === 'long' ? '↑ Hausse' : '↓ Baisse';
+      const msg = 'Signal optimal — ' + asset.symbol + ' ' + dir + ' Score ' + asset.adjScore + '/100 | SL : ' + Fmt.price(optSL) + ' TP : ' + Fmt.price(optTP) + ' R/R ' + rrRatio + ':1 | Tous les facteurs au vert';
+
+      if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+        try {
+          new Notification('ManiTradePro — Signal optimal détecté', {
+            body: msg, icon: '/ManiTradePro/icon.png', tag: key,
+          });
+        } catch(e) {}
+      }
+
+      // In-app toast
+      UI.toast('🎯 ' + asset.symbol + ' ' + dir + ' — Score ' + asset.adjScore + '/100 — Tous les feux au vert !', 'success', 8000);
+
+      // Store alert
+      _lastCheck[key] = Date.now();
+      _firedAlerts.add(key);
+      setTimeout(() => _firedAlerts.delete(key), 4 * 60 * 60 * 1000);
+
+      // Log to Storage
+      const alerts = Storage.getAlerts();
+      alerts.unshift({
+        id: 'smart_' + Date.now(),
+        type: 'optimal_signal',
+        symbol: asset.symbol,
+        direction: asset.direction,
+        score: asset.adjScore,
+        price: asset.price,
+        stopLoss: optSL,
+        takeProfit: optTP,
+        rrRatio,
+        reasons: check.reasons,
+        firedAt: Date.now(),
+      });
+      Storage.saveAlerts(alerts.slice(0, 50));
+    }
+  }
+
+  function init() {
+    // Check every 15 min
+    setInterval(() => checkAllAssets(), CHECK_INTERVAL_CRYPTO);
+    // First check after 30s (let data load first)
+    setTimeout(() => checkAllAssets(), 30000);
+    console.log('[SmartAlerts] Surveillance des signaux optimaux activée');
+  }
+
+  function getRecentAlerts() {
+    return Storage.getAlerts().filter(a => a.type === 'optimal_signal').slice(0, 10);
+  }
+
+  return { init, checkAllAssets, getRecentAlerts, _allFactorsGreen };
+})();
+
 // ═══ BOOT ═══
 async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
@@ -5241,6 +5543,9 @@ async function boot() {
     link.href = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjgwIiBmaWxsPSIjMGEwZTFhIi8+CiAgPHRleHQgeD0iMjU2IiB5PSIzNDAiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMjgwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzAwZTVhMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TTwvdGV4dD4KPC9zdmc+';
     document.head.appendChild(link);
   })();
+
+  // Init smart signal alerts
+  SmartAlerts.init();
 
   Router.navigate('dashboard');
   Router.attachNavClicks();
