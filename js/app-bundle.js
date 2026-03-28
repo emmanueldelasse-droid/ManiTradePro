@@ -131,6 +131,135 @@ const SupabaseDB = (() => {
   return { getCapital, saveCapital, getPositions, savePosition, deletePosition, getTrades, saveTrade, syncAll, ping };
 })();
 
+
+// ═══ TrendingEngine — Détection automatique de pépites ═══
+const TrendingEngine = (() => {
+  const PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev';
+  const CACHE_TTL = 60 * 60 * 1000; // 1h
+  let _cache = null;
+  let _lastFetch = 0;
+  let _countdown = 0;
+  let _countdownInterval = null;
+
+  async function fetchTrending() {
+    const now = Date.now();
+    if (_cache && (now - _lastFetch) < CACHE_TTL) return _cache;
+
+    try {
+      // Worker: Yahoo movers + Fear & Greed
+      const [workerRes, cgRes] = await Promise.allSettled([
+        fetch(PROXY + '/trending'),
+        fetch('https://api.coingecko.com/api/v3/search/trending'),
+      ]);
+
+      let data = { trending: [], fearGreed: null, movers: [] };
+
+      if (workerRes.status === 'fulfilled' && workerRes.value.ok) {
+        data = await workerRes.value.json();
+      }
+
+      // CoinGecko direct depuis le navigateur
+      if (cgRes.status === 'fulfilled' && cgRes.value.ok) {
+        const cgData = await cgRes.value.json();
+        data.trending = (cgData.coins || []).slice(0, 7).map(c => ({
+          symbol: c.item.symbol.toUpperCase(),
+          name: c.item.name,
+          rank: c.item.market_cap_rank,
+          source: 'CoinGecko Trending',
+        }));
+      }
+
+      _cache = data;
+      _lastFetch = now;
+      _countdown = CACHE_TTL / 1000;
+      _startCountdown();
+      return data;
+    } catch(e) {
+      console.warn('[Trending] Error:', e.message);
+      return { trending: [], fearGreed: null, movers: [] };
+    }
+  }
+
+  function _startCountdown() {
+    if (_countdownInterval) clearInterval(_countdownInterval);
+    _countdownInterval = setInterval(() => {
+      _countdown = Math.max(0, _countdown - 1);
+      // Update UI countdown
+      document.querySelectorAll('[data-trending-countdown]').forEach(el => {
+        el.textContent = _formatCountdown(_countdown);
+      });
+      if (_countdown === 0) {
+        fetchTrending().then(() => {
+          if (window.__MTP?.Router) {
+            const cur = window.__MTP.Router.getCurrent();
+            if (cur === 'dashboard' || cur === 'opportunities') {
+              window.__MTP.Router.navigate(cur);
+            }
+          }
+        });
+      }
+    }, 1000);
+  }
+
+  function _formatCountdown(seconds) {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return m + ':' + (s < 10 ? '0' : '') + s;
+  }
+
+  function getCountdown() {
+    return _formatCountdown(_countdown);
+  }
+
+  function getFearGreedEmoji(value) {
+    if (value <= 20) return '😱';
+    if (value <= 40) return '😰';
+    if (value <= 60) return '😐';
+    if (value <= 80) return '😊';
+    return '🤑';
+  }
+
+  function getFearGreedLabel(value) {
+    if (value <= 20) return 'Peur extrême';
+    if (value <= 40) return 'Peur';
+    if (value <= 60) return 'Neutre';
+    if (value <= 80) return 'Avidité';
+    return 'Avidité extrême';
+  }
+
+  function getFearGreedColor(value) {
+    if (value <= 20) return 'var(--loss)';
+    if (value <= 40) return '#ff8c00';
+    if (value <= 60) return 'var(--text-secondary)';
+    if (value <= 80) return 'var(--profit)';
+    return '#00e5a0';
+  }
+
+  // Enrichir les actifs trending avec le score algo
+  function enrichWithAlgo(trendingData) {
+    const analysis = window.__MTP?.lastAnalysis;
+    if (!analysis) return trendingData;
+
+    const enriched = { ...trendingData };
+
+    // Enrichir trending cryptos
+    enriched.trending = (trendingData.trending || []).map(t => {
+      const algoResult = analysis.all?.find(a => a.symbol === t.symbol);
+      return { ...t, algoScore: algoResult?.adjScore || null, algoDirection: algoResult?.direction || null, inWatchlist: !!algoResult };
+    });
+
+    // Enrichir movers
+    enriched.movers = (trendingData.movers || []).map(m => {
+      const algoResult = analysis.all?.find(a => a.symbol === m.symbol);
+      return { ...m, algoScore: algoResult?.adjScore || null, inWatchlist: !!algoResult };
+    });
+
+    return enriched;
+  }
+
+  return { fetchTrending, getCountdown, getFearGreedEmoji, getFearGreedLabel, getFearGreedColor, enrichWithAlgo };
+})();
+
 // ── AbortSignal.timeout polyfill (iOS 15 and below) ──
 if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout !== 'function') {
   AbortSignal.timeout = function(ms) {
@@ -1817,6 +1946,10 @@ const Router = (() => {
   }
 
   function attachScreenEvents(screenName) {
+    // Load trending data async for dashboard
+    if (screenName === 'dashboard') {
+      setTimeout(() => _loadTrendingSection(), 100);
+    }
     // Navigation interne
     document.querySelectorAll('[data-screen]').forEach(el => {
       if (el.closest('.nav-item') || el.closest('.bnav-item')) return;
@@ -2154,6 +2287,95 @@ function renderPositionCardMini(p) {
 
 Router.register('dashboard', renderDashboard);
 
+// Fetch trending data async and update dashboard
+async function _loadTrendingSection() {
+  const section = document.getElementById('trending-section');
+  if (!section) return;
+
+  try {
+    const raw = await TrendingEngine.fetchTrending();
+    const data = TrendingEngine.enrichWithAlgo(raw);
+    const fg = data.fearGreed;
+
+    let html = '<div style="display:flex;flex-direction:column;gap:var(--space-3);">';
+
+    // Fear & Greed
+    if (fg) {
+      const emoji = TrendingEngine.getFearGreedEmoji(fg.value);
+      const label = TrendingEngine.getFearGreedLabel(fg.value);
+      const color = TrendingEngine.getFearGreedColor(fg.value);
+      const tip = fg.value <= 25 ? '💡 La peur extrême = opportunité historique d\'achat' : fg.value >= 75 ? '⚠️ Avidité extrême = prudence recommandée' : '';
+      html += `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-4);">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:var(--space-3);">
+            <span style="font-size:1.8rem;">${emoji}</span>
+            <div>
+              <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;">Sentiment du marché crypto</div>
+              <div style="font-size:var(--text-md);font-weight:700;color:${color};">${label}</div>
+              ${tip ? `<div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:2px;">${tip}</div>` : ''}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;color:${color};">${fg.value}</div>
+            <div style="font-size:var(--text-xs);color:var(--text-muted);">/100</div>
+          </div>
+        </div>
+        <div style="margin-top:var(--space-3);height:6px;background:linear-gradient(90deg,var(--loss),#ff8c00,var(--text-muted),var(--profit),#00e5a0);border-radius:3px;position:relative;">
+          <div style="position:absolute;top:50%;left:${fg.value}%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:white;border:2px solid ${color};"></div>
+        </div>
+      </div>`;
+    }
+
+    // Trending cryptos
+    if (data.trending?.length > 0) {
+      html += `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-4);">
+        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">🔥 Cryptos tendance (CoinGecko)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:var(--space-2);">
+          ${data.trending.map(t => `
+            <div style="display:flex;align-items:center;gap:var(--space-2);background:var(--bg-elevated);border:1px solid ${t.inWatchlist ? 'var(--accent-glow)' : 'var(--border-subtle)'};border-radius:8px;padding:var(--space-2) var(--space-3);cursor:pointer;" ${t.inWatchlist ? `data-screen="asset-detail" data-symbol="${t.symbol}"` : ''}>
+              <span style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;">${t.symbol}</span>
+              ${t.algoScore ? `<span style="font-size:0.65rem;font-weight:700;padding:1px 4px;border-radius:3px;background:${t.algoScore >= 70 ? 'rgba(0,229,160,0.15)' : 'rgba(245,166,35,0.15)'};color:${t.algoScore >= 70 ? 'var(--profit)' : 'var(--signal-medium)'};">${t.algoScore}</span>` : ''}
+              ${!t.inWatchlist ? '<span style="font-size:0.6rem;color:var(--text-muted);">hors liste</span>' : ''}
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    // Yahoo movers
+    if (data.movers?.length > 0) {
+      html += `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-4);">
+        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">⚡ Actions qui bougent aujourd'hui</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);">
+          ${data.movers.map(m => `
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) 0;border-bottom:1px solid var(--border-subtle);">
+              <div style="display:flex;align-items:center;gap:var(--space-2);">
+                <span style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;">${m.symbol}</span>
+                <span style="font-size:var(--text-xs);color:var(--text-muted);">${m.name}</span>
+                ${m.inWatchlist ? '<span style="font-size:0.6rem;background:rgba(0,229,160,0.12);color:var(--profit);padding:1px 4px;border-radius:3px;">✓ Liste</span>' : ''}
+              </div>
+              <span style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--profit);">+${m.change?.toFixed(1)}%</span>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }
+
+    html += '</div>';
+    section.innerHTML = html;
+
+    // Attach click events
+    section.querySelectorAll('[data-screen]').forEach(el => {
+      el.addEventListener('click', () => {
+        const s = el.dataset.screen, sym = el.dataset.symbol;
+        if (s) window.__MTP.Router.navigate(s, sym ? { symbol: sym } : null);
+      });
+    });
+
+  } catch(e) {
+    const section = document.getElementById('trending-section');
+    if (section) section.innerHTML = '';
+  }
+}
+
 // ═══ opportunities.js ═══
 function renderOpportunities() {
   const analysis = window.__MTP?.lastAnalysis || AnalysisEngine.analyzeAllSync();
@@ -2440,10 +2662,14 @@ function renderAssetDetail(params) {
     <!-- Boutons brokers -->
     <div class="section-sep"><span class="sep-label">Accès rapide broker</span><div class="sep-line"></div></div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5);">
-      ${['BTC','ETH','SOL','GOLD','EURUSD','GBPUSD'].includes(symbol) ? `
+      ${['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR','GOLD','EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD'].includes(symbol) ? `
       <a href="https://www.binance.com/fr/trade/${{
-        'BTC':'BTC_USDT','ETH':'ETH_USDT','SOL':'SOL_USDT',
-        'GOLD':'XAU_USDT','EURUSD':'EUR_USDT','GBPUSD':'GBP_USDT'
+        'BTC':'BTC_USDT','ETH':'ETH_USDT','SOL':'SOL_USDT','BNB':'BNB_USDT',
+        'XRP':'XRP_USDT','ADA':'ADA_USDT','AVAX':'AVAX_USDT','DOT':'DOT_USDT',
+        'LINK':'LINK_USDT','DOGE':'DOGE_USDT','MATIC':'MATIC_USDT','UNI':'UNI_USDT',
+        'ATOM':'ATOM_USDT','LTC':'LTC_USDT','NEAR':'NEAR_USDT',
+        'GOLD':'XAU_USDT','EURUSD':'EUR_USDT','GBPUSD':'GBP_USDT',
+        'USDJPY':'USD_JPY','USDCHF':'USD_CHF','AUDUSD':'AUD_USDT',
       }[symbol]}" target="_blank" rel="noopener"
         style="display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);border-radius:var(--btn-radius);color:var(--sim-color);font-size:var(--text-sm);font-weight:600;text-decoration:none;transition:all var(--transition-fast);">
         🟡 Ouvrir sur Binance
