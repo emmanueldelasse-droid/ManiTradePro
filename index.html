@@ -1,16 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <head>
   <script>
     var t = localStorage.getItem('mtp_settings');
     if (t) { try { var s = JSON.parse(t); if (s.theme) document.documentElement.setAttribute('data-theme', s.theme); } catch(e){} }
   </script>
   <meta charset="UTF-8" />
-  ...
-  <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<div id="mode-banner" style="display:none;"></div>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="theme-color" content="#0a0e1a" />
@@ -28,14 +25,8 @@
   <link rel="stylesheet" href="css/screens-v2-additions.css" />
 </head>
 <body>
-
-  <div id="mode-banner" class="mode-banner mode-simulation">
-    <span class="mode-icon">⚡</span>
-    <span class="mode-label">MODE SIMULATION — Aucun argent réel</span>
-  </div>
-
+  <div id="mode-banner" style="display:none;"></div>
   <div id="app" class="app-shell">
-
     <nav class="sidebar" id="sidebar">
       <div class="sidebar-logo">
         <span class="logo-mark">M</span>
@@ -49,10 +40,10 @@
           <span class="nav-icon">◎</span><span>Opportunités</span>
         </a></li>
         <li><a href="#" data-screen="portefeuille" class="nav-item">
-          <span class="nav-icon">📊</span><span>Portefeuille</span>
+          <span class="nav-icon">📊</span><span>Mes trades</span>
         </a></li>
         <li><a href="#" data-screen="settings" class="nav-item">
-          <span class="nav-icon">◬</span><span>Paramètres</span>
+          <span class="nav-icon">◬</span><span>Réglages</span>
         </a></li>
       </ul>
       <div class="sidebar-status">
@@ -60,9 +51,7 @@
         <span>Marché actif</span>
       </div>
     </nav>
-
     <main class="main-content" id="main-content"></main>
-
     <nav class="bottom-nav" id="bottom-nav">
       <a href="#" data-screen="dashboard" class="bnav-item active">
         <span class="bnav-icon">◈</span><span>Accueil</span>
@@ -71,25 +60,21 @@
         <span class="bnav-icon">◎</span><span>Signaux</span>
       </a>
       <a href="#" data-screen="portefeuille" class="bnav-item">
-        <span class="bnav-icon">📊</span><span>Portefeuille</span>
+        <span class="bnav-icon">📊</span><span>Mes trades</span>
       </a>
       <a href="#" data-screen="settings" class="bnav-item">
         <span class="bnav-icon">◬</span><span>Config</span>
       </a>
     </nav>
-
   </div>
-
   <div id="modal-overlay" class="modal-overlay hidden">
     <div id="modal-box" class="modal-box">
       <div id="modal-content"></div>
     </div>
   </div>
-
   <div id="toast-container" class="toast-container"></div>
- <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
-<script src="js/app-bundle.js"></script>
-
+  <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
+  <script>eruda.init();</script>
+  <script src="js/app-bundle.js"></script>
 </body>
 </html>
