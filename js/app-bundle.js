@@ -1603,7 +1603,7 @@ const BrokerAdapter = (() => {
       const cap = Storage.getSimCapital();
       let openPnL = 0;
       Storage.getSimPositions().forEach(p => {
-        const curr = window.__prices[p.symbol] || MOCK_DATA.prices[p.symbol]?.price || p.entryPrice;
+        const curr = window.__prices[p.symbol] || p.entryPrice;
         openPnL += RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
       });
       return { available: cap, total: cap + openPnL, currency: 'EUR' };
@@ -1626,7 +1626,7 @@ const BrokerAdapter = (() => {
       const idx = positions.findIndex(p => p.id === positionId);
       if (idx === -1) return { success: false, error: 'Position introuvable' };
       const pos = positions[idx];
-      const curr = window.__prices[pos.symbol] || MOCK_DATA.prices[pos.symbol]?.price || pos.entryPrice;
+      const curr = window.__prices[pos.symbol] || pos.entryPrice;
       const pnl = RiskCalculator.openPnL(pos.entryPrice, curr, pos.quantity, pos.direction);
       const pnlPct = RiskCalculator.openPnLPct(pos.entryPrice, curr, pos.direction);
       Storage.saveSimCapital(Storage.getSimCapital() + pos.invested + pnl);
@@ -2046,7 +2046,7 @@ const UI = (() => {
       const overlay = document.getElementById('modal-overlay');
       const content = document.getElementById('modal-content');
       const settings = Storage.getSettings();
-      const price    = window.__prices[symbol] || MOCK_DATA.prices[symbol]?.price || 0;
+      const price    = window.__prices[symbol] || 0;
       const stop     = analysis.stopLoss   || (price * 0.98);
       const tp       = analysis.takeProfit || (price * 1.05);
       const capNum   = Storage.getSimCapital();
@@ -2536,7 +2536,7 @@ const Sync = (() => {
 
   function updateLivePnL() {
     Storage.getSimPositions().forEach(pos => {
-      const curr = window.__prices[pos.symbol] || MOCK_DATA.prices[pos.symbol]?.price || pos.entryPrice;
+      const curr = window.__prices[pos.symbol] || pos.entryPrice;
       const pnl  = RiskCalculator.openPnL(pos.entryPrice, curr, pos.quantity, pos.direction);
       const pnlP = RiskCalculator.openPnLPct(pos.entryPrice, curr, pos.direction);
       const el   = document.querySelector(`[data-position-pnl="${pos.id}"]`);
@@ -2556,6 +2556,298 @@ const Sync = (() => {
   return { init, refreshPrices, getLastSync };
 })();
 
+
+// ═══ Single source of truth for prices ═══
+function getPriceForSymbol(symbol) {
+  const p = window.__prices[symbol];
+  return p && p > 0 ? p : null;
+}
+
+function getPriceDisplay(symbol) {
+  const p = getPriceForSymbol(symbol);
+  if (!p) return { price: null, text: '— Prix indisponible', loading: true };
+  return { price: p, text: Fmt.price(p), loading: false };
+}
+
+
+// ═══ PepiteEngine — Détection intelligente précoce ═══
+const PepiteEngine = (() => {
+
+  function detectPepites(analysis) {
+    if (!analysis?.all?.length) return [];
+    const pepites = [];
+
+    analysis.all.forEach(a => {
+      if (a.error) return;
+      const ind = a.indicators;
+      if (!ind) return;
+
+      // Not already a top opportunity
+      const isTopOpportunity = a.adjScore >= 70;
+      if (isTopOpportunity) return;
+
+      const reasons = [];
+      let watchScore = 0;
+      let status = 'trop_tot';
+      let waitFor = '';
+      let maturity = 0; // 0-100
+
+      // ── Signal 1: Score en construction (40-60)
+      if (a.adjScore >= 40 && a.adjScore < 70) {
+        watchScore += 30;
+        maturity += 30;
+        reasons.push('Score en construction (' + a.adjScore + '/100)');
+      }
+
+      // ── Signal 2: MACD bullish cross récent
+      if (ind.macd?.bullishCross || ind.macd?.bearishCross) {
+        watchScore += 20;
+        maturity += 20;
+        reasons.push('Croisement MACD recent');
+      }
+
+      // ── Signal 3: Bollinger compression (breakout imminent)
+      if (ind.bollinger?.compressed) {
+        watchScore += 15;
+        maturity += 15;
+        reasons.push('Bollinger compresses — breakout possible');
+      }
+
+      // ── Signal 4: RSI sortant de zone extrême
+      if (ind.rsi) {
+        if (ind.rsi > 25 && ind.rsi < 35) { watchScore += 15; maturity += 15; reasons.push('RSI remonte de zone de survente'); }
+        if (ind.rsi > 65 && ind.rsi < 75) { watchScore += 10; maturity += 10; reasons.push('RSI en zone de force'); }
+      }
+
+      // ── Signal 5: Volume supérieur à la moyenne
+      if (ind.relVol > 1.2) {
+        watchScore += 10;
+        maturity += 10;
+        reasons.push('Volume superieur a la moyenne (' + ind.relVol?.toFixed(1) + 'x)');
+      }
+
+      // ── Signal 6: Ichimoku en transition
+      if (ind.ichimoku?.inCloud === false && ind.ichimoku?.tenkan > ind.ichimoku?.kijun) {
+        watchScore += 15;
+        maturity += 15;
+        reasons.push('Tenkan au-dessus de Kijun — signal Ichimoku positif');
+      }
+
+      // ── Signal 7: Divergence RSI bullish
+      if (ind.rsiDiv?.bullishDiv) {
+        watchScore += 20;
+        maturity += 20;
+        reasons.push('Divergence RSI haussiere detectee');
+      }
+
+      // ── Signal 8: Régression linéaire positive en construction
+      if (ind.regression?.slope > 0 && ind.regression?.r2 > 0.3) {
+        watchScore += 10;
+        maturity += 10;
+        reasons.push('Regression lineaire positive (R2=' + ind.regression.r2?.toFixed(2) + ')');
+      }
+
+      // Need at least 2 signals and min score
+      if (reasons.length < 2 || watchScore < 35) return;
+
+      // Determine status
+      maturity = Math.min(100, maturity);
+      if (maturity >= 80) status = 'proche_validation';
+      else if (maturity >= 60) status = 'a_confirmer';
+      else if (maturity >= 40) status = 'en_construction';
+      else status = 'surveillance_active';
+
+      // What to wait for
+      const missing = [];
+      if (a.adjScore < 60) missing.push('score > 60');
+      if (!ind.macd?.bullishCross && a.direction === 'long') missing.push('croisement MACD');
+      if (ind.bollinger?.compressed) missing.push('breakout Bollinger');
+      if (ind.adx < 20) missing.push('ADX > 20');
+      if (ind.relVol < 1.0) missing.push('confirmation volume');
+      waitFor = missing.length > 0 ? missing.slice(0, 2).join(' + ') : 'Confirmation generale';
+
+      // Horizon
+      const horizon = ind.vol20 > 40 ? '1-3 jours' : ind.adx > 25 ? '1-2 semaines' : '2-4 semaines';
+
+      pepites.push({
+        symbol: a.symbol,
+        name: a.name,
+        assetClass: a.assetClass,
+        price: getPriceForSymbol(a.symbol) || a.price,
+        change24h: a.change24h,
+        watchScore,
+        maturity,
+        status,
+        direction: a.direction,
+        riskLevel: a.riskLevel,
+        reasons,
+        waitFor,
+        horizon,
+        adjScore: a.adjScore,
+      });
+    });
+
+    return pepites
+      .sort((a, b) => b.watchScore - a.watchScore)
+      .slice(0, 5);
+  }
+
+  function getStatusLabel(status) {
+    const map = {
+      proche_validation: { label: 'Proche validation', color: 'var(--profit)', emoji: '🟢' },
+      a_confirmer:       { label: 'A confirmer',       color: 'var(--signal-medium)', emoji: '🟡' },
+      en_construction:   { label: 'En construction',   color: 'var(--text-muted)', emoji: '🔵' },
+      surveillance_active:{ label: 'Sous surveillance', color: 'var(--accent)', emoji: '👁️' },
+      trop_tot:          { label: 'Trop tot',           color: 'var(--text-muted)', emoji: '⏳' },
+    };
+    return map[status] || map.trop_tot;
+  }
+
+  return { detectPepites, getStatusLabel };
+})();
+
+// ── Render section pépites
+function renderPepitesSection(analysis, maxItems = 3) {
+  const pepites = PepiteEngine.detectPepites(analysis);
+  if (!pepites.length) return '';
+
+  const items = pepites.slice(0, maxItems).map(p => {
+    const st = PepiteEngine.getStatusLabel(p.status);
+    const priceAvail = p.price && p.price > 0;
+    const change = Fmt.change(p.change24h);
+    const mainReason = p.reasons[0] || '';
+
+    return '<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-left:3px solid ' + st.color + ';border-radius:var(--card-radius);padding:var(--space-4);cursor:pointer;" data-screen="asset-detail" data-symbol="' + p.symbol + '">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2);">'
+      + '<div style="display:flex;align-items:center;gap:var(--space-2);">'
+      + '<span style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;">' + p.symbol + '</span>'
+      + '<span style="font-size:var(--text-xs);color:var(--text-muted);">' + (p.name || '') + '</span>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;gap:var(--space-2);">'
+      + '<span style="font-size:0.65rem;font-weight:700;padding:1px 6px;border-radius:4px;background:' + st.color + '22;color:' + st.color + ';">' + st.emoji + ' ' + st.label + '</span>'
+      + '</div>'
+      + '</div>'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-2);">'
+      + '<div>'
+      + '<div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">' + (priceAvail ? Fmt.price(p.price) : '— Chargement') + '</div>'
+      + '<div style="font-size:var(--text-xs);" class="' + change.cls + '">' + change.text + '</div>'
+      + '</div>'
+      + '<div style="text-align:right;">'
+      + '<div style="font-size:var(--text-xs);color:var(--text-muted);">Score surveillance</div>'
+      + '<div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:' + st.color + ';">' + p.watchScore + '/100</div>'
+      + '</div>'
+      + '</div>'
+      // Maturity bar
+      + '<div style="height:4px;background:var(--bg-elevated);border-radius:2px;margin-bottom:var(--space-2);">'
+      + '<div style="height:100%;width:' + p.maturity + '%;background:' + st.color + ';border-radius:2px;transition:width 0.5s;"></div>'
+      + '</div>'
+      + '<div style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:4px;">'
+      + '💡 ' + mainReason
+      + '</div>'
+      + '<div style="font-size:var(--text-xs);color:var(--text-muted);">'
+      + '⏳ Attendre : ' + p.waitFor + ' · Horizon : ' + p.horizon
+      + '</div>'
+      + '</div>';
+  }).join('');
+
+  return '<div class="section-title" style="margin-top:var(--space-6);">'
+    + '<span>💎 Pépites à surveiller</span>'
+    + '<span style="font-size:var(--text-xs);color:var(--text-muted);">Signaux en construction</span>'
+    + '</div>'
+    + '<div style="display:flex;flex-direction:column;gap:var(--space-3);margin-bottom:var(--space-6);">'
+    + items
+    + '</div>';
+}
+
+
+// ═══ FinnhubClient — Calendrier économique réel ═══
+const FinnhubClient = (() => {
+  const PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/finnhub';
+  let _cache = null;
+  let _lastFetch = 0;
+  const TTL = 60 * 60 * 1000; // 1h
+
+  async function getEconomicCalendar() {
+    const now = Date.now();
+    if (_cache && now - _lastFetch < TTL) return _cache;
+    try {
+      const from = new Date().toISOString().split('T')[0];
+      const toDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const r = await fetch(PROXY + '/calendar/economic?from=' + from + '&to=' + toDate, {
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!r.ok) throw new Error('Finnhub error ' + r.status);
+      const data = await r.json();
+      const events = (data.economicCalendar || [])
+        .filter(e => e.impact === 'high' || e.impact === 'medium')
+        .map(e => ({
+          time: e.time || '',
+          title: e.event || '',
+          impact: e.impact || 'low',
+          country: e.country || '',
+          actual: e.actual,
+          estimate: e.estimate,
+          prev: e.prev,
+          unit: e.unit || '',
+        }))
+        .slice(0, 15);
+      _cache = events;
+      _lastFetch = now;
+      return events;
+    } catch(e) {
+      console.warn('[Finnhub] Calendar error:', e.message);
+      return null; // Return null — fallback to static calendar
+    }
+  }
+
+  return { getEconomicCalendar };
+})();
+
+// ═══ AlphaVantageClient — News multi-sources avec sentiment ═══
+const AlphaVantageClient = (() => {
+  const PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/alphavantage';
+  let _cache = null;
+  let _lastFetch = 0;
+  const TTL = 30 * 60 * 1000; // 30 min
+
+  async function getNewsWithSentiment(topics = 'financial_markets,technology,economy_macro') {
+    const now = Date.now();
+    if (_cache && now - _lastFetch < TTL) return _cache;
+    try {
+      const r = await fetch(
+        PROXY + '/query?function=NEWS_SENTIMENT&topics=' + topics + '&limit=30&sort=LATEST',
+        { signal: AbortSignal.timeout(10000) }
+      );
+      if (!r.ok) throw new Error('AlphaVantage error ' + r.status);
+      const data = await r.json();
+      if (data.Note || data.Information) {
+        console.warn('[AlphaVantage] Quota atteint:', data.Note || data.Information);
+        return null;
+      }
+      const articles = (data.feed || []).map(a => ({
+        title: a.title || '',
+        summary: (a.summary || '').slice(0, 300),
+        source: a.source || '',
+        sourceUrl: a.source_domain || '',
+        link: a.url || '',
+        pubDate: a.time_published || '',
+        sentiment: a.overall_sentiment_label || 'Neutral',
+        sentimentScore: parseFloat(a.overall_sentiment_score) || 0,
+        symbols: (a.ticker_sentiment || []).map(t => t.ticker).filter(Boolean).slice(0, 3),
+        topics: (a.topics || []).map(t => t.topic).slice(0, 3),
+      }));
+      _cache = articles;
+      _lastFetch = now;
+      return articles;
+    } catch(e) {
+      console.warn('[AlphaVantage] News error:', e.message);
+      return null;
+    }
+  }
+
+  return { getNewsWithSentiment };
+})();
+
 // ═══ dashboard.js ═══
 function renderDashboard() {
   const settings = Storage.getSettings();
@@ -2568,7 +2860,7 @@ function renderDashboard() {
 
   let totalPnL = 0, totalInvested = 0;
   simPos.forEach(p => {
-    const curr = window.__prices[p.symbol] || MOCK_DATA.prices[p.symbol]?.price || p.entryPrice;
+    const curr = window.__prices[p.symbol] || p.entryPrice;
     totalPnL += RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
     totalInvested += p.invested;
   });
@@ -2675,6 +2967,8 @@ function renderDashboard() {
       : top5.map((a, i) => renderOpportunityRow(a, i + 1)).join('')
     }
 
+    ${renderPepitesSection(analysis)}
+
     ${analysis.all.length === 0 || analysis.all.every(a => a.error) ? `
     <div style="background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:var(--card-radius);padding:var(--space-5);margin-top:var(--space-4);">
       <div style="font-weight:700;margin-bottom:var(--space-2);">⏳ Chargement des données réelles en cours...</div>
@@ -2759,39 +3053,12 @@ function _trendArrow(change24h, direction) {
 }
 
 function renderOpportunityRow(a, rank) {
-  const change = Fmt.change(a.change24h);
-  return `
-    <div class="opp-row" data-screen="asset-detail" data-symbol="${a.symbol}">
-      <div class="opp-rank">#${rank}</div>
-      ${UI.scoreRing(a.adjScore, 44)}
-      <div class="asset-icon">${Fmt.assetIcon(a.symbol)}</div>
-      <div class="opp-asset">
-        <div class="opp-asset-line1">
-          <span class="asset-symbol">${a.symbol}</span>
-          <span style="font-size:0.55rem;vertical-align:middle;">${MarketHours.isOpen(a.symbol) ? '🟢' : '🔴'}</span>
-          ${_assetClassBadge(a.assetClass)}
-          ${a.isSolid ? '<span class="solid-badge">★ Solide</span>' : ''}
-          <span class="direction-tag ${a.direction}">${Fmt.directionIcon(a.direction)} ${Fmt.directionLabel(a.direction)}</span>
-        </div>
-        <div class="opp-asset-line2">
-          <span style="font-size:var(--text-xs);color:var(--text-muted);">${a.name}</span>
-          <span class="risk-badge ${a.riskLevel}" style="margin-left:var(--space-2);">${Fmt.riskLabel(a.riskLevel)}</span>
-        </div>
-      </div>
-      <div class="opp-trend-arrow">${_trendArrow(a.change24h, a.direction)}</div>
-      <div class="opp-price-col">
-        <div class="opp-price">${Fmt.price(a.price)}</div>
-        <div class="opp-change ${change.cls}">${change.text}</div>
-        ${a.stopLoss && a.takeProfit ? `<div class="opp-sltp">
-          <span class="opp-sl">SL&nbsp;${Fmt.price(a.stopLoss)}</span>
-          <span class="opp-tp">TP&nbsp;${Fmt.price(a.takeProfit)}</span>
-        </div>` : ''}
-      </div>
-    </div>`;
+  // Unified component — same format as renderOppCard
+  return renderOppCard(a, rank, a.isSolid, false, true);
 }
 
 function renderPositionCardMini(p) {
-  const curr = window.__prices[p.symbol] || MOCK_DATA.prices[p.symbol]?.price || p.entryPrice;
+  const curr = window.__prices[p.symbol] || p.entryPrice;
   const pnl  = RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
   const pnlP = RiskCalculator.openPnLPct(p.entryPrice, curr, p.direction);
   return `
@@ -2818,6 +3085,26 @@ function renderPositionCardMini(p) {
 
 Router.register('dashboard', renderDashboard);
 
+function _getFGData(val) {
+  const d = {
+    short: val <= 20 ? 'Marche domine par la peur. Ventes massives parfois irrationnelles.'
+      : val <= 40 ? 'Sentiment negatif. Investisseurs reduisent leur exposition.'
+      : val <= 60 ? 'Sentiment equilibre. Ni euphorie ni panique.'
+      : val <= 80 ? 'Investisseurs optimistes. Exposition au risque en hausse.'
+      : 'Marche en euphorie. Achats massifs, risque de surchauffe.',
+    context: val <= 20 ? 'Historiquement proche des points bas. Confirmer avec signaux techniques.'
+      : val <= 40 ? 'Peut preceder un rebond ou prolonger la baisse.'
+      : val <= 60 ? 'Contexte favorable a une analyse rationnelle.'
+      : val <= 80 ? 'Accompagne souvent les hausses saines. Surveiller valorisations.'
+      : 'Precede souvent une correction. Reduire les positions.',
+    caution: val <= 20 ? 'La peur extreme peut durer — ne pas confondre opportunite et chute libre.'
+      : val <= 40 ? 'Attendre confirmation technique avant d agir.'
+      : val <= 60 ? 'Bon contexte pour analyser sereinement.'
+      : val <= 80 ? 'Ne pas sur-exposer. Gerer le risque avec discipline.'
+      : 'Correction possible. Reduire exposition et rester prudent.',
+  };
+  return d;
+}
 // Fetch trending data async and update dashboard
 async function _loadTrendingSection() {
   const section = document.getElementById('trending-section');
@@ -2835,26 +3122,33 @@ async function _loadTrendingSection() {
       const emoji = TrendingEngine.getFearGreedEmoji(fg.value);
       const label = TrendingEngine.getFearGreedLabel(fg.value);
       const color = TrendingEngine.getFearGreedColor(fg.value);
-      const tip = fg.value <= 25 ? '💡 La peur extrême = opportunité historique d\'achat' : fg.value >= 75 ? '⚠️ Avidité extrême = prudence recommandée' : '';
-      html += `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-4);">
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div style="display:flex;align-items:center;gap:var(--space-3);">
-            <span style="font-size:1.8rem;">${emoji}</span>
-            <div>
-              <div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;">Sentiment du marché crypto</div>
-              <div style="font-size:var(--text-md);font-weight:700;color:${color};">${label}</div>
-              ${tip ? `<div style="font-size:var(--text-xs);color:var(--text-secondary);margin-top:2px;">${tip}</div>` : ''}
-            </div>
-          </div>
-          <div style="text-align:right;">
-            <div style="font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;color:${color};">${fg.value}</div>
-            <div style="font-size:var(--text-xs);color:var(--text-muted);">/100</div>
-          </div>
-        </div>
-        <div style="margin-top:var(--space-3);height:6px;background:linear-gradient(90deg,var(--loss),#ff8c00,var(--text-muted),var(--profit),#00e5a0);border-radius:3px;position:relative;">
-          <div style="position:absolute;top:50%;left:${fg.value}%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:white;border:2px solid ${color};"></div>
-        </div>
-      </div>`;
+      const fgInfo = _getFGData(fg.value);
+      const tip = '';
+      const _fi = fgInfo;
+      html += '<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3);">'
+        + '<div style="display:flex;align-items:center;gap:var(--space-3);">'
+        + '<span style="font-size:1.8rem;">' + emoji + '</span>'
+        + '<div><div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;">Fear & Greed Index</div>'
+        + '<div style="font-size:var(--text-lg);font-weight:700;color:' + color + ';">' + label + '</div></div>'
+        + '</div>'
+        + '<div style="font-family:var(--font-mono);font-size:2rem;font-weight:700;color:' + color + ';">' + fg.value + '<span style="font-size:var(--text-xs);color:var(--text-muted);">/100</span></div>'
+        + '</div>'
+        + '<div style="height:8px;background:linear-gradient(90deg,#ef4444,#f97316,#eab308,#22c55e,#00e5a0);border-radius:4px;position:relative;margin-bottom:var(--space-2);">'
+        + '<div style="position:absolute;top:50%;left:' + fg.value + '%;transform:translate(-50%,-50%);width:14px;height:14px;border-radius:50%;background:white;border:3px solid ' + color + ';"></div>'
+        + '</div>'
+        + '<div style="display:flex;justify-content:space-between;font-size:0.6rem;color:var(--text-muted);margin-bottom:var(--space-4);">'
+        + '<span>Peur extr.</span><span>Peur</span><span>Neutre</span><span>Cupidite</span><span>Cupi. extr.</span>'
+        + '</div>'
+        + '<div style="background:var(--bg-elevated);border-radius:8px;padding:var(--space-3);margin-bottom:var(--space-3);">'
+        + '<div style="font-size:var(--text-sm);color:var(--text-secondary);font-weight:600;margin-bottom:4px;">' + _fi.short + '</div>'
+        + '<div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:4px;line-height:1.5;">' + _fi.context + '</div>'
+        + '<div style="font-size:var(--text-xs);font-weight:700;color:' + color + ';">' + _fi.caution + '</div>'
+        + '</div>'
+        + '<div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.5;border-top:1px solid var(--border-subtle);padding-top:var(--space-2);">'
+        + 'Indicateur de sentiment crypto base sur 7 facteurs. A combiner avec analyse technique — ce n\'est pas un signal d\'achat ou de vente.'
+        + '</div>'
+        + '</div>';
     }
 
     // Trending cryptos
@@ -2946,6 +3240,8 @@ function renderOpportunities() {
       }
     </div>
 
+    ${renderPepitesSection(window.__MTP?.lastAnalysis, 5)}
+
     ${analysis.neutral.length > 0 ? `
       <div class="section-sep"><span class="sep-label">En observation</span><div class="sep-line"></div></div>
       ${analysis.neutral.map((a, i) => renderOppCard(a, i + 1, false, true)).join('')}
@@ -2957,10 +3253,14 @@ function renderOpportunities() {
     </div>`;
 }
 
-function renderOppCard(a, rank, isSolid = false, isNeutral = false) {
+function renderOppCard(a, rank, isSolid = false, isNeutral = false, compact = false) {
+  // Always use real price from single source of truth
+  const realPrice = getPriceForSymbol(a.symbol) || a.price;
+  const priceAvailable = !!getPriceForSymbol(a.symbol);
+  const displayPrice = realPrice;
   const change = Fmt.change(a.change24h);
-  const slPct = a.stopLoss ? ((Math.abs(a.price - a.stopLoss) / a.price) * 100).toFixed(1) : null;
-  const tpPct = a.takeProfit ? ((Math.abs(a.takeProfit - a.price) / a.price) * 100).toFixed(1) : null;
+  const slPct = a.stopLoss && displayPrice ? ((Math.abs(displayPrice - a.stopLoss) / displayPrice) * 100).toFixed(1) : null;
+  const tpPct = a.takeProfit && displayPrice ? ((Math.abs(a.takeProfit - displayPrice) / displayPrice) * 100).toFixed(1) : null;
   const scoreColor = a.adjScore >= 70 ? 'var(--signal-strong)' : a.adjScore >= 50 ? 'var(--signal-medium)' : 'var(--signal-weak)';
 
   return `
@@ -2980,7 +3280,7 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false) {
           <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">${a.name}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.price(a.price)}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Chargement...'}</div>
           <div style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;" class="${change.cls}">${change.text}</div>
           <div style="font-size:0.6rem;color:var(--text-muted);margin-top:1px;">🔄 <span data-countdown="${['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR'].includes(a.symbol) ? 'crypto' : 'prices'}">--</span></div>
         </div>
@@ -3015,14 +3315,18 @@ function renderAssetDetail(params) {
   if (!asset || !priceData) return `<div class="screen"><p>Actif "${symbol}" inconnu.</p></div>`;
 
   const cached   = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
+  // Always use real price from single source of truth
+  const realPrice = getPriceForSymbol(symbol);
   const analysis = cached || {
     symbol, name: asset.name, assetClass: asset.class,
-    price: priceData.price, change24h: priceData.change24h || 0,
+    price: realPrice || 0, change24h: 0,
     direction: 'neutral', adjScore: 0, score: 0,
     regime: { pass: false, reasons: [] }, indicators: {}, isSolid: false,
     stopLoss: null, takeProfit: null, rrRatio: 0,
-    recommendation: 'Données en cours de chargement...',
+    recommendation: realPrice ? 'Données en cours de chargement...' : 'Prix en cours de récupération...',
   };
+  // Override with real price if available
+  if (realPrice && realPrice > 0) analysis.price = realPrice;
 
   const ind      = analysis.indicators || {};
   const change   = Fmt.change(analysis.change24h);
@@ -3058,7 +3362,7 @@ function renderAssetDetail(params) {
         </div>
       </div>
       <div class="asset-price-block">
-        <div class="asset-price-main">${Fmt.price(priceData.price)}</div>
+        <div class="asset-price-main">${realPrice ? Fmt.price(realPrice) : '⏳ Chargement...'}</div>
         <div class="asset-price-change ${change.cls}">${change.text} (24h)</div>
       </div>
     </div>
@@ -3616,6 +3920,25 @@ function renderPortefeuille() {
         </div>
       `}
 
+      <!-- Claude IA Analyse historique -->
+      <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);" id="pf-ai-section">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3);">
+          <div style="font-size:var(--text-xs);font-weight:700;color:#8b5cf6;text-transform:uppercase;letter-spacing:0.1em;">🤖 Analyses IA disponibles</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-2);">
+          <button id="btn-ai-history" style="padding:var(--space-3);background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:var(--btn-radius);color:#8b5cf6;font-size:var(--text-sm);font-weight:600;cursor:pointer;text-align:left;">
+            📈 Analyser mon historique de trades
+          </button>
+          <button id="btn-ai-coaching" style="padding:var(--space-3);background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:var(--btn-radius);color:#8b5cf6;font-size:var(--text-sm);font-weight:600;cursor:pointer;text-align:left;">
+            🎯 Coaching personnalisé
+          </button>
+          <button id="btn-ai-bias" style="padding:var(--space-3);background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:var(--btn-radius);color:#8b5cf6;font-size:var(--text-sm);font-weight:600;cursor:pointer;text-align:left;">
+            🧠 Détecter mes biais comportementaux
+          </button>
+        </div>
+        <div id="pf-ai-result" style="display:none;margin-top:var(--space-4);padding:var(--space-4);background:var(--bg-elevated);border-radius:8px;font-size:var(--text-sm);color:var(--text-secondary);line-height:1.8;white-space:pre-wrap;"></div>
+      </div>
+
       <!-- Reset -->
       <div style="margin-top:var(--space-6);padding:var(--space-5);background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);">
         <button class="btn btn-ghost" style="color:var(--loss);width:100%;" id="btn-reset-sim-pf">🔄 Réinitialiser la simulation</button>
@@ -4024,6 +4347,51 @@ function _attachPortefeuilleEvents() {
       } catch(err) { UI.toast(`Erreur : ${err.message}`, 'error'); }
     });
   });
+  // AI buttons
+  const _aiResult = document.getElementById('pf-ai-result');
+  const _showAiResult = (text) => {
+    if (!_aiResult) return;
+    _aiResult.style.display = '';
+    _aiResult.textContent = text;
+  };
+
+  document.getElementById('btn-ai-history')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-ai-history');
+    btn.textContent = '⏳ Analyse en cours...'; btn.disabled = true;
+    const history = Storage.getSimHistory();
+    const result = await ClaudeAI.analyzeHistory(history);
+    _showAiResult(result);
+    btn.textContent = '📈 Analyser mon historique de trades'; btn.disabled = false;
+  });
+
+  document.getElementById('btn-ai-coaching')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-ai-coaching');
+    btn.textContent = '⏳ En cours...'; btn.disabled = true;
+    const capital = Storage.getSimCapital();
+    const history = Storage.getSimHistory();
+    const wins = history.filter(t => t.pnl > 0).length;
+    const winRate = history.length > 0 ? Math.round(wins / history.length * 100) : 0;
+    const result = await ClaudeAI.getCoaching(capital, history, winRate);
+    _showAiResult(result);
+    btn.textContent = '🎯 Coaching personnalisé'; btn.disabled = false;
+  });
+
+  document.getElementById('btn-ai-bias')?.addEventListener('click', async () => {
+    const btn = document.getElementById('btn-ai-bias');
+    btn.textContent = '⏳ Analyse en cours...'; btn.disabled = true;
+    const history = Storage.getSimHistory();
+    if (history.length < 3) { _showAiResult('Pas assez de trades pour detecter des biais (minimum 3).'); btn.textContent = '🧠 Détecter mes biais comportementaux'; btn.disabled = false; return; }
+    const wins = history.filter(t => t.pnl > 0);
+    const losses = history.filter(t => t.pnl <= 0);
+    const avgWin = wins.length > 0 ? wins.reduce((s,t) => s + (t.pnlPct||0), 0) / wins.length : 0;
+    const avgLoss = losses.length > 0 ? losses.reduce((s,t) => s + (t.pnlPct||0), 0) / losses.length : 0;
+    const system = 'Tu es un psychologue du trading. Analyse ces donnees et identifie les biais cognitifs et comportementaux du trader. Sois direct et constructif. Maximum 4 biais identifies.';
+    const prompt = 'Donnees trader:\nTrades: ' + history.length + '\nWin rate: ' + Math.round(wins.length/history.length*100) + '%\nGain moyen: +' + avgWin.toFixed(1) + '%\nPerte moyenne: ' + avgLoss.toFixed(1) + '%\nIdentifie les biais comportementaux et donne des conseils concrets pour les corriger.';
+    const result = await ClaudeAI._ask ? ClaudeAI._ask(system, prompt, null) : await ClaudeAI.analyzeHistory(history);
+    _showAiResult(result);
+    btn.textContent = '🧠 Détecter mes biais comportementaux'; btn.disabled = false;
+  });
+
   // Reset sim
   const resetBtn = document.getElementById('btn-reset-sim-pf');
   if (resetBtn) {
@@ -4098,7 +4466,7 @@ function _renderHistoryRow(t) {
 }
 
 function _enrichPosition(pos) {
-  const currentPrice = window.__prices[pos.symbol] || MOCK_DATA.prices[pos.symbol]?.price || pos.entryPrice;
+  const currentPrice = window.__prices[pos.symbol] || pos.entryPrice;
   const dir = (pos.direction || '').toLowerCase();
   const diff = dir === 'long' ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice;
   return { ...pos, currentPrice, pnl: diff * pos.quantity, pnlPct: (diff / pos.entryPrice) * 100, invested: pos.entryPrice * pos.quantity };
@@ -4255,7 +4623,7 @@ function _computeStats(capital, history, openPos, settings) {
   const initialCapital = parseFloat(settings.simInitialCapital) || 10000;
   let openPnl = 0;
   openPos.forEach(pos => {
-    const curr = window.__prices[pos.symbol] || MOCK_DATA.prices[pos.symbol]?.price || pos.entryPrice;
+    const curr = window.__prices[pos.symbol] || pos.entryPrice;
     const dir  = (pos.direction || '').toLowerCase();
     const diff = dir === 'long' ? curr - pos.entryPrice : pos.entryPrice - curr;
     openPnl += diff * pos.quantity;
@@ -4314,7 +4682,7 @@ function _renderEquityCurve(curve, initial) {
 }
 
 function _renderMiniPosition(pos) {
-  const curr = window.__prices[pos.symbol] || MOCK_DATA.prices[pos.symbol]?.price || pos.entryPrice;
+  const curr = window.__prices[pos.symbol] || pos.entryPrice;
   const dir  = (pos.direction || '').toLowerCase();
   const diff = dir === 'long' ? curr - pos.entryPrice : pos.entryPrice - curr;
   const pnl  = diff * pos.quantity;
@@ -5087,11 +5455,15 @@ const NewsEngine = (() => {
   const TTL = 30 * 60 * 1000; // 30 min
 
   const RSS_SOURCES = [
-    { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters', type: 'general' },
-    { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk', type: 'crypto' },
-    { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US', name: 'Yahoo Finance', type: 'stocks' },
-    { url: 'https://www.aktionnaire.com/articles', name: 'Aktionnaire.com', type: 'stocks_fr', scrape: true },
-    { url: 'https://www.boursorama.com/rss/actus-internationales', name: 'Boursorama', type: 'general_fr' },
+    { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters', type: 'general', importance: 'high' },
+    { url: 'https://feeds.reuters.com/reuters/topNews', name: 'Reuters Top', type: 'general', importance: 'high' },
+    { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk', type: 'crypto', importance: 'high' },
+    { url: 'https://cointelegraph.com/rss', name: 'CoinTelegraph', type: 'crypto', importance: 'medium' },
+    { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US', name: 'Yahoo Finance', type: 'stocks', importance: 'high' },
+    { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=BTC-USD&region=US&lang=en-US', name: 'Yahoo Crypto', type: 'crypto', importance: 'medium' },
+    { url: 'https://www.aktionnaire.com/articles', name: 'Aktionnaire', type: 'stocks_fr', scrape: true, importance: 'medium' },
+    { url: 'https://www.boursorama.com/rss/actus-internationales', name: 'Boursorama', type: 'general_fr', importance: 'medium' },
+    { url: 'https://feeds.marketwatch.com/marketwatch/topstories/', name: 'MarketWatch', type: 'stocks', importance: 'high' },
   ];
 
   // Symbols to watch in news
@@ -5115,6 +5487,27 @@ const NewsEngine = (() => {
     'recession': null, 'croissance': null, 'pib': null, 'chomage': null,
     'interest rate': null, 'nfp': null, 'earnings': null, 'resultats': null,
   };
+
+
+  function _getNewsImportance(title, sourceImportance) {
+    const highKeywords = ['fed', 'bce', 'ecb', 'inflation', 'rate', 'taux', 'crash', 'crisis', 'bitcoin', 'etf', 'sec', 'regulation', 'ban', 'gdp', 'pib', 'nfp', 'jobs'];
+    const lower = title.toLowerCase();
+    const hasHighKeyword = highKeywords.some(k => lower.includes(k));
+    if (hasHighKeyword && sourceImportance === 'high') return 'high';
+    if (hasHighKeyword || sourceImportance === 'high') return 'medium';
+    return 'low';
+  }
+
+  function _getNewsCategory(type) {
+    const map = {
+      general: 'Macro',
+      general_fr: 'Marches FR',
+      stocks: 'Actions',
+      stocks_fr: 'Actions FR',
+      crypto: 'Crypto',
+    };
+    return map[type] || 'General';
+  }
 
   function detectSymbols(text) {
     const lower = text.toLowerCase();
@@ -5156,14 +5549,19 @@ const NewsEngine = (() => {
         if (data.status !== 'ok' || !data.items?.length) continue;
         for (const item of data.items.slice(0, 8)) {
           const text = (item.title || '') + ' ' + (item.description || '');
+          const importance = _getNewsImportance(item.title || '', source.importance || 'medium');
           items.push({
             title: item.title || '',
+            description: (item.description || '').replace(/<[^>]*>/g, '').slice(0, 200),
             source: source.name,
+            sourceUrl: source.url,
             type: source.type,
+            importance,
             pubDate: item.pubDate,
             link: item.link || source.url,
             symbols: detectSymbols(text),
             sentiment: scoreSentiment(text),
+            category: _getNewsCategory(source.type),
           });
         }
       } catch(e) { console.warn('[News]', source.name, e.message); }
@@ -5198,7 +5596,53 @@ const NewsEngine = (() => {
     }
     alerts.sort((a, b) => b.mentions * b.algoScore - a.mentions * a.algoScore);
 
-    const result = { items, symbolMentions, alerts, fetchedAt: now };
+    // Enrich with Alpha Vantage news (async, non-blocking)
+    let avArticles = null;
+    try {
+      avArticles = await AlphaVantageClient.getNewsWithSentiment();
+    } catch(e) {}
+
+    if (avArticles && avArticles.length > 0) {
+      avArticles.forEach(a => {
+        // Avoid duplicates by title similarity
+        const isDup = items.some(existing =>
+          existing.title.toLowerCase().slice(0, 40) === a.title.toLowerCase().slice(0, 40)
+        );
+        if (isDup) return;
+        const avSentiment = a.sentimentScore > 0.2 ? 'bullish' : a.sentimentScore < -0.2 ? 'bearish' : 'neutral';
+        items.push({
+          title: a.title,
+          description: a.summary,
+          source: a.source + ' (AV)',
+          sourceUrl: a.sourceUrl,
+          type: 'stocks',
+          importance: Math.abs(a.sentimentScore) > 0.3 ? 'high' : 'medium',
+          pubDate: a.pubDate,
+          link: a.link,
+          symbols: a.symbols.filter(s => WATCH_SYMBOLS[s.toLowerCase()] || s.length <= 5),
+          sentiment: avSentiment,
+          category: 'Multi-sources',
+        });
+      });
+      // Re-sort by importance
+      items.sort((a, b) => {
+        const imp = { high: 3, medium: 2, low: 1 };
+        return (imp[b.importance] || 1) - (imp[a.importance] || 1);
+      });
+    }
+
+    // Recalculate symbolMentions with enriched items
+    const symbolMentions2 = {};
+    items.forEach(item => {
+      item.symbols.forEach(sym => {
+        if (!symbolMentions2[sym]) symbolMentions2[sym] = { count: 0, bullish: 0, bearish: 0 };
+        symbolMentions2[sym].count++;
+        if (item.sentiment === 'bullish') symbolMentions2[sym].bullish++;
+        if (item.sentiment === 'bearish') symbolMentions2[sym].bearish++;
+      });
+    });
+
+    const result = { items, symbolMentions: symbolMentions2, alerts, fetchedAt: now, hasAlphaVantage: !!avArticles };
     _cache = result;
     _lastFetch = now;
     return result;
@@ -5269,6 +5713,121 @@ const NewsEngine = (() => {
   return { fetchNews, generateSummary };
 })();
 
+
+
+// ═══ Economic Calendar — Événements à venir ═══
+const EconomicCalendar = (() => {
+
+  function getUpcomingEvents() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun, 1=Mon...
+    const hour = now.getHours();
+
+    // Static weekly calendar — real events rotate by weekday
+    const weeklyEvents = {
+      1: [ // Lundi
+        { time: '10:00', title: 'PMI Manufacturier Zone Euro', impact: 'medium', zone: 'EUR', symbol: null },
+        { time: '16:00', title: 'ISM Manufacturier USA', impact: 'high', zone: 'USD', symbol: null },
+      ],
+      2: [ // Mardi
+        { time: '11:00', title: 'Confiance consommateurs Zone Euro', impact: 'medium', zone: 'EUR', symbol: null },
+        { time: '14:30', title: 'Balance commerciale USA', impact: 'medium', zone: 'USD', symbol: null },
+        { time: '15:00', title: 'JOLTS Offres emploi USA', impact: 'high', zone: 'USD', symbol: null },
+      ],
+      3: [ // Mercredi
+        { time: '11:00', title: 'Inflation Zone Euro (IPC)', impact: 'high', zone: 'EUR', symbol: 'EURUSD' },
+        { time: '14:30', title: 'ADP Emploi prive USA', impact: 'high', zone: 'USD', symbol: null },
+        { time: '16:30', title: 'Stocks petrole EIA', impact: 'medium', zone: 'OIL', symbol: 'OIL' },
+        { time: '20:00', title: 'Compte-rendu Fed (FOMC Minutes)', impact: 'high', zone: 'USD', symbol: null },
+      ],
+      4: [ // Jeudi
+        { time: '08:00', title: 'Decisions BCE (si applicable)', impact: 'high', zone: 'EUR', symbol: 'EURUSD' },
+        { time: '14:30', title: 'Demandes allocations chomage USA', impact: 'high', zone: 'USD', symbol: null },
+        { time: '14:30', title: 'PIB USA (si applicable)', impact: 'high', zone: 'USD', symbol: null },
+      ],
+      5: [ // Vendredi
+        { time: '14:30', title: 'NFP — Emplois non-agricoles USA', impact: 'high', zone: 'USD', symbol: null },
+        { time: '14:30', title: 'Taux de chomage USA', impact: 'high', zone: 'USD', symbol: null },
+        { time: '16:00', title: 'Confiance consommateurs Michigan', impact: 'medium', zone: 'USD', symbol: null },
+      ],
+    };
+
+    const events = [];
+    // Today remaining events
+    const todayEvents = weeklyEvents[day] || [];
+    todayEvents.forEach(e => {
+      const [h, m] = e.time.split(':').map(Number);
+      if (h * 60 + m > hour * 60) {
+        events.push({ ...e, when: 'Aujourd\'hui ' + e.time, daysAhead: 0 });
+      }
+    });
+
+    // Next 3 days
+    for (let i = 1; i <= 3; i++) {
+      const nextDay = (day + i) % 7;
+      if (nextDay === 0 || nextDay === 6) continue; // Skip weekends
+      const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+      const dayEvents = weeklyEvents[nextDay] || [];
+      dayEvents.forEach(e => {
+        events.push({ ...e, when: dayNames[nextDay] + ' ' + e.time, daysAhead: i });
+      });
+    }
+
+    return events.slice(0, 8);
+  }
+
+  async function renderUpcomingSection() {
+    // Try Finnhub first — fallback to static calendar
+    let events = null;
+    try {
+      const finnhubEvents = await FinnhubClient.getEconomicCalendar();
+      if (finnhubEvents && finnhubEvents.length > 0) {
+        events = finnhubEvents.map(e => {
+          const dt = e.time ? new Date(e.time) : null;
+          const when = dt ? dt.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}) : '';
+          return { ...e, when, zone: e.country || '', symbol: null };
+        });
+      }
+    } catch(err) {}
+
+    // Fallback to static
+    if (!events || !events.length) events = getUpcomingEvents();
+    if (!events.length) return '';
+
+    const items = events.slice(0, 8).map(e => {
+      const impColor = e.impact === 'high' ? 'var(--loss)' : e.impact === 'medium' ? 'var(--signal-medium)' : 'var(--text-muted)';
+      const impLabel = e.impact === 'high' ? '🔴 Fort' : e.impact === 'medium' ? '🟡 Moyen' : '⚪ Faible';
+      const hasData = e.actual !== undefined || e.estimate !== undefined;
+      const dataStr = hasData
+        ? ' | Prev: ' + (e.prev !== undefined ? e.prev + (e.unit||'') : '—')
+          + (e.estimate !== undefined ? ' Est: ' + e.estimate + (e.unit||'') : '')
+          + (e.actual !== undefined ? ' Réel: ' + e.actual + (e.unit||'') : '')
+        : '';
+      return '<div style="display:flex;align-items:flex-start;justify-content:space-between;padding:var(--space-3) 0;border-bottom:1px solid var(--border-subtle);">'
+        + '<div style="flex:1;">'
+        + '<div style="font-size:var(--text-sm);font-weight:600;color:var(--text-primary);">' + e.title + '</div>'
+        + '<div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-top:2px;">'
+        + (e.when ? '<span style="font-size:var(--text-xs);color:var(--text-muted);">' + e.when + '</span>' : '')
+        + '<span style="font-size:var(--text-xs);font-weight:700;color:' + impColor + ';">' + impLabel + '</span>'
+        + '<span style="font-size:var(--text-xs);background:var(--bg-elevated);padding:1px 4px;border-radius:3px;color:var(--text-muted);">' + e.zone + '</span>'
+        + (dataStr ? '<span style="font-size:0.6rem;color:var(--text-muted);">' + dataStr + '</span>' : '')
+        + '</div>'
+        + '</div>'
+        + '</div>';
+    }).join('');
+
+    return '<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">'
+      + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3);">'
+      + '<div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;">📅 Événements à venir</div>'
+      + '<div style="font-size:0.6rem;color:var(--text-muted);">Source: Finnhub</div>'
+      + '</div>'
+      + '<div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);">Ces événements peuvent créer des mouvements importants. Adapter la gestion du risque en conséquence.</div>'
+      + items
+      + '</div>';
+  }
+
+  return { getUpcomingEvents, renderUpcomingSection };
+})();
 
 // ═══ Écran Informations ═══
 function renderInfoScreen() {
@@ -5343,50 +5902,89 @@ async function _loadInfoContent() {
       </div>`;
     }
 
-    // News récentes
+    // News récentes — structured cards
     if (newsData.items?.length > 0) {
-      html += `<div style="margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">📰 Dernières news (sources vérifiées)</div>
-        <div style="display:flex;flex-direction:column;gap:var(--space-3);">
-          ${newsData.items.slice(0, 10).map(item => {
-            const sent = item.sentiment === 'bullish' ? '📈' : item.sentiment === 'bearish' ? '📉' : '➡️';
-            const syms = item.symbols.length > 0 ? item.symbols.map(s => `<span style="font-size:0.6rem;background:var(--bg-elevated);padding:1px 4px;border-radius:3px;">${s}</span>`).join(' ') : '';
-            return `<a href="${item.link}" target="_blank" rel="noopener" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-4);display:block;text-decoration:none;">
-              <div style="display:flex;align-items:flex-start;gap:var(--space-3);">
-                <span style="font-size:1rem;flex-shrink:0;">${sent}</span>
-                <div style="flex:1;">
-                  <div style="font-size:var(--text-sm);font-weight:600;color:var(--text-primary);line-height:1.4;margin-bottom:var(--space-2);">${item.title}</div>
-                  <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;">
-                    <span style="font-size:var(--text-xs);color:var(--text-muted);">${item.source}</span>
-                    ${syms}
-                  </div>
-                </div>
-              </div>
-            </a>`;
-          }).join('')}
-        </div>
-      </div>`;
+      // Separate high importance from regular
+      const highItems = newsData.items.filter(i => i.importance === 'high').slice(0, 4);
+      const otherItems = newsData.items.filter(i => i.importance !== 'high').slice(0, 8);
+
+      const renderNewsCard = (item) => {
+        const sent = item.sentiment === 'bullish' ? '📈' : item.sentiment === 'bearish' ? '📉' : '➡️';
+        const impColor = item.importance === 'high' ? 'var(--loss)' : item.importance === 'medium' ? 'var(--signal-medium)' : 'var(--text-muted)';
+        const impLabel = item.importance === 'high' ? 'Important' : item.importance === 'medium' ? 'Notable' : '';
+        const syms = item.symbols.length > 0 ? item.symbols.map(s => '<span style="font-size:0.6rem;background:var(--bg-elevated);padding:1px 4px;border-radius:3px;">' + s + '</span>').join(' ') : '';
+        const pubTime = item.pubDate ? (() => { try { const d = new Date(item.pubDate); return d.toLocaleDateString('fr-FR', {day:'2-digit',month:'2-digit'}) + ' ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit',minute:'2-digit'}); } catch(e) { return ''; } })() : '';
+        return '<a href="' + item.link + '" target="_blank" rel="noopener" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-left:3px solid ' + (item.importance === 'high' ? 'var(--loss)' : 'var(--border-medium)') + ';border-radius:var(--card-radius);padding:var(--space-4);display:block;text-decoration:none;">'
+          + '<div style="display:flex;align-items:flex-start;gap:var(--space-3);">'
+          + '<span style="font-size:1rem;flex-shrink:0;">' + sent + '</span>'
+          + '<div style="flex:1;min-width:0;">'
+          + '<div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;margin-bottom:4px;">'
+          + '<span style="font-size:0.6rem;font-weight:700;padding:1px 5px;border-radius:3px;background:var(--bg-elevated);color:var(--text-muted);">' + item.category + '</span>'
+          + (impLabel ? '<span style="font-size:0.6rem;font-weight:700;color:' + impColor + ';">' + impLabel + '</span>' : '')
+          + (pubTime ? '<span style="font-size:0.6rem;color:var(--text-muted);">' + pubTime + '</span>' : '')
+          + '</div>'
+          + '<div style="font-size:var(--text-sm);font-weight:600;color:var(--text-primary);line-height:1.4;margin-bottom:4px;">' + item.title + '</div>'
+          + (item.description ? '<div style="font-size:var(--text-xs);color:var(--text-muted);line-height:1.4;margin-bottom:4px;">' + item.description + '</div>' : '')
+          + '<div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;">'
+          + '<span style="font-size:var(--text-xs);color:var(--accent);">🔗 ' + item.source + '</span>'
+          + syms
+          + '</div>'
+          + '</div>'
+          + '</div>'
+          + '</a>';
+      };
+
+      if (highItems.length > 0) {
+        html += '<div style="margin-bottom:var(--space-5);">'
+          + '<div style="font-size:var(--text-xs);font-weight:700;color:var(--loss);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">🔴 À la une aujourd\'hui</div>'
+          + '<div style="display:flex;flex-direction:column;gap:var(--space-3);">'
+          + highItems.map(renderNewsCard).join('')
+          + '</div></div>';
+      }
+
+      if (otherItems.length > 0) {
+        html += '<div style="margin-bottom:var(--space-5);">'
+          + '<div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">📰 Autres actualités</div>'
+          + '<div style="display:flex;flex-direction:column;gap:var(--space-3);">'
+          + otherItems.map(renderNewsCard).join('')
+          + '</div></div>';
+      }
     }
 
-    // Fear & Greed
+    // Fear & Greed in News
     if (fg) {
-      const fgColor = fg.value <= 25 ? 'var(--loss)' : fg.value <= 45 ? '#ff8c00' : fg.value <= 55 ? 'var(--text-muted)' : 'var(--profit)';
-      html += `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">
-        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">😱 Fear & Greed Index</div>
-        <div style="display:flex;align-items:center;justify-content:space-between;">
-          <div style="font-size:var(--text-md);font-weight:700;color:${fgColor};">${fg.label}</div>
-          <div style="font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;color:${fgColor};">${fg.value}<span style="font-size:var(--text-sm);color:var(--text-muted);">/100</span></div>
-        </div>
-        <div style="margin-top:var(--space-3);height:6px;background:linear-gradient(90deg,var(--loss),#ff8c00,var(--text-muted),var(--profit));border-radius:3px;position:relative;">
-          <div style="position:absolute;top:50%;left:${fg.value}%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:white;border:2px solid ${fgColor};"></div>
-        </div>
-      </div>`;
+      const fgColor2 = fg.value <= 25 ? 'var(--loss)' : fg.value <= 45 ? '#ff8c00' : fg.value <= 55 ? 'var(--text-muted)' : 'var(--profit)';
+      const fgLabel2 = fg.value <= 20 ? 'Peur extreme' : fg.value <= 40 ? 'Peur' : fg.value <= 60 ? 'Neutre' : fg.value <= 80 ? 'Cupidite' : 'Cupidite extreme';
+      const fgEmoji2 = fg.value <= 20 ? '😱' : fg.value <= 40 ? '😰' : fg.value <= 60 ? '😐' : fg.value <= 80 ? '😊' : '🤑';
+      const fgd2 = _getFGData(fg.value);
+      html += '<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3);">'
+        + '<div style="display:flex;align-items:center;gap:var(--space-2);">'
+        + '<span style="font-size:1.5rem;">' + fgEmoji2 + '</span>'
+        + '<div><div style="font-size:var(--text-xs);color:var(--text-muted);text-transform:uppercase;">Fear & Greed Index</div>'
+        + '<div style="font-size:var(--text-md);font-weight:700;color:' + fgColor2 + ';">' + fgLabel2 + '</div></div>'
+        + '</div>'
+        + '<div style="font-family:var(--font-mono);font-size:1.8rem;font-weight:700;color:' + fgColor2 + ';">' + fg.value + '<span style="font-size:var(--text-xs);color:var(--text-muted);">/100</span></div>'
+        + '</div>'
+        + '<div style="height:6px;background:linear-gradient(90deg,#ef4444,#f97316,#eab308,#22c55e,#00e5a0);border-radius:3px;position:relative;margin-bottom:var(--space-3);">'
+        + '<div style="position:absolute;top:50%;left:' + fg.value + '%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:white;border:2px solid ' + fgColor2 + ';"></div>'
+        + '</div>'
+        + '<div style="font-size:var(--text-xs);color:var(--text-secondary);font-weight:600;margin-bottom:4px;">' + fgd2.short + '</div>'
+        + '<div style="font-size:var(--text-xs);color:var(--text-muted);">' + fgd2.caution + '</div>'
+        + '</div>';
     }
 
-    html += `<div style="font-size:var(--text-xs);color:var(--text-muted);text-align:center;padding:var(--space-4);">
-      Sources vérifiées : Reuters · CoinDesk · Yahoo Finance · Aktionnaire.com · Boursorama · Alternative.me<br>
-      Mise à jour toutes les 30 minutes · Prochaine dans <span data-trending-countdown>--</span>
-    </div>`;
+    // Add upcoming events calendar (async Finnhub)
+    html += await EconomicCalendar.renderUpcomingSection();
+
+    const avLabel = newsData.hasAlphaVantage
+      ? '✅ Alpha Vantage · '
+      : '⚠️ Alpha Vantage indisponible · ';
+    html += '<div style="background:var(--bg-elevated);border-radius:8px;padding:var(--space-3);margin-bottom:var(--space-3);font-size:var(--text-xs);color:var(--text-muted);text-align:center;">'
+      + avLabel
+      + 'Reuters · CoinDesk · Yahoo Finance · MarketWatch · Aktionnaire · Boursorama<br>'
+      + 'Mise a jour toutes les 30 min · Prochaine dans <span data-trending-countdown>--</span>'
+      + '</div>';
 
     container.innerHTML = html;
     container.style.display = '';
@@ -5738,18 +6336,34 @@ const ClaudeAI = (() => {
     const cached = _cache.get(cacheKey);
     if (cached && Date.now() - cached.ts < CACHE_TTL * 12) return cached.text;
 
-    const newsTitles = newsItems.slice(0, 10).map(n => '- ' + n.title + ' (' + n.source + ')').join('\n');
+    // Prioritize Alpha Vantage articles (multi-source, pre-analyzed)
+    const avItems = newsItems.filter(n => n.source && n.source.includes('(AV)'));
+    const rssItems = newsItems.filter(n => !n.source?.includes('(AV)'));
+    const topItems = [
+      ...avItems.slice(0, 6),
+      ...rssItems.slice(0, 6),
+    ].slice(0, 10);
+
+    const newsTitles = topItems.map(n => {
+      const sentLabel = n.sentiment === 'bullish' ? '[+]' : n.sentiment === 'bearish' ? '[-]' : '[=]';
+      const syms = n.symbols.length > 0 ? ' (' + n.symbols.join(',') + ')' : '';
+      return '- ' + sentLabel + ' ' + n.title + syms + ' [' + n.source + ']';
+    }).join('\n');
     const fg = fearGreed ? 'Fear & Greed: ' + fearGreed.value + '/100 (' + fearGreed.label + ')' : '';
     const analysis = window.__MTP?.lastAnalysis;
     const signaux = analysis?.tradeable?.length || 0;
     const forts = analysis?.tradeable?.filter(a => a.adjScore >= 70).length || 0;
 
-    const system = 'Tu es un analyste financier senior. Analyse les informations de marché du jour et génère un résumé structuré en français. Sois concis, factuel, et actionnable. Maximum 5 points clés.';
-    const prompt = 'Voici les informations du marché aujourd hui:\n\n' +
-      'SENTIMENT: ' + fg + '\n' +
-      'SIGNAUX ALGO: ' + signaux + ' opportunités dont ' + forts + ' forts\n\n' +
-      'HEADLINES:\n' + newsTitles + '\n\n' +
-      'Génère un résumé de marché en 5 points maximum. Identifie les actifs à surveiller et les risques du jour.';
+    const system = 'Tu es un analyste financier senior specialise dans les marches mondiaux. Tu recois des titres de presse de plusieurs sources serieuses. Produis une synthese structuree en francais, claire et factuelle. Distingue les faits confirmes des interpretations. Ne jamais inventer de donnees. Rester prudent et objectif.';
+    const prompt = 'CONTEXTE MARCHE DU JOUR\n\n'
+      + 'SENTIMENT CRYPTO: ' + fg + '\n'
+      + 'SIGNAUX ALGO: ' + signaux + ' opportunites dont ' + forts + ' forts\n\n'
+      + 'TITRES DE PRESSE:\n' + newsTitles + '\n\n'
+      + 'Produis une analyse en 4 sections:\n'
+      + '1. CE QUI COMPTE (2-3 faits majeurs)\n'
+      + '2. ACTIFS CONCERNES (lesquels et pourquoi)\n'
+      + '3. CONTEXTE MARCHE (interpretation prudente)\n'
+      + '4. INCERTITUDES (points a surveiller, limites)';
 
     return _ask(system, prompt, cacheKey);
   }
@@ -5851,7 +6465,7 @@ const ClaudeAI = (() => {
     return { count, max: MAX_CALLS_DAY, remaining: MAX_CALLS_DAY - count };
   }
 
-  return { summarizeNews, analyzeSignal, analyzeHistory, getCoaching, interpretMacroEvent, weeklyReport, getCallStats, _syncFromSupabase };
+  return { summarizeNews, analyzeSignal, analyzeHistory, getCoaching, interpretMacroEvent, weeklyReport, getCallStats, _syncFromSupabase, _ask };
 })();
 
 
