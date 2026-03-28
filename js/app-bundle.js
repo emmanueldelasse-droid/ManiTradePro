@@ -1044,7 +1044,7 @@ const BinanceClient = (() => {
   }
   async function _fetchEurUsdRate() {
     try {
-      const r = await fetch(`${BASE}/api/v3/ticker/price?symbol=EURUSDT`, { mode: 'cors' });
+      const r = await fetch('https://aged-bar-257a.emmanueldelasse.workers.dev/binance/api/v3/ticker/price?symbol=EURUSDT', { signal: AbortSignal.timeout(5000) });
       if (r.ok) { const d = await r.json(); _eurUsdRate = parseFloat(d.price); }
     } catch(e) {}
   }
@@ -1067,7 +1067,7 @@ const BinanceClient = (() => {
     const pair = BINANCE_PAIRS[symbol];
     if (!pair) return null;
     try {
-      const r = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pair}`, { signal: AbortSignal.timeout(6000), mode: 'cors' });
+      const r = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pair}`, { signal: AbortSignal.timeout(6000) });
       if (!r.ok) return null;
       const d = await r.json();
       const priceUsdt = parseFloat(d.lastPrice);
@@ -1546,7 +1546,7 @@ const BrokerAdapter = (() => {
       const cap = Storage.getSimCapital();
       let openPnL = 0;
       Storage.getSimPositions().forEach(p => {
-        const curr = window.__prices[p.symbol] || p.entryPrice;
+        const curr = window.__prices[p.symbol] || null;
         openPnL += RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
       });
       return { available: cap, total: cap + openPnL, currency: 'EUR' };
@@ -1569,7 +1569,8 @@ const BrokerAdapter = (() => {
       const idx = positions.findIndex(p => p.id === positionId);
       if (idx === -1) return { success: false, error: 'Position introuvable' };
       const pos = positions[idx];
-      const curr = window.__prices[pos.symbol] || pos.entryPrice;
+      const curr = window.__prices[pos.symbol] || null;
+      if (!curr || curr <= 0) { resolve({ success: false, error: 'Prix réel non disponible' }); return; }
       const pnl = RiskCalculator.openPnL(pos.entryPrice, curr, pos.quantity, pos.direction);
       const pnlPct = RiskCalculator.openPnLPct(pos.entryPrice, curr, pos.direction);
       Storage.saveSimCapital(Storage.getSimCapital() + pos.invested + pnl);
@@ -2492,7 +2493,8 @@ const Sync = (() => {
 
   function updateLivePnL() {
     Storage.getSimPositions().forEach(pos => {
-      const curr = window.__prices[pos.symbol] || pos.entryPrice;
+      const curr = window.__prices[pos.symbol] || null;
+      if (!curr || curr <= 0) { resolve({ success: false, error: 'Prix réel non disponible' }); return; }
       const pnl  = RiskCalculator.openPnL(pos.entryPrice, curr, pos.quantity, pos.direction);
       const pnlP = RiskCalculator.openPnLPct(pos.entryPrice, curr, pos.direction);
       const el   = document.querySelector(`[data-position-pnl="${pos.id}"]`);
@@ -2500,7 +2502,7 @@ const Sync = (() => {
       const pEl  = document.querySelector(`[data-position-pnlpct="${pos.id}"]`);
       if (pEl) { pEl.textContent = Fmt.pct(pnlP); pEl.className = 'pnl-pct ' + Fmt.pnlClass(pnlP); }
       const prEl = document.querySelector(`[data-position-price="${pos.id}"]`);
-      if (prEl) prEl.textContent = Fmt.price(curr);
+      if (prEl) prEl.textContent = curr && curr > 0 ? Fmt.price(curr) : '⏳';
     });
   }
 
@@ -2629,7 +2631,7 @@ const PepiteEngine = (() => {
         symbol: a.symbol,
         name: a.name,
         assetClass: a.assetClass,
-        price: getPriceForSymbol(a.symbol) || a.price,
+        price: getPriceForSymbol(a.symbol) || null, // null si prix réel indisponible
         change24h: a.change24h,
         watchScore,
         maturity,
@@ -2819,9 +2821,12 @@ function renderDashboard() {
 
   let totalPnL = 0, totalInvested = 0;
   simPos.forEach(p => {
-    const curr = window.__prices[p.symbol] || p.entryPrice;
-    totalPnL += RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
+    const curr = window.__prices[p.symbol];
     totalInvested += p.invested;
+    // Only add PnL if real price available — never use entry price as current
+    if (curr && curr > 0) {
+      totalPnL += RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
+    }
   });
 
   const simCapNum    = Storage.getSimCapital();
@@ -3020,7 +3025,7 @@ function renderOpportunityRow(a, rank) {
 }
 
 function renderPositionCardMini(p) {
-  const curr = window.__prices[p.symbol] || p.entryPrice;
+  const curr = window.__prices[p.symbol] || null;
   const pnl  = RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
   const pnlP = RiskCalculator.openPnLPct(p.entryPrice, curr, p.direction);
   return `
@@ -3217,7 +3222,7 @@ function renderOpportunities() {
 
 function renderOppCard(a, rank, isSolid = false, isNeutral = false, compact = false) {
   // Always use real price from single source of truth
-  const realPrice = getPriceForSymbol(a.symbol) || a.price;
+  const realPrice = getPriceForSymbol(a.symbol) || null // STRICT: jamais a.price stale;
   const priceAvailable = !!getPriceForSymbol(a.symbol);
   const displayPrice = realPrice;
   const change = Fmt.change(a.change24h);
@@ -3242,14 +3247,16 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false, compact = fa
           <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">${a.name}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:${priceAvailable ? 'var(--text-primary)' : 'var(--text-muted)'}">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Prix en cours...'}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:${priceAvailable ? 'var(--text-primary)' : 'var(--signal-medium)'}">
+            ${priceAvailable ? Fmt.price(displayPrice) : '⏳ Chargement prix réel...'}
+          </div>
           <div style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;" class="${change.cls}">${change.text}</div>
           <div style="font-size:0.6rem;color:var(--text-muted);margin-top:1px;">🔄 <span data-countdown="${['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR'].includes(a.symbol) ? 'crypto' : 'prices'}">--</span></div>
         </div>
       </div>
 
-      <!-- Ligne 2: Barre SL → TP -->
-      ${a.stopLoss && a.takeProfit ? `
+      <!-- Ligne 2: Barre SL → TP — only show if real price available -->
+      ${priceAvailable && a.stopLoss && a.takeProfit ? `
       <div style="background:var(--bg-elevated);border-radius:6px;padding:var(--space-3);">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-2);">
           <span style="font-size:var(--text-xs);color:var(--loss);font-weight:700;">SL ${Fmt.price(a.stopLoss)}<span style="color:var(--text-muted);font-weight:400;"> -${slPct}%</span></span>
@@ -3301,7 +3308,7 @@ function renderAssetDetail(params) {
 
   const analysis = cached || {
     symbol, name: asset.name, assetClass: asset.class,
-    price: realPrice || 0,
+    price: realPrice || null, // null = prix non disponible
     change24h: 0,
     direction: 'neutral', adjScore: 0, score: 0,
     regime: { pass: false, reasons: [] }, indicators: {}, isSolid: false,
@@ -3309,7 +3316,8 @@ function renderAssetDetail(params) {
     recommendation: priceAvailable ? 'Analyse en cours...' : 'Prix en cours de récupération...',
   };
 
-  const displayPrice = realPrice || analysis.price || 0;
+  // STRICT: only real-time price — never OHLC close or stale price
+  const displayPrice = (realPrice && realPrice > 0) ? realPrice : null;
   const ind      = analysis.indicators || {};
   const change   = Fmt.change(analysis.change24h);
   const settings = Storage.getSettings();
@@ -3345,8 +3353,10 @@ function renderAssetDetail(params) {
         </div>
       </div>
       <div class="asset-price-block">
-        <div class="asset-price-main">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Chargement...'}</div>
-        <div class="asset-price-change ${change.cls}">${priceAvailable ? change.text + ' (24h)' : '— en attente'}</div>
+        <div class="asset-price-main" style="color:${displayPrice ? 'var(--text-primary)' : 'var(--signal-medium)'}">
+          ${displayPrice ? Fmt.price(displayPrice) : '⏳ Prix réel en cours de chargement...'}
+        </div>
+        <div class="asset-price-change ${change.cls}">${displayPrice ? change.text + ' (24h)' : ''}</div>
       </div>
     </div>
 
@@ -3501,7 +3511,7 @@ function renderAssetDetail(params) {
     <div class="card" style="margin-bottom:var(--space-5);">
       <div class="card-header"><span class="card-title">Niveaux clés suggérés</span></div>
       <div class="grid-3">
-        <div><div class="stat-label">Prix actuel (live)</div><div class="stat-value">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Chargement'}</div></div>
+        <div><div class="stat-label">Prix actuel (live)</div><div class="stat-value" style="color:${displayPrice ? 'var(--text-primary)' : 'var(--signal-medium)'}">${displayPrice ? Fmt.price(displayPrice) : '⏳ En chargement...'}</div></div>
         <div><div class="stat-label">Stop-loss (2×ATR)</div><div class="stat-value" style="color:var(--loss);">${stopLoss ? Fmt.price(stopLoss) : '—'}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">${stopLoss && displayPrice > 0 ? '-' + ((Math.abs(displayPrice - stopLoss) / displayPrice) * 100).toFixed(1) + '%' : ''}</div></div>
         <div><div class="stat-label">Take profit (R/R 2.5)</div><div class="stat-value" style="color:var(--profit);">${takeProfit ? Fmt.price(takeProfit) : '—'}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">${takeProfit && displayPrice > 0 ? '+' + ((Math.abs(takeProfit - displayPrice) / displayPrice) * 100).toFixed(1) + '%' : ''}</div></div>
       </div>
@@ -4250,8 +4260,10 @@ function _renderPortefeuilleCard(pos, mode) {
           </div>
         </div>
         <div class="pf-card-pnl">
-          <div class="pf-pnl-big ${pnlCls}" data-position-pnl="${pos.id}" style="font-size:clamp(var(--text-lg),4vw,var(--text-2xl));">${Fmt.signedCurrency(pos.pnl)}</div>
-          <div class="pf-pnl-pct ${pnlCls}" data-position-pnlpct="${pos.id}">${Fmt.signedPct(pos.pnlPct)}</div>
+          <div class="pf-pnl-big ${pos.priceLoaded ? pnlCls : ''}" data-position-pnl="${pos.id}" style="font-size:clamp(var(--text-lg),4vw,var(--text-2xl));color:${pos.priceLoaded ? '' : 'var(--text-muted)'}">
+            ${pos.priceLoaded && pos.pnl !== null ? Fmt.signedCurrency(pos.pnl) : '⏳ Prix en cours...'}
+          </div>
+          <div class="pf-pnl-pct ${pos.priceLoaded ? pnlCls : ''}" data-position-pnlpct="${pos.id}">${pos.priceLoaded && pos.pnlPct !== null ? Fmt.signedPct(pos.pnlPct) : ''}</div>
         </div>
       </div>
       ${barHtml}
@@ -4451,11 +4463,19 @@ function _renderHistoryRow(t) {
 }
 
 function _enrichPosition(pos) {
-  // Real price only — if not loaded yet use entry price as fallback
-  const currentPrice = window.__prices[pos.symbol] > 0 ? window.__prices[pos.symbol] : pos.entryPrice;
+  // STRICT: real price only — never show entry price as current
+  const currentPrice = window.__prices[pos.symbol] > 0 ? window.__prices[pos.symbol] : null;
+  const priceLoaded = currentPrice !== null;
   const dir = (pos.direction || '').toLowerCase();
-  const diff = dir === 'long' ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice;
-  return { ...pos, currentPrice, pnl: diff * pos.quantity, pnlPct: (diff / pos.entryPrice) * 100, invested: pos.entryPrice * pos.quantity };
+  const diff = priceLoaded ? (dir === 'long' ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice) : null;
+  return {
+    ...pos,
+    currentPrice: currentPrice, // null si prix réel non disponible — jamais entryPrice
+    priceLoaded,
+    pnl: diff !== null ? diff * pos.quantity : null,
+    pnlPct: diff !== null ? (diff / pos.entryPrice) * 100 : null,
+    invested: pos.entryPrice * pos.quantity,
+  };
 }
 
 function _attachPositionEvents() {
@@ -4609,7 +4629,7 @@ function _computeStats(capital, history, openPos, settings) {
   const initialCapital = parseFloat(settings.simInitialCapital) || 10000;
   let openPnl = 0;
   openPos.forEach(pos => {
-    const curr = window.__prices[pos.symbol] || pos.entryPrice;
+    const curr = window.__prices[pos.symbol] || null;
     const dir  = (pos.direction || '').toLowerCase();
     const diff = dir === 'long' ? curr - pos.entryPrice : pos.entryPrice - curr;
     openPnl += diff * pos.quantity;
