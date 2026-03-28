@@ -33,45 +33,22 @@
         <span class="logo-text">ManiTrade<strong>Pro</strong></span>
       </div>
       <ul class="nav-list">
-        <li><a href="#" data-screen="dashboard" class="nav-item active">
-          <span class="nav-icon">◈</span><span>Tableau de bord</span>
-        </a></li>
-        <li><a href="#" data-screen="opportunities" class="nav-item">
-          <span class="nav-icon">◎</span><span>Opportunités</span>
-        </a></li>
-        <li><a href="#" data-screen="portefeuille" class="nav-item">
-          <span class="nav-icon">📊</span><span>Mes trades</span>
-        </a></li>
-        <li><a href="#" data-screen="settings" class="nav-item">
-          <span class="nav-icon">◬</span><span>Réglages</span>
-        </a></li>
+        <li><a href="#" data-screen="dashboard" class="nav-item active"><span class="nav-icon">◈</span><span>Accueil</span></a></li>
+        <li><a href="#" data-screen="opportunities" class="nav-item"><span class="nav-icon">◎</span><span>Opportunités</span></a></li>
+        <li><a href="#" data-screen="portefeuille" class="nav-item"><span class="nav-icon">📊</span><span>Mes trades</span></a></li>
+        <li><a href="#" data-screen="settings" class="nav-item"><span class="nav-icon">◬</span><span>Réglages</span></a></li>
       </ul>
-      <div class="sidebar-status">
-        <div class="status-dot active"></div>
-        <span>Marché actif</span>
-      </div>
+      <div class="sidebar-status"><div class="status-dot active"></div><span>Marché actif</span></div>
     </nav>
     <main class="main-content" id="main-content"></main>
     <nav class="bottom-nav" id="bottom-nav">
-      <a href="#" data-screen="dashboard" class="bnav-item active">
-        <span class="bnav-icon">◈</span><span>Accueil</span>
-      </a>
-      <a href="#" data-screen="opportunities" class="bnav-item">
-        <span class="bnav-icon">◎</span><span>Signaux</span>
-      </a>
-      <a href="#" data-screen="portefeuille" class="bnav-item">
-        <span class="bnav-icon">📊</span><span>Mes trades</span>
-      </a>
-      <a href="#" data-screen="settings" class="bnav-item">
-        <span class="bnav-icon">◬</span><span>Config</span>
-      </a>
+      <a href="#" data-screen="dashboard" class="bnav-item active"><span class="bnav-icon">◈</span><span>Accueil</span></a>
+      <a href="#" data-screen="opportunities" class="bnav-item"><span class="bnav-icon">◎</span><span>Signaux</span></a>
+      <a href="#" data-screen="portefeuille" class="bnav-item"><span class="bnav-icon">📊</span><span>Mes trades</span></a>
+      <a href="#" data-screen="settings" class="bnav-item"><span class="bnav-icon">◬</span><span>Config</span></a>
     </nav>
   </div>
-  <div id="modal-overlay" class="modal-overlay hidden">
-    <div id="modal-box" class="modal-box">
-      <div id="modal-content"></div>
-    </div>
-  </div>
+  <div id="modal-overlay" class="modal-overlay hidden"><div id="modal-box" class="modal-box"><div id="modal-content"></div></div></div>
   <div id="toast-container" class="toast-container"></div>
   <script src="https://cdn.jsdelivr.net/npm/eruda"></script>
   <script>eruda.init();</script>
