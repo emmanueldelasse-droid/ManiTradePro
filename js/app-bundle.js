@@ -421,19 +421,9 @@ const MOCK_DATA = {
     'SOL': 'S', 'SPY': 'S&P', 'AMZN': 'A', 'GBPUSD': '£$',
   },
 
-  sampleSimPositions: [
-    { id: 'sim_001', mode: 'sim', symbol: 'BTC',  name: 'Bitcoin', direction: 'long', entryPrice: 64200.00, quantity: 0.156, invested: 10015.20, stopLoss: 61800.00, takeProfit: 72000.00, openedAt: Date.now() - 3 * 86400000 },
-    { id: 'sim_002', mode: 'sim', symbol: 'NVDA', name: 'Nvidia',  direction: 'long', entryPrice: 845.00,   quantity: 11.83, invested: 9996.35,  stopLoss: 808.00,   takeProfit: 960.00,   openedAt: Date.now() - 7 * 86400000 },
-    { id: 'sim_003', mode: 'sim', symbol: 'GOLD', name: 'Or',      direction: 'long', entryPrice: 2290.00,  quantity: 4.36,  invested: 9984.40,  stopLoss: 2240.00,  takeProfit: 2420.00,  openedAt: Date.now() - 14 * 86400000 },
-  ],
+  sampleSimPositions: [],
 
-  sampleTradeHistory: [
-    { id: 'h001', symbol: 'ETH',  direction: 'long',  entryPrice: 3100,  exitPrice: 3420, pnl: 516.13,  pnlPct: 10.32, closedAt: Date.now() - 20 * 86400000, durationDays: 12 },
-    { id: 'h002', symbol: 'AAPL', direction: 'long',  entryPrice: 198,   exitPrice: 210,  pnl: 302.02,  pnlPct: 6.06,  closedAt: Date.now() - 35 * 86400000, durationDays: 8  },
-    { id: 'h003', symbol: 'TSLA', direction: 'short', entryPrice: 192,   exitPrice: 178,  pnl: 364.58,  pnlPct: 7.29,  closedAt: Date.now() - 42 * 86400000, durationDays: 5  },
-    { id: 'h004', symbol: 'BTC',  direction: 'long',  entryPrice: 69000, exitPrice: 66500,pnl: -361.23, pnlPct: -3.62, closedAt: Date.now() - 55 * 86400000, durationDays: 3  },
-    { id: 'h005', symbol: 'GOLD', direction: 'long',  entryPrice: 2180,  exitPrice: 2260, pnl: 366.97,  pnlPct: 3.67,  closedAt: Date.now() - 60 * 86400000, durationDays: 18 },
-  ],
+  sampleTradeHistory: [],
 
   defaultSettings: {
     mode: 'simulation',
@@ -537,7 +527,13 @@ const Storage = (() => {
   function getRealPositions() { return get(KEYS.REAL_POSITIONS) || []; }
   function saveRealPositions(p) { return set(KEYS.REAL_POSITIONS, p); }
 
-  function getWatchlist() { return get(KEYS.WATCHLIST) || MOCK_DATA.watchlist; }
+  function getWatchlist() {
+    const base = MOCK_DATA.watchlist;
+    try {
+      const custom = JSON.parse(localStorage.getItem('mtp_custom_watchlist') || '[]');
+      return [...base, ...custom];
+    } catch(e) { return base; }
+  }
 
   function getApiKeys() {
     return get(KEYS.API_KEYS) || {
@@ -587,8 +583,8 @@ const Storage = (() => {
   function init() {
     if (!get(KEYS.SETTINGS)) saveSettings({ ...MOCK_DATA.defaultSettings });
     if (get(KEYS.SIM_CAPITAL) === null) saveSimCapital(MOCK_DATA.defaultSettings.simInitialCapital || 10000);
-    if (!get(KEYS.SIM_POSITIONS)) saveSimPositions([...MOCK_DATA.sampleSimPositions]);
-    if (!get(KEYS.SIM_HISTORY))   saveSimHistory([...MOCK_DATA.sampleTradeHistory]);
+    if (!get(KEYS.SIM_POSITIONS)) saveSimPositions([]);
+    if (!get(KEYS.SIM_HISTORY))   saveSimHistory([]);
     console.log('[Storage] V1 initialisé');
   }
 
@@ -754,7 +750,212 @@ const Indicators = (() => {
       atrPct: atrVal ? (atrVal / lastPrice) * 100 : 0,
     };
   }
-  return { ema, emaSeries, sma, atr, adx, donchian, rsi, realizedVol, emaSlope, momentum, relativeVolume, isDonchianBreakoutUp, isDonchianBreakoutDown, computeAll };
+
+  // ── NIVEAU 1: MACD
+  function macd(closes, fast=12, slow=26, signal=9) {
+    if (closes.length < slow + signal) return null;
+    const emaFast = emaSeries(closes, fast);
+    const emaSlow = emaSeries(closes, slow);
+    const macdLine = emaFast.map((v, i) => v !== null && emaSlow[i] !== null ? v - emaSlow[i] : null).filter(v => v !== null);
+    if (macdLine.length < signal) return null;
+    const signalLine = emaSeries(macdLine, signal);
+    const last = macdLine[macdLine.length - 1];
+    const sig = signalLine[signalLine.length - 1];
+    const prev = macdLine[macdLine.length - 2];
+    const prevSig = signalLine[signalLine.length - 2];
+    return {
+      macd: last, signal: sig,
+      histogram: last - sig,
+      bullishCross: prev < prevSig && last > sig,
+      bearishCross: prev > prevSig && last < sig,
+      aboveZero: last > 0,
+    };
+  }
+
+  // ── NIVEAU 1: Bollinger Bands
+  function bollingerBands(closes, period=20, stdDev=2) {
+    if (closes.length < period) return null;
+    const slice = closes.slice(closes.length - period);
+    const mean = slice.reduce((a, b) => a + b, 0) / period;
+    const variance = slice.reduce((s, v) => s + (v - mean) ** 2, 0) / period;
+    const std = Math.sqrt(variance);
+    const upper = mean + stdDev * std;
+    const lower = mean - stdDev * std;
+    const last = closes[closes.length - 1];
+    const bandwidth = (upper - lower) / mean * 100;
+    return {
+      upper, middle: mean, lower,
+      bandwidth,
+      compressed: bandwidth < 5,
+      nearUpper: last > upper * 0.98,
+      nearLower: last < lower * 1.02,
+      position: (last - lower) / (upper - lower) * 100,
+    };
+  }
+
+  // ── NIVEAU 1: Stochastic
+  function stochastic(candles, kPeriod=14, dPeriod=3) {
+    if (candles.length < kPeriod) return null;
+    const slice = candles.slice(candles.length - kPeriod);
+    const high = slice.map(c => c.high).reduce(function(a,b){return a>b?a:b;});
+    const low  = slice.map(c => c.low).reduce(function(a,b){return a<b?a:b;});
+    const last = candles[candles.length - 1].close;
+    const k = high === low ? 50 : ((last - low) / (high - low)) * 100;
+    const prev = candles[candles.length - 2]?.close || last;
+    const prevHigh = candles.slice(candles.length - kPeriod - 1, candles.length - 1).map(c => c.high).reduce(function(a,b){return a>b?a:b;});
+    const prevLow  = candles.slice(candles.length - kPeriod - 1, candles.length - 1).map(c => c.low).reduce(function(a,b){return a<b?a:b;});
+    const prevK = prevHigh === prevLow ? 50 : ((prev - prevLow) / (prevHigh - prevLow)) * 100;
+    return {
+      k, d: (k + prevK) / 2,
+      oversold: k < 20,
+      overbought: k > 80,
+      bullishCross: prevK < 20 && k > prevK,
+      bearishCross: prevK > 80 && k < prevK,
+    };
+  }
+
+  // ── NIVEAU 1: Support & Resistance
+  function supportResistance(candles, lookback=20) {
+    if (candles.length < lookback) return null;
+    const slice = candles.slice(candles.length - lookback);
+    const highs = slice.map(c => c.high);
+    const lows  = slice.map(c => c.low);
+    const resistance = highs.reduce(function(a,b){return a>b?a:b;});
+    const support    = lows.reduce(function(a,b){return a<b?a:b;});
+    const last = candles[candles.length - 1].close;
+    const range = resistance - support;
+    return {
+      resistance, support,
+      distToResistance: range > 0 ? ((resistance - last) / last) * 100 : 0,
+      distToSupport: range > 0 ? ((last - support) / last) * 100 : 0,
+      nearResistance: last > resistance * 0.98,
+      nearSupport: last < support * 1.02,
+      breakoutAbove: last > resistance,
+      breakoutBelow: last < support,
+    };
+  }
+
+  // ── NIVEAU 2: Ichimoku Cloud (simplifié)
+  function ichimoku(candles) {
+    if (candles.length < 52) return null;
+    function midpoint(arr, n) {
+      const s = arr.slice(arr.length - n);
+      const h = s.map(c => c.high).reduce(function(a,b){return a>b?a:b;});
+      const l = s.map(c => c.low).reduce(function(a,b){return a<b?a:b;});
+      return (h + l) / 2;
+    }
+    const tenkan  = midpoint(candles, 9);
+    const kijun   = midpoint(candles, 26);
+    const senkouA = (tenkan + kijun) / 2;
+    const senkouB = midpoint(candles, 52);
+    const last = candles[candles.length - 1].close;
+    const aboveCloud = last > Math.max(senkouA, senkouB);
+    const belowCloud = last < Math.min(senkouA, senkouB);
+    return {
+      tenkan, kijun, senkouA, senkouB,
+      aboveCloud, belowCloud, inCloud: !aboveCloud && !belowCloud,
+      bullish: tenkan > kijun && aboveCloud,
+      bearish: tenkan < kijun && belowCloud,
+    };
+  }
+
+  // ── NIVEAU 2: RSI Divergence
+  function rsiDivergence(candles, period=14) {
+    if (candles.length < period + 10) return null;
+    const closes = candles.map(c => c.close);
+    const rsiNow  = rsi(closes, period);
+    const rsiPrev = rsi(closes.slice(0, closes.length - 5), period);
+    if (!rsiNow || !rsiPrev) return null;
+    const priceNow  = closes[closes.length - 1];
+    const pricePrev = closes[closes.length - 6];
+    return {
+      bullishDiv: priceNow < pricePrev && rsiNow > rsiPrev,
+      bearishDiv: priceNow > pricePrev && rsiNow < rsiPrev,
+    };
+  }
+
+  // ── NIVEAU 2: Japanese Candlestick patterns
+  function candlePatterns(candles) {
+    if (candles.length < 3) return null;
+    const [c2, c1, c0] = candles.slice(candles.length - 3);
+    const body0 = Math.abs(c0.close - c0.open);
+    const body1 = Math.abs(c1.close - c1.open);
+    const range0 = c0.high - c0.low;
+    const doji = body0 < range0 * 0.1;
+    const hammer = c0.close > c0.open && (c0.open - c0.low) > body0 * 2 && (c0.high - c0.close) < body0 * 0.5;
+    const shootingStar = c0.close < c0.open && (c0.high - c0.open) > body0 * 2;
+    const bullEngulf = c1.close < c1.open && c0.close > c0.open && c0.open < c1.close && c0.close > c1.open;
+    const bearEngulf = c1.close > c1.open && c0.close < c0.open && c0.open > c1.close && c0.close < c1.open;
+    return { doji, hammer, shootingStar, bullEngulf, bearEngulf,
+      bullish: hammer || bullEngulf,
+      bearish: shootingStar || bearEngulf,
+    };
+  }
+
+  // ── NIVEAU 3: Linear Regression
+  function linearRegression(closes, period=20) {
+    if (closes.length < period) return null;
+    const slice = closes.slice(closes.length - period);
+    const n = slice.length;
+    const xMean = (n - 1) / 2;
+    const yMean = slice.reduce((a, b) => a + b, 0) / n;
+    let num = 0, den = 0;
+    slice.forEach((y, x) => { num += (x - xMean) * (y - yMean); den += (x - xMean) ** 2; });
+    const slope = den !== 0 ? num / den : 0;
+    const intercept = yMean - slope * xMean;
+    const predicted = intercept + slope * (n - 1);
+    const r2 = den !== 0 ? (num / den) ** 2 / (slice.reduce((s, y) => s + (y - yMean) ** 2, 0) / n || 1) : 0;
+    return { slope, predicted, r2: Math.min(1, Math.abs(r2)), trending: Math.abs(slope / yMean) > 0.001 };
+  }
+
+  // ── Updated computeAll with all levels
+  function computeAll(candles) {
+    if (!candles || candles.length < 10) return null;
+    const closes = candles.map(c => c.close);
+    const settings = Storage.getSettings();
+    const ema50  = ema(closes, settings.emaFast);
+    const ema100 = ema(closes, settings.emaSlow);
+    const atrVal = atr(candles, settings.atrPeriod);
+    const adxRes = adx(candles, settings.adxPeriod);
+    const don55  = donchian(candles, settings.donchianSlow);
+    const don20  = donchian(candles, settings.donchianFast);
+    const rsiVal = rsi(closes, 14);
+    const vol20  = realizedVol(closes, 20);
+    const slope50  = emaSlope(closes, settings.emaFast);
+    const slope100 = emaSlope(closes, settings.emaSlow);
+    const mom3m  = momentum(closes, Math.min(60, closes.length - 1));
+    const lastPrice = closes[closes.length - 1];
+    const relVol = relativeVolume(candles, 20);
+    const breakoutUp   = isDonchianBreakoutUp(candles, settings.donchianSlow);
+    const breakoutDown = isDonchianBreakoutDown(candles, settings.donchianSlow);
+    // Niveau 1
+    const macdVal  = macd(closes);
+    const bbVal    = bollingerBands(closes);
+    const stochVal = stochastic(candles);
+    const srVal    = supportResistance(candles);
+    // Niveau 2
+    const ichimokuVal = ichimoku(candles);
+    const divVal      = rsiDivergence(candles);
+    const candleVal   = candlePatterns(candles);
+    // Niveau 3
+    const regVal      = linearRegression(closes);
+    return {
+      price: lastPrice, ema50, ema100,
+      atr: atrVal, adx: adxRes.adx, plus_di: adxRes.plus_di, minus_di: adxRes.minus_di,
+      don55, don20, rsi: rsiVal, vol20,
+      slope50, slope100, mom3m, relVol,
+      breakoutUp, breakoutDown,
+      atrPct: atrVal ? (atrVal / lastPrice) * 100 : 0,
+      // Niveau 1
+      macd: macdVal, bollinger: bbVal, stoch: stochVal, sr: srVal,
+      // Niveau 2
+      ichimoku: ichimokuVal, rsiDiv: divVal, candles: candleVal,
+      // Niveau 3
+      regression: regVal,
+    };
+  }
+
+  return { ema, emaSeries, sma, atr, adx, donchian, rsi, realizedVol, emaSlope, momentum, relativeVolume, isDonchianBreakoutUp, isDonchianBreakoutDown, macd, bollingerBands, stochastic, supportResistance, ichimoku, rsiDivergence, candlePatterns, linearRegression, computeAll };
 })();
 
 // ═══ riskCalculator.js ═══
@@ -921,18 +1122,21 @@ const RealDataClient = (() => {
   const YAHOO_PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/yahoo';
 
   async function _fetchWithProxy(url) {
-    // Use our Cloudflare proxy for Yahoo Finance
+    // 1. Cloudflare proxy pour Yahoo Finance (priorité)
     if (url.includes('finance.yahoo.com')) {
       try {
         const yahooPath = url.replace('https://query1.finance.yahoo.com', '');
-        const proxyUrl = YAHOO_PROXY + yahooPath;
+        const proxyUrl = 'https://aged-bar-257a.emmanueldelasse.workers.dev/yahoo' + yahooPath;
         const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-        if (r.ok) return r;
+        if (r.ok) {
+          Storage.incrementCallCount();
+          return r;
+        }
       } catch(e) {}
     }
-    // Fallback: direct fetch
+    // 2. Direct fetch
     try { const r = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (r.ok) return r; } catch(e) {}
-    // Fallback: public proxies
+    // 3. Public proxies fallback
     for (const proxy of CORS_PROXIES) {
       try { const r = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(8000) }); if (r.ok) return r; } catch(e) {}
     }
@@ -1053,24 +1257,84 @@ const AnalysisEngine = (() => {
       const earned = cond ? pts : 0; max += maxPts; total += earned;
       criteria.push({ label, description: desc, earned, max: maxPts, pass: cond, partial: earned > 0 && earned < maxPts });
     }
+
+    // ── Critères originaux (50 pts)
     const adxOk = ind.adx !== null && ind.adx > 20, adxStr = ind.adx !== null && ind.adx > 25;
-    add('ADX > 20 (tendance)', adxStr ? 20 : (adxOk ? 12 : 0), 20, adxOk, `ADX : ${ind.adx?.toFixed(1) || 'N/A'}`);
-    const slopeOk = direction === 'long' ? ind.slope100 > 0 : ind.slope100 < 0, slopeStr = Math.abs(ind.slope100) > 0.05;
-    add('Pente EMA 100 favorable', slopeOk ? (slopeStr ? 15 : 8) : 0, 15, slopeOk, `Pente : ${ind.slope100?.toFixed(3) || 'N/A'}%/j`);
-    const mom3ok = direction === 'long' ? ind.mom3m > 2 : ind.mom3m < -2, mom3str = direction === 'long' ? ind.mom3m > 8 : ind.mom3m < -8;
-    add('Momentum 3 mois', mom3str ? 15 : (mom3ok ? 8 : 0), 15, mom3ok, `Perf 3 mois : ${ind.mom3m?.toFixed(1) || 'N/A'}%`);
-    const volOk = ind.relVol > 1.0, volStr = ind.relVol > 1.3;
-    add('Volume > moyenne 20j', volStr ? 10 : (volOk ? 5 : 0), 10, volOk, `Vol. relative : ${ind.relVol?.toFixed(2) || 'N/A'}x`);
-    const rsiNE = direction === 'long' ? ind.rsi !== null && ind.rsi < 75 : ind.rsi !== null && ind.rsi > 25;
-    const rsiId = direction === 'long' ? ind.rsi > 40 && ind.rsi < 65 : ind.rsi > 35 && ind.rsi < 60;
-    add('RSI non extrême', rsiId ? 10 : (rsiNE ? 5 : 0), 10, rsiNE, `RSI 14 : ${ind.rsi?.toFixed(1) || 'N/A'}`);
-    const dist = ind.don55 ? (direction === 'long' ? ((ind.don55.upper - ind.price) / ind.price) * 100 : ((ind.price - ind.don55.lower) / ind.price) * 100) : 0;
-    add('Espace libre Donchian', dist > 4 ? 10 : (dist > 1.5 ? 5 : 0), 10, dist > 1.5, `Distance : ${dist.toFixed(1)}%`);
-    const volN = ind.vol20 !== null && ind.vol20 > 5 && ind.vol20 < 60;
-    add('Volatilité normale', volN ? 10 : 0, 10, volN, `Vol annualisée : ${ind.vol20?.toFixed(1) || 'N/A'}%`);
+    add('Tendance ADX', adxStr ? 8 : (adxOk ? 5 : 0), 8, adxOk, `ADX : ${ind.adx?.toFixed(1) || 'N/A'}`);
+    const slopeOk = direction === 'long' ? ind.slope100 > 0 : ind.slope100 < 0;
+    add('Direction EMA 100', slopeOk ? 6 : 0, 6, slopeOk, `Pente : ${ind.slope100?.toFixed(3) || 'N/A'}%/j`);
+    const mom3ok = direction === 'long' ? ind.mom3m > 2 : ind.mom3m < -2;
+    add('Momentum 3 mois', mom3ok ? 6 : 0, 6, mom3ok, `Perf : ${ind.mom3m?.toFixed(1) || 'N/A'}%`);
+    const volOk = ind.relVol > 1.0;
+    add('Volume > moyenne', volOk ? 5 : 0, 5, volOk, `Vol : ${ind.relVol?.toFixed(2) || 'N/A'}x`);
+    const rsiOk = direction === 'long' ? ind.rsi !== null && ind.rsi < 75 : ind.rsi !== null && ind.rsi > 25;
+    add('RSI non extrême', rsiOk ? 5 : 0, 5, rsiOk, `RSI : ${ind.rsi?.toFixed(1) || 'N/A'}`);
     const bo = direction === 'long' ? ind.breakoutUp : ind.breakoutDown;
-    add(`Cassure Donchian 55j`, bo ? 10 : 0, 10, bo, `Niveau : ${ind.don55 ? (direction === 'long' ? ind.don55.upper.toFixed(2) : ind.don55.lower.toFixed(2)) : 'N/A'}`);
-    return { score: Math.round((total / max) * 100), criteria, rawScore: total, maxScore: max };
+    add('Cassure Donchian', bo ? 5 : 0, 5, bo, 'Nouveau plus haut/bas 55j');
+    const volN = ind.vol20 !== null && ind.vol20 > 5 && ind.vol20 < 60;
+    add('Volatilité normale', volN ? 5 : 0, 5, volN, `Vol annualisée : ${ind.vol20?.toFixed(1) || 'N/A'}%`);
+    const dist = ind.don55 ? (direction === 'long' ? ((ind.don55.upper - ind.price) / ind.price) * 100 : ((ind.price - ind.don55.lower) / ind.price) * 100) : 0;
+    add('Espace Donchian', dist > 1.5 ? 5 : 0, 5, dist > 1.5, `Distance : ${dist.toFixed(1)}%`);
+    add('EMA 50 > EMA 100', direction === 'long' ? ind.ema50 > ind.ema100 : ind.ema50 < ind.ema100 ? 5 : 0, 5, direction === 'long' ? ind.ema50 > ind.ema100 : ind.ema50 < ind.ema100, 'Alignement EMA');
+
+    // ── Niveau 1: MACD (15 pts)
+    if (ind.macd) {
+      const macdOk = direction === 'long' ? ind.macd.aboveZero : !ind.macd.aboveZero;
+      add('MACD direction', macdOk ? 5 : 0, 5, macdOk, `MACD : ${ind.macd.macd?.toFixed(4) || 'N/A'}`);
+      const crossOk = direction === 'long' ? ind.macd.bullishCross : ind.macd.bearishCross;
+      add('MACD croisement', crossOk ? 5 : 0, 5, crossOk, 'Signal de croisement');
+      add('MACD histogramme', direction === 'long' ? ind.macd.histogram > 0 : ind.macd.histogram < 0 ? 5 : 0, 5, direction === 'long' ? ind.macd.histogram > 0 : ind.macd.histogram < 0, `Histo : ${ind.macd.histogram?.toFixed(4) || 'N/A'}`);
+    }
+
+    // ── Niveau 1: Bollinger (10 pts)
+    if (ind.bollinger) {
+      add('Bollinger compression', ind.bollinger.compressed ? 5 : 0, 5, ind.bollinger.compressed, `Bandes compressées (${ind.bollinger.bandwidth?.toFixed(1)}%)`);
+      const bbOk = direction === 'long' ? ind.bollinger.nearLower : ind.bollinger.nearUpper;
+      add('Position Bollinger', bbOk ? 5 : 0, 5, bbOk, `Position : ${ind.bollinger.position?.toFixed(0)}%`);
+    }
+
+    // ── Niveau 1: Stochastique (8 pts)
+    if (ind.stoch) {
+      const stochOk = direction === 'long' ? ind.stoch.oversold || ind.stoch.bullishCross : ind.stoch.overbought || ind.stoch.bearishCross;
+      add('Stochastique signal', stochOk ? 8 : 0, 8, stochOk, `K : ${ind.stoch.k?.toFixed(1) || 'N/A'}`);
+    }
+
+    // ── Niveau 1: Support/Résistance (7 pts)
+    if (ind.sr) {
+      const srOk = direction === 'long' ? !ind.sr.nearResistance && ind.sr.distToSupport < 5 : !ind.sr.nearSupport && ind.sr.distToResistance < 5;
+      add('Support/Résistance', srOk ? 7 : 0, 7, srOk, `S: ${ind.sr.support?.toFixed(2)} R: ${ind.sr.resistance?.toFixed(2)}`);
+    }
+
+    // ── Niveau 2: Ichimoku (10 pts)
+    if (ind.ichimoku) {
+      const ichOk = direction === 'long' ? ind.ichimoku.bullish : ind.ichimoku.bearish;
+      add('Ichimoku Cloud', ichOk ? 10 : 0, 10, ichOk, ichOk ? 'Au-dessus du nuage' : 'En dessous du nuage');
+    }
+
+    // ── Niveau 2: Divergence RSI (8 pts)
+    if (ind.rsiDiv) {
+      const divOk = direction === 'long' ? ind.rsiDiv.bullishDiv : ind.rsiDiv.bearishDiv;
+      add('Divergence RSI', divOk ? 8 : 0, 8, divOk, divOk ? 'Divergence haussière' : 'Pas de divergence');
+    }
+
+    // ── Niveau 2: Chandeliers (7 pts)
+    if (ind.candles) {
+      const candleOk = direction === 'long' ? ind.candles.bullish : ind.candles.bearish;
+      add('Pattern chandelier', candleOk ? 7 : 0, 7, candleOk, candleOk ? 'Pattern de retournement' : 'Pas de pattern');
+    }
+
+    // ── Niveau 3: Régression linéaire (10 pts)
+    if (ind.regression) {
+      const regOk = direction === 'long' ? ind.regression.slope > 0 : ind.regression.slope < 0;
+      add('Régression linéaire', regOk && ind.regression.r2 > 0.5 ? 10 : regOk ? 5 : 0, 10, regOk, `R² : ${ind.regression.r2?.toFixed(2) || 'N/A'}`);
+    }
+
+    // Apply algo learning bonus
+    const algoBonus = AlgoLearning ? AlgoLearning.getAdjustedScore(ind.symbol || '', direction, 0) : 0;
+    const baseScore = max > 0 ? Math.round((total / max) * 100) : 0;
+    const finalScore = Math.min(100, Math.max(0, baseScore + algoBonus));
+
+    return { score: finalScore, criteria, rawScore: total, maxScore: max };
   }
 
   function adjustedScore(s, riskLvl) { return Math.round(s * (1 - RiskCalculator.riskPenalty(riskLvl))); }
@@ -1300,6 +1564,15 @@ const BrokerAdapter = (() => {
       Storage.saveSimCapital(Storage.getSimCapital() + pos.invested + pnl);
       const history = Storage.getSimHistory();
       history.unshift({ id: 'h_' + Date.now(), symbol: pos.symbol, direction: pos.direction, entryPrice: pos.entryPrice, exitPrice: curr, pnl, pnlPct, closedAt: Date.now(), durationDays: Math.round((Date.now() - pos.openedAt) / 86400000) });
+      // Record for algo learning
+      const currentAnalysis = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === pos.symbol);
+      if (currentAnalysis?.indicators) {
+        AlgoLearning.recordTrade({
+          symbol: pos.symbol, direction: pos.direction,
+          pnl, pnlPct, score: currentAnalysis.adjScore,
+          closedAt: Date.now(),
+        }, currentAnalysis.indicators);
+      }
       Storage.saveSimHistory(history);
       positions.splice(idx, 1);
       Storage.saveSimPositions(positions);
@@ -1832,13 +2105,7 @@ const UI = (() => {
   function updateModeBanner(mode) {
     const banner = document.getElementById('mode-banner');
     if (!banner) return;
-    if (mode === 'simulation') {
-      banner.className = 'mode-banner mode-simulation';
-      banner.innerHTML = '<span class="mode-icon">⚡</span><span class="mode-label">MODE SIMULATION — Aucun argent réel</span>';
-    } else {
-      banner.className = 'mode-banner mode-real';
-      banner.innerHTML = '<span class="mode-icon">⚠️</span><span class="mode-label">MODE RÉEL — Ordres envoyés au broker</span>';
-    }
+    banner.style.display = 'none'; // Bannière masquée
   }
 
   return { toast, confirm, openOrderModal, scoreRing, sparkline, updateModeBanner };
@@ -2639,46 +2906,46 @@ function renderAssetDetail(params) {
     <!-- Prendre une position -->
     <div class="section-sep"><span class="sep-label">Prendre une position</span><div class="sep-line"></div></div>
     <div class="order-zones">
+      <!-- Trade d'entraînement -->
       <div class="mode-zone sim-zone">
-        <div class="mode-zone-title">⚡ Mode Simulation</div>
+        <div class="mode-zone-title">🎯 Trade d'entraînement</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:var(--space-4);line-height:1.6;">
-          Capital fictif disponible : <strong>${Fmt.currency(_capNum)}</strong><br/>
-          Je risque X% par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(_capNum * settings.riskPerTrade)}
+          Capital disponible : <strong>${Fmt.currency(_capNum)}</strong><br/>
+          Risque par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(_capNum * settings.riskPerTrade)}
         </div>
         ${analysis.direction !== 'neutral' ? `
           <button class="btn btn-sim btn-block" id="btn-open-sim" data-open-position="${symbol}" data-mode="sim">
-            ⚡ Trader maintenant — ${Fmt.directionLabel(analysis.direction)}
+            🎯 Ouvrir un trade d'entraînement
           </button>` : `
           <button class="btn btn-ghost btn-block" disabled>Signal neutre — attendre</button>`
         }
       </div>
-      <div class="mode-zone real-zone">
-        <div class="mode-zone-title">⚠️ Mode Réel</div>
-        <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:var(--space-4);">Brokers connectés : <strong>Aucun</strong></div>
-        <button class="btn btn-ghost btn-block" disabled>⚠️ Aucun broker configuré</button>
+
+      <!-- Trader maintenant (brokers réels) -->
+      <div class="mode-zone" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);">
+        <div style="font-size:var(--text-sm);font-weight:700;margin-bottom:var(--space-4);">💰 Trader maintenant</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+          ${['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR','GOLD','EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD'].includes(symbol) ? `
+          <a href="https://www.binance.com/fr/trade/${{
+            'BTC':'BTC_USDT','ETH':'ETH_USDT','SOL':'SOL_USDT','BNB':'BNB_USDT',
+            'XRP':'XRP_USDT','ADA':'ADA_USDT','AVAX':'AVAX_USDT','DOT':'DOT_USDT',
+            'LINK':'LINK_USDT','DOGE':'DOGE_USDT','MATIC':'MATIC_USDT','UNI':'UNI_USDT',
+            'ATOM':'ATOM_USDT','LTC':'LTC_USDT','NEAR':'NEAR_USDT',
+            'GOLD':'XAU_USDT','EURUSD':'EUR_USDT','GBPUSD':'GBP_USDT',
+            'USDJPY':'USD_JPY','USDCHF':'USD_CHF','AUDUSD':'AUD_USDT',
+          }[symbol]}" target="_blank" rel="noopener"
+            style="display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);border-radius:var(--btn-radius);color:var(--sim-color);font-size:var(--text-sm);font-weight:600;text-decoration:none;">
+            🟡 Ouvrir sur Binance
+          </a>` : ''}
+          <button id="btn-tr-open-${symbol}"
+            style="display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:var(--btn-radius);color:var(--accent);font-size:var(--text-sm);font-weight:600;cursor:pointer;">
+            🟢 Trader sur Trade Republic
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Boutons brokers -->
-    <div class="section-sep"><span class="sep-label">Accès rapide broker</span><div class="sep-line"></div></div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-bottom:var(--space-5);">
-      ${['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR','GOLD','EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD'].includes(symbol) ? `
-      <a href="https://www.binance.com/fr/trade/${{
-        'BTC':'BTC_USDT','ETH':'ETH_USDT','SOL':'SOL_USDT','BNB':'BNB_USDT',
-        'XRP':'XRP_USDT','ADA':'ADA_USDT','AVAX':'AVAX_USDT','DOT':'DOT_USDT',
-        'LINK':'LINK_USDT','DOGE':'DOGE_USDT','MATIC':'MATIC_USDT','UNI':'UNI_USDT',
-        'ATOM':'ATOM_USDT','LTC':'LTC_USDT','NEAR':'NEAR_USDT',
-        'GOLD':'XAU_USDT','EURUSD':'EUR_USDT','GBPUSD':'GBP_USDT',
-        'USDJPY':'USD_JPY','USDCHF':'USD_CHF','AUDUSD':'AUD_USDT',
-      }[symbol]}" target="_blank" rel="noopener"
-        style="display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.3);border-radius:var(--btn-radius);color:var(--sim-color);font-size:var(--text-sm);font-weight:600;text-decoration:none;transition:all var(--transition-fast);">
-        🟡 Ouvrir sur Binance
-      </a>` : `<div></div>`}
-      <button id="btn-tr-open-${symbol}"
-        style="display:flex;align-items:center;justify-content:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:rgba(0,229,160,0.08);border:1px solid rgba(0,229,160,0.25);border-radius:var(--btn-radius);color:var(--accent);font-size:var(--text-sm);font-weight:600;cursor:pointer;transition:all var(--transition-fast);">
-        🟢 Trader sur Trade Republic
-      </button>
-    </div>
+
 
     <div class="warning-box" style="margin-top:var(--space-5);">
       ⚠️ Ce score est une suggestion algorithmique. Il ne constitue pas un conseil financier.
@@ -4038,6 +4305,162 @@ function _attachSettingsEvents(settings) {
 
 Router.register('settings', () => { renderSettings(); });
 
+
+
+// ═══ AlgoLearning — Apprentissage sur les trades ═══
+const AlgoLearning = (() => {
+
+  const STORAGE_KEY = 'mtp_algo_insights';
+
+  function getInsights() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}'); }
+    catch(e) { return {}; }
+  }
+
+  function saveInsights(insights) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(insights));
+  }
+
+  // Enregistrer les conditions d'un trade fermé
+  function recordTrade(trade, indicators) {
+    const insights = getInsights();
+    const key = trade.symbol + '_' + trade.direction;
+    if (!insights[key]) {
+      insights[key] = { symbol: trade.symbol, direction: trade.direction, trades: [], winRate: 0, avgRR: 0 };
+    }
+    insights[key].trades.push({
+      pnl: trade.pnl, pnlPct: trade.pnlPct,
+      score: trade.score || 0,
+      adx: indicators?.adx || null,
+      rsi: indicators?.rsi || null,
+      atr: indicators?.atrPct || null,
+      vol20: indicators?.vol20 || null,
+      win: trade.pnl > 0,
+      closedAt: trade.closedAt || Date.now(),
+    });
+    // Recalculate stats
+    const trades = insights[key].trades;
+    const wins = trades.filter(t => t.win);
+    insights[key].winRate = Math.round((wins.length / trades.length) * 100);
+    insights[key].avgRR = trades.reduce((s, t) => s + (t.pnlPct || 0), 0) / trades.length;
+    insights[key].sampleSize = trades.length;
+    insights[key].updatedAt = Date.now();
+    saveInsights(insights);
+    // Sync to Supabase
+    _syncInsight(insights[key]).catch(() => {});
+  }
+
+  async function _syncInsight(insight) {
+    if (!insight.symbol) return;
+    await SupabaseDB._request?.('POST', 'algo_insights', {
+      symbol: insight.symbol,
+      direction: insight.direction,
+      win_rate: insight.winRate,
+      avg_rr: insight.avgRR,
+      best_conditions: JSON.stringify(insight.trades.slice(-10)),
+      sample_size: insight.sampleSize,
+    }).catch(() => {});
+  }
+
+  // Obtenir le score ajusté selon l'historique
+  function getAdjustedScore(symbol, direction, baseScore) {
+    const insights = getInsights();
+    const key = symbol + '_' + direction;
+    const insight = insights[key];
+    if (!insight || insight.sampleSize < 3) return baseScore;
+    // Bonus si win rate > 60%, malus si < 40%
+    const winRate = insight.winRate;
+    let bonus = 0;
+    if (winRate >= 70) bonus = 10;
+    else if (winRate >= 60) bonus = 5;
+    else if (winRate <= 30) bonus = -10;
+    else if (winRate <= 40) bonus = -5;
+    return Math.min(100, Math.max(0, baseScore + bonus));
+  }
+
+  // Résumé pour l'affichage
+  function getSummary() {
+    const insights = getInsights();
+    const keys = Object.keys(insights);
+    if (!keys.length) return null;
+    const bestKey = keys.sort((a, b) => (insights[b].winRate || 0) - (insights[a].winRate || 0))[0];
+    const best = insights[bestKey];
+    return {
+      totalTrades: keys.reduce((s, k) => s + (insights[k].sampleSize || 0), 0),
+      bestSymbol: best?.symbol,
+      bestDirection: best?.direction,
+      bestWinRate: best?.winRate,
+      insights,
+    };
+  }
+
+  return { recordTrade, getAdjustedScore, getSummary, getInsights };
+})();
+
+// ═══ WatchlistManager — Gestion dynamique de la watchlist ═══
+const WatchlistManager = (() => {
+
+  function getCustomWatchlist() {
+    const stored = localStorage.getItem('mtp_custom_watchlist');
+    return stored ? JSON.parse(stored) : [];
+  }
+
+  function saveCustomWatchlist(list) {
+    localStorage.setItem('mtp_custom_watchlist', JSON.stringify(list));
+  }
+
+  function addAsset(symbol, name, assetClass) {
+    const custom = getCustomWatchlist();
+    if (custom.find(a => a.symbol === symbol)) return false;
+    if (MOCK_DATA.watchlist.find(a => a.symbol === symbol)) return false;
+    custom.push({ symbol, name, class: assetClass || 'crypto', trend: 'neutral', volatility: 0.03, custom: true });
+    saveCustomWatchlist(custom);
+    return true;
+  }
+
+  function removeAsset(symbol) {
+    const custom = getCustomWatchlist().filter(a => a.symbol !== symbol);
+    saveCustomWatchlist(custom);
+  }
+
+  function getFullWatchlist() {
+    return [...MOCK_DATA.watchlist, ...getCustomWatchlist()];
+  }
+
+  // Auto-add trending cryptos if score is good
+  async function autoAddTrending() {
+    try {
+      const trending = await TrendingEngine.fetchTrending();
+      const added = [];
+      for (const t of (trending.trending || [])) {
+        if (!t.symbol) continue;
+        const alreadyIn = MOCK_DATA.watchlist.find(a => a.symbol === t.symbol) ||
+                          getCustomWatchlist().find(a => a.symbol === t.symbol);
+        if (!alreadyIn) {
+          // Check if Binance has this pair
+          const pair = t.symbol + 'USDT';
+          try {
+            const r = await fetch('https://aged-bar-257a.emmanueldelasse.workers.dev/binance/api/v3/ticker/price?symbol=' + pair);
+            if (r.ok) {
+              addAsset(t.symbol, t.name, 'crypto');
+              added.push(t.symbol);
+            }
+          } catch(e) {}
+        }
+      }
+      if (added.length > 0) {
+        console.log('[Watchlist] Auto-added:', added);
+        UI.toast('🔥 ' + added.join(', ') + ' ajouté(s) à votre watchlist', 'success');
+      }
+      return added;
+    } catch(e) {
+      return [];
+    }
+  }
+
+  return { addAsset, removeAsset, getFullWatchlist, getCustomWatchlist, autoAddTrending };
+})();
+
 // ═══ BOOT ═══
 async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
@@ -4101,6 +4524,9 @@ async function boot() {
     console.warn('analyzeAllSync error:', e);
     window.__MTP.lastAnalysis = { all: [], tradeable: [], neutral: [], inactive: [] };
   }
+  // Auto-add trending assets to watchlist
+  WatchlistManager.autoAddTrending().catch(() => {});
+
   // Sync depuis Supabase au démarrage
   SupabaseDB.syncAll().then(ok => {
     if (ok) {
