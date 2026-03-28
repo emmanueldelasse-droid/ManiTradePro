@@ -2530,6 +2530,20 @@ function renderDashboard() {
       : top5.map((a, i) => renderOpportunityRow(a, i + 1)).join('')
     }
 
+    <!-- AlgoLearning summary -->
+    ${(function() {
+      const summary = AlgoLearning?.getSummary?.();
+      if (!summary || summary.totalTrades < 3) return '';
+      return '<div style=\"background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:var(--card-radius);padding:var(--space-4);margin-top:var(--space-4);\">' +
+        '<div style=\"font-size:var(--text-xs);font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);\">' +
+        '🧠 Ce que l\'algo a appris de vos ' + summary.totalTrades + ' trades</div>' +
+        '<div style=\"font-size:var(--text-sm);color:var(--text-secondary);\">' +
+        'Meilleur signal : <strong>' + (summary.bestSymbol || '—') + ' ' + (summary.bestDirection === 'long' ? '↑ Hausse' : '↓ Baisse') + '</strong>' +
+        ' · Win rate : <strong style=\"color:var(--profit);\">' + (summary.bestWinRate || 0) + '%</strong>' +
+        '</div>' +
+        '</div>';
+    })()}
+
     ${simPos.length > 0 ? `
       <div class="section-title" style="margin-top:var(--space-8);">
         <span>Positions ouvertes</span>
@@ -3092,7 +3106,13 @@ document.addEventListener('click', async e => {
     if (result.success) {
       // Auto-créer alertes stop/tp pour cette position
       AlertManager.syncPositionAlerts();
-      UI.toast(`Position ${symbol} ouverte — ${Fmt.currency(result.position.invested)} investi`, 'success');
+      // Request push notification permission on first trade
+      if (AlertManager.getStats().permission === 'default') {
+        AlertManager.requestPermission().then(ok => {
+          if (ok) UI.toast('🔔 Notifications activées — vous serez alerté sur vos trades', 'success');
+        });
+      }
+      UI.toast(`Trade ouvert sur ${symbol} — ${Fmt.currency(result.position.invested)} engagé`, 'success');
       Router.navigate('positions');
     } else {
       UI.toast('Erreur : ' + result.error, 'error');
@@ -3466,7 +3486,7 @@ function renderPositionDetail(posId) {
       </div>
     </div>
 
-    <!-- Score algo si dispo -->
+    <!-- Score algo + Multi-timeframe -->
     ${analysis ? `
     <div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">
       <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">Analyse algo actuelle</div>
@@ -3476,11 +3496,42 @@ function renderPositionDetail(posId) {
           <div style="font-size:var(--text-md);font-weight:700;margin-bottom:var(--space-2);">Score : <span style="color:${analysis.adjScore >= 70 ? 'var(--signal-strong)' : analysis.adjScore >= 50 ? 'var(--signal-medium)' : 'var(--signal-weak)'};">${analysis.adjScore}/100</span></div>
           <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.5;">${analysis.recommendation || ''}</div>
           <div style="display:flex;gap:var(--space-2);margin-top:var(--space-3);flex-wrap:wrap;">
-            <span class="risk-badge ${analysis.riskLevel}">Risque ${Fmt.riskLabel(analysis.riskLevel)}</span>
+            <span class="risk-badge ${analysis.riskLevel}">Prudence ${Fmt.riskLabel(analysis.riskLevel)}</span>
             <span class="direction-tag ${analysis.direction}">${Fmt.directionIcon(analysis.direction)} ${Fmt.directionLabel(analysis.direction)}</span>
           </div>
         </div>
       </div>
+
+      <!-- Multi-timeframe -->
+      ${(function() {
+        const mtf = window.__MTP?.mtfData?.[pos.symbol];
+        if (!mtf) return '<div style=\"font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px solid var(--border-subtle);\">' +
+          '⏳ Analyse multi-timeframe en cours (1h · 4h)...</div>';
+        const alignColor = mtf.alignment === 'bullish' ? 'var(--profit)' : mtf.alignment === 'bearish' ? 'var(--loss)' : 'var(--signal-medium)';
+        const alignLabel = mtf.alignment === 'bullish' ? '↑ Alignement haussier' : mtf.alignment === 'bearish' ? '↓ Alignement baissier' : '↔ Signal mixte';
+        return '<div style=\"margin-top:var(--space-4);padding-top:var(--space-3);border-top:1px solid var(--border-subtle);\">' +
+          '<div style=\"font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);\">' +
+          'MULTI-TIMEFRAME</div>' +
+          '<div style=\"display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);\">' +
+          '<div style=\"text-align:center;background:var(--bg-elevated);border-radius:8px;padding:var(--space-3);\">' +
+          '<div style=\"font-size:0.65rem;color:var(--text-muted);\">' + '1H' + '</div>' +
+          '<div style=\"font-size:var(--text-sm);font-weight:700;color:' + (mtf.h1?.trend === 'up' ? 'var(--profit)' : 'var(--loss)') + ';\">' +
+          (mtf.h1 ? (mtf.h1.trend === 'up' ? '↑' : '↓') : '—') + '</div>' +
+          '<div style=\"font-size:0.6rem;color:var(--text-muted);\">' + (mtf.h1 ? 'RSI ' + mtf.h1.rsi?.toFixed(0) : '—') + '</div>' +
+          '</div>' +
+          '<div style=\"text-align:center;background:var(--bg-elevated);border-radius:8px;padding:var(--space-3);\">' +
+          '<div style=\"font-size:0.65rem;color:var(--text-muted);\">' + '4H' + '</div>' +
+          '<div style=\"font-size:var(--text-sm);font-weight:700;color:' + (mtf.h4?.trend === 'up' ? 'var(--profit)' : 'var(--loss)') + ';\">' +
+          (mtf.h4 ? (mtf.h4.trend === 'up' ? '↑' : '↓') : '—') + '</div>' +
+          '<div style=\"font-size:0.6rem;color:var(--text-muted);\">' + (mtf.h4 ? 'RSI ' + mtf.h4.rsi?.toFixed(0) : '—') + '</div>' +
+          '</div>' +
+          '<div style=\"text-align:center;background:var(--bg-elevated);border-radius:8px;padding:var(--space-3);\">' +
+          '<div style=\"font-size:0.65rem;color:var(--text-muted);\">' + 'SIGNAL' + '</div>' +
+          '<div style=\"font-size:var(--text-xs);font-weight:700;color:' + alignColor + ';\">' + alignLabel + '</div>' +
+          '<div style=\"font-size:0.6rem;color:var(--text-muted);\">' + mtf.alignmentScore?.toFixed(0) + '% aligné</div>' +
+          '</div>' +
+          '</div></div>';
+      })()}
     </div>
     ` : ''}
 
@@ -4022,6 +4073,33 @@ function renderSettings() {
       <h1 class="screen-title">Paramètres</h1>
       <p class="screen-subtitle">Profil de risque, données et connexions</p>
     </div>
+
+    <!-- ═══ COMPTEUR API ═══ -->
+    <section class="settings-section">
+      <div class="settings-section-title">📊 Consommation API</div>
+      <div class="settings-card" style="padding:var(--space-5);">
+        ${(function() {
+          const stats = Storage.getCallStats ? Storage.getCallStats() : { count: 0, limit: 3200, remaining: 3200, pct: 0 };
+          const color = stats.pct > 80 ? 'var(--loss)' : stats.pct > 60 ? 'var(--signal-medium)' : 'var(--profit)';
+          return '<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3);\">' +
+            '<div><div style=\"font-size:var(--text-sm);font-weight:700;\">Twelve Data aujourd\'hui</div>' +
+            '<div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' + stats.count + ' / ' + stats.limit + ' appels · ' + stats.remaining + ' restants</div></div>' +
+            '<div style=\"font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:' + color + ';\">' + stats.pct + '%</div>' +
+            '</div>' +
+            '<div style=\"height:8px;background:var(--bg-elevated);border-radius:4px;overflow:hidden;\">' +
+            '<div style=\"height:100%;width:' + stats.pct + '%;background:' + color + ';border-radius:4px;transition:width 0.5s;\"></div>' +
+            '</div>' +
+            '<div style=\"display:grid;grid-template-columns:1fr 1fr;gap:var(--space-3);margin-top:var(--space-4);\">' +
+            '<div style=\"text-align:center;\"><div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' +
+            'Binance</div><div style=\"font-size:var(--text-sm);font-weight:700;color:var(--profit);\">' +
+            'Illimité ✅</div></div>' +
+            '<div style=\"text-align:center;\"><div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' +
+            'Cloudflare</div><div style=\"font-size:var(--text-sm);font-weight:700;color:var(--profit);\">' +
+            '100k/jour ✅</div></div>' +
+            '</div>';
+        })()}
+      </div>
+    </section>
 
     <!-- ═══ ALERTES ═══ -->
     <section class="settings-section">
