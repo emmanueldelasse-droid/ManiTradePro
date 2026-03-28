@@ -1092,24 +1092,18 @@ const RealDataClient = (() => {
   const YAHOO_PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/yahoo';
 
   async function _fetchWithProxy(url) {
-    // 1. Cloudflare proxy pour Yahoo Finance (priorité)
+    // TOUJOURS passer par le proxy Cloudflare pour Yahoo Finance
     if (url.includes('finance.yahoo.com')) {
       try {
         const yahooPath = url.replace('https://query1.finance.yahoo.com', '');
         const proxyUrl = 'https://aged-bar-257a.emmanueldelasse.workers.dev/yahoo' + yahooPath;
-        const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-        if (r.ok) {
-          Storage.incrementCallCount();
-          return r;
-        }
-      } catch(e) {}
+        const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+        if (r.ok) return r;
+      } catch(e) { console.warn('[Yahoo] Proxy error:', e.message); }
+      return null; // Ne pas essayer en direct — bloqué par CORS
     }
-    // 2. Direct fetch
+    // Autres URLs
     try { const r = await fetch(url, { signal: AbortSignal.timeout(6000) }); if (r.ok) return r; } catch(e) {}
-    // 3. Public proxies fallback
-    for (const proxy of CORS_PROXIES) {
-      try { const r = await fetch(proxy + encodeURIComponent(url), { signal: AbortSignal.timeout(8000) }); if (r.ok) return r; } catch(e) {}
-    }
     return null;
   }
 
@@ -1893,6 +1887,15 @@ const AlertManager = (() => {
   };
 })();
 
+// ── Tooltip helper (global)
+function tooltip(term, explanation) {
+  const safe = (explanation || '').replace(/'/g, "\'");
+  return '<span style="display:inline-flex;align-items:center;gap:3px;">' +
+    term +
+    '<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-medium);font-size:9px;color:var(--text-muted);cursor:pointer;flex-shrink:0;" title="' + safe + '" onclick="alert(\'' + safe + '\')">?</span>' +
+    '</span>';
+}
+
 // ═══ UI Helpers ═══
 const UI = (() => {
   function toast(message, type = 'info') {
@@ -2050,15 +2053,6 @@ const UI = (() => {
       }
       overlay.onclick = e => { if (e.target === overlay) { overlay.classList.add('hidden'); resolve(null); } };
     });
-  }
-
-  // ── Tooltip system
-  function tooltip(term, explanation) {
-    return `<span style="display:inline-flex;align-items:center;gap:3px;">
-      ${term}
-      <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-medium);font-size:9px;color:var(--text-muted);cursor:pointer;flex-shrink:0;"
-        title="${explanation}" onclick="alert('${explanation}')">?</span>
-    </span>`;
   }
 
   function scoreRing(score, size = 44) {
@@ -2977,7 +2971,7 @@ function renderAssetDetail(params) {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4);margin-top:var(--space-5);padding-top:var(--space-4);border-top:1px solid var(--border-subtle);">
         <div>
           <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);">
-            Style de setup ${UI.tooltip('?', 'Le type de stratégie utilisée pour ce signal')}
+            Style de setup ${tooltip('?', 'Le type de stratégie utilisée pour ce signal')}
           </div>
           <div style="font-size:var(--text-sm);font-weight:700;">
             ${(function() {
@@ -2992,7 +2986,7 @@ function renderAssetDetail(params) {
         </div>
         <div>
           <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-2);">
-            Horizon estimé ${UI.tooltip('?', 'Durée approximative pendant laquelle ce signal reste valide')}
+            Horizon estimé ${tooltip('?', 'Durée approximative pendant laquelle ce signal reste valide')}
           </div>
           <div style="font-size:var(--text-sm);font-weight:700;">
             ${(function() {
@@ -3008,7 +3002,7 @@ function renderAssetDetail(params) {
       <!-- Conditions de prudence -->
       <div style="margin-top:var(--space-4);padding-top:var(--space-4);border-top:1px solid var(--border-subtle);">
         <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);">
-          ⚠️ Conditions qui invalideraient ce signal ${UI.tooltip('?', 'Si ces evenements se produisent, le signal n\'est plus valide')}
+          ⚠️ Conditions qui invalideraient ce signal ${tooltip('?', 'Si ces evenements se produisent, le signal n\'est plus valide')}
         </div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);line-height:1.8;">
           ${(function() {
