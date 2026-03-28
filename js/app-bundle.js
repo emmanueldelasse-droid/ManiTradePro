@@ -275,60 +275,9 @@ window.__prices = {};
 
 // ═══ mockData.js ═══
 const MOCK_DATA = {
-  prices: {
-    'BTC':   { price: 67420.50, change24h: 2.34,  volume24h: 28400000000 },
-    'ETH':   { price: 3528.20,  change24h: 1.87,  volume24h: 14200000000 },
-    'SOL':   { price: 172.40,   change24h: 4.21,  volume24h: 3100000000  },
-    'BNB':   { price: 412.30,   change24h: 1.20,  volume24h: 1800000000  },
-    'XRP':   { price: 0.6240,   change24h: 2.10,  volume24h: 2400000000  },
-    'ADA':   { price: 0.4820,   change24h: -0.80, volume24h: 980000000   },
-    'AVAX':  { price: 38.40,    change24h: 3.50,  volume24h: 820000000   },
-    'DOT':   { price: 7.82,     change24h: 1.20,  volume24h: 520000000   },
-    'LINK':  { price: 18.40,    change24h: 2.80,  volume24h: 680000000   },
-    'DOGE':  { price: 0.1842,   change24h: 5.20,  volume24h: 1200000000  },
-    'MATIC': { price: 0.8420,   change24h: 1.80,  volume24h: 620000000   },
-    'UNI':   { price: 8.240,    change24h: 2.10,  volume24h: 280000000   },
-    'ATOM':  { price: 9.820,    change24h: 1.40,  volume24h: 320000000   },
-    'LTC':   { price: 84.20,    change24h: 1.10,  volume24h: 480000000   },
-    'NEAR':  { price: 6.840,    change24h: 3.20,  volume24h: 420000000   },
-    'AAPL':  { price: 213.45,   change24h: 0.62,  volume24h: 3800000000  },
-    'MSFT':  { price: 421.80,   change24h: 0.44,  volume24h: 2100000000  },
-    'NVDA':  { price: 875.60,   change24h: 3.12,  volume24h: 8900000000  },
-    'TSLA':  { price: 176.30,   change24h: -1.23, volume24h: 5600000000  },
-    'AMZN':  { price: 196.20,   change24h: 0.88,  volume24h: 2800000000  },
-    'GOOGL': { price: 168.40,   change24h: 0.52,  volume24h: 1800000000  },
-    'META':  { price: 524.80,   change24h: 1.20,  volume24h: 2200000000  },
-    'NFLX':  { price: 628.40,   change24h: 0.84,  volume24h: 820000000   },
-    'AMD':   { price: 168.20,   change24h: 2.10,  volume24h: 3200000000  },
-    'JPM':   { price: 198.40,   change24h: 0.38,  volume24h: 1200000000  },
-    'V':     { price: 274.80,   change24h: 0.42,  volume24h: 980000000   },
-    'MA':    { price: 462.40,   change24h: 0.38,  volume24h: 820000000   },
-    'DIS':   { price: 112.40,   change24h: -0.52, volume24h: 680000000   },
-    'COIN':  { price: 224.80,   change24h: 4.20,  volume24h: 1800000000  },
-    'PYPL':  { price: 68.40,    change24h: -0.82, volume24h: 620000000   },
-    'MC':    { price: 742.80,   change24h: 0.82,  volume24h: 420000000   },
-    'ASML':  { price: 842.40,   change24h: 1.20,  volume24h: 380000000   },
-    'SAP':   { price: 198.40,   change24h: 0.62,  volume24h: 280000000   },
-    'TTE':   { price: 58.40,    change24h: 0.42,  volume24h: 320000000   },
-    'BNP':   { price: 68.20,    change24h: -0.32, volume24h: 280000000   },
-    'AIR':   { price: 168.40,   change24h: 0.82,  volume24h: 220000000   },
-    'RMS':   { price: 2142.00,  change24h: 0.62,  volume24h: 180000000   },
-    'OR':    { price: 384.20,   change24h: 0.42,  volume24h: 160000000   },
-    'SAN':   { price: 94.20,    change24h: 0.22,  volume24h: 180000000   },
-    'STLA':  { price: 14.82,    change24h: -1.20, volume24h: 280000000   },
-    'EURUSD':{ price: 1.0842,   change24h: 0.18,  volume24h: 0 },
-    'GBPUSD':{ price: 1.2714,   change24h: -0.12, volume24h: 0 },
-    'USDJPY':{ price: 149.82,   change24h: 0.22,  volume24h: 0 },
-    'USDCHF':{ price: 0.8982,   change24h: -0.08, volume24h: 0 },
-    'AUDUSD':{ price: 0.6542,   change24h: 0.12,  volume24h: 0 },
-    'GOLD':  { price: 2318.40,  change24h: 0.75,  volume24h: 0 },
-    'SILVER':{ price: 27.42,    change24h: 1.20,  volume24h: 0 },
-    'OIL':   { price: 78.42,    change24h: -0.82, volume24h: 0 },
-    'SPY':   { price: 523.80,   change24h: 0.51,  volume24h: 4200000000  },
-    'QQQ':   { price: 448.40,   change24h: 0.82,  volume24h: 2800000000  },
-    'GLD':   { price: 214.80,   change24h: 0.62,  volume24h: 820000000   },
-    'TLT':   { price: 92.40,    change24h: -0.42, volume24h: 420000000   },
-  },
+  // ══ PRIX SUPPRIMÉS — Données réelles uniquement via Binance/Yahoo/TwelveData ══
+  // Utiliser window.__prices[symbol] pour obtenir le vrai prix en temps réel
+  prices: {},
 
   generateOHLC: function() { return []; }, // Supprimé — données réelles uniquement
 
@@ -428,13 +377,7 @@ const MOCK_DATA = {
     binanceSecret: '',
   },
 
-  marketRegime: {
-    label: 'En attente des données',
-    icon: '⏳',
-    color: 'var(--text-muted)',
-    description: 'Chargement des données de marché réelles...',
-    score: 0,
-  },
+  // marketRegime supprimé — calculé dynamiquement depuis les données réelles
 };
 
 MOCK_DATA._ohlcCache = {};
@@ -2892,7 +2835,10 @@ function renderDashboard() {
     icon: analysis.tradeable.length > 5 ? '🟢' : analysis.tradeable.length > 0 ? '🟡' : '🔴',
     color: analysis.tradeable.length > 5 ? 'var(--profit)' : analysis.tradeable.length > 0 ? 'var(--signal-medium)' : 'var(--loss)',
     score: analysis.tradeable.length > 0 ? Math.round(analysis.tradeable.reduce((s,a) => s + a.adjScore, 0) / analysis.tradeable.length) : 0,
-  } : MOCK_DATA.marketRegime;
+  } : {
+    label: 'Chargement...', icon: '⏳',
+    color: 'var(--text-muted)', score: 0,
+  };
   const alertStats = AlertManager.getStats();
 
   return `
@@ -3296,7 +3242,7 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false, compact = fa
           <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">${a.name}</div>
         </div>
         <div style="text-align:right;flex-shrink:0;">
-          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Chargement...'}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;color:${priceAvailable ? 'var(--text-primary)' : 'var(--text-muted)'}">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Prix en cours...'}</div>
           <div style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;" class="${change.cls}">${change.text}</div>
           <div style="font-size:0.6rem;color:var(--text-muted);margin-top:1px;">🔄 <span data-countdown="${['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR'].includes(a.symbol) ? 'crypto' : 'prices'}">--</span></div>
         </div>
@@ -3331,6 +3277,21 @@ function renderAssetDetail(params) {
   // ── SINGLE SOURCE OF TRUTH: real price only ──
   const realPrice = getPriceForSymbol(symbol);
   const priceAvailable = realPrice && realPrice > 0;
+  // Trigger async price load if not available
+  if (!priceAvailable) {
+    setTimeout(async () => {
+      try {
+        const pd = await RealDataClient.getPrice(symbol);
+        if (pd?.price > 0) {
+          window.__prices[symbol] = pd.price;
+          // Re-render only if still on this screen
+          if (Router.getCurrent() === 'asset-detail') {
+            Router.navigate('asset-detail', { symbol });
+          }
+        }
+      } catch(e) {}
+    }, 100);
+  }
 
   // Use analysis cache if available (contains real price from last analysis run)
   const cached = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
@@ -4707,7 +4668,7 @@ function _renderEquityCurve(curve, initial) {
 }
 
 function _renderMiniPosition(pos) {
-  const curr = window.__prices[pos.symbol] || pos.entryPrice;
+  const curr = window.__prices[pos.symbol] > 0 ? window.__prices[pos.symbol] : pos.entryPrice;
   const dir  = (pos.direction || '').toLowerCase();
   const diff = dir === 'long' ? curr - pos.entryPrice : pos.entryPrice - curr;
   const pnl  = diff * pos.quantity;
@@ -4716,7 +4677,7 @@ function _renderMiniPosition(pos) {
       <span class="mini-pos-icon">${Fmt.assetIcon(pos.symbol)}</span>
       <span class="mini-pos-symbol">${pos.symbol}</span>
       <span class="mini-pos-dir ${dir === 'long' ? 'long' : 'short'}">${pos.direction}</span>
-      <span class="mini-pos-pnl ${Fmt.pnlClass(pnl)}">${Fmt.signedCurrency(pnl)}</span>
+      <span class="mini-pos-pnl ${Fmt.pnlClass(pnl)}">${window.__prices[pos.symbol] > 0 ? Fmt.signedCurrency(pnl) : '⏳'}</span>
     </div>`;
 }
 
