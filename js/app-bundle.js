@@ -19,7 +19,59 @@ window.__prices = {};
 // ═══ mockData.js ═══
 const MOCK_DATA = {
   prices: {
-    'BTC':   { price: 67420.50, change24h: 2.34,  volume24h: 28_400_000_000 },
+    'BTC':   { price: 67420.50, change24h: 2.34,  volume24h: 28400000000 },
+    'ETH':   { price: 3528.20,  change24h: 1.87,  volume24h: 14200000000 },
+    'SOL':   { price: 172.40,   change24h: 4.21,  volume24h: 3100000000  },
+    'BNB':   { price: 412.30,   change24h: 1.20,  volume24h: 1800000000  },
+    'XRP':   { price: 0.6240,   change24h: 2.10,  volume24h: 2400000000  },
+    'ADA':   { price: 0.4820,   change24h: -0.80, volume24h: 980000000   },
+    'AVAX':  { price: 38.40,    change24h: 3.50,  volume24h: 820000000   },
+    'DOT':   { price: 7.82,     change24h: 1.20,  volume24h: 520000000   },
+    'LINK':  { price: 18.40,    change24h: 2.80,  volume24h: 680000000   },
+    'DOGE':  { price: 0.1842,   change24h: 5.20,  volume24h: 1200000000  },
+    'MATIC': { price: 0.8420,   change24h: 1.80,  volume24h: 620000000   },
+    'UNI':   { price: 8.240,    change24h: 2.10,  volume24h: 280000000   },
+    'ATOM':  { price: 9.820,    change24h: 1.40,  volume24h: 320000000   },
+    'LTC':   { price: 84.20,    change24h: 1.10,  volume24h: 480000000   },
+    'NEAR':  { price: 6.840,    change24h: 3.20,  volume24h: 420000000   },
+    'AAPL':  { price: 213.45,   change24h: 0.62,  volume24h: 3800000000  },
+    'MSFT':  { price: 421.80,   change24h: 0.44,  volume24h: 2100000000  },
+    'NVDA':  { price: 875.60,   change24h: 3.12,  volume24h: 8900000000  },
+    'TSLA':  { price: 176.30,   change24h: -1.23, volume24h: 5600000000  },
+    'AMZN':  { price: 196.20,   change24h: 0.88,  volume24h: 2800000000  },
+    'GOOGL': { price: 168.40,   change24h: 0.52,  volume24h: 1800000000  },
+    'META':  { price: 524.80,   change24h: 1.20,  volume24h: 2200000000  },
+    'NFLX':  { price: 628.40,   change24h: 0.84,  volume24h: 820000000   },
+    'AMD':   { price: 168.20,   change24h: 2.10,  volume24h: 3200000000  },
+    'JPM':   { price: 198.40,   change24h: 0.38,  volume24h: 1200000000  },
+    'V':     { price: 274.80,   change24h: 0.42,  volume24h: 980000000   },
+    'MA':    { price: 462.40,   change24h: 0.38,  volume24h: 820000000   },
+    'DIS':   { price: 112.40,   change24h: -0.52, volume24h: 680000000   },
+    'COIN':  { price: 224.80,   change24h: 4.20,  volume24h: 1800000000  },
+    'PYPL':  { price: 68.40,    change24h: -0.82, volume24h: 620000000   },
+    'MC':    { price: 742.80,   change24h: 0.82,  volume24h: 420000000   },
+    'ASML':  { price: 842.40,   change24h: 1.20,  volume24h: 380000000   },
+    'SAP':   { price: 198.40,   change24h: 0.62,  volume24h: 280000000   },
+    'TTE':   { price: 58.40,    change24h: 0.42,  volume24h: 320000000   },
+    'BNP':   { price: 68.20,    change24h: -0.32, volume24h: 280000000   },
+    'AIR':   { price: 168.40,   change24h: 0.82,  volume24h: 220000000   },
+    'RMS':   { price: 2142.00,  change24h: 0.62,  volume24h: 180000000   },
+    'OR':    { price: 384.20,   change24h: 0.42,  volume24h: 160000000   },
+    'SAN':   { price: 94.20,    change24h: 0.22,  volume24h: 180000000   },
+    'STLA':  { price: 14.82,    change24h: -1.20, volume24h: 280000000   },
+    'EURUSD':{ price: 1.0842,   change24h: 0.18,  volume24h: 0 },
+    'GBPUSD':{ price: 1.2714,   change24h: -0.12, volume24h: 0 },
+    'USDJPY':{ price: 149.82,   change24h: 0.22,  volume24h: 0 },
+    'USDCHF':{ price: 0.8982,   change24h: -0.08, volume24h: 0 },
+    'AUDUSD':{ price: 0.6542,   change24h: 0.12,  volume24h: 0 },
+    'GOLD':  { price: 2318.40,  change24h: 0.75,  volume24h: 0 },
+    'SILVER':{ price: 27.42,    change24h: 1.20,  volume24h: 0 },
+    'OIL':   { price: 78.42,    change24h: -0.82, volume24h: 0 },
+    'SPY':   { price: 523.80,   change24h: 0.51,  volume24h: 4200000000  },
+    'QQQ':   { price: 448.40,   change24h: 0.82,  volume24h: 2800000000  },
+    'GLD':   { price: 214.80,   change24h: 0.62,  volume24h: 820000000   },
+    'TLT':   { price: 92.40,    change24h: -0.42, volume24h: 420000000   },
+  },
     'ETH':   { price: 3528.20,  change24h: 1.87,  volume24h: 14_200_000_000 },
     'AAPL':  { price: 213.45,   change24h: 0.62,  volume24h: 3_800_000_000  },
     'MSFT':  { price: 421.80,   change24h: 0.44,  volume24h: 2_100_000_000  },
@@ -58,18 +110,64 @@ const MOCK_DATA = {
   },
 
   watchlist: [
-    { symbol: 'BTC',    name: 'Bitcoin',        class: 'crypto',    trend: 'up',      volatility: 0.025 },
-    { symbol: 'ETH',    name: 'Ethereum',       class: 'crypto',    trend: 'up',      volatility: 0.028 },
-    { symbol: 'NVDA',   name: 'Nvidia',         class: 'stock',     trend: 'up',      volatility: 0.022 },
-    { symbol: 'AAPL',   name: 'Apple',          class: 'stock',     trend: 'up',      volatility: 0.014 },
-    { symbol: 'MSFT',   name: 'Microsoft',      class: 'stock',     trend: 'up',      volatility: 0.013 },
-    { symbol: 'GOLD',   name: 'Or (XAU/USD)',   class: 'commodity', trend: 'up',      volatility: 0.008 },
-    { symbol: 'EURUSD', name: 'Euro / Dollar',  class: 'forex',     trend: 'neutral', volatility: 0.005 },
-    { symbol: 'TSLA',   name: 'Tesla',          class: 'stock',     trend: 'down',    volatility: 0.035 },
-    { symbol: 'SOL',    name: 'Solana',         class: 'crypto',    trend: 'up',      volatility: 0.040 },
-    { symbol: 'SPY',    name: 'S&P 500 ETF',    class: 'etf',       trend: 'up',      volatility: 0.010 },
-    { symbol: 'AMZN',   name: 'Amazon',         class: 'stock',     trend: 'up',      volatility: 0.018 },
-    { symbol: 'GBPUSD', name: 'Livre / Dollar', class: 'forex',     trend: 'down',    volatility: 0.006 },
+    // ── Cryptos (Binance — illimité)
+    { symbol: 'BTC',    name: 'Bitcoin',         class: 'crypto',    trend: 'up',      volatility: 0.025 },
+    { symbol: 'ETH',    name: 'Ethereum',        class: 'crypto',    trend: 'up',      volatility: 0.028 },
+    { symbol: 'SOL',    name: 'Solana',          class: 'crypto',    trend: 'up',      volatility: 0.040 },
+    { symbol: 'BNB',    name: 'BNB',             class: 'crypto',    trend: 'up',      volatility: 0.022 },
+    { symbol: 'XRP',    name: 'Ripple',          class: 'crypto',    trend: 'up',      volatility: 0.035 },
+    { symbol: 'ADA',    name: 'Cardano',         class: 'crypto',    trend: 'neutral', volatility: 0.038 },
+    { symbol: 'AVAX',   name: 'Avalanche',       class: 'crypto',    trend: 'up',      volatility: 0.045 },
+    { symbol: 'DOT',    name: 'Polkadot',        class: 'crypto',    trend: 'neutral', volatility: 0.042 },
+    { symbol: 'LINK',   name: 'Chainlink',       class: 'crypto',    trend: 'up',      volatility: 0.038 },
+    { symbol: 'DOGE',   name: 'Dogecoin',        class: 'crypto',    trend: 'up',      volatility: 0.055 },
+    { symbol: 'MATIC',  name: 'Polygon',         class: 'crypto',    trend: 'neutral', volatility: 0.048 },
+    { symbol: 'UNI',    name: 'Uniswap',         class: 'crypto',    trend: 'neutral', volatility: 0.042 },
+    { symbol: 'ATOM',   name: 'Cosmos',          class: 'crypto',    trend: 'neutral', volatility: 0.040 },
+    { symbol: 'LTC',    name: 'Litecoin',        class: 'crypto',    trend: 'up',      volatility: 0.030 },
+    { symbol: 'NEAR',   name: 'NEAR Protocol',   class: 'crypto',    trend: 'up',      volatility: 0.050 },
+    // ── Actions US (Twelve Data)
+    { symbol: 'AAPL',   name: 'Apple',           class: 'stock',     trend: 'up',      volatility: 0.014 },
+    { symbol: 'MSFT',   name: 'Microsoft',       class: 'stock',     trend: 'up',      volatility: 0.013 },
+    { symbol: 'NVDA',   name: 'Nvidia',          class: 'stock',     trend: 'up',      volatility: 0.022 },
+    { symbol: 'TSLA',   name: 'Tesla',           class: 'stock',     trend: 'down',    volatility: 0.035 },
+    { symbol: 'AMZN',   name: 'Amazon',          class: 'stock',     trend: 'up',      volatility: 0.018 },
+    { symbol: 'GOOGL',  name: 'Alphabet',        class: 'stock',     trend: 'up',      volatility: 0.016 },
+    { symbol: 'META',   name: 'Meta',            class: 'stock',     trend: 'up',      volatility: 0.020 },
+    { symbol: 'NFLX',   name: 'Netflix',         class: 'stock',     trend: 'up',      volatility: 0.025 },
+    { symbol: 'AMD',    name: 'AMD',             class: 'stock',     trend: 'up',      volatility: 0.028 },
+    { symbol: 'JPM',    name: 'JPMorgan',        class: 'stock',     trend: 'up',      volatility: 0.015 },
+    { symbol: 'V',      name: 'Visa',            class: 'stock',     trend: 'up',      volatility: 0.012 },
+    { symbol: 'MA',     name: 'Mastercard',      class: 'stock',     trend: 'up',      volatility: 0.013 },
+    { symbol: 'DIS',    name: 'Disney',          class: 'stock',     trend: 'neutral', volatility: 0.018 },
+    { symbol: 'COIN',   name: 'Coinbase',        class: 'stock',     trend: 'up',      volatility: 0.045 },
+    { symbol: 'PYPL',   name: 'PayPal',          class: 'stock',     trend: 'down',    volatility: 0.022 },
+    // ── Actions EU (Twelve Data)
+    { symbol: 'MC',     name: 'LVMH',            class: 'stock',     trend: 'up',      volatility: 0.016 },
+    { symbol: 'ASML',   name: 'ASML',            class: 'stock',     trend: 'up',      volatility: 0.020 },
+    { symbol: 'SAP',    name: 'SAP',             class: 'stock',     trend: 'up',      volatility: 0.014 },
+    { symbol: 'TTE',    name: 'TotalEnergies',   class: 'stock',     trend: 'neutral', volatility: 0.015 },
+    { symbol: 'BNP',    name: 'BNP Paribas',     class: 'stock',     trend: 'neutral', volatility: 0.018 },
+    { symbol: 'AIR',    name: 'Airbus',          class: 'stock',     trend: 'up',      volatility: 0.016 },
+    { symbol: 'RMS',    name: 'Hermès',          class: 'stock',     trend: 'up',      volatility: 0.015 },
+    { symbol: 'OR',     name: "L'Oréal",         class: 'stock',     trend: 'up',      volatility: 0.013 },
+    { symbol: 'SAN',    name: 'Sanofi',          class: 'stock',     trend: 'neutral', volatility: 0.012 },
+    { symbol: 'STLA',   name: 'Stellantis',      class: 'stock',     trend: 'down',    volatility: 0.020 },
+    // ── Forex (Twelve Data)
+    { symbol: 'EURUSD', name: 'Euro / Dollar',   class: 'forex',     trend: 'neutral', volatility: 0.005 },
+    { symbol: 'GBPUSD', name: 'Livre / Dollar',  class: 'forex',     trend: 'down',    volatility: 0.006 },
+    { symbol: 'USDJPY', name: 'Dollar / Yen',    class: 'forex',     trend: 'up',      volatility: 0.006 },
+    { symbol: 'USDCHF', name: 'Dollar / Franc',  class: 'forex',     trend: 'neutral', volatility: 0.005 },
+    { symbol: 'AUDUSD', name: 'Australien / $',  class: 'forex',     trend: 'neutral', volatility: 0.006 },
+    // ── Matières premières (Twelve Data)
+    { symbol: 'GOLD',   name: 'Or (XAU/USD)',    class: 'commodity', trend: 'up',      volatility: 0.008 },
+    { symbol: 'SILVER', name: 'Argent',          class: 'commodity', trend: 'up',      volatility: 0.012 },
+    { symbol: 'OIL',    name: 'Pétrole (WTI)',   class: 'commodity', trend: 'neutral', volatility: 0.018 },
+    // ── ETF (Twelve Data)
+    { symbol: 'SPY',    name: 'S&P 500 ETF',     class: 'etf',       trend: 'up',      volatility: 0.010 },
+    { symbol: 'QQQ',    name: 'Nasdaq 100 ETF',  class: 'etf',       trend: 'up',      volatility: 0.014 },
+    { symbol: 'GLD',    name: 'Gold ETF',        class: 'etf',       trend: 'up',      volatility: 0.008 },
+    { symbol: 'TLT',    name: 'Obligations US',  class: 'etf',       trend: 'down',    volatility: 0.010 },
   ],
 
   icons: {
@@ -217,6 +315,28 @@ const Storage = (() => {
     saveSimPositions([]);
     saveSimHistory([]);
     return true;
+  }
+
+  // ── API Call Counter
+  function getTodayCallCount() {
+    const today = new Date().toISOString().split('T')[0];
+    const stored = get('mtp_api_calls');
+    if (!stored || stored.date !== today) return 0;
+    return stored.count || 0;
+  }
+  function incrementCallCount() {
+    const today = new Date().toISOString().split('T')[0];
+    const stored = get('mtp_api_calls');
+    const count = (stored?.date === today ? (stored.count || 0) : 0) + 1;
+    set('mtp_api_calls', { date: today, count });
+    return count;
+  }
+  function getCallStats() {
+    const today = new Date().toISOString().split('T')[0];
+    const stored = get('mtp_api_calls');
+    const count = stored?.date === today ? (stored.count || 0) : 0;
+    const limit = 3200; // 4 keys × 800
+    return { count, limit, remaining: limit - count, pct: Math.round((count / limit) * 100) };
   }
 
   function init() {
@@ -447,8 +567,13 @@ const RiskCalculator = (() => {
 // ═══ BinanceClient ═══
 const BinanceClient = (() => {
   const BASE = 'https://aged-bar-257a.emmanueldelasse.workers.dev/binance';
-  const BINANCE_PAIRS = { 'BTC': 'BTCEUR', 'ETH': 'ETHEUR', 'SOL': 'SOLEUR', 'BNB': 'BNBEUR' };
-  const BINANCE_USDT  = { 'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'SOL': 'SOLUSDT' };
+  const BINANCE_PAIRS = {
+    'BTC': 'BTCUSDT', 'ETH': 'ETHUSDT', 'SOL': 'SOLUSDT', 'BNB': 'BNBUSDT',
+    'XRP': 'XRPUSDT', 'ADA': 'ADAUSDT', 'AVAX': 'AVAXUSDT', 'DOT': 'DOTUSDT',
+    'LINK': 'LINKUSDT', 'DOGE': 'DOGEUSDT', 'MATIC': 'MATICUSDT', 'UNI': 'UNIUSDT',
+    'ATOM': 'ATOMUSDT', 'LTC': 'LTCUSDT', 'NEAR': 'NEARUSDT',
+  };
+  const BINANCE_USDT = {};
   let _apiKey = '', _secretKey = '', _eurUsdRate = 1.08;
 
   function init(apiKey = '', secretKey = '') {
@@ -477,15 +602,15 @@ const BinanceClient = (() => {
     } catch(e) { return { error: e.message }; }
   }
   async function getPrice(symbol) {
-    const pairEur = BINANCE_PAIRS[symbol], pairUsdt = BINANCE_USDT[symbol];
-    if (!pairEur && !pairUsdt) return null;
+    const pair = BINANCE_PAIRS[symbol];
+    if (!pair) return null;
     try {
-      const pair = pairEur || pairUsdt;
       const r = await fetch(`${BASE}/api/v3/ticker/24hr?symbol=${pair}`, { signal: AbortSignal.timeout(6000), mode: 'cors' });
       if (!r.ok) return null;
       const d = await r.json();
-      const price = parseFloat(d.lastPrice) / (pairEur ? 1 : _eurUsdRate);
-      return { price, change24h: parseFloat(d.priceChangePercent), volume24h: parseFloat(d.quoteVolume), source: 'Binance' };
+      const priceUsdt = parseFloat(d.lastPrice);
+      const priceEur = priceUsdt / (_eurUsdRate || 1.08);
+      return { price: priceEur, change24h: parseFloat(d.priceChangePercent), volume24h: parseFloat(d.quoteVolume), source: 'Binance' };
     } catch(e) { return null; }
   }
   async function getOHLC(symbol) {
@@ -496,13 +621,13 @@ const BinanceClient = (() => {
       if (!r.ok) return null;
       const raw = await r.json();
       if (!Array.isArray(raw) || raw.length < 20) return null;
-      const useUsdt = !BINANCE_PAIRS[symbol];
+      const rate = _eurUsdRate || 1.08;
       return raw.map(k => ({
         ts: k[0],
-        open:   parseFloat(k[1]) / (useUsdt ? _eurUsdRate : 1),
-        high:   parseFloat(k[2]) / (useUsdt ? _eurUsdRate : 1),
-        low:    parseFloat(k[3]) / (useUsdt ? _eurUsdRate : 1),
-        close:  parseFloat(k[4]) / (useUsdt ? _eurUsdRate : 1),
+        open:   parseFloat(k[1]) / rate,
+        high:   parseFloat(k[2]) / rate,
+        low:    parseFloat(k[3]) / rate,
+        close:  parseFloat(k[4]) / rate,
         volume: parseFloat(k[5]),
       }));
     } catch(e) { return null; }
@@ -530,8 +655,23 @@ const RealDataClient = (() => {
   }
   function _cacheSet(key, data) { _cache.set(key, { data, ts: Date.now() }); }
 
-  const COINGECKO_IDS = { 'BTC': 'bitcoin', 'ETH': 'ethereum', 'SOL': 'solana', 'BNB': 'binancecoin' };
-  const YAHOO_TICKERS = { 'AAPL': 'AAPL', 'MSFT': 'MSFT', 'NVDA': 'NVDA', 'TSLA': 'TSLA', 'AMZN': 'AMZN', 'SPY': 'SPY', 'GOLD': 'GC=F', 'EURUSD': 'EURUSD=X', 'GBPUSD': 'GBPUSD=X' };
+  const COINGECKO_IDS = {
+    'BTC':'bitcoin','ETH':'ethereum','SOL':'solana','BNB':'binancecoin',
+    'XRP':'ripple','ADA':'cardano','AVAX':'avalanche-2','DOT':'polkadot',
+    'LINK':'chainlink','DOGE':'dogecoin','MATIC':'matic-network',
+    'UNI':'uniswap','ATOM':'cosmos','LTC':'litecoin','NEAR':'near',
+  };
+  const YAHOO_TICKERS = {
+    'AAPL':'AAPL','MSFT':'MSFT','NVDA':'NVDA','TSLA':'TSLA','AMZN':'AMZN',
+    'GOOGL':'GOOGL','META':'META','NFLX':'NFLX','AMD':'AMD','JPM':'JPM',
+    'V':'V','MA':'MA','DIS':'DIS','COIN':'COIN','PYPL':'PYPL',
+    'MC':'MC.PA','ASML':'ASML','SAP':'SAP','TTE':'TTE.PA','BNP':'BNP.PA',
+    'AIR':'AIR.PA','RMS':'RMS.PA','OR':'OR.PA','SAN':'SAN.PA','STLA':'STLA',
+    'GOLD':'GC=F','SILVER':'SI=F','OIL':'CL=F',
+    'EURUSD':'EURUSD=X','GBPUSD':'GBPUSD=X','USDJPY':'USDJPY=X',
+    'USDCHF':'USDCHF=X','AUDUSD':'AUDUSD=X',
+    'SPY':'SPY','QQQ':'QQQ','GLD':'GLD','TLT':'TLT',
+  };
   const CORS_PROXIES = ['https://api.allorigins.win/raw?url=', 'https://corsproxy.io/?url='];
   const YAHOO_PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/yahoo';
 
@@ -727,7 +867,8 @@ const AnalysisEngine = (() => {
     const stopLoss = RiskCalculator.initialStop(priceData.price, ind.atr, direction, settings.stopAtrMultiplier);
     const takeProfit = RiskCalculator.takeProfitEstimate(priceData.price, stopLoss, direction, 2.5);
     const rrRatio = RiskCalculator.riskRewardRatio(priceData.price, stopLoss, takeProfit);
-    const sizing = RiskCalculator.positionSize(10000, settings.riskPerTrade, priceData.price, stopLoss);
+    const realCapital = Storage.getSimCapital();
+    const sizing = RiskCalculator.positionSize(realCapital, settings.riskPerTrade, priceData.price, stopLoss);
     return {
       symbol, name, assetClass,
       price: priceData.price, change24h: priceData.change24h, volume24h: priceData.volume24h,
@@ -768,6 +909,7 @@ const AnalysisEngine = (() => {
         const conf = computeConfidenceScore(ind, direction);
         const riskLvl = RiskCalculator.riskLevel(ind.atrPct, ind.vol20, ind.adx);
         const adjScoreVal = adjustedScore(conf.score, riskLvl);
+        const _cap = Storage.getSimCapital();
         const stopLoss = RiskCalculator.initialStop(price.price, ind.atr, direction, Storage.getSettings().stopAtrMultiplier);
         const takeProfit = RiskCalculator.takeProfitEstimate(price.price, stopLoss, direction, 2.5);
         const rrRatio = RiskCalculator.riskRewardRatio(price.price, stopLoss, takeProfit);
@@ -987,8 +1129,8 @@ const Fmt = (() => {
   function dateShort(ts) { if (!ts) return '—'; return new Date(ts).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }); }
   function volume(v) { if (!v) return '—'; if (v >= 1e9) return (v/1e9).toFixed(1)+'G'; if (v >= 1e6) return (v/1e6).toFixed(1)+'M'; if (v >= 1e3) return (v/1e3).toFixed(1)+'K'; return v.toFixed(0); }
   function directionIcon(d) { return d === 'long' ? '↑' : d === 'short' ? '↓' : '—'; }
-  function directionLabel(d) { return d === 'long' ? 'Long' : d === 'short' ? 'Short' : 'Neutre'; }
-  function riskLabel(l) { return l === 'low' ? 'Faible' : l === 'medium' ? 'Modéré' : l === 'high' ? 'Élevé' : '—'; }
+  function directionLabel(d) { return d === 'long' ? '↑ Hausse' : d === 'short' ? '↓ Baisse' : 'Neutre'; }
+  function riskLabel(l) { return l === 'low' ? 'Prudence faible' : l === 'medium' ? 'Prudence moyenne' : l === 'high' ? 'Prudence élevée' : '—'; }
   function profileLabel(p) { return p === 'conservative' ? 'Conservateur' : p === 'balanced' ? 'Équilibré' : p === 'dynamic' ? 'Dynamique' : p; }
   function assetIcon(symbol) { return MOCK_DATA.icons[symbol] || symbol.slice(0, 2).toUpperCase(); }
   function signedCurrency(v) { if (v === null || v === undefined) return '—'; return (v >= 0 ? '+' : '') + currency(v); }
@@ -1351,7 +1493,7 @@ const UI = (() => {
             <!-- Sizing -->
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);">
               <div style="text-align:center;">
-                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Montant investi</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Montant engagé</div>
                 <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.currency(invested)}</div>
               </div>
               <div style="text-align:center;">
@@ -1400,6 +1542,15 @@ const UI = (() => {
       }
       overlay.onclick = e => { if (e.target === overlay) { overlay.classList.add('hidden'); resolve(null); } };
     });
+  }
+
+  // ── Tooltip system
+  function tooltip(term, explanation) {
+    return `<span style="display:inline-flex;align-items:center;gap:3px;">
+      ${term}
+      <span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-medium);font-size:9px;color:var(--text-muted);cursor:pointer;flex-shrink:0;"
+        title="${explanation}" onclick="alert('${explanation}')">?</span>
+    </span>`;
   }
 
   function scoreRing(score, size = 44) {
@@ -1608,11 +1759,35 @@ const Sync = (() => {
   let lastSyncTime = Date.now();
 
   function init() {
-    setInterval(() => refreshPrices(), 5 * 60 * 1000);
+    // Crypto positions: every 15 seconds via Binance
+    setInterval(() => refreshCryptoPrices(), 15 * 1000);
+    // All prices: every 10 minutes
+    setInterval(() => refreshPrices(), 10 * 60 * 1000);
+    // Full analysis: every hour
     setInterval(() => refreshAnalysis(), 60 * 60 * 1000);
+    // On app focus
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && Date.now() - lastSyncTime > 2 * 60 * 1000) refreshPrices();
     });
+  }
+
+  async function refreshCryptoPrices() {
+    // Only refresh crypto positions via Binance (free, unlimited)
+    const openSymbols = new Set([
+      ...Storage.getSimPositions().map(p => p.symbol),
+      ...Storage.getRealPositions().map(p => p.symbol),
+    ]);
+    const cryptoSymbols = ['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR'];
+    const toRefresh = cryptoSymbols.filter(s => openSymbols.has(s));
+    if (!toRefresh.length) return;
+    for (const symbol of toRefresh) {
+      try {
+        const data = await BinanceClient.getPrice(symbol);
+        if (data?.price) window.__prices[symbol] = data.price;
+      } catch(e) {}
+    }
+    if (window.__MTP?.lastAnalysis) AlertManager.checkAlerts(window.__MTP.lastAnalysis);
+    if (['portefeuille','dashboard'].includes(Router.getCurrent())) updateLivePnL();
   }
 
   async function refreshAnalysis() {
@@ -1688,17 +1863,40 @@ function renderDashboard() {
           <div class="screen-title">Tableau de bord</div>
           <div class="screen-subtitle">${new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
         </div>
-        <span class="hero-mode-tag sim">⚡ Simulation active</span>
+        <span class="hero-mode-tag sim">⚡ Mode entraînement</span>
+      </div>
+    </div>
+
+    <!-- Message contextuel -->
+    <div style="background:${analysis.tradeable.filter(a=>a.isSolid).length > 0 ? 'rgba(0,229,160,0.08)' : analysis.tradeable.length > 3 ? 'rgba(245,166,35,0.08)' : 'var(--bg-elevated)'};border:1px solid ${analysis.tradeable.filter(a=>a.isSolid).length > 0 ? 'rgba(0,229,160,0.25)' : 'var(--border-subtle)'};border-radius:var(--card-radius);padding:var(--space-4);margin-bottom:var(--space-6);display:flex;align-items:center;gap:var(--space-3);">
+      <span style="font-size:1.4rem;">${analysis.tradeable.filter(a=>a.isSolid).length > 0 ? '🟢' : analysis.tradeable.length > 3 ? '🟡' : '🔴'}</span>
+      <div>
+        <div style="font-size:var(--text-sm);font-weight:700;color:var(--text-primary);">
+          ${analysis.tradeable.filter(a=>a.isSolid).length > 0
+            ? `${analysis.tradeable.filter(a=>a.isSolid).length} signal${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} fort${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} détecté${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} — Bonne opportunité`
+            : analysis.tradeable.length > 3 ? 'Marché actif — Quelques opportunités'
+            : 'Marché calme — Peu de signaux aujourd'hui'}
+        </div>
+        <div style="font-size:var(--text-xs);color:var(--text-muted);">${analysis.tradeable.length} opportunité${analysis.tradeable.length > 1 ? 's' : ''} · ${analysis.tradeable.filter(a=>a.isSolid).length} signal${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''} fort${analysis.tradeable.filter(a=>a.isSolid).length > 1 ? 's' : ''}</div>
       </div>
     </div>
 
     <div class="dashboard-hero">
-      <div class="hero-label">Capital simulation total estimé</div>
-      <div class="hero-capital">${Fmt.currency(capitalTotal)}</div>
-      <div class="hero-pnl">
-        <span class="hero-pnl-value ${Fmt.pnlClass(totalPnL)}" style="font-size:var(--text-xl);font-family:var(--font-mono);">${totalPnL >= 0 ? '+' : ''}${Fmt.currency(totalPnL)}</span>
-        <span style="font-family:var(--font-mono);font-size:var(--text-sm);color:var(--text-secondary);">(${Fmt.pct(globalReturn)})</span>
-        <span style="font-size:var(--text-xs);color:var(--text-muted);">P&L positions ouvertes</span>
+      <div class="hero-label">Mon capital d'entraînement</div>
+      <div class="hero-capital">${Fmt.currency(simCapNum)}</div>
+      <div style="display:flex;gap:var(--space-4);margin-top:var(--space-3);flex-wrap:wrap;">
+        <div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">Disponible</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.currency(simCapNum - totalInvested)}</div>
+        </div>
+        <div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">Engagé dans des trades</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.currency(totalInvested)}</div>
+        </div>
+        <div>
+          <div style="font-size:var(--text-xs);color:var(--text-muted);">Gains/Pertes en cours</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;" class="${Fmt.pnlClass(totalPnL)}">${Fmt.signedCurrency(totalPnL)}</div>
+        </div>
       </div>
     </div>
 
@@ -1728,12 +1926,12 @@ function renderDashboard() {
     </div>
 
     <div class="section-title">
-      <span>Régime du marché</span>
+      <span>État du marché</span>
       <span class="see-all-link" data-screen="opportunities">Voir tous les signaux →</span>
     </div>
     <div class="regime-row">
       <div class="regime-card"><div class="regime-icon">${regime.icon}</div><div><div class="regime-label">Régime global</div><div class="regime-value" style="color:${regime.color};">${regime.label}</div></div></div>
-      <div class="regime-card"><div class="regime-icon">◎</div><div><div class="regime-label">Signaux actifs</div><div class="regime-value">${analysis.tradeable.length} / ${analysis.all.length}</div></div></div>
+      <div class="regime-card"><div class="regime-icon">◎</div><div><div class="regime-label">Opportunités actifs</div><div class="regime-value">${analysis.tradeable.length} / ${analysis.all.length}</div></div></div>
       <div class="regime-card"><div class="regime-icon">◷</div><div><div class="regime-label">Score moyen</div><div class="regime-value">${regime.score}/100</div></div></div>
     </div>
 
@@ -2099,7 +2297,7 @@ function renderAssetDetail(params) {
         <div class="mode-zone-title">⚡ Mode Simulation</div>
         <div style="font-size:var(--text-xs);color:var(--text-secondary);margin-bottom:var(--space-4);line-height:1.6;">
           Capital fictif disponible : <strong>${Fmt.currency(_capNum)}</strong><br/>
-          Risque par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(_capNum * settings.riskPerTrade)}
+          Je risque X% par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(_capNum * settings.riskPerTrade)}
         </div>
         ${analysis.direction !== 'neutral' ? `
           <button class="btn btn-sim btn-block" id="btn-open-sim" data-open-position="${symbol}" data-mode="sim">
@@ -2294,7 +2492,7 @@ document.addEventListener('click', async e => {
 Router.register('asset-detail', renderAssetDetail);
 
 // ═══ portefeuille.js — écran unifié Positions + Simulation ═══
-function renderPortefeuille() {
+function renderMes trades() {
   const screen = document.getElementById('screen-portefeuille');
   if (!screen) return;
 
@@ -2315,7 +2513,7 @@ function renderPortefeuille() {
 
   screen.innerHTML = `
     <div class="screen-header">
-      <h1 class="screen-title">Portefeuille</h1>
+      <h1 class="screen-title">Mes trades</h1>
       <p class="screen-subtitle">Positions ouvertes · Historique · Statistiques</p>
     </div>
 
@@ -2355,11 +2553,11 @@ function renderPortefeuille() {
       ` : `
         ${simWithPnl.length > 0 ? `
           <div class="pf-section-label"><span class="sim-dot-label">⚡ SIMULATION</span><span>${simWithPnl.length} position(s) — Capital ${Fmt.currency(simCapNum)}</span></div>
-          ${simWithPnl.map(p => _renderPortefeuilleCard(p, 'sim')).join('')}
+          ${simWithPnl.map(p => _renderMes tradesCard(p, 'sim')).join('')}
         ` : ''}
         ${realPos.length > 0 ? `
           <div class="pf-section-label" style="margin-top:var(--space-6);"><span class="real-dot-label">⚠️ RÉEL</span></div>
-          ${realPos.map(p => _enrichPosition(p)).map(p => _renderPortefeuilleCard(p, 'real')).join('')}
+          ${realPos.map(p => _enrichPosition(p)).map(p => _renderMes tradesCard(p, 'real')).join('')}
         ` : `
           <div class="card" style="margin-top:var(--space-5);border:1px dashed var(--real-border);background:var(--real-bg);padding:var(--space-5);">
             <div style="display:flex;align-items:center;gap:var(--space-3);">
@@ -2414,7 +2612,7 @@ function renderPortefeuille() {
 
     <div class="warning-box" style="margin-top:var(--space-6);">⚠️ Les positions réelles engagent votre capital. ManiTradePro est un outil d'aide à la décision uniquement.</div>`;
 
-  _attachPortefeuilleEvents();
+  _attachMes tradesEvents();
 }
 
 
@@ -2426,7 +2624,7 @@ function renderPositionDetail(posId) {
   // Find position in sim + real
   const allPos = [...Storage.getSimPositions(), ...Storage.getRealPositions()];
   const pos = allPos.find(p => p.id === posId);
-  if (!pos) { renderPortefeuille(); return; }
+  if (!pos) { renderMes trades(); return; }
 
   const enriched = _enrichPosition(pos);
   const mode     = pos.mode || 'sim';
@@ -2552,7 +2750,7 @@ function renderPositionDetail(posId) {
         <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Quantité</div>
           <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.qty(pos.quantity, pos.symbol)}</div></div>
 
-        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Montant investi</div>
+        <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">Montant engagé</div>
           <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${Fmt.currency(pos.invested)}</div></div>
 
         <div><div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:3px;">% du capital</div>
@@ -2609,7 +2807,7 @@ function renderPositionDetail(posId) {
         📊 Voir l'analyse complète
       </button>
       <button class="btn ${mode === 'real' ? 'btn-danger' : 'btn-sim'}" style="flex:1;" id="btn-close-from-detail" data-mode="${mode}" data-id="${pos.id}" data-symbol="${pos.symbol}">
-        ${mode === 'real' ? '🔴 Clôturer (RÉEL)' : '⬛ Clôturer cette position'}
+        ${mode === 'real' ? '🔴 Clôturer (RÉEL)' : '⬛ Fermer ce trade'}
       </button>
     </div>
 
@@ -2621,7 +2819,7 @@ function renderPositionDetail(posId) {
   // Events
   document.getElementById('btn-back-to-portfolio')?.addEventListener('click', () => {
     window.__portfolioTab = 'positions';
-    renderPortefeuille();
+    renderMes trades();
   });
 
   document.getElementById('btn-close-from-detail')?.addEventListener('click', async () => {
@@ -2639,7 +2837,7 @@ function renderPositionDetail(posId) {
     if (result.success) {
       UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
       window.__portfolioTab = 'positions';
-      renderPortefeuille();
+      renderMes trades();
     } else {
       UI.toast(`Erreur : ${result.error}`, 'error');
     }
@@ -2653,7 +2851,7 @@ function renderPositionDetail(posId) {
   });
 }
 
-function _renderPortefeuilleCard(pos, mode) {
+function _renderMes tradesCard(pos, mode) {
   const pnlCls = Fmt.pnlClass(pos.pnl);
   const isLong = (pos.direction||'').toLowerCase() === 'long';
   const stopDistPct = pos.stopLoss ? Math.abs(pos.currentPrice - pos.stopLoss) / pos.currentPrice * 100 : null;
@@ -2705,14 +2903,14 @@ function _renderPortefeuilleCard(pos, mode) {
       <div class="pf-card-grid">
         <div class="pf-grid-item"><span class="pf-grid-label">Entrée</span><span>${Fmt.price(pos.entryPrice)}</span></div>
         <div class="pf-grid-item"><span class="pf-grid-label">Actuel</span><span data-position-price="${pos.id}">${Fmt.price(pos.currentPrice)}</span></div>
-        <div class="pf-grid-item"><span class="pf-grid-label">Investi</span><span>${Fmt.currency(pos.invested)}</span></div>
-        <div class="pf-grid-item"><span class="pf-grid-label">Qté</span><span>${Fmt.qty(pos.quantity, pos.symbol)}</span></div>
+        <div class="pf-grid-item"><span class="pf-grid-label">Engagé</span><span>${Fmt.currency(pos.invested)}</span></div>
+        <div class="pf-grid-item"><span class="pf-grid-label">Quantité</span><span>${Fmt.qty(pos.quantity, pos.symbol)}</span></div>
       </div>
       ${stopWarn ? `<div class="stop-warning-bar">⚠️ Stop-loss à moins de 3% du prix actuel</div>` : ''}
       <div class="pf-card-actions">
         <button class="btn btn-ghost btn-sm" data-open-detail="${pos.symbol}">Analyse →</button>
         <button class="btn ${mode === 'real' ? 'btn-danger' : 'btn-sim'} btn-sm btn-close-pos" data-mode="${mode}" data-id="${pos.id}" data-symbol="${pos.symbol}">
-          ${mode === 'real' ? '🔴 Clôturer RÉEL' : '⬛ Clôturer SIM'}
+          ${mode === 'real' ? '🔴 Clôturer RÉEL' : '⬛ Fermer ce trade'}
         </button>
       </div>
     </div>`;
@@ -2732,7 +2930,7 @@ function _renderPfHistoryRow(t) {
     </div>`;
 }
 
-function _attachPortefeuilleEvents() {
+function _attachMes tradesEvents() {
   // Click on card → detail
   document.querySelectorAll('[data-pos-detail]').forEach(card => {
     card.addEventListener('click', (e) => {
@@ -2747,7 +2945,7 @@ function _attachPortefeuilleEvents() {
   document.querySelectorAll('[data-pftab]').forEach(btn => {
     btn.addEventListener('click', () => {
       window.__portfolioTab = btn.dataset.pftab;
-      renderPortefeuille();
+      renderMes trades();
     });
   });
   // Navigate
@@ -2772,7 +2970,7 @@ function _attachPortefeuilleEvents() {
         const result = await BrokerAdapter.closePosition(id, mode);
         if (result.success) {
           UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
-          renderPortefeuille();
+          renderMes trades();
         } else {
           UI.toast(`Erreur : ${result.error}`, 'error');
         }
@@ -2790,12 +2988,12 @@ function _attachPortefeuilleEvents() {
       Storage.saveSimPositions([]);
       Storage.saveSimHistory([]);
       UI.toast('Simulation réinitialisée', 'success');
-      renderPortefeuille();
+      renderMes trades();
     });
   }
 }
 
-Router.register('portefeuille', () => { renderPortefeuille(); });
+Router.register('portefeuille', () => { renderMes trades(); });
 function _renderPositionCard(pos, mode) {
   const isLong = (pos.direction || '').toLowerCase() === 'long';
   const pnlCls = Fmt.pnlClass(pos.pnl);
@@ -2823,7 +3021,7 @@ function _renderPositionCard(pos, mode) {
         <div class="grid-item"><span class="grid-label">Entrée</span><span class="grid-value">${Fmt.price(pos.entryPrice)}</span></div>
         <div class="grid-item"><span class="grid-label">Actuel</span><span class="grid-value current-price" data-id="${pos.id}">${Fmt.price(pos.currentPrice)}</span></div>
         <div class="grid-item"><span class="grid-label">Quantité</span><span class="grid-value">${Fmt.qty(pos.quantity, pos.symbol)}</span></div>
-        <div class="grid-item"><span class="grid-label">Investi</span><span class="grid-value">${Fmt.currency(pos.invested)}</span></div>
+        <div class="grid-item"><span class="grid-label">Engagé</span><span class="grid-value">${Fmt.currency(pos.invested)}</span></div>
         <div class="grid-item"><span class="grid-label">Stop-loss</span><span class="grid-value ${stopWarn ? 'stop-close' : ''}">${pos.stopLoss ? Fmt.price(pos.stopLoss) : '—'}</span></div>
         <div class="grid-item"><span class="grid-label">Take profit</span><span class="grid-value">${pos.takeProfit ? Fmt.price(pos.takeProfit) : '—'}</span></div>
         <div class="grid-item"><span class="grid-label">Durée</span><span class="grid-value">${Fmt.duration(pos.openedAt)}</span></div>
@@ -2833,7 +3031,7 @@ function _renderPositionCard(pos, mode) {
       <div class="position-actions">
         <button class="btn-ghost btn-sm" data-open-detail="${pos.symbol}">Voir l'analyse</button>
         <button class="btn-close-pos btn-sm ${mode === 'real' ? 'btn-danger' : 'btn-warning'}" data-mode="${mode}" data-id="${pos.id}" data-symbol="${pos.symbol}">
-          ${mode === 'real' ? '🔴 Clôturer (RÉEL)' : '⬛ Clôturer (SIM)'}
+          ${mode === 'real' ? '🔴 Clôturer (RÉEL)' : '⬛ Fermer ce trade'}
         </button>
       </div>
     </div>`;
@@ -2879,7 +3077,7 @@ function _attachPositionEvents() {
         const result = await BrokerAdapter.closePosition(id, mode);
         if (result.success) {
           UI.toast(`${symbol} clôturé — ${Fmt.signedCurrency(result.pnl)}`, result.pnl >= 0 ? 'success' : 'warning');
-          renderPortefeuille();
+          renderMes trades();
         } else {
           UI.toast(`Erreur : ${result.error}`, 'error');
         }
@@ -2911,7 +3109,7 @@ function updatePositionPrices() {
   });
 }
 
-Router.register('positions', () => { renderPortefeuille(); }); // alias → portefeuille
+Router.register('positions', () => { renderMes trades(); }); // alias → portefeuille
 
 // ═══ simulation.js ═══
 function renderSimulation() {
@@ -3200,20 +3398,20 @@ function renderSettings() {
     <section class="settings-section">
       <div class="settings-section-title">Profil de risque</div>
       <div class="profile-cards-row">
-        ${_renderProfileCard('conservative', 'Conservateur', '0.25%', '🛡️', 'Signaux les plus forts uniquement.', settings.riskProfile)}
+        ${_renderProfileCard('conservative', 'Conservateur', '0.25%', '🛡️', 'Opportunités les plus forts uniquement.', settings.riskProfile)}
         ${_renderProfileCard('balanced',     'Équilibré',    '0.50%', '⚖️', 'Défaut recommandé.',                settings.riskProfile)}
         ${_renderProfileCard('dynamic',      'Dynamique',    '1.00%', '⚡', 'Plus d\'opportunités, plus d\'exposition.', settings.riskProfile)}
       </div>
       <div class="settings-card">
         <div class="settings-row">
-          <div class="settings-row-label"><span class="settings-label">Risque par trade</span><span class="settings-hint">% du capital par signal</span></div>
+          <div class="settings-row-label"><span class="settings-label">Je risque X% par trade</span><span class="settings-hint">% du capital par signal</span></div>
           <div class="settings-control">
             <input type="range" id="risk-slider" class="range-input" min="0.25" max="1.00" step="0.25" value="${settings.riskPerTrade * 100}"/>
             <span class="range-value" id="risk-value">${(settings.riskPerTrade * 100).toFixed(2)}%</span>
           </div>
         </div>
         <div class="settings-row">
-          <div class="settings-row-label"><span class="settings-label">Capital fictif initial</span></div>
+          <div class="settings-row-label"><span class="settings-label">Mon budget de départ</span></div>
           <div class="settings-control-inline">
             <input type="number" id="settings-sim-capital" class="input-sm" value="${settings.simInitialCapital || 10000}" min="1000" max="1000000" step="1000"/>
             <span class="input-suffix">€</span>
@@ -3531,9 +3729,9 @@ async function boot() {
   Router.register('dashboard',    renderDashboard);
   Router.register('opportunities',renderOpportunities);
   Router.register('asset-detail', renderAssetDetail);
-  Router.register('portefeuille', () => { renderPortefeuille(); });
-  Router.register('positions',    () => { renderPortefeuille(); }); // alias
-  Router.register('simulation',   () => { renderPortefeuille(); }); // alias
+  Router.register('portefeuille', () => { renderMes trades(); });
+  Router.register('positions',    () => { renderMes trades(); }); // alias
+  Router.register('simulation',   () => { renderMes trades(); }); // alias
   Router.register('settings',     () => { renderSettings(); });
   window.__MTP.Router = Router;
 
