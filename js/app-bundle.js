@@ -1055,7 +1055,8 @@ const BinanceClient = (() => {
     return { connected: true, balances: d.balances?.length || 0 };
   }
   function isConfigured() { return _apiKey.length > 0 && _secretKey.length > 0; }
-  return { init, getPrice, getOHLC, testConnection, isConfigured };
+  function _setEurUsdRate(rate) { if (rate > 0) _eurUsdRate = rate; }
+  return { init, getPrice, getOHLC, testConnection, isConfigured, _setEurUsdRate };
 })();
 
 // ═══ RealDataClient ═══
@@ -1128,7 +1129,8 @@ const RealDataClient = (() => {
       const d = await r.json(); const meta = d?.chart?.result?.[0]?.meta; if (!meta) return null;
       const price = meta.regularMarketPrice, prev = meta.previousClose || meta.chartPreviousClose;
       let priceEur = price;
-      if (!ticker.includes('=X') && ticker !== 'GC=F') priceEur = price * 0.92;
+      const eurRate = window.__eurUsdRate || 1.08;
+      if (!ticker.includes('=X') && ticker !== 'GC=F') priceEur = price / eurRate;
       const res = { price: priceEur, change24h: prev ? ((price - prev) / prev) * 100 : 0, volume24h: meta.regularMarketVolume || 0, source: 'Yahoo Finance' };
       _cacheSet(ck, res); return res;
     } catch(e) { return null; }
@@ -1147,7 +1149,8 @@ const RealDataClient = (() => {
         ts: t * 1000, open: q.open?.[i] || 0, high: q.high?.[i] || 0,
         low: q.low?.[i] || 0, close: q.close?.[i] || 0, volume: q.volume?.[i] || 1000000,
       })).filter(c => c.close > 0);
-      if (!ticker.includes('=X') && ticker !== 'GC=F') candles.forEach(c => { c.open *= 0.92; c.high *= 0.92; c.low *= 0.92; c.close *= 0.92; });
+      const eurRateOHLC = window.__eurUsdRate || 1.08;
+      if (!ticker.includes('=X') && ticker !== 'GC=F') candles.forEach(c => { c.open /= eurRateOHLC; c.high /= eurRateOHLC; c.low /= eurRateOHLC; c.close /= eurRateOHLC; });
       _cacheSet(ck, candles); return candles;
     } catch(e) { return null; }
   }
@@ -2348,14 +2351,29 @@ const Sync = (() => {
   }
 
   async function refreshCryptoPrices() {
-    // Only refresh crypto positions via Binance (free, unlimited)
+    // Refresh EUR/USD rate first (same Binance call, no extra quota)
+    try {
+      const r = await fetch('https://aged-bar-257a.emmanueldelasse.workers.dev/binance/api/v3/ticker/price?symbol=EURUSDT');
+      if (r.ok) {
+        const d = await r.json();
+        if (d.price) {
+          window.__eurUsdRate = parseFloat(d.price);
+          BinanceClient._setEurUsdRate(window.__eurUsdRate);
+        }
+      }
+    } catch(e) {}
+
+    // Refresh all crypto prices (positions + watchlist top)
     const openSymbols = new Set([
       ...Storage.getSimPositions().map(p => p.symbol),
       ...Storage.getRealPositions().map(p => p.symbol),
     ]);
     const cryptoSymbols = ['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR'];
-    const toRefresh = cryptoSymbols.filter(s => openSymbols.has(s));
-    if (!toRefresh.length) return;
+    // Prioritize open positions, then all cryptos
+    const toRefresh = [
+      ...cryptoSymbols.filter(s => openSymbols.has(s)),
+      ...cryptoSymbols.filter(s => !openSymbols.has(s)),
+    ];
     for (const symbol of toRefresh) {
       try {
         const data = await BinanceClient.getPrice(symbol);
@@ -4775,6 +4793,362 @@ async function refreshMultiTimeframe() {
       window.__MTP.mtfData[pos.symbol] = mtf;
     }
     await new Promise(r => setTimeout(r, 2000)); // 2s between calls
+  }
+}
+
+
+// ═══ Market Hours ═══
+const MarketHours = (() => {
+  const MARKETS = {
+    crypto:    { name: 'Crypto', open: true, always: true },
+    stock_us:  { name: 'NYSE/NASDAQ', tz: 'America/New_York', open: '09:30', close: '16:00', days: [1,2,3,4,5] },
+    stock_eu:  { name: 'Euronext', tz: 'Europe/Paris', open: '09:00', close: '17:30', days: [1,2,3,4,5] },
+    forex:     { name: 'Forex', open: '00:00', close: '24:00', days: [1,2,3,4,5] },
+    commodity: { name: 'Matières premières', open: '00:00', close: '24:00', days: [1,2,3,4,5] },
+  };
+
+  const CRYPTO_SYMBOLS = ['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR'];
+  const US_STOCKS = ['AAPL','MSFT','NVDA','TSLA','AMZN','GOOGL','META','NFLX','AMD','JPM','V','MA','DIS','COIN','PYPL','SPY','QQQ','TLT'];
+  const EU_STOCKS = ['MC','ASML','SAP','TTE','BNP','AIR','RMS','OR','SAN','STLA','GLD'];
+  const FOREX = ['EURUSD','GBPUSD','USDJPY','USDCHF','AUDUSD'];
+  const COMMODITIES = ['GOLD','SILVER','OIL'];
+
+  function getMarketType(symbol) {
+    if (CRYPTO_SYMBOLS.includes(symbol)) return 'crypto';
+    if (US_STOCKS.includes(symbol)) return 'stock_us';
+    if (EU_STOCKS.includes(symbol)) return 'stock_eu';
+    if (FOREX.includes(symbol)) return 'forex';
+    if (COMMODITIES.includes(symbol)) return 'commodity';
+    return 'stock_us';
+  }
+
+  function isOpen(symbol) {
+    const type = getMarketType(symbol);
+    if (type === 'crypto') return true;
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun, 6=Sat
+    const market = MARKETS[type];
+    if (!market.days.includes(day)) return false;
+    const tz = market.tz || 'Europe/Paris';
+    const localTime = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+    const h = localTime.getHours(), m = localTime.getMinutes();
+    const current = h * 60 + m;
+    const [oh, om] = market.open.split(':').map(Number);
+    const [ch, cm] = market.close.split(':').map(Number);
+    return current >= oh * 60 + om && current < ch * 60 + cm;
+  }
+
+  function getStatus(symbol) {
+    const type = getMarketType(symbol);
+    if (type === 'crypto') return { open: true, label: '🟢 Ouvert 24h/7j', next: null };
+    
+    const market = MARKETS[type];
+    const open = isOpen(symbol);
+    const now = new Date();
+    const tz = market.tz || 'Europe/Paris';
+    const localTime = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+    const day = localTime.getDay();
+    const h = localTime.getHours(), m = localTime.getMinutes();
+    const current = h * 60 + m;
+    const [oh, om] = market.open.split(':').map(Number);
+    const [ch, cm] = market.close.split(':').map(Number);
+
+    if (open) {
+      const closeIn = (ch * 60 + cm) - current;
+      const closeH = Math.floor(closeIn / 60), closeM = closeIn % 60;
+      return { open: true, label: '🟢 Marché ouvert', next: 'Ferme dans ' + closeH + 'h' + (closeM > 0 ? closeM + 'min' : '') };
+    } else {
+      // Find next opening
+      let daysUntil = 0;
+      let nextDay = day;
+      for (let i = 1; i <= 7; i++) {
+        nextDay = (day + i) % 7;
+        if (market.days.includes(nextDay)) { daysUntil = i; break; }
+      }
+      const dayNames = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+      const openTime = market.open;
+      if (daysUntil === 1) return { open: false, label: '🔴 Marché fermé', next: 'Ouvre demain à ' + openTime };
+      return { open: false, label: '🔴 Marché fermé', next: 'Ouvre ' + dayNames[nextDay] + ' à ' + openTime };
+    }
+  }
+
+  return { isOpen, getStatus, getMarketType };
+})();
+
+
+// ═══ NewsEngine — Agrégateur d'informations marché ═══
+const NewsEngine = (() => {
+  const PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev';
+  let _cache = null;
+  let _lastFetch = 0;
+  const TTL = 30 * 60 * 1000; // 30 min
+
+  const RSS_SOURCES = [
+    { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters', type: 'general' },
+    { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk', type: 'crypto' },
+    { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US', name: 'Yahoo Finance', type: 'stocks' },
+  ];
+
+  // Symbols to watch in news
+  const WATCH_SYMBOLS = {
+    'bitcoin': 'BTC', 'btc': 'BTC', 'ethereum': 'ETH', 'eth': 'ETH',
+    'solana': 'SOL', 'nvidia': 'NVDA', 'apple': 'AAPL', 'tesla': 'TSLA',
+    'microsoft': 'MSFT', 'amazon': 'AMZN', 'google': 'GOOGL', 'meta': 'META',
+    'gold': 'GOLD', 'oil': 'OIL', 'fed': null, 'inflation': null,
+    'interest rate': null, 'taux': null, 'bce': null,
+  };
+
+  function detectSymbols(text) {
+    const lower = text.toLowerCase();
+    const found = new Set();
+    for (const [keyword, symbol] of Object.entries(WATCH_SYMBOLS)) {
+      if (lower.includes(keyword) && symbol) found.add(symbol);
+    }
+    return [...found];
+  }
+
+  function scoreSentiment(text) {
+    const lower = text.toLowerCase();
+    const bullish = ['surge', 'rally', 'gain', 'high', 'bull', 'rise', 'up', 'hausse', 'monte', 'record', 'breakout'];
+    const bearish = ['drop', 'fall', 'crash', 'low', 'bear', 'down', 'baisse', 'chute', 'sold off', 'warning'];
+    let score = 0;
+    bullish.forEach(w => { if (lower.includes(w)) score++; });
+    bearish.forEach(w => { if (lower.includes(w)) score--; });
+    return score > 0 ? 'bullish' : score < 0 ? 'bearish' : 'neutral';
+  }
+
+  async function fetchNews() {
+    const now = Date.now();
+    if (_cache && (now - _lastFetch) < TTL) return _cache;
+
+    const items = [];
+
+    // Try each RSS via allorigins proxy (free CORS proxy for RSS)
+    for (const source of RSS_SOURCES) {
+      try {
+        const proxyUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(source.url) + '&count=5';
+        const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+        if (!r.ok) continue;
+        const data = await r.json();
+        if (data.status !== 'ok' || !data.items) continue;
+        for (const item of data.items.slice(0, 5)) {
+          const text = (item.title || '') + ' ' + (item.description || '');
+          items.push({
+            title: item.title || '',
+            source: source.name,
+            type: source.type,
+            pubDate: item.pubDate,
+            link: item.link,
+            symbols: detectSymbols(text),
+            sentiment: scoreSentiment(text),
+          });
+        }
+      } catch(e) {}
+    }
+
+    // Generate algo summary
+    const symbolMentions = {};
+    items.forEach(item => {
+      item.symbols.forEach(sym => {
+        if (!symbolMentions[sym]) symbolMentions[sym] = { count: 0, bullish: 0, bearish: 0 };
+        symbolMentions[sym].count++;
+        if (item.sentiment === 'bullish') symbolMentions[sym].bullish++;
+        if (item.sentiment === 'bearish') symbolMentions[sym].bearish++;
+      });
+    });
+
+    // Cross with algo scores
+    const analysis = window.__MTP?.lastAnalysis;
+    const alerts = [];
+    for (const [sym, mentions] of Object.entries(symbolMentions)) {
+      if (mentions.count < 2) continue;
+      const algoResult = analysis?.all?.find(a => a.symbol === sym);
+      if (algoResult && algoResult.adjScore >= 60) {
+        alerts.push({
+          symbol: sym,
+          mentions: mentions.count,
+          sentiment: mentions.bullish > mentions.bearish ? 'bullish' : mentions.bearish > mentions.bullish ? 'bearish' : 'neutral',
+          algoScore: algoResult.adjScore,
+          direction: algoResult.direction,
+        });
+      }
+    }
+    alerts.sort((a, b) => b.mentions * b.algoScore - a.mentions * a.algoScore);
+
+    const result = { items, symbolMentions, alerts, fetchedAt: now };
+    _cache = result;
+    _lastFetch = now;
+    return result;
+  }
+
+  function generateSummary(data, fearGreed) {
+    const lines = [];
+    const d = new Date();
+    lines.push('📰 Résumé du marché — ' + d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }));
+
+    if (fearGreed) {
+      const emoji = fearGreed.value <= 25 ? '😱' : fearGreed.value <= 45 ? '😰' : fearGreed.value <= 55 ? '😐' : fearGreed.value <= 75 ? '😊' : '🤑';
+      lines.push(emoji + ' Sentiment crypto : ' + (fearGreed.value <= 25 ? 'Peur extrême' : fearGreed.value <= 45 ? 'Peur' : fearGreed.value <= 55 ? 'Neutre' : 'Avidité') + ' (' + fearGreed.value + '/100)');
+      if (fearGreed.value <= 25) lines.push('💡 Historiquement favorable aux achats BTC/ETH');
+      if (fearGreed.value >= 75) lines.push('⚠️ Marché suracheté — prudence recommandée');
+    }
+
+    if (data.alerts?.length > 0) {
+      lines.push('');
+      lines.push('🎯 Actifs à surveiller (news + signal technique) :');
+      data.alerts.slice(0, 3).forEach(a => {
+        const dir = a.direction === 'long' ? '↑' : '↓';
+        const sent = a.sentiment === 'bullish' ? '📈' : a.sentiment === 'bearish' ? '📉' : '➡️';
+        lines.push(sent + ' ' + a.symbol + ' · ' + a.mentions + ' news · Score ' + a.algoScore + '/100 ' + dir);
+      });
+    }
+
+    const topSymbols = Object.entries(data.symbolMentions)
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5);
+    if (topSymbols.length > 0) {
+      lines.push('');
+      lines.push('📊 Plus mentionnés dans les news :');
+      topSymbols.forEach(([sym, m]) => {
+        lines.push('• ' + sym + ' · ' + m.count + ' mention' + (m.count > 1 ? 's' : ''));
+      });
+    }
+
+    return lines.join('\n');
+  }
+
+  return { fetchNews, generateSummary };
+})();
+
+
+// ═══ Écran Informations ═══
+function renderInfoScreen() {
+  const main = document.getElementById('main-content');
+  if (!main) return;
+  main.innerHTML = `
+    <div class="screen-content">
+      <div class="screen-header">
+        <div class="screen-title">📰 Informations</div>
+        <div class="screen-subtitle">News & analyse du marché en temps réel</div>
+      </div>
+
+      <div id="info-loading" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-6);text-align:center;">
+        <div style="font-size:2rem;margin-bottom:var(--space-3);">⏳</div>
+        <div style="font-size:var(--text-sm);color:var(--text-muted);">Chargement des news et analyse en cours...</div>
+      </div>
+
+      <div id="info-content" style="display:none;"></div>
+    </div>`;
+
+  // Load async
+  setTimeout(() => _loadInfoContent(), 100);
+}
+
+async function _loadInfoContent() {
+  const container = document.getElementById('info-content');
+  const loading = document.getElementById('info-loading');
+  if (!container) return;
+
+  try {
+    const [newsData, trendingData] = await Promise.all([
+      NewsEngine.fetchNews(),
+      TrendingEngine.fetchTrending(),
+    ]);
+
+    const summary = NewsEngine.generateSummary(newsData, trendingData.fearGreed);
+    const fg = trendingData.fearGreed;
+
+    let html = '';
+
+    // Résumé algo
+    html += `<div style="background:rgba(0,229,160,0.06);border:1px solid rgba(0,229,160,0.2);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">
+      <div style="font-size:var(--text-xs);font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">🧠 Résumé généré par l'algo</div>
+      <pre style="font-family:var(--font-body);font-size:var(--text-sm);color:var(--text-secondary);white-space:pre-wrap;line-height:1.8;">${summary}</pre>
+    </div>`;
+
+    // Actifs à surveiller
+    if (newsData.alerts?.length > 0) {
+      html += `<div style="margin-bottom:var(--space-5);">
+        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">🎯 Actifs détectés — News + Signal technique</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+          ${newsData.alerts.slice(0, 5).map(a => {
+            const color = a.algoScore >= 70 ? 'var(--profit)' : 'var(--signal-medium)';
+            const sent = a.sentiment === 'bullish' ? '📈' : a.sentiment === 'bearish' ? '📉' : '➡️';
+            const dir = a.direction === 'long' ? '↑ Hausse' : '↓ Baisse';
+            return `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-4);display:flex;align-items:center;justify-content:space-between;cursor:pointer;" data-screen="asset-detail" data-symbol="${a.symbol}">
+              <div style="display:flex;align-items:center;gap:var(--space-3);">
+                <span style="font-size:1.4rem;">${sent}</span>
+                <div>
+                  <div style="font-family:var(--font-mono);font-weight:700;">${a.symbol}</div>
+                  <div style="font-size:var(--text-xs);color:var(--text-muted);">${a.mentions} news · ${dir}</div>
+                </div>
+              </div>
+              <div style="text-align:right;">
+                <div style="font-family:var(--font-mono);font-weight:700;color:${color};">${a.algoScore}/100</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);">Score algo</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    // News récentes
+    if (newsData.items?.length > 0) {
+      html += `<div style="margin-bottom:var(--space-5);">
+        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">📰 Dernières news (sources vérifiées)</div>
+        <div style="display:flex;flex-direction:column;gap:var(--space-3);">
+          ${newsData.items.slice(0, 10).map(item => {
+            const sent = item.sentiment === 'bullish' ? '📈' : item.sentiment === 'bearish' ? '📉' : '➡️';
+            const syms = item.symbols.length > 0 ? item.symbols.map(s => `<span style="font-size:0.6rem;background:var(--bg-elevated);padding:1px 4px;border-radius:3px;">${s}</span>`).join(' ') : '';
+            return `<a href="${item.link}" target="_blank" rel="noopener" style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-4);display:block;text-decoration:none;">
+              <div style="display:flex;align-items:flex-start;gap:var(--space-3);">
+                <span style="font-size:1rem;flex-shrink:0;">${sent}</span>
+                <div style="flex:1;">
+                  <div style="font-size:var(--text-sm);font-weight:600;color:var(--text-primary);line-height:1.4;margin-bottom:var(--space-2);">${item.title}</div>
+                  <div style="display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap;">
+                    <span style="font-size:var(--text-xs);color:var(--text-muted);">${item.source}</span>
+                    ${syms}
+                  </div>
+                </div>
+              </div>
+            </a>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
+
+    // Fear & Greed
+    if (fg) {
+      const fgColor = fg.value <= 25 ? 'var(--loss)' : fg.value <= 45 ? '#ff8c00' : fg.value <= 55 ? 'var(--text-muted)' : 'var(--profit)';
+      html += `<div style="background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">
+        <div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-4);">😱 Fear & Greed Index</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:var(--text-md);font-weight:700;color:${fgColor};">${fg.label}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-2xl);font-weight:700;color:${fgColor};">${fg.value}<span style="font-size:var(--text-sm);color:var(--text-muted);">/100</span></div>
+        </div>
+        <div style="margin-top:var(--space-3);height:6px;background:linear-gradient(90deg,var(--loss),#ff8c00,var(--text-muted),var(--profit));border-radius:3px;position:relative;">
+          <div style="position:absolute;top:50%;left:${fg.value}%;transform:translate(-50%,-50%);width:12px;height:12px;border-radius:50%;background:white;border:2px solid ${fgColor};"></div>
+        </div>
+      </div>`;
+    }
+
+    html += `<div style="font-size:var(--text-xs);color:var(--text-muted);text-align:center;padding:var(--space-4);">
+      Sources : Reuters · CoinDesk · Yahoo Finance · Alternative.me<br>
+      Mise à jour toutes les 30 minutes · <span data-trending-countdown></span>
+    </div>`;
+
+    container.innerHTML = html;
+    container.style.display = '';
+    if (loading) loading.style.display = 'none';
+
+    // Attach click events for asset alerts
+    container.querySelectorAll('[data-screen="asset-detail"]').forEach(el => {
+      el.addEventListener('click', () => Router.navigate('asset-detail', { symbol: el.dataset.symbol }));
+    });
+
+  } catch(e) {
+    if (loading) loading.innerHTML = `<div style="text-align:center;padding:var(--space-6);"><div style="font-size:1.5rem;">⚠️</div><div style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-3);">Impossible de charger les news.<br>Vérifiez votre connexion.</div></div>`;
   }
 }
 
