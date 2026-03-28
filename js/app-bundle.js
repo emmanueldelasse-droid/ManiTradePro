@@ -2315,6 +2315,34 @@ const Router = (() => {
     if (currentScreen === 'asset-detail') {
       const result = fn(assetDetailParam);
       if (typeof result === 'string') wrapper.innerHTML = result;
+      // Async: load real OHLC + price if not in cache
+      const sym = assetDetailParam?.symbol;
+      if (sym) {
+        (async () => {
+          let needsRefresh = false;
+          if (!window.__ohlcCache?.[sym]) {
+            try {
+              const candles = await RealDataClient.getOHLC(sym);
+              if (candles?.length >= 20) {
+                if (!window.__ohlcCache) window.__ohlcCache = {};
+                window.__ohlcCache[sym] = candles;
+                needsRefresh = true;
+              }
+            } catch(e) {}
+          }
+          if (!window.__prices?.[sym]) {
+            try {
+              const pd = await RealDataClient.getPrice(sym);
+              if (pd?.price) { window.__prices[sym] = pd.price; needsRefresh = true; }
+            } catch(e) {}
+          }
+          if (needsRefresh && currentScreen === 'asset-detail') {
+            const newResult = fn(assetDetailParam);
+            const w = document.querySelector('.screen');
+            if (w && typeof newResult === 'string') w.innerHTML = newResult;
+          }
+        })();
+      }
     } else {
       // Pour les screens qui utilisent getElementById('screen-X'), le div est déjà présent
       const result = fn();
@@ -2740,6 +2768,7 @@ function renderOpportunityRow(a, rank) {
       <div class="opp-asset">
         <div class="opp-asset-line1">
           <span class="asset-symbol">${a.symbol}</span>
+          <span style="font-size:0.55rem;vertical-align:middle;">${MarketHours.isOpen(a.symbol) ? '🟢' : '🔴'}</span>
           ${_assetClassBadge(a.assetClass)}
           ${a.isSolid ? '<span class="solid-badge">★ Solide</span>' : ''}
           <span class="direction-tag ${a.direction}">${Fmt.directionIcon(a.direction)} ${Fmt.directionLabel(a.direction)}</span>
@@ -5037,6 +5066,8 @@ const NewsEngine = (() => {
     { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters', type: 'general' },
     { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk', type: 'crypto' },
     { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US', name: 'Yahoo Finance', type: 'stocks' },
+    { url: 'https://www.aktionnaire.com/feed/', name: 'Aktionnaire.com', type: 'stocks_fr' },
+    { url: 'https://www.boursorama.com/rss/actus-internationales', name: 'Boursorama', type: 'general_fr' },
   ];
 
   // Symbols to watch in news
@@ -5134,22 +5165,38 @@ const NewsEngine = (() => {
   function generateSummary(data, fearGreed) {
     const lines = [];
     const d = new Date();
-    lines.push('📰 Résumé du marché — ' + d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }));
+    const hour = d.getHours();
+    const session = hour < 10 ? 'matin' : hour < 14 ? 'matinée' : hour < 18 ? 'après-midi' : 'soirée';
+
+    lines.push('📰 Résumé du marché — ' + d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }) + ' · ' + session);
+    lines.push('');
+
+    // Market context
+    const analysis = window.__MTP?.lastAnalysis;
+    if (analysis?.tradeable) {
+      const nb = analysis.tradeable.length;
+      const strong = analysis.tradeable.filter(a => a.adjScore >= 70).length;
+      if (strong > 0) lines.push('🎯 ' + strong + ' signal' + (strong > 1 ? 's' : '') + ' fort' + (strong > 1 ? 's' : '') + ' détecté' + (strong > 1 ? 's' : '') + ' sur ' + nb + ' actifs analysés');
+      else if (nb > 5) lines.push('📊 ' + nb + ' opportunités modérées — pas de signal fort ce moment');
+      else lines.push('😴 Marché calme — peu de signaux disponibles');
+    }
 
     if (fearGreed) {
+      lines.push('');
       const emoji = fearGreed.value <= 25 ? '😱' : fearGreed.value <= 45 ? '😰' : fearGreed.value <= 55 ? '😐' : fearGreed.value <= 75 ? '😊' : '🤑';
-      lines.push(emoji + ' Sentiment crypto : ' + (fearGreed.value <= 25 ? 'Peur extrême' : fearGreed.value <= 45 ? 'Peur' : fearGreed.value <= 55 ? 'Neutre' : 'Avidité') + ' (' + fearGreed.value + '/100)');
-      if (fearGreed.value <= 25) lines.push('💡 Historiquement favorable aux achats BTC/ETH');
-      if (fearGreed.value >= 75) lines.push('⚠️ Marché suracheté — prudence recommandée');
+      const label = fearGreed.value <= 25 ? 'Peur extrême' : fearGreed.value <= 45 ? 'Peur' : fearGreed.value <= 55 ? 'Neutre' : fearGreed.value <= 75 ? 'Avidité' : 'Avidité extrême';
+      lines.push(emoji + ' Sentiment marché : ' + label + ' (' + fearGreed.value + '/100)');
+      if (fearGreed.value <= 25) lines.push('   💡 La peur extreme est historiquement un signal d achat pour BTC/ETH');
+      if (fearGreed.value >= 75) lines.push('   ⚠️ Avidite extreme — risque de correction, reduire les positions');
     }
 
     if (data.alerts?.length > 0) {
       lines.push('');
-      lines.push('🎯 Actifs à surveiller (news + signal technique) :');
-      data.alerts.slice(0, 3).forEach(a => {
-        const dir = a.direction === 'long' ? '↑' : '↓';
+      lines.push('🔥 Actifs a surveiller (news + algo) :');
+      data.alerts.slice(0, 5).forEach(a => {
+        const dir = a.direction === 'long' ? 'Hausse' : 'Baisse';
         const sent = a.sentiment === 'bullish' ? '📈' : a.sentiment === 'bearish' ? '📉' : '➡️';
-        lines.push(sent + ' ' + a.symbol + ' · ' + a.mentions + ' news · Score ' + a.algoScore + '/100 ' + dir);
+        lines.push(sent + ' ' + a.symbol + ' · ' + a.mentions + ' news · Score algo ' + a.algoScore + '/100 · Signal ' + dir);
       });
     }
 
@@ -5158,11 +5205,21 @@ const NewsEngine = (() => {
       .slice(0, 5);
     if (topSymbols.length > 0) {
       lines.push('');
-      lines.push('📊 Plus mentionnés dans les news :');
+      lines.push('📊 Plus mentionnes dans les news aujourd hui :');
       topSymbols.forEach(([sym, m]) => {
-        lines.push('• ' + sym + ' · ' + m.count + ' mention' + (m.count > 1 ? 's' : ''));
+        const sent = m.bullish > m.bearish ? ' 📈' : m.bearish > m.bullish ? ' 📉' : '';
+        lines.push('• ' + sym + ' · ' + m.count + ' mention' + (m.count > 1 ? 's' : '') + sent);
       });
     }
+
+    // Upcoming events
+    lines.push('');
+    lines.push('📅 Evenements importants a surveiller :');
+    const day = d.getDay();
+    if (day === 3) lines.push('• Mercredi : Publication reserves petrole EIA');
+    if (day === 4) lines.push('• Jeudi : Decisions taux BCE possibles / NFP US');
+    if (day === 5) lines.push('• Vendredi : Cloture semaine — eviter nouveaux trades');
+    lines.push('• Suivre : decisions Fed, BCE, donnees inflation, NFP');
 
     return lines.join('\n');
   }
@@ -5284,8 +5341,8 @@ async function _loadInfoContent() {
     }
 
     html += `<div style="font-size:var(--text-xs);color:var(--text-muted);text-align:center;padding:var(--space-4);">
-      Sources : Reuters · CoinDesk · Yahoo Finance · Alternative.me<br>
-      Mise à jour toutes les 30 minutes · <span data-trending-countdown></span>
+      Sources vérifiées : Reuters · CoinDesk · Yahoo Finance · Aktionnaire.com · Boursorama · Alternative.me<br>
+      Mise à jour toutes les 30 minutes · Prochaine dans <span data-trending-countdown>--</span>
     </div>`;
 
     container.innerHTML = html;
