@@ -1083,7 +1083,7 @@ const BinanceClient = (() => {
       if (!r.ok) return null;
       const raw = await r.json();
       if (!Array.isArray(raw) || raw.length < 20) return null;
-      const rate = _eurUsdRate || 1.08;
+      const rate = window.__eurUsdRate > 0 ? window.__eurUsdRate : (_eurUsdRate || 1.08);
       return raw.map(k => ({
         ts: k[0],
         open:   parseFloat(k[1]) / rate,
@@ -1175,7 +1175,7 @@ const RealDataClient = (() => {
       const d = await r.json(); const meta = d?.chart?.result?.[0]?.meta; if (!meta) return null;
       const price = meta.regularMarketPrice, prev = meta.previousClose || meta.chartPreviousClose;
       let priceEur = price;
-      const eurRate = window.__eurUsdRate || 1.08;
+      const eurRate = (window.__eurUsdRate > 0.5 && window.__eurUsdRate < 3.0) ? window.__eurUsdRate : 1.08;
       if (!ticker.includes('=X') && ticker !== 'GC=F') priceEur = price / eurRate;
       const res = { price: priceEur, change24h: prev ? ((price - prev) / prev) * 100 : 0, volume24h: meta.regularMarketVolume || 0, source: 'Yahoo Finance' };
       _cacheSet(ck, res); return res;
@@ -1195,7 +1195,7 @@ const RealDataClient = (() => {
         ts: t * 1000, open: q.open?.[i] || 0, high: q.high?.[i] || 0,
         low: q.low?.[i] || 0, close: q.close?.[i] || 0, volume: q.volume?.[i] || 1000000,
       })).filter(c => c.close > 0);
-      const eurRateOHLC = window.__eurUsdRate || 1.08;
+      const eurRateOHLC = (window.__eurUsdRate > 0.5 && window.__eurUsdRate < 3.0) ? window.__eurUsdRate : 1.08;
       if (!ticker.includes('=X') && ticker !== 'GC=F') candles.forEach(c => { c.open /= eurRateOHLC; c.high /= eurRateOHLC; c.low /= eurRateOHLC; c.close /= eurRateOHLC; });
       _cacheSet(ck, candles); return candles;
     } catch(e) { return null; }
@@ -6578,8 +6578,26 @@ async function boot() {
   // 7. Theme
   document.documentElement.setAttribute('data-theme', s.theme || 'dark');
 
+  // 8. Pre-fetch EUR/USD rate before any price display
+  try {
+    const eurRes = await fetch('https://aged-bar-257a.emmanueldelasse.workers.dev/binance/api/v3/ticker/price?symbol=EURUSDT', {
+      signal: AbortSignal.timeout(5000)
+    });
+    if (eurRes.ok) {
+      const eurData = await eurRes.json();
+      const rate = parseFloat(eurData.price);
+      if (rate > 0.5 && rate < 3.0) {
+        window.__eurUsdRate = rate;
+        BinanceClient._setEurUsdRate(rate);
+        console.log('[Boot] EUR/USD rate:', rate);
+      }
+    }
+  } catch(e) {
+    window.__eurUsdRate = 1.08; // Safe default
+    console.warn('[Boot] EUR/USD fetch failed, using 1.08');
+  }
+
   // 8. Sync
-  Sync.init();
   window.__MTP.Sync = Sync;
 
   // 9. Affichage immédiat (jamais bloquer sur réseau)
