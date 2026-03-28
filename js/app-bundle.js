@@ -2163,6 +2163,41 @@ function _injectLightTheme() {
 }
 _injectLightTheme();
 
+// Inject responsive CSS
+(function() {
+  if (document.getElementById('mtp-responsive')) return;
+  const style = document.createElement('style');
+  style.id = 'mtp-responsive';
+  style.textContent = `
+/* ── Responsive Mobile-first ── */
+.screen-header { padding: var(--space-4) 0 var(--space-2); }
+.screen-title { font-size: clamp(1.4rem, 5vw, 2rem); font-weight: 800; }
+.screen-subtitle { font-size: var(--text-sm); color: var(--text-muted); margin-top: 2px; }
+.pf-hero { padding: var(--space-5); }
+.pf-pnl-big { font-size: clamp(1.2rem, 5vw, 1.8rem) !important; }
+.pf-hero-pnl { font-size: clamp(1rem, 4vw, 1.5rem); }
+.hero-capital { font-size: clamp(1.8rem, 7vw, 3rem) !important; }
+.opp-row { padding: var(--space-3) var(--space-4); }
+.asset-symbol { font-size: clamp(0.85rem, 3vw, 1rem); }
+@media (max-width: 480px) {
+  .grid-4 { grid-template-columns: 1fr 1fr !important; }
+  .order-zones { grid-template-columns: 1fr !important; }
+  .pf-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .sim-stats-grid { grid-template-columns: 1fr 1fr !important; }
+  .profile-cards-row { grid-template-columns: 1fr 1fr !important; }
+}
+@media (min-width: 768px) {
+  .main-content { padding: var(--space-6) var(--space-8); }
+  .screen-title { font-size: 2rem; }
+  .opp-row { padding: var(--space-4) var(--space-6); }
+}
+@media (min-width: 1024px) {
+  .main-content { padding: var(--space-8) var(--space-12); max-width: 900px; margin: 0 auto; }
+}
+`;
+  document.head.appendChild(style);
+})();
+
 // ═══ Router ═══
 const Router = (() => {
   let currentScreen = 'dashboard';
@@ -2282,13 +2317,40 @@ const Router = (() => {
 const Sync = (() => {
   let lastSyncTime = Date.now();
 
+  let _priceCountdown = 600; // 10 min
+  let _cryptoCountdown = 15;  // 15 sec
+
   function init() {
     // Crypto positions: every 15 seconds via Binance
-    setInterval(() => refreshCryptoPrices(), 15 * 1000);
+    setInterval(() => {
+      refreshCryptoPrices();
+      _cryptoCountdown = 15;
+    }, 15 * 1000);
+
     // All prices: every 10 minutes
-    setInterval(() => refreshPrices(), 10 * 60 * 1000);
+    setInterval(() => {
+      refreshPrices();
+      _priceCountdown = 600;
+    }, 10 * 60 * 1000);
+
     // Full analysis: every hour
     setInterval(() => refreshAnalysis(), 60 * 60 * 1000);
+
+    // Countdown tickers
+    setInterval(() => {
+      _cryptoCountdown = Math.max(0, _cryptoCountdown - 1);
+      _priceCountdown  = Math.max(0, _priceCountdown - 1);
+      // Update all countdown elements
+      document.querySelectorAll('[data-countdown="crypto"]').forEach(el => {
+        el.textContent = _cryptoCountdown + 's';
+      });
+      document.querySelectorAll('[data-countdown="prices"]').forEach(el => {
+        const m = Math.floor(_priceCountdown / 60);
+        const s = _priceCountdown % 60;
+        el.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+      });
+    }, 1000);
+
     // On app focus
     document.addEventListener('visibilitychange', () => {
       if (!document.hidden && Date.now() - lastSyncTime > 2 * 60 * 1000) refreshPrices();
@@ -2714,6 +2776,7 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false) {
         <div style="text-align:right;flex-shrink:0;">
           <div style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${Fmt.price(a.price)}</div>
           <div style="font-family:var(--font-mono);font-size:var(--text-xs);font-weight:600;" class="${change.cls}">${change.text}</div>
+          <div style="font-size:0.6rem;color:var(--text-muted);margin-top:1px;">🔄 <span data-countdown="${['BTC','ETH','SOL','BNB','XRP','ADA','AVAX','DOT','LINK','DOGE','MATIC','UNI','ATOM','LTC','NEAR'].includes(a.symbol) ? 'crypto' : 'prices'}">--</span></div>
         </div>
       </div>
 
@@ -3314,6 +3377,9 @@ function renderPositionDetail(posId) {
       <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:600;margin-top:var(--space-2);" class="${pnlCls}" data-position-pnlpct="${pos.id}">${Fmt.signedPct(enriched.pnlPct)}</div>
       <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:var(--space-3);">
         Depuis ${Fmt.date(pos.openedAt)} · ${durationDays}j ${durationHrs}h · ${Fmt.currency(pos.invested)} investi
+      </div>
+      <div style="font-size:var(--text-xs);color:var(--accent);margin-top:var(--space-2);">
+        🔄 Prochain refresh crypto dans <span data-countdown="crypto">--</span> · prix dans <span data-countdown="prices">--</span>
       </div>
     </div>
 
@@ -4461,6 +4527,63 @@ const WatchlistManager = (() => {
   return { addAsset, removeAsset, getFullWatchlist, getCustomWatchlist, autoAddTrending };
 })();
 
+
+// ── Multi-timeframe analysis for open positions (Niveau 3)
+async function analyzeMultiTimeframe(symbol) {
+  try {
+    const [h1, h4] = await Promise.all([
+      TwelveDataClient.call('time_series', { symbol, interval: '1h', outputsize: 50 }, 3600000),
+      TwelveDataClient.call('time_series', { symbol, interval: '4h', outputsize: 50 }, 3600000),
+    ]);
+
+    const parseCandles = (data) => {
+      if (!data?.values) return null;
+      return data.values.map(v => ({
+        ts: new Date(v.datetime).getTime(),
+        open: parseFloat(v.open), high: parseFloat(v.high),
+        low: parseFloat(v.low), close: parseFloat(v.close),
+        volume: parseFloat(v.volume) || 1000000,
+      })).reverse();
+    };
+
+    const candles1h = parseCandles(h1);
+    const candles4h = parseCandles(h4);
+
+    if (!candles1h && !candles4h) return null;
+
+    const ind1h = candles1h ? Indicators.computeAll(candles1h) : null;
+    const ind4h = candles4h ? Indicators.computeAll(candles4h) : null;
+
+    // Alignment score: how many timeframes agree
+    let bullishCount = 0, bearishCount = 0;
+    if (ind1h) { if (ind1h.ema50 > ind1h.ema100) bullishCount++; else bearishCount++; }
+    if (ind4h) { if (ind4h.ema50 > ind4h.ema100) bullishCount++; else bearishCount++; }
+
+    return {
+      h1: ind1h ? { trend: ind1h.ema50 > ind1h.ema100 ? 'up' : 'down', rsi: ind1h.rsi, macd: ind1h.macd } : null,
+      h4: ind4h ? { trend: ind4h.ema50 > ind4h.ema100 ? 'up' : 'down', rsi: ind4h.rsi, macd: ind4h.macd } : null,
+      alignment: bullishCount > bearishCount ? 'bullish' : bearishCount > bullishCount ? 'bearish' : 'mixed',
+      alignmentScore: Math.max(bullishCount, bearishCount) / 2 * 100,
+    };
+  } catch(e) {
+    return null;
+  }
+}
+
+// Run multi-TF analysis every hour for open positions
+async function refreshMultiTimeframe() {
+  const positions = [...Storage.getSimPositions(), ...Storage.getRealPositions()];
+  if (!positions.length) return;
+  for (const pos of positions) {
+    const mtf = await analyzeMultiTimeframe(pos.symbol);
+    if (mtf) {
+      if (!window.__MTP.mtfData) window.__MTP.mtfData = {};
+      window.__MTP.mtfData[pos.symbol] = mtf;
+    }
+    await new Promise(r => setTimeout(r, 2000)); // 2s between calls
+  }
+}
+
 // ═══ BOOT ═══
 async function boot() {
   console.log('🚀 ManiTradePro V1 — démarrage…');
@@ -4536,8 +4659,20 @@ async function boot() {
     }
   }).catch(() => {});
 
+  // Multi-timeframe refresh every hour
+  setInterval(() => refreshMultiTimeframe(), 60 * 60 * 1000);
+  setTimeout(() => refreshMultiTimeframe(), 5000); // First run after 5s
+
   // Ping Supabase toutes les 6 jours pour éviter la mise en pause
   setInterval(() => SupabaseDB.ping().catch(() => {}), 6 * 24 * 60 * 60 * 1000);
+
+  // Dynamic PWA icon
+  (function() {
+    const link = document.querySelector("link[rel~='apple-touch-icon']") || document.createElement('link');
+    link.rel = 'apple-touch-icon';
+    link.href = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj4KICA8cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjgwIiBmaWxsPSIjMGEwZTFhIi8+CiAgPHRleHQgeD0iMjU2IiB5PSIzNDAiIGZvbnQtZmFtaWx5PSJtb25vc3BhY2UiIGZvbnQtc2l6ZT0iMjgwIiBmb250LXdlaWdodD0iYm9sZCIgZmlsbD0iIzAwZTVhMCIgdGV4dC1hbmNob3I9Im1pZGRsZSI+TTwvdGV4dD4KPC9zdmc+';
+    document.head.appendChild(link);
+  })();
 
   Router.navigate('dashboard');
   Router.attachNavClicks();
