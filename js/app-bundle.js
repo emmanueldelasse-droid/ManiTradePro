@@ -1860,7 +1860,7 @@ const AlertManager = (() => {
       // Cooldown
       if (_lastFiredMap[alert.id] && (now - _lastFiredMap[alert.id]) < COOLDOWN) return;
 
-      const currentPrice = window.__prices[alert.symbol] || MOCK_DATA.prices[alert.symbol]?.price;
+      const currentPrice = window.__prices[alert.symbol] || null; // real price only
       const assetAnalysis = analysisResults?.all?.find(a => a.symbol === alert.symbol);
 
       let shouldFire = false, title = '', body = '';
@@ -2320,6 +2320,21 @@ const Router = (() => {
       if (sym) {
         (async () => {
           let needsRefresh = false;
+
+          // 1. Fetch real price immediately if not in cache
+          if (!window.__prices?.[sym] || window.__prices[sym] <= 0) {
+            try {
+              const pd = await RealDataClient.getPrice(sym);
+              if (pd?.price && pd.price > 0) {
+                window.__prices[sym] = pd.price;
+                needsRefresh = true;
+              }
+            } catch(e) {}
+          } else {
+            needsRefresh = true; // Price already available — refresh to show it
+          }
+
+          // 2. Fetch OHLC for chart and indicators
           if (!window.__ohlcCache?.[sym]) {
             try {
               const candles = await RealDataClient.getOHLC(sym);
@@ -2330,16 +2345,14 @@ const Router = (() => {
               }
             } catch(e) {}
           }
-          if (!window.__prices?.[sym]) {
-            try {
-              const pd = await RealDataClient.getPrice(sym);
-              if (pd?.price) { window.__prices[sym] = pd.price; needsRefresh = true; }
-            } catch(e) {}
-          }
+
+          // 3. Re-render with real data
           if (needsRefresh && currentScreen === 'asset-detail') {
             const newResult = fn(assetDetailParam);
             const w = document.querySelector('.screen');
             if (w && typeof newResult === 'string') w.innerHTML = newResult;
+            // Re-attach events
+            attachScreenEvents('asset-detail');
           }
         })();
       }
@@ -2768,39 +2781,42 @@ const FinnhubClient = (() => {
   const TTL = 60 * 60 * 1000; // 1h
 
   async function getEconomicCalendar() {
+    // /calendar/economic requires paid Finnhub plan
+    // Use static calendar — Finnhub free plan only gives market news
+    return null;
+  }
+
+  async function getMarketNews(category = 'general') {
     const now = Date.now();
     if (_cache && now - _lastFetch < TTL) return _cache;
     try {
-      const from = new Date().toISOString().split('T')[0];
-      const toDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-      const r = await fetch(PROXY + '/calendar/economic?from=' + from + '&to=' + toDate, {
+      const r = await fetch(PROXY + '/news?category=' + category + '&minId=0', {
         signal: AbortSignal.timeout(8000)
       });
       if (!r.ok) throw new Error('Finnhub error ' + r.status);
       const data = await r.json();
-      const events = (data.economicCalendar || [])
-        .filter(e => e.impact === 'high' || e.impact === 'medium')
-        .map(e => ({
-          time: e.time || '',
-          title: e.event || '',
-          impact: e.impact || 'low',
-          country: e.country || '',
-          actual: e.actual,
-          estimate: e.estimate,
-          prev: e.prev,
-          unit: e.unit || '',
-        }))
-        .slice(0, 15);
-      _cache = events;
+      if (!Array.isArray(data)) return null;
+      const news = data.slice(0, 10).map(a => ({
+        title: a.headline || '',
+        summary: (a.summary || '').slice(0, 200),
+        source: a.source || 'Finnhub',
+        link: a.url || '',
+        pubDate: new Date((a.datetime || 0) * 1000).toISOString(),
+        sentiment: 'neutral',
+        symbols: a.related ? a.related.split(',').map(s => s.trim()).filter(Boolean).slice(0, 3) : [],
+        category: 'Marches',
+        importance: 'medium',
+      }));
+      _cache = news;
       _lastFetch = now;
-      return events;
+      return news;
     } catch(e) {
-      console.warn('[Finnhub] Calendar error:', e.message);
-      return null; // Return null — fallback to static calendar
+      console.warn('[Finnhub] News error:', e.message);
+      return null;
     }
   }
 
-  return { getEconomicCalendar };
+  return { getEconomicCalendar, getMarketNews };
 })();
 
 // ═══ AlphaVantageClient — News multi-sources avec sentiment ═══
@@ -2808,7 +2824,7 @@ const AlphaVantageClient = (() => {
   const PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/alphavantage';
   let _cache = null;
   let _lastFetch = 0;
-  const TTL = 30 * 60 * 1000; // 30 min
+  const TTL = 6 * 60 * 60 * 1000; // 6h — preserve 25 calls/day quota
 
   async function getNewsWithSentiment(topics = 'financial_markets,technology,economy_macro') {
     const now = Date.now();
@@ -3309,35 +3325,40 @@ function renderAssetDetail(params) {
   if (!params || !params.symbol) return `<div class="screen"><p>Actif non trouvé.</p></div>`;
 
   const { symbol } = params;
-  const asset     = MOCK_DATA.watchlist.find(a => a.symbol === symbol);
-  const priceData = MOCK_DATA.prices[symbol];
+  const asset = MOCK_DATA.watchlist.find(a => a.symbol === symbol);
+  if (!asset) return `<div class="screen"><p>Actif "${symbol}" non reconnu.</p></div>`;
 
-  if (!asset || !priceData) return `<div class="screen"><p>Actif "${symbol}" inconnu.</p></div>`;
-
-  const cached   = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
-  // Always use real price from single source of truth
+  // ── SINGLE SOURCE OF TRUTH: real price only ──
   const realPrice = getPriceForSymbol(symbol);
+  const priceAvailable = realPrice && realPrice > 0;
+
+  // Use analysis cache if available (contains real price from last analysis run)
+  const cached = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
+
+  // Always override with freshest real price
+  if (cached && priceAvailable) cached.price = realPrice;
+
   const analysis = cached || {
     symbol, name: asset.name, assetClass: asset.class,
-    price: realPrice || 0, change24h: 0,
+    price: realPrice || 0,
+    change24h: 0,
     direction: 'neutral', adjScore: 0, score: 0,
     regime: { pass: false, reasons: [] }, indicators: {}, isSolid: false,
     stopLoss: null, takeProfit: null, rrRatio: 0,
-    recommendation: realPrice ? 'Données en cours de chargement...' : 'Prix en cours de récupération...',
+    recommendation: priceAvailable ? 'Analyse en cours...' : 'Prix en cours de récupération...',
   };
-  // Override with real price if available
-  if (realPrice && realPrice > 0) analysis.price = realPrice;
 
+  const displayPrice = realPrice || analysis.price || 0;
   const ind      = analysis.indicators || {};
   const change   = Fmt.change(analysis.change24h);
   const settings = Storage.getSettings();
 
-  // ── FIX : _capNum correctement défini ici
   const _simCap = Storage.getSimCapital();
   const _capNum = typeof _simCap === 'object' ? (_simCap.current || _simCap.initial || 10000) : (parseFloat(_simCap) || 10000);
 
-  const stopLoss   = analysis.stopLoss   || (priceData.price * 0.97);
-  const takeProfit = analysis.takeProfit || (priceData.price * 1.06);
+  // SL/TP based on real price — never on mock
+  const stopLoss   = analysis.stopLoss   || (displayPrice > 0 ? displayPrice * 0.97 : null);
+  const takeProfit = analysis.takeProfit || (displayPrice > 0 ? displayPrice * 1.06 : null);
 
   // Alertes déjà configurées pour cet actif
   const existingAlerts = Storage.getAlerts().filter(a => a.symbol === symbol && !a.autoCreated);
@@ -3359,11 +3380,12 @@ function renderAssetDetail(params) {
             }
           </div>
           <div class="asset-detail-full">${asset.name} · ${asset.class?.toUpperCase()}</div>
+          <div style="font-size:0.6rem;margin-top:2px;">${priceAvailable ? '<span style=\"color:var(--profit);\">● Prix en direct</span>' : '<span style=\"color:var(--signal-medium);">⏳ Chargement prix réel...</span>'}</div>
         </div>
       </div>
       <div class="asset-price-block">
-        <div class="asset-price-main">${realPrice ? Fmt.price(realPrice) : '⏳ Chargement...'}</div>
-        <div class="asset-price-change ${change.cls}">${change.text} (24h)</div>
+        <div class="asset-price-main">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Chargement...'}</div>
+        <div class="asset-price-change ${change.cls}">${priceAvailable ? change.text + ' (24h)' : '— en attente'}</div>
       </div>
     </div>
 
@@ -3518,9 +3540,9 @@ function renderAssetDetail(params) {
     <div class="card" style="margin-bottom:var(--space-5);">
       <div class="card-header"><span class="card-title">Niveaux clés suggérés</span></div>
       <div class="grid-3">
-        <div><div class="stat-label">Prix d'entrée</div><div class="stat-value">${Fmt.price(priceData.price)}</div></div>
-        <div><div class="stat-label">Stop-loss (2×ATR)</div><div class="stat-value" style="color:var(--loss);">${Fmt.price(stopLoss)}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">-${ind.atr ? ((Math.abs(priceData.price - stopLoss) / priceData.price) * 100).toFixed(1) : '?'}%</div></div>
-        <div><div class="stat-label">Take profit (R/R 2.5)</div><div class="stat-value" style="color:var(--profit);">${Fmt.price(takeProfit)}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">+${((Math.abs(takeProfit - priceData.price) / priceData.price) * 100).toFixed(1)}%</div></div>
+        <div><div class="stat-label">Prix actuel (live)</div><div class="stat-value">${priceAvailable ? Fmt.price(displayPrice) : '⏳ Chargement'}</div></div>
+        <div><div class="stat-label">Stop-loss (2×ATR)</div><div class="stat-value" style="color:var(--loss);">${stopLoss ? Fmt.price(stopLoss) : '—'}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">${stopLoss && displayPrice > 0 ? '-' + ((Math.abs(displayPrice - stopLoss) / displayPrice) * 100).toFixed(1) + '%' : ''}</div></div>
+        <div><div class="stat-label">Take profit (R/R 2.5)</div><div class="stat-value" style="color:var(--profit);">${takeProfit ? Fmt.price(takeProfit) : '—'}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">${takeProfit && displayPrice > 0 ? '+' + ((Math.abs(takeProfit - displayPrice) / displayPrice) * 100).toFixed(1) + '%' : ''}</div></div>
       </div>
     </div>
 
@@ -3548,7 +3570,7 @@ function renderAssetDetail(params) {
           </div>
           <div style="display:flex;gap:var(--space-2);align-items:center;">
             <input type="number" id="alert-price-input" class="input-field" style="width:120px;padding:6px 10px;"
-              placeholder="${Fmt.price(priceData.price)}" value="${priceData.price.toFixed(priceData.price > 100 ? 2 : 4)}" step="${priceData.price > 100 ? 1 : 0.0001}"/>
+              placeholder="${priceAvailable ? Fmt.price(displayPrice) : '—'}" value="${displayPrice > 0 ? displayPrice.toFixed(displayPrice > 100 ? 2 : 4) : ''}" step="${displayPrice > 100 ? 1 : 0.0001}"/>
             <select id="alert-price-dir" class="input-field" style="width:90px;padding:6px 8px;">
               <option value="up">↑ Hausse</option>
               <option value="down">↓ Baisse</option>
@@ -3969,7 +3991,9 @@ function renderPositionDetail(posId) {
 
   // Get analysis for this symbol
   const analysis = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === pos.symbol);
-  const priceData = MOCK_DATA.prices[pos.symbol];
+  // Use real price only — no mock fallback
+  const realPosPrice = getPriceForSymbol(pos.symbol);
+  const priceData = realPosPrice ? { price: realPosPrice, change24h: analysis?.change24h || 0 } : null;
 
   // Progress bar SL → current → TP
   let progress = 50, barHtml = '';
@@ -4466,7 +4490,8 @@ function _renderHistoryRow(t) {
 }
 
 function _enrichPosition(pos) {
-  const currentPrice = window.__prices[pos.symbol] || pos.entryPrice;
+  // Real price only — if not loaded yet use entry price as fallback
+  const currentPrice = window.__prices[pos.symbol] > 0 ? window.__prices[pos.symbol] : pos.entryPrice;
   const dir = (pos.direction || '').toLowerCase();
   const diff = dir === 'long' ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice;
   return { ...pos, currentPrice, pnl: diff * pos.quantity, pnlPct: (diff / pos.entryPrice) * 100, invested: pos.entryPrice * pos.quantity };
@@ -5509,6 +5534,25 @@ const NewsEngine = (() => {
     return map[type] || 'General';
   }
 
+
+  function _parseRSSXML(xml, sourceName) {
+    try {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(xml, 'text/xml');
+      const items = [];
+      const entries = doc.querySelectorAll('item, entry');
+      entries.forEach(item => {
+        const title = item.querySelector('title')?.textContent?.trim() || '';
+        const link = item.querySelector('link')?.textContent?.trim()
+          || item.querySelector('link')?.getAttribute('href') || '';
+        const pubDate = item.querySelector('pubDate, published, updated')?.textContent?.trim() || '';
+        const description = item.querySelector('description, summary, content')?.textContent?.trim() || '';
+        if (title) items.push({ title, link, pubDate, description: description.replace(/<[^>]*>/g, '').slice(0, 200) });
+      });
+      return items.slice(0, 8);
+    } catch(e) { return []; }
+  }
+
   function detectSymbols(text) {
     const lower = text.toLowerCase();
     const found = new Set();
@@ -5542,11 +5586,31 @@ const NewsEngine = (() => {
         if (source.scrape) {
           feedUrl = source.url.replace(/\/$/, '') + '/feed';
         }
-        const proxyUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl) + '&count=8';
-        const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-        if (!r.ok) continue;
-        const data = await r.json();
-        if (data.status !== 'ok' || !data.items?.length) continue;
+        // Try rss2json first, fallback to allorigins XML parse
+        let data = null;
+        try {
+          const proxyUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl) + '&count=8&api_key=';
+          const r1 = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+          if (r1.ok) {
+            const d = await r1.json();
+            if (d.status === 'ok' && d.items?.length) data = d;
+          }
+        } catch(e) {}
+        // Fallback: allorigins proxy + XML parse
+        if (!data) {
+          try {
+            const aoUrl = 'https://api.allorigins.win/get?url=' + encodeURIComponent(feedUrl);
+            const r2 = await fetch(aoUrl, { signal: AbortSignal.timeout(8000) });
+            if (r2.ok) {
+              const ao = await r2.json();
+              if (ao.contents) {
+                const items = _parseRSSXML(ao.contents, source.name);
+                if (items.length > 0) data = { status: 'ok', items };
+              }
+            }
+          } catch(e) {}
+        }
+        if (!data || data.status !== 'ok' || !data.items?.length) continue;
         for (const item of data.items.slice(0, 8)) {
           const text = (item.title || '') + ' ' + (item.description || '');
           const importance = _getNewsImportance(item.title || '', source.importance || 'medium');
@@ -5596,7 +5660,20 @@ const NewsEngine = (() => {
     }
     alerts.sort((a, b) => b.mentions * b.algoScore - a.mentions * a.algoScore);
 
-    // Enrich with Alpha Vantage news (async, non-blocking)
+    // Enrich with Finnhub market news (free endpoint)
+    try {
+      const finnhubNews = await FinnhubClient.getMarketNews('general');
+      if (finnhubNews && finnhubNews.length > 0) {
+        finnhubNews.forEach(a => {
+          const isDup = items.some(e => e.title.toLowerCase().slice(0,40) === a.title.toLowerCase().slice(0,40));
+          if (!isDup && a.title) {
+            items.push({ ...a, type: 'stocks', importance: 'medium' });
+          }
+        });
+      }
+    } catch(e) {}
+
+    // Enrich with Alpha Vantage news (6h cache — 25 calls/day quota)
     let avArticles = null;
     try {
       avArticles = await AlphaVantageClient.getNewsWithSentiment();
