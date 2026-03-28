@@ -1,7 +1,5 @@
-// ── ManiTradePro Service Worker v1
-// Détecte les mises à jour et notifie l'utilisateur
-
-const CACHE_NAME = 'manitradepro-v1.0';
+// ── ManiTradePro Service Worker v2.0
+const CACHE_NAME = 'manitradepro-v2.0';
 const ASSETS = [
   '/ManiTradePro/',
   '/ManiTradePro/index.html',
@@ -15,7 +13,6 @@ const ASSETS = [
   '/ManiTradePro/css/screens-v2-additions.css',
 ];
 
-// Installation — mise en cache initiale
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE_NAME)
@@ -24,7 +21,6 @@ self.addEventListener('install', e => {
   );
 });
 
-// Activation — supprime les anciens caches
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -33,15 +29,11 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch — réseau d'abord, cache en fallback
 self.addEventListener('fetch', e => {
-  // Ne pas intercepter les requêtes API externes
   if (!e.request.url.includes('github.io')) return;
-
   e.respondWith(
     fetch(e.request)
       .then(response => {
-        // Mettre en cache la nouvelle version
         const clone = response.clone();
         caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
         return response;
@@ -50,7 +42,6 @@ self.addEventListener('fetch', e => {
   );
 });
 
-// Message depuis l'app pour forcer la mise à jour
 self.addEventListener('message', e => {
   if (e.data === 'SKIP_WAITING') self.skipWaiting();
 });
