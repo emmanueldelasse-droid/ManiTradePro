@@ -1,6 +1,13 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
+  <head>
+  <script>
+    var t = localStorage.getItem('mtp_settings');
+    if (t) { try { var s = JSON.parse(t); if (s.theme) document.documentElement.setAttribute('data-theme', s.theme); } catch(e){} }
+  </script>
+  <meta charset="UTF-8" />
+  ...
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <div id="mode-banner" style="display:none;"></div>
