@@ -4387,6 +4387,30 @@ function renderSettings() {
       <p class="screen-subtitle">Profil de risque, données et connexions</p>
     </div>
 
+    <!-- ═══ CLAUDE IA ═══ -->
+    <section class="settings-section">
+      <div class="settings-section-title">🤖 Intelligence Artificielle (Claude)</div>
+      <div class="settings-card" style="padding:var(--space-5);">
+        ${(function() {
+          const stats = ClaudeAI.getCallStats();
+          const pct = Math.round((stats.count / stats.max) * 100);
+          const color = pct > 80 ? 'var(--loss)' : pct > 50 ? 'var(--signal-medium)' : '#8b5cf6';
+          return '<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-3);\">' +
+            '<div><div style=\"font-size:var(--text-sm);font-weight:700;\">Analyses Claude aujourd\'hui</div>' +
+            '<div style=\"font-size:var(--text-xs);color:var(--text-muted);\">' + stats.count + ' / ' + stats.max + ' · ' + stats.remaining + ' restantes</div></div>' +
+            '<div style=\"font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;color:' + color + ';\">' + pct + '%</div>' +
+            '</div>' +
+            '<div style=\"height:6px;background:var(--bg-elevated);border-radius:3px;overflow:hidden;\">' +
+            '<div style=\"height:100%;width:' + pct + '%;background:' + color + ';border-radius:3px;\"></div>' +
+            '</div>' +
+            '<div style=\"margin-top:var(--space-4);\">' +
+            '<button onclick=\"_generateWeeklyReport()\" style=\"width:100%;padding:var(--space-3);background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.3);border-radius:var(--btn-radius);color:#8b5cf6;font-size:var(--text-sm);font-weight:600;cursor:pointer;\">' +
+            '📊 Générer le rapport hebdomadaire</button>' +
+            '</div>';
+        })()}
+      </div>
+    </section>
+
     <!-- ═══ COMPTEUR API ═══ -->
     <section class="settings-section">
       <div class="settings-section-title">📊 Consommation API</div>
@@ -5066,17 +5090,30 @@ const NewsEngine = (() => {
     { url: 'https://feeds.reuters.com/reuters/businessNews', name: 'Reuters', type: 'general' },
     { url: 'https://www.coindesk.com/arc/outboundfeeds/rss/', name: 'CoinDesk', type: 'crypto' },
     { url: 'https://feeds.finance.yahoo.com/rss/2.0/headline?s=^GSPC&region=US&lang=en-US', name: 'Yahoo Finance', type: 'stocks' },
-    { url: 'https://www.aktionnaire.com/feed/', name: 'Aktionnaire.com', type: 'stocks_fr' },
+    { url: 'https://www.aktionnaire.com/articles', name: 'Aktionnaire.com', type: 'stocks_fr', scrape: true },
     { url: 'https://www.boursorama.com/rss/actus-internationales', name: 'Boursorama', type: 'general_fr' },
   ];
 
   // Symbols to watch in news
   const WATCH_SYMBOLS = {
+    // Crypto
     'bitcoin': 'BTC', 'btc': 'BTC', 'ethereum': 'ETH', 'eth': 'ETH',
-    'solana': 'SOL', 'nvidia': 'NVDA', 'apple': 'AAPL', 'tesla': 'TSLA',
-    'microsoft': 'MSFT', 'amazon': 'AMZN', 'google': 'GOOGL', 'meta': 'META',
-    'gold': 'GOLD', 'oil': 'OIL', 'fed': null, 'inflation': null,
-    'interest rate': null, 'taux': null, 'bce': null,
+    'solana': 'SOL', 'ripple': 'XRP', 'xrp': 'XRP', 'cardano': 'ADA',
+    // US Stocks
+    'nvidia': 'NVDA', 'apple': 'AAPL', 'tesla': 'TSLA', 'microsoft': 'MSFT',
+    'amazon': 'AMZN', 'google': 'GOOGL', 'alphabet': 'GOOGL', 'meta': 'META',
+    'netflix': 'NFLX', 'amd': 'AMD', 'jpmorgan': 'JPM', 'visa': 'V',
+    // EU Stocks (French)
+    'lvmh': 'MC', 'asml': 'ASML', 'sap': 'SAP', 'totalenergies': 'TTE',
+    'bnp': 'BNP', 'airbus': 'AIR', 'hermes': 'RMS', 'loreal': 'OR',
+    'sanofi': 'SAN', 'stellantis': 'STLA',
+    // Commodities & macro
+    'gold': 'GOLD', 'or': 'GOLD', 'petrole': 'OIL', 'oil': 'OIL',
+    'argent': 'SILVER', 'silver': 'SILVER',
+    // Macro keywords (no symbol)
+    'fed': null, 'inflation': null, 'taux': null, 'bce': null,
+    'recession': null, 'croissance': null, 'pib': null, 'chomage': null,
+    'interest rate': null, 'nfp': null, 'earnings': null, 'resultats': null,
   };
 
   function detectSymbols(text) {
@@ -5107,24 +5144,29 @@ const NewsEngine = (() => {
     // Try each RSS via allorigins proxy (free CORS proxy for RSS)
     for (const source of RSS_SOURCES) {
       try {
-        const proxyUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(source.url) + '&count=5';
-        const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+        let feedUrl = source.url;
+        // For scrape:true sources (no native RSS), try common feed paths
+        if (source.scrape) {
+          feedUrl = source.url.replace(/\/$/, '') + '/feed';
+        }
+        const proxyUrl = 'https://api.rss2json.com/v1/api.json?rss_url=' + encodeURIComponent(feedUrl) + '&count=8';
+        const r = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
         if (!r.ok) continue;
         const data = await r.json();
-        if (data.status !== 'ok' || !data.items) continue;
-        for (const item of data.items.slice(0, 5)) {
+        if (data.status !== 'ok' || !data.items?.length) continue;
+        for (const item of data.items.slice(0, 8)) {
           const text = (item.title || '') + ' ' + (item.description || '');
           items.push({
             title: item.title || '',
             source: source.name,
             type: source.type,
             pubDate: item.pubDate,
-            link: item.link,
+            link: item.link || source.url,
             symbols: detectSymbols(text),
             sentiment: scoreSentiment(text),
           });
         }
-      } catch(e) {}
+      } catch(e) { console.warn('[News]', source.name, e.message); }
     }
 
     // Generate algo summary
@@ -5243,6 +5285,7 @@ function renderInfoScreen() {
         <div style="font-size:2rem;margin-bottom:var(--space-3);">⏳</div>
         <div style="font-size:var(--text-sm);color:var(--text-muted);">Chargement des news et analyse en cours...</div>
       </div>
+      <div id="claude-summary-section" style="display:none;"></div>
 
       <div id="info-content" style="display:none;"></div>
     </div>`;
@@ -5353,6 +5396,26 @@ async function _loadInfoContent() {
     container.querySelectorAll('[data-screen="asset-detail"]').forEach(el => {
       el.addEventListener('click', () => Router.navigate('asset-detail', { symbol: el.dataset.symbol }));
     });
+
+    // Claude AI summary (async, non-blocking)
+    const claudeSection = document.getElementById('claude-summary-section');
+    if (claudeSection) {
+      claudeSection.style.display = '';
+      claudeSection.innerHTML = '<div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);"><div style="font-size:var(--text-xs);font-weight:700;color:#8b5cf6;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:var(--space-3);">🤖 Analyse IA en cours...</div><div style="font-size:var(--text-sm);color:var(--text-muted);">Claude analyse les news du jour...</div></div>';
+      
+      ClaudeAI.summarizeNews(newsData.items, trendingData.fearGreed).then(summary => {
+        const stats = ClaudeAI.getCallStats();
+        claudeSection.innerHTML = '<div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:var(--card-radius);padding:var(--space-5);margin-bottom:var(--space-5);">' +
+          '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-3);">' +
+          '<div style="font-size:var(--text-xs);font-weight:700;color:#8b5cf6;text-transform:uppercase;letter-spacing:0.1em;">🤖 Analyse IA — Claude</div>' +
+          '<div style="font-size:var(--text-xs);color:var(--text-muted);">' + stats.remaining + ' analyses restantes aujourd\'hui</div>' +
+          '</div>' +
+          '<div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.8;white-space:pre-wrap;">' + summary + '</div>' +
+          '</div>';
+      }).catch(() => {
+        claudeSection.style.display = 'none';
+      });
+    }
 
   } catch(e) {
     if (loading) loading.innerHTML = `<div style="text-align:center;padding:var(--space-6);"><div style="font-size:1.5rem;">⚠️</div><div style="font-size:var(--text-sm);color:var(--text-muted);margin-top:var(--space-3);">Impossible de charger les news.<br>Vérifiez votre connexion.</div></div>`;
@@ -5472,6 +5535,16 @@ const SmartAlerts = (() => {
       // In-app toast
       UI.toast('🎯 ' + asset.symbol + ' ' + dir + ' — Score ' + asset.adjScore + '/100 — Tous les feux au vert !', 'success', 8000);
 
+      // Claude analysis of the signal (async)
+      try {
+        const newsData = await NewsEngine.fetchNews().catch(() => ({ items: [] }));
+        ClaudeAI.analyzeSignal(asset, newsData.items || []).then(analysis => {
+          if (analysis && !analysis.startsWith('⚠️')) {
+            UI.toast('🤖 ' + asset.symbol + ': ' + analysis.substring(0, 100) + '...', 'info', 10000);
+          }
+        }).catch(() => {});
+      } catch(e) {}
+
       // Store alert
       _lastCheck[key] = Date.now();
       _firedAlerts.add(key);
@@ -5510,6 +5583,219 @@ const SmartAlerts = (() => {
 
   return { init, checkAllAssets, getRecentAlerts, _allFactorsGreen };
 })();
+
+
+// ═══ ClaudeAI — Analyse intelligente via Worker sécurisé ═══
+const ClaudeAI = (() => {
+  const PROXY = 'https://aged-bar-257a.emmanueldelasse.workers.dev/claude';
+  const _cache = new Map();
+  const CACHE_TTL = 2 * 60 * 60 * 1000; // 2 heures
+  let _callsToday = 0;
+  let _callDate = '';
+  const MAX_CALLS_DAY = 50;
+
+  function _getCallCount() {
+    const today = new Date().toISOString().split('T')[0];
+    const stored = localStorage.getItem('mtp_claude_calls');
+    if (!stored) return { count: 0, date: today };
+    try { return JSON.parse(stored); } catch(e) { return { count: 0, date: today }; }
+  }
+
+  function _incrementCalls() {
+    const today = new Date().toISOString().split('T')[0];
+    const data = _getCallCount();
+    const count = data.date === today ? data.count + 1 : 1;
+    localStorage.setItem('mtp_claude_calls', JSON.stringify({ count, date: today }));
+    return count;
+  }
+
+  function _isLimited() {
+    const data = _getCallCount();
+    const today = new Date().toISOString().split('T')[0];
+    return data.date === today && data.count >= MAX_CALLS_DAY;
+  }
+
+  async function _ask(systemPrompt, userPrompt, cacheKey) {
+    // Check cache
+    if (cacheKey) {
+      const cached = _cache.get(cacheKey);
+      if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.text;
+    }
+
+    // Check daily limit
+    if (_isLimited()) {
+      return '⚠️ Limite quotidienne atteinte (50 analyses/jour). Revenez demain.';
+    }
+
+    try {
+      const r = await fetch(PROXY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          max_tokens: 400,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: userPrompt }],
+        }),
+        signal: AbortSignal.timeout(30000),
+      });
+
+      if (!r.ok) {
+        if (r.status === 500) return '⚠️ Clé Claude non configurée dans Cloudflare. Ajoutez CLAUDE_API_KEY dans les variables.';
+        return '⚠️ Erreur IA (' + r.status + ')';
+      }
+
+      const data = await r.json();
+      const text = data.content?.[0]?.text || 'Analyse indisponible';
+      _incrementCalls();
+
+      if (cacheKey) _cache.set(cacheKey, { text, ts: Date.now() });
+      return text;
+    } catch(e) {
+      return '⚠️ IA temporairement indisponible: ' + e.message;
+    }
+  }
+
+  // ── Résumé News quotidien
+  async function summarizeNews(newsItems, fearGreed) {
+    const today = new Date().toISOString().split('T')[0];
+    const cacheKey = 'news_summary_' + today;
+    const cached = _cache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < CACHE_TTL * 12) return cached.text;
+
+    const newsTitles = newsItems.slice(0, 10).map(n => '- ' + n.title + ' (' + n.source + ')').join('\n');
+    const fg = fearGreed ? 'Fear & Greed: ' + fearGreed.value + '/100 (' + fearGreed.label + ')' : '';
+    const analysis = window.__MTP?.lastAnalysis;
+    const signaux = analysis?.tradeable?.length || 0;
+    const forts = analysis?.tradeable?.filter(a => a.adjScore >= 70).length || 0;
+
+    const system = 'Tu es un analyste financier senior. Analyse les informations de marché du jour et génère un résumé structuré en français. Sois concis, factuel, et actionnable. Maximum 5 points clés.';
+    const prompt = 'Voici les informations du marché aujourd hui:\n\n' +
+      'SENTIMENT: ' + fg + '\n' +
+      'SIGNAUX ALGO: ' + signaux + ' opportunités dont ' + forts + ' forts\n\n' +
+      'HEADLINES:\n' + newsTitles + '\n\n' +
+      'Génère un résumé de marché en 5 points maximum. Identifie les actifs à surveiller et les risques du jour.';
+
+    return _ask(system, prompt, cacheKey);
+  }
+
+  // ── Analyse signal fort
+  async function analyzeSignal(asset, newsItems) {
+    const cacheKey = 'signal_' + asset.symbol + '_' + new Date().toISOString().split('T')[0];
+    const relevantNews = newsItems.filter(n => n.symbols.includes(asset.symbol)).slice(0, 3);
+    const newsContext = relevantNews.length > 0
+      ? 'News pertinentes:\n' + relevantNews.map(n => '- ' + n.title).join('\n')
+      : 'Aucune news spécifique trouvée.';
+
+    const system = 'Tu es un analyste financier expert. Analyse un signal de trading et donne un avis court et factuel en français. Maximum 3 phrases.';
+    const prompt = 'Signal de trading détecté:\n' +
+      'Actif: ' + asset.symbol + ' (' + asset.name + ')\n' +
+      'Direction: ' + (asset.direction === 'long' ? 'Hausse' : 'Baisse') + '\n' +
+      'Score algo: ' + asset.adjScore + '/100\n' +
+      'RSI: ' + (asset.indicators?.rsi?.toFixed(0) || 'N/A') + '\n' +
+      'ADX: ' + (asset.indicators?.adx?.toFixed(0) || 'N/A') + '\n' +
+      newsContext + '\n\n' +
+      'Donne ton avis sur ce signal en 2-3 phrases. Est-il fiable ? Quels risques ?';
+
+    return _ask(system, prompt, cacheKey);
+  }
+
+  // ── Analyse historique trades
+  async function analyzeHistory(trades) {
+    if (!trades || trades.length < 3) return 'Pas assez de trades pour une analyse (minimum 3).';
+    const cacheKey = 'history_' + trades.length + '_' + new Date().toISOString().split('T')[0];
+
+    const wins = trades.filter(t => t.pnl > 0);
+    const losses = trades.filter(t => t.pnl <= 0);
+    const winRate = Math.round((wins.length / trades.length) * 100);
+    const avgWin = wins.reduce((s, t) => s + t.pnlPct, 0) / (wins.length || 1);
+    const avgLoss = losses.reduce((s, t) => s + t.pnlPct, 0) / (losses.length || 1);
+
+    const summary = trades.slice(0, 10).map(t =>
+      t.symbol + ' ' + (t.direction === 'long' ? '↑' : '↓') + ' ' + (t.pnl > 0 ? '+' : '') + t.pnlPct?.toFixed(1) + '%'
+    ).join(', ');
+
+    const system = 'Tu es un coach de trading expert. Analyse l historique de trades et identifie les patterns, forces et faiblesses. Sois direct et constructif. Maximum 4 points.';
+    const prompt = 'Historique de trading:\n' +
+      'Total trades: ' + trades.length + '\n' +
+      'Win rate: ' + winRate + '%\n' +
+      'Gain moyen: +' + avgWin.toFixed(1) + '%\n' +
+      'Perte moyenne: ' + avgLoss.toFixed(1) + '%\n' +
+      'Derniers trades: ' + summary + '\n\n' +
+      'Analyse ce profil de trader: patterns identifiés, biais comportementaux, conseils d amélioration.';
+
+    return _ask(system, prompt, cacheKey);
+  }
+
+  // ── Coaching personnalisé
+  async function getCoaching(capital, history, winRate) {
+    const cacheKey = 'coaching_' + new Date().toISOString().split('T')[0];
+    const system = 'Tu es un coach de trading bienveillant et expert. Donne des conseils personnalisés basés sur le profil du trader. Sois encourageant mais réaliste. Maximum 3 conseils actionnables.';
+    const prompt = 'Profil trader:\n' +
+      'Capital: ' + capital + '€\n' +
+      'Nombre de trades: ' + (history?.length || 0) + '\n' +
+      'Win rate: ' + (winRate || 0) + '%\n\n' +
+      'Donne 3 conseils personnalisés et actionnables pour améliorer ses performances.';
+
+    return _ask(system, prompt, cacheKey);
+  }
+
+  // ── Interprétation événement macro
+  async function interpretMacroEvent(eventTitle, openPositions) {
+    const posContext = openPositions.map(p => p.symbol + ' ' + (p.direction === 'long' ? '↑' : '↓')).join(', ');
+    const system = 'Tu es un macro-économiste expert. Explique l impact probable d un événement sur les marchés et les positions ouvertes. Sois factuel et concis. Maximum 3 impacts.';
+    const prompt = 'Événement: ' + eventTitle + '\n' +
+      'Positions ouvertes: ' + (posContext || 'Aucune') + '\n\n' +
+      'Explique l impact probable sur les marchés et ces positions spécifiquement.';
+
+    return _ask(system, prompt, null); // Pas de cache pour les événements
+  }
+
+  // ── Rapport hebdomadaire
+  async function weeklyReport(trades, topSignals) {
+    const weekKey = 'weekly_' + Math.floor(Date.now() / (7 * 24 * 60 * 60 * 1000));
+    const wins = trades.filter(t => t.pnl > 0).length;
+    const pnl = trades.reduce((s, t) => s + (t.pnl || 0), 0);
+    const signals = topSignals.slice(0, 5).map(a => a.symbol + ' (score ' + a.adjScore + ')').join(', ');
+
+    const system = 'Tu es un analyste financier. Génère un rapport hebdomadaire de trading clair et structuré en français. Maximum 5 points.';
+    const prompt = 'Semaine de trading:\n' +
+      'Trades cette semaine: ' + trades.length + '\n' +
+      'Trades gagnants: ' + wins + '\n' +
+      'P&L total: ' + (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + '€\n' +
+      'Meilleurs signaux détectés: ' + (signals || 'Aucun') + '\n\n' +
+      'Génère un rapport de la semaine et les opportunités à surveiller la semaine prochaine.';
+
+    return _ask(system, prompt, weekKey);
+  }
+
+  function getCallStats() {
+    const data = _getCallCount();
+    const today = new Date().toISOString().split('T')[0];
+    const count = data.date === today ? data.count : 0;
+    return { count, max: MAX_CALLS_DAY, remaining: MAX_CALLS_DAY - count };
+  }
+
+  return { summarizeNews, analyzeSignal, analyzeHistory, getCoaching, interpretMacroEvent, weeklyReport, getCallStats };
+})();
+
+
+async function _generateWeeklyReport() {
+  UI.toast('🤖 Génération du rapport en cours...', 'info');
+  const history = Storage.getSimHistory().filter(t => {
+    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return t.closedAt > weekAgo;
+  });
+  const analysis = window.__MTP?.lastAnalysis;
+  const topSignals = analysis?.tradeable?.slice(0, 5) || [];
+  const report = await ClaudeAI.weeklyReport(history, topSignals);
+  
+  UI.modal('📊 Rapport hebdomadaire', `
+    <div style="padding:var(--space-4);">
+      <div style="font-size:var(--text-xs);color:#8b5cf6;font-weight:700;margin-bottom:var(--space-3);">🤖 Généré par Claude IA</div>
+      <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.8;white-space:pre-wrap;">${report}</div>
+    </div>
+  `);
+}
 
 // ═══ BOOT ═══
 async function boot() {
