@@ -3,6 +3,134 @@
 // ============================================================
 'use strict';
 
+
+// ═══ Supabase — Synchronisation temps réel ═══
+const SupabaseDB = (() => {
+  const URL = 'https://ukgfyhdzbfhxpmnhdlgq.supabase.co';
+  const KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVrZ2Z5aGR6YmZoeHBtbmhkbGdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2NTI3NDYsImV4cCI6MjA5MDIyODc0Nn0.BJ1yb-5bCam0MLR2tjOp3JN56MJeK22HxqGbJpJM1w0';
+  const HEADERS = {
+    'Content-Type': 'application/json',
+    'apikey': KEY,
+    'Authorization': 'Bearer ' + KEY,
+    'Prefer': 'return=representation',
+  };
+
+  async function _request(method, table, body = null, query = '') {
+    try {
+      const r = await fetch(URL + '/rest/v1/' + table + query, {
+        method,
+        headers: HEADERS,
+        body: body ? JSON.stringify(body) : null,
+      });
+      if (!r.ok) {
+        const err = await r.text();
+        console.warn('[Supabase]', method, table, err);
+        return null;
+      }
+      const text = await r.text();
+      return text ? JSON.parse(text) : [];
+    } catch(e) {
+      console.warn('[Supabase] Error:', e.message);
+      return null;
+    }
+  }
+
+  // ── Capital
+  async function getCapital() {
+    const data = await _request('GET', 'capital', null, '?id=eq.1');
+    return data?.[0]?.amount || null;
+  }
+  async function saveCapital(amount) {
+    return _request('PATCH', 'capital', { amount, updated_at: new Date().toISOString() }, '?id=eq.1');
+  }
+
+  // ── Positions
+  async function getPositions() {
+    return await _request('GET', 'positions', null, '?order=opened_at.desc') || [];
+  }
+  async function savePosition(pos) {
+    const data = {
+      id: pos.id, symbol: pos.symbol, name: pos.name || pos.symbol,
+      direction: pos.direction, entry_price: pos.entryPrice,
+      quantity: pos.quantity, invested: pos.invested,
+      stop_loss: pos.stopLoss || null, take_profit: pos.takeProfit || null,
+      mode: pos.mode || 'sim', opened_at: pos.openedAt,
+      score: pos.score || null,
+    };
+    return _request('POST', 'positions', data);
+  }
+  async function deletePosition(id) {
+    return _request('DELETE', 'positions', null, '?id=eq.' + id);
+  }
+
+  // ── Trades (historique)
+  async function getTrades() {
+    return await _request('GET', 'trades', null, '?order=closed_at.desc&limit=200') || [];
+  }
+  async function saveTrade(trade) {
+    const data = {
+      id: trade.id, symbol: trade.symbol, direction: trade.direction,
+      entry_price: trade.entryPrice, exit_price: trade.exitPrice || null,
+      quantity: trade.quantity, invested: trade.invested,
+      stop_loss: trade.stopLoss || null, take_profit: trade.takeProfit || null,
+      pnl: trade.pnl || null, pnl_pct: trade.pnlPct || null,
+      opened_at: trade.openedAt, closed_at: trade.closedAt || null,
+      duration_days: trade.durationDays || null, mode: trade.mode || 'sim',
+      score: trade.score || null, adj_score: trade.adjScore || null,
+      rr_ratio: trade.rrRatio || null,
+    };
+    return _request('POST', 'trades', data);
+  }
+
+  // ── Sync complet
+  async function syncAll() {
+    try {
+      const [cap, positions, trades] = await Promise.all([
+        getCapital(), getPositions(), getTrades()
+      ]);
+
+      if (cap !== null) Storage.saveSimCapital(cap);
+
+      if (positions?.length >= 0) {
+        const mapped = positions.map(p => ({
+          id: p.id, symbol: p.symbol, name: p.name,
+          direction: p.direction, entryPrice: p.entry_price,
+          quantity: p.quantity, invested: p.invested,
+          stopLoss: p.stop_loss, takeProfit: p.take_profit,
+          mode: p.mode, openedAt: p.opened_at,
+        }));
+        Storage.saveSimPositions(mapped.filter(p => p.mode === 'sim'));
+        Storage.saveRealPositions(mapped.filter(p => p.mode === 'real'));
+      }
+
+      if (trades?.length >= 0) {
+        const mapped = trades.map(t => ({
+          id: t.id, symbol: t.symbol, direction: t.direction,
+          entryPrice: t.entry_price, exitPrice: t.exit_price,
+          quantity: t.quantity, invested: t.invested,
+          pnl: t.pnl, pnlPct: t.pnl_pct,
+          openedAt: t.opened_at, closedAt: t.closed_at,
+          durationDays: t.duration_days, mode: t.mode,
+        }));
+        Storage.saveSimHistory(mapped.filter(t => t.mode === 'sim'));
+      }
+
+      console.log('[Supabase] ✅ Sync OK — capital:', cap, 'positions:', positions?.length, 'trades:', trades?.length);
+      return true;
+    } catch(e) {
+      console.warn('[Supabase] Sync failed:', e.message);
+      return false;
+    }
+  }
+
+  // ── Ping pour garder la base active
+  async function ping() {
+    return _request('GET', 'capital', null, '?id=eq.1&select=id');
+  }
+
+  return { getCapital, saveCapital, getPositions, savePosition, deletePosition, getTrades, saveTrade, syncAll, ping };
+})();
+
 // ── AbortSignal.timeout polyfill (iOS 15 and below) ──
 if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout !== 'function') {
   AbortSignal.timeout = function(ms) {
@@ -1027,6 +1155,9 @@ const BrokerAdapter = (() => {
       const positions = Storage.getSimPositions();
       positions.push(pos);
       Storage.saveSimPositions(positions);
+      // Sync with Supabase
+      SupabaseDB.savePosition(pos).catch(() => {});
+      SupabaseDB.saveCapital(Math.max(0, cap - pos.invested)).catch(() => {});
       return { success: true, position: pos, orderId: pos.id };
     },
     async closePosition(positionId) {
@@ -1043,6 +1174,11 @@ const BrokerAdapter = (() => {
       Storage.saveSimHistory(history);
       positions.splice(idx, 1);
       Storage.saveSimPositions(positions);
+      // Sync with Supabase
+      const closedTrade = history[0];
+      SupabaseDB.saveTrade({...closedTrade, mode: 'sim'}).catch(() => {});
+      SupabaseDB.deletePosition(positionId).catch(() => {});
+      SupabaseDB.saveCapital(Storage.getSimCapital() + pos.invested + pnl).catch(() => {});
       return { success: true, pnl, pnlPct, exitPrice: curr };
     },
   };
@@ -3662,6 +3798,8 @@ function _attachSettingsEvents(settings) {
         }
       }
       Storage.saveSettings(s);
+      // Sync capital to Supabase
+      SupabaseDB.saveCapital(Storage.getSimCapital()).catch(() => {});
       // Re-analyze with new settings
       window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
       UI.toast('Paramètres enregistrés ✅', 'success');
@@ -3737,6 +3875,18 @@ async function boot() {
     console.warn('analyzeAllSync error:', e);
     window.__MTP.lastAnalysis = { all: [], tradeable: [], neutral: [], inactive: [] };
   }
+  // Sync depuis Supabase au démarrage
+  SupabaseDB.syncAll().then(ok => {
+    if (ok) {
+      window.__MTP.lastAnalysis = AnalysisEngine.analyzeAllSync();
+      const cur = Router.getCurrent();
+      if (['dashboard','portefeuille'].includes(cur)) Router.navigate(cur);
+    }
+  }).catch(() => {});
+
+  // Ping Supabase toutes les 6 jours pour éviter la mise en pause
+  setInterval(() => SupabaseDB.ping().catch(() => {}), 6 * 24 * 60 * 60 * 1000);
+
   Router.navigate('dashboard');
   Router.attachNavClicks();
 
