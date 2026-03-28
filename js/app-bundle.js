@@ -330,29 +330,7 @@ const MOCK_DATA = {
     'TLT':   { price: 92.40,    change24h: -0.42, volume24h: 420000000   },
   },
 
-  generateOHLC: function(symbol, currentPrice, trend = 'up', volatility = 0.02) {
-    const candles = [];
-    let price = currentPrice * (trend === 'up' ? 0.75 : 1.25);
-    const now = Date.now();
-    for (let i = 130; i >= 0; i--) {
-      const dayAgo = now - i * 86400000;
-      const noise = (Math.random() - 0.5) * volatility;
-      const trendBias = trend === 'up' ? 0.007 : (trend === 'down' ? -0.007 : 0.001);
-      const open = price;
-      const move = noise + trendBias;
-      const close = price * (1 + move);
-      const high = Math.max(open, close) * (1 + Math.random() * volatility * 0.3);
-      const low  = Math.min(open, close) * (1 - Math.random() * volatility * 0.3);
-      const volMult = Math.abs(move) > volatility ? 2.5 : 1;
-      const volume = 1_000_000 * (1 + Math.random() * 2) * volMult;
-      candles.push({ ts: dayAgo, open, high, low, close, volume });
-      price = close;
-    }
-    if (candles.length > 0 && MOCK_DATA.prices[symbol]) {
-      candles[candles.length - 1].close = MOCK_DATA.prices[symbol].price;
-    }
-    return candles;
-  },
+  generateOHLC: function() { return []; }, // Supprimé — données réelles uniquement
 
   watchlist: [
     // ── Cryptos (Binance — illimité)
@@ -451,24 +429,16 @@ const MOCK_DATA = {
   },
 
   marketRegime: {
-    label: 'Tendance haussière',
-    icon: '↗',
-    color: 'var(--profit)',
-    description: 'Régime favorable aux longs sur actifs liquides',
-    score: 72,
+    label: 'En attente des données',
+    icon: '⏳',
+    color: 'var(--text-muted)',
+    description: 'Chargement des données de marché réelles...',
+    score: 0,
   },
 };
 
 MOCK_DATA._ohlcCache = {};
-MOCK_DATA.getOHLC = function(symbol) {
-  if (!this._ohlcCache[symbol]) {
-    const asset = this.watchlist.find(a => a.symbol === symbol);
-    if (!asset) return [];
-    const price = this.prices[symbol]?.price || 100;
-    this._ohlcCache[symbol] = this.generateOHLC(symbol, price, asset.trend, asset.volatility);
-  }
-  return this._ohlcCache[symbol];
-};
+MOCK_DATA.getOHLC = function() { return []; }; // Supprimé — données réelles uniquement
 
 // ═══ storage.js ═══
 const Storage = (() => {
@@ -1201,9 +1171,9 @@ const RealDataClient = (() => {
   async function getOHLC(symbol) {
     const ck = 'ohlc_' + symbol; const cached = _cacheGet(ck); if (cached) return cached;
     let candles = null;
-    if (COINGECKO_IDS[symbol]) { candles = await BinanceClient.getOHLC(symbol); if (candles?.length >= 20) { _cacheSet(ck, candles); return candles; } }
-    if (TwelveDataClient?.getTimeSeries) { candles = await TwelveDataClient.getTimeSeries(symbol); if (candles?.length >= 20) { _cacheSet(ck, candles); return candles; } }
-    if (YAHOO_TICKERS[symbol]) { candles = await _getYahooOHLC(symbol); if (candles?.length >= 20) { _cacheSet(ck, candles); return candles; } }
+    if (COINGECKO_IDS[symbol]) { candles = await BinanceClient.getOHLC(symbol); if (candles?.length >= 20) { _cacheSet(ck, candles); if (!window.__ohlcCache) window.__ohlcCache = {}; window.__ohlcCache[symbol] = candles; return candles; } }
+    if (TwelveDataClient?.getTimeSeries) { candles = await TwelveDataClient.getTimeSeries(symbol); if (candles?.length >= 20) { _cacheSet(ck, candles); if (!window.__ohlcCache) window.__ohlcCache = {}; window.__ohlcCache[symbol] = candles; return candles; } }
+    if (YAHOO_TICKERS[symbol]) { candles = await _getYahooOHLC(symbol); if (candles?.length >= 20) { _cacheSet(ck, candles); if (!window.__ohlcCache) window.__ohlcCache = {}; window.__ohlcCache[symbol] = candles; return candles; } }
     return null;
   }
 
@@ -1357,12 +1327,7 @@ const AnalysisEngine = (() => {
     catch(e) { console.warn('[Analysis] Erreur fetch', symbol); }
 
     if (!candles || candles.length < 20 || !priceData) {
-      const mp = MOCK_DATA.prices[symbol], mc = MOCK_DATA.getOHLC(symbol);
-      if (mp && mc?.length >= 20) {
-        const ind2 = Indicators.computeAll(mc);
-        if (ind2) return { symbol, name, assetClass, price: mp.price, change24h: mp.change24h || 0, dataWarning: 'Données simulées', direction: 'neutral', score: 0, adjScore: 0, strength: 'weak', riskLevel: 'medium', isSolid: false, indicators: ind2, regime: { pass: false, reasons: [{ label: 'API indisponible', pass: false }] } };
-      }
-      return { symbol, name, assetClass, price: 0, change24h: 0, error: 'Données indisponibles', direction: 'neutral', score: 0, adjScore: 0, strength: 'weak', riskLevel: 'high', isSolid: false, regime: { pass: false, reasons: [] } };
+      return { symbol, name, assetClass, price: 0, change24h: 0, error: 'Données indisponibles — configurez vos clés API', direction: 'neutral', score: 0, adjScore: 0, strength: 'weak', riskLevel: 'high', isSolid: false, regime: { pass: false, reasons: [{ label: 'API non configurée ou indisponible', pass: false }] } };
     }
 
     const ind = Indicators.computeAll(candles);
@@ -1408,30 +1373,33 @@ const AnalysisEngine = (() => {
 
   function analyzeAllSync() {
     const watchlist = Storage.getWatchlist();
+    // analyzeAllSync uses only cached real prices - no mock fallback
     const results = watchlist.map(asset => {
       try {
-        const candles = MOCK_DATA.getOHLC(asset.symbol), price = MOCK_DATA.prices[asset.symbol];
-        if (!candles || !price) return { symbol: asset.symbol, adjScore: 0, error: 'No data' };
-        const ind = Indicators.computeAll(candles);
-        if (!ind) return { symbol: asset.symbol, adjScore: 0 };
+        const price = window.__prices[asset.symbol];
+        if (!price) return { symbol: asset.symbol, name: asset.name, assetClass: asset.class, adjScore: 0, price: 0, error: 'En attente des données réelles...' };
+        // Use cached OHLC if available
+        const cachedOHLC = window.__ohlcCache?.[asset.symbol];
+        if (!cachedOHLC || cachedOHLC.length < 20) return { symbol: asset.symbol, name: asset.name, assetClass: asset.class, adjScore: 0, price, error: 'Bougies en cours de chargement...' };
+        const ind = Indicators.computeAll(cachedOHLC);
+        if (!ind) return { symbol: asset.symbol, adjScore: 0, error: 'Calcul impossible' };
         const regime = checkRegime(ind), direction = detectSignal(ind);
         const conf = computeConfidenceScore(ind, direction);
         const riskLvl = RiskCalculator.riskLevel(ind.atrPct, ind.vol20, ind.adx);
         const adjScoreVal = adjustedScore(conf.score, riskLvl);
-        const _cap = Storage.getSimCapital();
-        const stopLoss = RiskCalculator.initialStop(price.price, ind.atr, direction, Storage.getSettings().stopAtrMultiplier);
-        const takeProfit = RiskCalculator.takeProfitEstimate(price.price, stopLoss, direction, 2.5);
-        const rrRatio = RiskCalculator.riskRewardRatio(price.price, stopLoss, takeProfit);
+        const realCapital = Storage.getSimCapital();
+        const stopLoss = RiskCalculator.initialStop(price, ind.atr, direction, Storage.getSettings().stopAtrMultiplier);
+        const takeProfit = RiskCalculator.takeProfitEstimate(price, stopLoss, direction, 2.5);
+        const rrRatio = RiskCalculator.riskRewardRatio(price, stopLoss, takeProfit);
         return {
           symbol: asset.symbol, name: asset.name, assetClass: asset.class,
-          price: price.price, change24h: price.change24h || 0,
+          price, change24h: 0,
           direction, regime, indicators: ind,
           score: conf.score, adjScore: adjScoreVal,
           strength: signalStrength(adjScoreVal), riskLevel: riskLvl,
           isSolid: isSolidTrade(regime, adjScoreVal, riskLvl, rrRatio),
           confidence: conf, stopLoss, takeProfit, rrRatio,
           recommendation: getRecommendation(direction, adjScoreVal, riskLvl, regime.pass),
-          dataWarning: 'Données simulées',
         };
       } catch(e) { return { symbol: asset.symbol, adjScore: 0, error: e.message }; }
     });
@@ -1658,7 +1626,21 @@ const Fmt = (() => {
   function directionLabel(d) { return d === 'long' ? '↑ Hausse' : d === 'short' ? '↓ Baisse' : 'Neutre'; }
   function riskLabel(l) { return l === 'low' ? 'Prudence faible' : l === 'medium' ? 'Prudence moyenne' : l === 'high' ? 'Prudence élevée' : '—'; }
   function profileLabel(p) { return p === 'conservative' ? 'Conservateur' : p === 'balanced' ? 'Équilibré' : p === 'dynamic' ? 'Dynamique' : p; }
-  function assetIcon(symbol) { return MOCK_DATA.icons[symbol] || symbol.slice(0, 2).toUpperCase(); }
+  function assetIcon(symbol) {
+    const icons = {
+      'BTC':'₿','ETH':'Ξ','SOL':'◎','BNB':'B','XRP':'X','ADA':'A',
+      'AVAX':'AX','DOT':'●','LINK':'⬡','DOGE':'D','MATIC':'M','UNI':'U',
+      'ATOM':'⚛','LTC':'Ł','NEAR':'N','AAPL':'','MSFT':'M','NVDA':'N',
+      'TSLA':'T','AMZN':'A','GOOGL':'G','META':'M','NFLX':'N','AMD':'A',
+      'JPM':'J','V':'V','MA':'M','DIS':'D','COIN':'C','PYPL':'P',
+      'MC':'LV','ASML':'AS','SAP':'S','TTE':'T','BNP':'B','AIR':'✈',
+      'RMS':'H','OR':'L','SAN':'S','STLA':'ST',
+      'EURUSD':'€$','GBPUSD':'£$','USDJPY':'¥','USDCHF':'Fr','AUDUSD':'A$',
+      'GOLD':'Au','SILVER':'Ag','OIL':'🛢',
+      'SPY':'S&P','QQQ':'QQ','GLD':'Au','TLT':'📈',
+    };
+    return icons[symbol] || symbol.slice(0, 2).toUpperCase();
+  }
   function signedCurrency(v) { if (v === null || v === undefined) return '—'; return (v >= 0 ? '+' : '') + currency(v); }
   function signedPct(v) { if (v === null || v === undefined) return '—'; return (v >= 0 ? '+' : '') + Math.abs(v).toFixed(2) + '%'; }
   function qty(v, symbol) { if (v === null || v === undefined) return '—'; return ['BTC','ETH','SOL','BNB'].includes(symbol) ? v.toFixed(4) : v.toFixed(2); }
@@ -2453,7 +2435,13 @@ function renderDashboard() {
   const capitalTotal = simCapNum + totalInvested + totalPnL;
   const globalReturn = simCapInit > 0 ? ((capitalTotal - simCapInit) / simCapInit) * 100 : 0;
   const top5 = analysis.tradeable.slice(0, 5);
-  const regime = MOCK_DATA.marketRegime;
+  const hasRealData = analysis.all.some(a => !a.error);
+  const regime = hasRealData ? {
+    label: analysis.tradeable.length > 5 ? 'Marché actif' : analysis.tradeable.length > 0 ? 'Marché modéré' : 'Peu de signaux',
+    icon: analysis.tradeable.length > 5 ? '🟢' : analysis.tradeable.length > 0 ? '🟡' : '🔴',
+    color: analysis.tradeable.length > 5 ? 'var(--profit)' : analysis.tradeable.length > 0 ? 'var(--signal-medium)' : 'var(--loss)',
+    score: analysis.tradeable.length > 0 ? Math.round(analysis.tradeable.reduce((s,a) => s + a.adjScore, 0) / analysis.tradeable.length) : 0,
+  } : MOCK_DATA.marketRegime;
   const alertStats = AlertManager.getStats();
 
   return `
@@ -2543,6 +2531,16 @@ function renderDashboard() {
       ? `<div class="empty-state"><div class="empty-icon">◎</div><div class="empty-title">Aucune opportunité filtrée</div><div class="empty-desc">Marché peu favorable actuellement.</div></div>`
       : top5.map((a, i) => renderOpportunityRow(a, i + 1)).join('')
     }
+
+    ${analysis.all.length === 0 || analysis.all.every(a => a.error) ? `
+    <div style="background:rgba(245,166,35,0.08);border:1px solid rgba(245,166,35,0.2);border-radius:var(--card-radius);padding:var(--space-5);margin-top:var(--space-4);">
+      <div style="font-weight:700;margin-bottom:var(--space-2);">⏳ Chargement des données réelles en cours...</div>
+      <div style="font-size:var(--text-sm);color:var(--text-secondary);line-height:1.6;">
+        L'app récupère les vrais prix depuis Binance, Twelve Data et Yahoo Finance.<br>
+        Les opportunités apparaîtront dans quelques secondes.<br>
+        Si rien n'apparaît, vérifiez vos clés API dans <strong>Réglages</strong>.
+      </div>
+    </div>` : ''}
 
     <!-- AlgoLearning summary -->
     ${(function() {
@@ -3178,8 +3176,8 @@ function renderAlertRow(a) {
 }
 
 function renderPriceChart(symbol) {
-  const candles = MOCK_DATA.getOHLC(symbol);
-  if (!candles || candles.length < 5) return '<div style="height:120px;background:var(--bg-elevated);border-radius:8px;"></div>';
+  const candles = window.__ohlcCache?.[symbol];
+  if (!candles || candles.length < 5) return '<div style="height:120px;background:var(--bg-elevated);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);color:var(--text-muted);">⏳ Graphique en cours de chargement...</div>';
   const closes = candles.map(c => c.close);
   const min = closes.reduce(function(a,b){return a<b?a:b;}), max = closes.reduce(function(a,b){return a>b?a:b;}), range = max - min || 1;
   const W = 600, H = 120;
