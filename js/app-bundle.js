@@ -1080,7 +1080,7 @@ const RiskCalculator = (() => {
       ? ((currentPrice - entryPrice) / entryPrice) * 100
       : ((entryPrice - currentPrice) / entryPrice) * 100;
   }
-  return { initialStop, trailingStop, positionSize, takeProfitEstimate, riskRewardRatio, riskLevel, riskPenalty, openPnL, openPnLPct };
+  return { initialStop, trailingStop, positionSize, takeProfitEstimate, riskRewardRatio, riskLevel, riskPenalty, openPnL, openPnLPct, optimalStop, dynamicRR, optimalPositionSize, isOptimalTiming };
 })();
 
 // ═══ BinanceClient ═══
