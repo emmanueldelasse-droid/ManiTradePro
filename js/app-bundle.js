@@ -283,63 +283,63 @@ const MOCK_DATA = {
 
   watchlist: [
     // ── Cryptos (Binance — illimité)
-    { symbol: 'BTC',    name: 'Bitcoin',         class: 'crypto',    trend: 'up',      volatility: 0.025 },
-    { symbol: 'ETH',    name: 'Ethereum',        class: 'crypto',    trend: 'up',      volatility: 0.028 },
-    { symbol: 'SOL',    name: 'Solana',          class: 'crypto',    trend: 'up',      volatility: 0.040 },
-    { symbol: 'BNB',    name: 'BNB',             class: 'crypto',    trend: 'up',      volatility: 0.022 },
-    { symbol: 'XRP',    name: 'Ripple',          class: 'crypto',    trend: 'up',      volatility: 0.035 },
-    { symbol: 'ADA',    name: 'Cardano',         class: 'crypto',    trend: 'neutral', volatility: 0.038 },
-    { symbol: 'AVAX',   name: 'Avalanche',       class: 'crypto',    trend: 'up',      volatility: 0.045 },
-    { symbol: 'DOT',    name: 'Polkadot',        class: 'crypto',    trend: 'neutral', volatility: 0.042 },
-    { symbol: 'LINK',   name: 'Chainlink',       class: 'crypto',    trend: 'up',      volatility: 0.038 },
-    { symbol: 'DOGE',   name: 'Dogecoin',        class: 'crypto',    trend: 'up',      volatility: 0.055 },
-    { symbol: 'MATIC',  name: 'Polygon',         class: 'crypto',    trend: 'neutral', volatility: 0.048 },
-    { symbol: 'UNI',    name: 'Uniswap',         class: 'crypto',    trend: 'neutral', volatility: 0.042 },
-    { symbol: 'ATOM',   name: 'Cosmos',          class: 'crypto',    trend: 'neutral', volatility: 0.040 },
-    { symbol: 'LTC',    name: 'Litecoin',        class: 'crypto',    trend: 'up',      volatility: 0.030 },
-    { symbol: 'NEAR',   name: 'NEAR Protocol',   class: 'crypto',    trend: 'up',      volatility: 0.050 },
+    { symbol: 'BTC',    name: 'Bitcoin',         class: 'crypto' },
+    { symbol: 'ETH',    name: 'Ethereum',        class: 'crypto' },
+    { symbol: 'SOL',    name: 'Solana',          class: 'crypto' },
+    { symbol: 'BNB',    name: 'BNB',             class: 'crypto' },
+    { symbol: 'XRP',    name: 'Ripple',          class: 'crypto' },
+    { symbol: 'ADA',    name: 'Cardano',         class: 'crypto' },
+    { symbol: 'AVAX',   name: 'Avalanche',       class: 'crypto' },
+    { symbol: 'DOT',    name: 'Polkadot',        class: 'crypto' },
+    { symbol: 'LINK',   name: 'Chainlink',       class: 'crypto' },
+    { symbol: 'DOGE',   name: 'Dogecoin',        class: 'crypto' },
+    { symbol: 'MATIC',  name: 'Polygon',         class: 'crypto' },
+    { symbol: 'UNI',    name: 'Uniswap',         class: 'crypto' },
+    { symbol: 'ATOM',   name: 'Cosmos',          class: 'crypto' },
+    { symbol: 'LTC',    name: 'Litecoin',        class: 'crypto' },
+    { symbol: 'NEAR',   name: 'NEAR Protocol',   class: 'crypto' },
     // ── Actions US (Twelve Data)
-    { symbol: 'AAPL',   name: 'Apple',           class: 'stock',     trend: 'up',      volatility: 0.014 },
-    { symbol: 'MSFT',   name: 'Microsoft',       class: 'stock',     trend: 'up',      volatility: 0.013 },
-    { symbol: 'NVDA',   name: 'Nvidia',          class: 'stock',     trend: 'up',      volatility: 0.022 },
-    { symbol: 'TSLA',   name: 'Tesla',           class: 'stock',     trend: 'down',    volatility: 0.035 },
-    { symbol: 'AMZN',   name: 'Amazon',          class: 'stock',     trend: 'up',      volatility: 0.018 },
-    { symbol: 'GOOGL',  name: 'Alphabet',        class: 'stock',     trend: 'up',      volatility: 0.016 },
-    { symbol: 'META',   name: 'Meta',            class: 'stock',     trend: 'up',      volatility: 0.020 },
-    { symbol: 'NFLX',   name: 'Netflix',         class: 'stock',     trend: 'up',      volatility: 0.025 },
-    { symbol: 'AMD',    name: 'AMD',             class: 'stock',     trend: 'up',      volatility: 0.028 },
-    { symbol: 'JPM',    name: 'JPMorgan',        class: 'stock',     trend: 'up',      volatility: 0.015 },
-    { symbol: 'V',      name: 'Visa',            class: 'stock',     trend: 'up',      volatility: 0.012 },
-    { symbol: 'MA',     name: 'Mastercard',      class: 'stock',     trend: 'up',      volatility: 0.013 },
-    { symbol: 'DIS',    name: 'Disney',          class: 'stock',     trend: 'neutral', volatility: 0.018 },
-    { symbol: 'COIN',   name: 'Coinbase',        class: 'stock',     trend: 'up',      volatility: 0.045 },
-    { symbol: 'PYPL',   name: 'PayPal',          class: 'stock',     trend: 'down',    volatility: 0.022 },
+    { symbol: 'AAPL',   name: 'Apple',           class: 'stock' },
+    { symbol: 'MSFT',   name: 'Microsoft',       class: 'stock' },
+    { symbol: 'NVDA',   name: 'Nvidia',          class: 'stock' },
+    { symbol: 'TSLA',   name: 'Tesla',           class: 'stock' },
+    { symbol: 'AMZN',   name: 'Amazon',          class: 'stock' },
+    { symbol: 'GOOGL',  name: 'Alphabet',        class: 'stock' },
+    { symbol: 'META',   name: 'Meta',            class: 'stock' },
+    { symbol: 'NFLX',   name: 'Netflix',         class: 'stock' },
+    { symbol: 'AMD',    name: 'AMD',             class: 'stock' },
+    { symbol: 'JPM',    name: 'JPMorgan',        class: 'stock' },
+    { symbol: 'V',      name: 'Visa',            class: 'stock' },
+    { symbol: 'MA',     name: 'Mastercard',      class: 'stock' },
+    { symbol: 'DIS',    name: 'Disney',          class: 'stock' },
+    { symbol: 'COIN',   name: 'Coinbase',        class: 'stock' },
+    { symbol: 'PYPL',   name: 'PayPal',          class: 'stock' },
     // ── Actions EU (Twelve Data)
-    { symbol: 'MC',     name: 'LVMH',            class: 'stock',     trend: 'up',      volatility: 0.016 },
-    { symbol: 'ASML',   name: 'ASML',            class: 'stock',     trend: 'up',      volatility: 0.020 },
-    { symbol: 'SAP',    name: 'SAP',             class: 'stock',     trend: 'up',      volatility: 0.014 },
-    { symbol: 'TTE',    name: 'TotalEnergies',   class: 'stock',     trend: 'neutral', volatility: 0.015 },
-    { symbol: 'BNP',    name: 'BNP Paribas',     class: 'stock',     trend: 'neutral', volatility: 0.018 },
-    { symbol: 'AIR',    name: 'Airbus',          class: 'stock',     trend: 'up',      volatility: 0.016 },
-    { symbol: 'RMS',    name: 'Hermès',          class: 'stock',     trend: 'up',      volatility: 0.015 },
-    { symbol: 'OR',     name: "L'Oréal",         class: 'stock',     trend: 'up',      volatility: 0.013 },
-    { symbol: 'SAN',    name: 'Sanofi',          class: 'stock',     trend: 'neutral', volatility: 0.012 },
-    { symbol: 'STLA',   name: 'Stellantis',      class: 'stock',     trend: 'down',    volatility: 0.020 },
+    { symbol: 'MC',     name: 'LVMH',            class: 'stock' },
+    { symbol: 'ASML',   name: 'ASML',            class: 'stock' },
+    { symbol: 'SAP',    name: 'SAP',             class: 'stock' },
+    { symbol: 'TTE',    name: 'TotalEnergies',   class: 'stock' },
+    { symbol: 'BNP',    name: 'BNP Paribas',     class: 'stock' },
+    { symbol: 'AIR',    name: 'Airbus',          class: 'stock' },
+    { symbol: 'RMS',    name: 'Hermès',          class: 'stock' },
+    { symbol: 'OR',     name: "L'Oréal",         class: 'stock' },
+    { symbol: 'SAN',    name: 'Sanofi',          class: 'stock' },
+    { symbol: 'STLA',   name: 'Stellantis',      class: 'stock' },
     // ── Forex (Twelve Data)
-    { symbol: 'EURUSD', name: 'Euro / Dollar',   class: 'forex',     trend: 'neutral', volatility: 0.005 },
-    { symbol: 'GBPUSD', name: 'Livre / Dollar',  class: 'forex',     trend: 'down',    volatility: 0.006 },
-    { symbol: 'USDJPY', name: 'Dollar / Yen',    class: 'forex',     trend: 'up',      volatility: 0.006 },
-    { symbol: 'USDCHF', name: 'Dollar / Franc',  class: 'forex',     trend: 'neutral', volatility: 0.005 },
-    { symbol: 'AUDUSD', name: 'Australien / $',  class: 'forex',     trend: 'neutral', volatility: 0.006 },
+    { symbol: 'EURUSD', name: 'Euro / Dollar',   class: 'forex' },
+    { symbol: 'GBPUSD', name: 'Livre / Dollar',  class: 'forex' },
+    { symbol: 'USDJPY', name: 'Dollar / Yen',    class: 'forex' },
+    { symbol: 'USDCHF', name: 'Dollar / Franc',  class: 'forex' },
+    { symbol: 'AUDUSD', name: 'Australien / $',  class: 'forex' },
     // ── Matières premières (Twelve Data)
-    { symbol: 'GOLD',   name: 'Or (XAU/USD)',    class: 'commodity', trend: 'up',      volatility: 0.008 },
-    { symbol: 'SILVER', name: 'Argent',          class: 'commodity', trend: 'up',      volatility: 0.012 },
-    { symbol: 'OIL',    name: 'Pétrole (WTI)',   class: 'commodity', trend: 'neutral', volatility: 0.018 },
+    { symbol: 'GOLD',   name: 'Or (XAU/USD)',    class: 'commodity' },
+    { symbol: 'SILVER', name: 'Argent',          class: 'commodity' },
+    { symbol: 'OIL',    name: 'Pétrole (WTI)',   class: 'commodity' },
     // ── ETF (Twelve Data)
-    { symbol: 'SPY',    name: 'S&P 500 ETF',     class: 'etf',       trend: 'up',      volatility: 0.010 },
-    { symbol: 'QQQ',    name: 'Nasdaq 100 ETF',  class: 'etf',       trend: 'up',      volatility: 0.014 },
-    { symbol: 'GLD',    name: 'Gold ETF',        class: 'etf',       trend: 'up',      volatility: 0.008 },
-    { symbol: 'TLT',    name: 'Obligations US',  class: 'etf',       trend: 'down',    volatility: 0.010 },
+    { symbol: 'SPY',    name: 'S&P 500 ETF',     class: 'etf' },
+    { symbol: 'QQQ',    name: 'Nasdaq 100 ETF',  class: 'etf' },
+    { symbol: 'GLD',    name: 'Gold ETF',        class: 'etf' },
+    { symbol: 'TLT',    name: 'Obligations US',  class: 'etf' },
   ],
 
   icons: {
@@ -387,23 +387,70 @@ MOCK_DATA.getOHLC = function() { return []; }; // Supprimé — données réelle
 const Storage = (() => {
   const PREFIX = 'mtp_';
   const KEYS = {
-    SETTINGS:      PREFIX + 'settings',
-    SIM_CAPITAL:   PREFIX + 'sim_capital',
-    SIM_POSITIONS: PREFIX + 'sim_positions',
-    SIM_HISTORY:   PREFIX + 'sim_history',
-    REAL_POSITIONS:PREFIX + 'real_positions',
-    WATCHLIST:     PREFIX + 'watchlist',
-    API_KEYS:      PREFIX + 'api_keys',
-    ALERTS:        PREFIX + 'alerts',
+    SETTINGS:       PREFIX + 'settings',
+    SIM_CAPITAL:    PREFIX + 'sim_capital',
+    SIM_POSITIONS:  PREFIX + 'sim_positions',
+    SIM_HISTORY:    PREFIX + 'sim_history',
+    REAL_POSITIONS: PREFIX + 'real_positions',
+    WATCHLIST:      PREFIX + 'watchlist',
+    API_KEYS:       PREFIX + 'api_keys',
+    ALERTS:         PREFIX + 'alerts',
   };
 
   function get(key) {
-    try { const r = localStorage.getItem(key); return r ? JSON.parse(r) : null; }
-    catch(e) { console.error('[Storage] get', key, e); return null; }
+    try {
+      const r = localStorage.getItem(key);
+      return r ? JSON.parse(r) : null;
+    } catch(e) {
+      console.error('[Storage] get', key, e);
+      return null;
+    }
   }
+
   function set(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); return true; }
-    catch(e) { console.error('[Storage] set', key, e); return false; }
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      return true;
+    } catch(e) {
+      console.error('[Storage] set', key, e);
+      return false;
+    }
+  }
+
+  function normalizeApiKeys(raw) {
+    const empty = {
+      twelveData: [
+        { key: '', label: 'Clé 1' },
+        { key: '', label: 'Clé 2' },
+        { key: '', label: 'Clé 3' },
+        { key: '', label: 'Clé 4' },
+      ],
+      binance: { apiKey: '', secret: '', connected: false },
+    };
+
+    if (!raw) return empty;
+
+    if (Array.isArray(raw)) {
+      return {
+        twelveData: [0,1,2,3].map(i => ({
+          key: typeof raw[i] === 'string' ? raw[i] : '',
+          label: 'Clé ' + (i + 1),
+        })),
+        binance: { apiKey: '', secret: '', connected: false },
+      };
+    }
+
+    return {
+      twelveData: [0,1,2,3].map(i => ({
+        key: raw?.twelveData?.[i]?.key || raw?.twelveData?.[i] || '',
+        label: raw?.twelveData?.[i]?.label || ('Clé ' + (i + 1)),
+      })),
+      binance: {
+        apiKey: raw?.binance?.apiKey || '',
+        secret: raw?.binance?.secret || '',
+        connected: !!raw?.binance?.connected,
+      },
+    };
   }
 
   function getSettings() { return Object.assign({}, MOCK_DATA.defaultSettings, get(KEYS.SETTINGS) || {}); }
@@ -411,7 +458,6 @@ const Storage = (() => {
   const setSettings = saveSettings;
 
   function getSimCapital() {
-    // Single source of truth — always a clean number
     const stored = get(KEYS.SIM_CAPITAL);
     if (stored === null) {
       const s = get(KEYS.SETTINGS);
@@ -419,14 +465,13 @@ const Storage = (() => {
     }
     if (typeof stored === 'object' && stored !== null) {
       const v = stored.current || stored.initial || 10000;
-      // Auto-fix corrupted object
       set(KEYS.SIM_CAPITAL, parseFloat(v) || 10000);
       return parseFloat(v) || 10000;
     }
     return parseFloat(stored) || 10000;
   }
   function saveSimCapital(v) {
-    const num = typeof v === 'object' ? (v.current || v.initial || 10000) : parseFloat(v) || 10000;
+    const num = typeof v === 'object' ? (v.current || v.initial || 10000) : (parseFloat(v) || 10000);
     return set(KEYS.SIM_CAPITAL, num);
   }
   const setSimCapital = saveSimCapital;
@@ -449,17 +494,12 @@ const Storage = (() => {
   }
 
   function getApiKeys() {
-    return get(KEYS.API_KEYS) || {
-      twelveData: [
-        { key: '', label: 'Clé 1' }, { key: '', label: 'Clé 2' },
-        { key: '', label: 'Clé 3' }, { key: '', label: 'Clé 4' },
-      ],
-      binance: { apiKey: '', secret: '', connected: false },
-    };
+    const normalized = normalizeApiKeys(get(KEYS.API_KEYS));
+    set(KEYS.API_KEYS, normalized);
+    return normalized;
   }
-  function saveApiKeys(k) { return set(KEYS.API_KEYS, k); }
+  function saveApiKeys(k) { return set(KEYS.API_KEYS, normalizeApiKeys(k)); }
 
-  // ── ALERTS
   function getAlerts() { return get(KEYS.ALERTS) || []; }
   function saveAlerts(a) { return set(KEYS.ALERTS, a); }
 
@@ -471,7 +511,6 @@ const Storage = (() => {
     return true;
   }
 
-  // ── API Call Counter
   function getTodayCallCount() {
     const today = new Date().toISOString().split('T')[0];
     const stored = get('mtp_api_calls');
@@ -489,15 +528,16 @@ const Storage = (() => {
     const today = new Date().toISOString().split('T')[0];
     const stored = get('mtp_api_calls');
     const count = stored?.date === today ? (stored.count || 0) : 0;
-    const limit = 3200; // 4 keys × 800
-    return { count, limit, remaining: limit - count, pct: Math.round((count / limit) * 100) };
+    const limit = 3200;
+    return { count, limit, remaining: Math.max(0, limit - count), pct: Math.round((count / limit) * 100) };
   }
 
   function init() {
     if (!get(KEYS.SETTINGS)) saveSettings({ ...MOCK_DATA.defaultSettings });
     if (get(KEYS.SIM_CAPITAL) === null) saveSimCapital(MOCK_DATA.defaultSettings.simInitialCapital || 10000);
     if (!get(KEYS.SIM_POSITIONS)) saveSimPositions([]);
-    if (!get(KEYS.SIM_HISTORY))   saveSimHistory([]);
+    if (!get(KEYS.SIM_HISTORY)) saveSimHistory([]);
+    if (!get(KEYS.API_KEYS)) saveApiKeys(null);
     console.log('[Storage] V1 initialisé');
   }
 
@@ -512,10 +552,12 @@ const Storage = (() => {
     getApiKeys, saveApiKeys,
     getAlerts, saveAlerts,
     resetSimulation,
+    getTodayCallCount, incrementCallCount, getCallStats,
     KEYS,
   };
 })();
 
+// ═══ indicators.js ═══
 // ═══ indicators.js ═══
 const Indicators = (() => {
   function ema(closes, period) {
@@ -1036,7 +1078,7 @@ const BinanceClient = (() => {
     'ATOM': 'ATOMUSDT', 'LTC': 'LTCUSDT', 'NEAR': 'NEARUSDT',
   };
   const BINANCE_USDT = {};
-  let _apiKey = '', _secretKey = '', _eurUsdRate = 1.08;
+  let _apiKey = '', _secretKey = '', _eurUsdRate = null;
 
   function init(apiKey = '', secretKey = '') {
     _apiKey = apiKey; _secretKey = secretKey;
@@ -1045,7 +1087,7 @@ const BinanceClient = (() => {
   async function _fetchEurUsdRate() {
     try {
       const r = await fetch('https://aged-bar-257a.emmanueldelasse.workers.dev/binance/api/v3/ticker/price?symbol=EURUSDT', { signal: AbortSignal.timeout(5000) });
-      if (r.ok) { const d = await r.json(); _eurUsdRate = parseFloat(d.price); }
+      if (r.ok) { const d = await r.json(); const rate = parseFloat(d.price); if (Number.isFinite(rate) && rate > 0) _eurUsdRate = rate; }
     } catch(e) {}
   }
   async function _sign(qs) {
@@ -1071,8 +1113,9 @@ const BinanceClient = (() => {
       if (!r.ok) return null;
       const d = await r.json();
       const priceUsdt = parseFloat(d.lastPrice);
-      const priceEur = priceUsdt / (_eurUsdRate || 1.08);
-      return { price: priceEur, change24h: parseFloat(d.priceChangePercent), volume24h: parseFloat(d.quoteVolume), source: 'Binance' };
+      if (!Number.isFinite(priceUsdt) || !_eurUsdRate || !Number.isFinite(_eurUsdRate) || _eurUsdRate <= 0) return null;
+      const priceEur = priceUsdt / _eurUsdRate;
+      return { price: priceEur, change24h: Number.isFinite(parseFloat(d.priceChangePercent)) ? parseFloat(d.priceChangePercent) : null, volume24h: Number.isFinite(parseFloat(d.quoteVolume)) ? parseFloat(d.quoteVolume) : null, source: 'Binance' };
     } catch(e) { return null; }
   }
   async function getOHLC(symbol) {
@@ -1083,7 +1126,8 @@ const BinanceClient = (() => {
       if (!r.ok) return null;
       const raw = await r.json();
       if (!Array.isArray(raw) || raw.length < 20) return null;
-      const rate = window.__eurUsdRate > 0 ? window.__eurUsdRate : (_eurUsdRate || 1.08);
+      const rate = window.__eurUsdRate > 0 ? window.__eurUsdRate : (_eurUsdRate && _eurUsdRate > 0 ? _eurUsdRate : null);
+      if (!rate) return null;
       return raw.map(k => ({
         ts: k[0],
         open:   parseFloat(k[1]) / rate,
@@ -1101,7 +1145,7 @@ const BinanceClient = (() => {
     return { connected: true, balances: d.balances?.length || 0 };
   }
   function isConfigured() { return _apiKey.length > 0 && _secretKey.length > 0; }
-  function _setEurUsdRate(rate) { if (rate > 0) _eurUsdRate = rate; }
+  function _setEurUsdRate(rate) { if (Number.isFinite(rate) && rate > 0) _eurUsdRate = rate; }
   return { init, getPrice, getOHLC, testConnection, isConfigured, _setEurUsdRate };
 })();
 
@@ -1161,7 +1205,7 @@ const RealDataClient = (() => {
       const r = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${id}&vs_currencies=eur&include_24hr_change=true`, { signal: AbortSignal.timeout(8000) });
       if (!r.ok) return null;
       const d = await r.json(); if (!d[id]) return null;
-      const res = { price: d[id].eur, change24h: d[id].eur_24h_change || 0, volume24h: 0, source: 'CoinGecko' };
+      const res = { price: d[id].eur, change24h: Number.isFinite(d[id].eur_24h_change) ? d[id].eur_24h_change : null, volume24h: null, source: 'CoinGecko' };
       _cacheSet(ck, res); return res;
     } catch(e) { return null; }
   }
@@ -1175,9 +1219,13 @@ const RealDataClient = (() => {
       const d = await r.json(); const meta = d?.chart?.result?.[0]?.meta; if (!meta) return null;
       const price = meta.regularMarketPrice, prev = meta.previousClose || meta.chartPreviousClose;
       let priceEur = price;
-      const eurRate = (window.__eurUsdRate > 0.5 && window.__eurUsdRate < 3.0) ? window.__eurUsdRate : 1.08;
-      if (!ticker.includes('=X') && ticker !== 'GC=F') priceEur = price / eurRate;
-      const res = { price: priceEur, change24h: prev ? ((price - prev) / prev) * 100 : 0, volume24h: meta.regularMarketVolume || 0, source: 'Yahoo Finance' };
+      const needsFx = !ticker.includes('=X') && ticker !== 'GC=F';
+      const eurRate = (window.__eurUsdRate > 0.5 && window.__eurUsdRate < 3.0) ? window.__eurUsdRate : null;
+      if (needsFx) {
+        if (!eurRate) return null;
+        priceEur = price / eurRate;
+      }
+      const res = { price: priceEur, change24h: prev ? ((price - prev) / prev) * 100 : null, volume24h: Number.isFinite(meta.regularMarketVolume) ? meta.regularMarketVolume : null, source: 'Yahoo Finance' };
       _cacheSet(ck, res); return res;
     } catch(e) { return null; }
   }
@@ -1192,11 +1240,19 @@ const RealDataClient = (() => {
       const ts = result.timestamp || [], q = result.indicators?.quote?.[0] || {};
       if (ts.length < 20) return null;
       const candles = ts.map((t, i) => ({
-        ts: t * 1000, open: q.open?.[i] || 0, high: q.high?.[i] || 0,
-        low: q.low?.[i] || 0, close: q.close?.[i] || 0, volume: q.volume?.[i] || 1000000,
-      })).filter(c => c.close > 0);
-      const eurRateOHLC = (window.__eurUsdRate > 0.5 && window.__eurUsdRate < 3.0) ? window.__eurUsdRate : 1.08;
-      if (!ticker.includes('=X') && ticker !== 'GC=F') candles.forEach(c => { c.open /= eurRateOHLC; c.high /= eurRateOHLC; c.low /= eurRateOHLC; c.close /= eurRateOHLC; });
+        ts: t * 1000,
+        open: q.open?.[i] ?? null,
+        high: q.high?.[i] ?? null,
+        low: q.low?.[i] ?? null,
+        close: q.close?.[i] ?? null,
+        volume: q.volume?.[i] ?? null,
+      })).filter(c => Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close) && c.close > 0);
+      const needsFxOHLC = !ticker.includes('=X') && ticker !== 'GC=F';
+      const eurRateOHLC = (window.__eurUsdRate > 0.5 && window.__eurUsdRate < 3.0) ? window.__eurUsdRate : null;
+      if (needsFxOHLC) {
+        if (!eurRateOHLC) return null;
+        candles.forEach(c => { c.open /= eurRateOHLC; c.high /= eurRateOHLC; c.low /= eurRateOHLC; c.close /= eurRateOHLC; });
+      }
       _cacheSet(ck, candles); return candles;
     } catch(e) { return null; }
   }
@@ -1370,7 +1426,7 @@ const AnalysisEngine = (() => {
     catch(e) { console.warn('[Analysis] Erreur fetch', symbol); }
 
     if (!candles || candles.length < 20 || !priceData) {
-      return { symbol, name, assetClass, price: 0, change24h: 0, error: 'Données indisponibles — configurez vos clés API', direction: 'neutral', score: 0, adjScore: 0, strength: 'weak', riskLevel: 'high', isSolid: false, regime: { pass: false, reasons: [{ label: 'API non configurée ou indisponible', pass: false }] } };
+      return { symbol, name, assetClass, price: null, change24h: null, error: 'Données indisponibles — configurez vos clés API', direction: 'neutral', score: 0, adjScore: 0, strength: 'weak', riskLevel: 'high', isSolid: false, regime: { pass: false, reasons: [{ label: 'API non configurée ou indisponible', pass: false }] } };
     }
 
     const ind = Indicators.computeAll(candles);
@@ -1420,7 +1476,7 @@ const AnalysisEngine = (() => {
     const results = watchlist.map(asset => {
       try {
         const price = window.__prices[asset.symbol];
-        if (!price) return { symbol: asset.symbol, name: asset.name, assetClass: asset.class, adjScore: 0, price: 0, error: 'En attente des données réelles...' };
+        if (!price) return { symbol: asset.symbol, name: asset.name, assetClass: asset.class, adjScore: 0, price: null, change24h: null, error: 'En attente des données réelles...' };
         // Use cached OHLC if available
         const cachedOHLC = window.__ohlcCache?.[asset.symbol];
         if (!cachedOHLC || cachedOHLC.length < 20) return { symbol: asset.symbol, name: asset.name, assetClass: asset.class, adjScore: 0, price, error: 'Bougies en cours de chargement...' };
@@ -1436,7 +1492,7 @@ const AnalysisEngine = (() => {
         const rrRatio = RiskCalculator.riskRewardRatio(price, stopLoss, takeProfit);
         return {
           symbol: asset.symbol, name: asset.name, assetClass: asset.class,
-          price, change24h: 0,
+          price, change24h: null,
           direction, regime, indicators: ind,
           score: conf.score, adjScore: adjScoreVal,
           strength: signalStrength(adjScoreVal), riskLevel: riskLvl,
@@ -1461,105 +1517,175 @@ const AnalysisEngine = (() => {
 
 // ═══ twelveData.js ═══
 const TwelveDataClient = (() => {
-  const BASE_URL = 'https://api.twelvedata.com';
+  const PROXY_BASE = 'https://aged-bar-257a.emmanueldelasse.workers.dev/twelve';
   const CACHE = new Map();
   let keyStates = [];
 
   function init(keysInput) {
-    // Accept array of strings OR object with .twelveData array
-    let keyList = [];
-    if (Array.isArray(keysInput)) {
-      keyList = keysInput.map((k, i) => ({ key: typeof k === 'string' ? k : (k.key || ''), label: 'Clé ' + (i + 1) }));
-    } else if (keysInput && Array.isArray(keysInput.twelveData)) {
-      keyList = keysInput.twelveData.map((k, i) => ({ key: k.key || k || '', label: k.label || 'Clé ' + (i + 1) }));
-    }
-    keyStates = keyList.map(k => ({
-      key: k.key || '', label: k.label,
-      callsMin: 0, callsDay: 0, lastReset: Date.now(), lastCall: 0,
+    const normalized = Storage.getApiKeys();
+    const list = Array.isArray(keysInput)
+      ? keysInput.map((k, i) => ({ key: typeof k === 'string' ? k : (k?.key || ''), label: 'Clé ' + (i + 1) }))
+      : (keysInput?.twelveData || normalized.twelveData || []).map((k, i) => ({
+          key: k?.key || k || '',
+          label: k?.label || ('Clé ' + (i + 1)),
+        }));
+
+    keyStates = list.map((k, i) => ({
+      key: k.key || '',
+      label: k.label || ('Clé ' + (i + 1)),
+      callsMin: 0,
+      callsDay: 0,
+      lastReset: Date.now(),
+      lastCall: 0,
       status: k.key ? 'active' : 'unconfigured',
     }));
-    if (keyStates.length === 0) keyStates = [1,2,3,4].map(i => ({ key: '', label: 'Clé ' + i, callsMin: 0, callsDay: 0, status: 'unconfigured', lastReset: Date.now(), lastCall: 0 }));
+
+    if (keyStates.length === 0) {
+      keyStates = [1,2,3,4].map(i => ({
+        key: '',
+        label: 'Clé ' + i,
+        callsMin: 0,
+        callsDay: 0,
+        lastReset: Date.now(),
+        lastCall: 0,
+        status: 'unconfigured',
+      }));
+    }
+
     console.log('[TwelveData] Init —', keyStates.filter(k => k.key).length, 'clé(s)');
   }
 
   function selectBestKey() {
     const active = keyStates.filter(k => k.status === 'active' && k.key);
     if (!active.length) return null;
-    return active.reduce((best, k) => {
-      if (Date.now() - k.lastReset > 60000) { k.callsMin = 0; k.lastReset = Date.now(); }
-      return k.callsMin < best.callsMin ? k : best;
+
+    active.forEach(k => {
+      if (Date.now() - k.lastReset > 60000) {
+        k.callsMin = 0;
+        k.lastReset = Date.now();
+      }
     });
+
+    return active.reduce((best, k) => k.callsMin < best.callsMin ? k : best, active[0]);
   }
 
-  async function call(endpoint, params, ttlMs = 60000) {
+  async function call(endpoint, params = {}, ttlMs = 60000) {
     const ck = endpoint + '|' + JSON.stringify(params);
     const cached = CACHE.get(ck);
     if (cached && Date.now() - cached.ts < ttlMs) return cached.data;
+
     const keyState = selectBestKey();
     if (!keyState) return null;
-    const url = `${BASE_URL}/${endpoint}?${new URLSearchParams({ ...params, apikey: keyState.key })}`;
+
+    const path = endpoint.startsWith('/') ? endpoint : '/' + endpoint;
+    const url = PROXY_BASE + path + '?' + new URLSearchParams(params).toString();
+
     try {
-      keyState.callsMin++; keyState.callsDay++; keyState.lastCall = Date.now();
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      keyState.callsMin++;
+      keyState.callsDay++;
+      keyState.lastCall = Date.now();
+
+      const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) {
+        if (r.status === 429) keyState.status = 'throttled';
+        return null;
+      }
+
       const data = await r.json();
-      if (data.code >= 400) { if (data.code === 429) keyState.status = 'throttled'; return null; }
+      if (!data) return null;
+      if (data.code === 429 || data.status === 'error') {
+        if (data.code === 429) keyState.status = 'throttled';
+        return null;
+      }
+
       CACHE.set(ck, { data, ts: Date.now() });
       return data;
-    } catch(e) { keyState.status = 'error'; return null; }
+    } catch(e) {
+      console.warn('[TwelveData] call error:', e.message);
+      keyState.status = 'error';
+      return null;
+    }
   }
 
   async function getPrice(symbol) {
     const keys = Storage.getApiKeys();
-    const keyList = Array.isArray(keys) ? keys : (keys.twelveData || []).map(k => k.key);
-    if (!keyList.some(k => k && k.length > 0)) return null;
-    const data = await call('price', { symbol }, 30000);
-    if (!data) return null;
-    return { price: parseFloat(data.price), change24h: 0, volume24h: 0, source: 'TwelveData' };
+    if (!keys.twelveData.some(k => k.key)) return null;
+
+    const data = await call('/price', { symbol }, 30000);
+    if (!data || data.price === undefined || data.price === null) return null;
+
+    const price = parseFloat(data.price);
+    if (!Number.isFinite(price) || price <= 0) return null;
+
+    return { price, change24h: null, volume24h: null, source: 'TwelveData' };
   }
 
   async function getTimeSeries(symbol, interval = '1day', outputsize = 130) {
     const keys = Storage.getApiKeys();
-    const keyList = Array.isArray(keys) ? keys : (keys.twelveData || []).map(k => k.key);
-    if (!keyList.some(k => k && k.length > 0)) return null;
-    const data = await call('time_series', { symbol, interval, outputsize }, 3600000);
-    if (!data?.values) return null;
-    return data.values.map(v => ({
+    if (!keys.twelveData.some(k => k.key)) return null;
+
+    const data = await call('/time_series', { symbol, interval, outputsize }, 3600000);
+    if (!data?.values || !Array.isArray(data.values)) return null;
+
+    const candles = data.values.map(v => ({
       ts: new Date(v.datetime).getTime(),
-      open: parseFloat(v.open), high: parseFloat(v.high),
-      low: parseFloat(v.low), close: parseFloat(v.close),
-      volume: parseFloat(v.volume) || 1000000,
-    })).reverse();
+      open: parseFloat(v.open),
+      high: parseFloat(v.high),
+      low: parseFloat(v.low),
+      close: parseFloat(v.close),
+      volume: Number.isFinite(parseFloat(v.volume)) ? parseFloat(v.volume) : null,
+    })).filter(c =>
+      Number.isFinite(c.open) && Number.isFinite(c.high) && Number.isFinite(c.low) && Number.isFinite(c.close)
+    ).reverse();
+
+    return candles.length >= 20 ? candles : null;
   }
 
-  function getKeyStatus() { return keyStates.map(k => ({ label: k.label, status: k.status, callsMin: k.callsMin, callsDay: k.callsDay, hasKey: !!k.key })); }
+  function getKeyStatus() {
+    return keyStates.map(k => ({ label: k.label, status: k.status, callsMin: k.callsMin, callsDay: k.callsDay, hasKey: !!k.key }));
+  }
   function clearCache() { CACHE.clear(); }
 
-  return { init, getPrice, getTimeSeries, getKeyStatus, clearCache };
+  return { init, call, getPrice, getTimeSeries, getKeyStatus, clearCache };
 })();
 
 // ═══ brokerAdapter.js ═══
+// ═══ brokerAdapter.js ═══
 const BrokerAdapter = (() => {
-  const MockAdapter = {
+const MockAdapter = {
     name: 'Simulation', type: 'mock', connected: true,
     async getBalance() {
       const cap = Storage.getSimCapital();
       let openPnL = 0;
       Storage.getSimPositions().forEach(p => {
-        const curr = window.__prices[p.symbol] || null;
-        openPnL += RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
+        const curr = getPriceForSymbol(p.symbol);
+        if (curr !== null) openPnL += RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
       });
       return { available: cap, total: cap + openPnL, currency: 'EUR' };
     },
     async placeOrder(order) {
       const { symbol, direction, quantity, entryPrice, stopLoss, takeProfit } = order;
-      const pos = { id: 'sim_' + Date.now(), mode: 'sim', symbol, name: MOCK_DATA.watchlist.find(a => a.symbol === symbol)?.name || symbol, direction, entryPrice, quantity, invested: entryPrice * quantity, stopLoss, takeProfit, openedAt: Date.now() };
+      if (!entryPrice || entryPrice <= 0) return { success: false, error: 'Prix réel indisponible' };
+      if (stopLoss === null || takeProfit === null) return { success: false, error: 'Niveaux SL/TP indisponibles' };
+
+      const pos = {
+        id: 'sim_' + Date.now(),
+        mode: 'sim',
+        symbol,
+        name: MOCK_DATA.watchlist.find(a => a.symbol === symbol)?.name || symbol,
+        direction,
+        entryPrice,
+        quantity,
+        invested: entryPrice * quantity,
+        stopLoss,
+        takeProfit,
+        openedAt: Date.now(),
+      };
       const cap = Storage.getSimCapital();
       Storage.saveSimCapital(Math.max(0, cap - pos.invested));
       const positions = Storage.getSimPositions();
       positions.push(pos);
       Storage.saveSimPositions(positions);
-      // Sync with Supabase
       SupabaseDB.savePosition(pos).catch(() => {});
       SupabaseDB.saveCapital(Math.max(0, cap - pos.invested)).catch(() => {});
       return { success: true, position: pos, orderId: pos.id };
@@ -1569,34 +1695,45 @@ const BrokerAdapter = (() => {
       const idx = positions.findIndex(p => p.id === positionId);
       if (idx === -1) return { success: false, error: 'Position introuvable' };
       const pos = positions[idx];
-      const curr = window.__prices[pos.symbol] || null;
-      if (!curr || curr <= 0) { resolve({ success: false, error: 'Prix réel non disponible' }); return; }
+      const curr = getPriceForSymbol(pos.symbol);
+      if (curr === null) return { success: false, error: 'Prix réel indisponible — impossible de clôturer' };
+
       const pnl = RiskCalculator.openPnL(pos.entryPrice, curr, pos.quantity, pos.direction);
       const pnlPct = RiskCalculator.openPnLPct(pos.entryPrice, curr, pos.direction);
       Storage.saveSimCapital(Storage.getSimCapital() + pos.invested + pnl);
       const history = Storage.getSimHistory();
-      history.unshift({ id: 'h_' + Date.now(), symbol: pos.symbol, direction: pos.direction, entryPrice: pos.entryPrice, exitPrice: curr, pnl, pnlPct, closedAt: Date.now(), durationDays: Math.round((Date.now() - pos.openedAt) / 86400000) });
-      // Record for algo learning
+      history.unshift({
+        id: 'h_' + Date.now(),
+        symbol: pos.symbol,
+        direction: pos.direction,
+        entryPrice: pos.entryPrice,
+        exitPrice: curr,
+        pnl,
+        pnlPct,
+        closedAt: Date.now(),
+        durationDays: Math.round((Date.now() - pos.openedAt) / 86400000),
+      });
       const currentAnalysis = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === pos.symbol);
       if (currentAnalysis?.indicators) {
         AlgoLearning.recordTrade({
-          symbol: pos.symbol, direction: pos.direction,
-          pnl, pnlPct, score: currentAnalysis.adjScore,
+          symbol: pos.symbol,
+          direction: pos.direction,
+          pnl,
+          pnlPct,
+          score: currentAnalysis.adjScore,
           closedAt: Date.now(),
         }, currentAnalysis.indicators);
       }
       Storage.saveSimHistory(history);
       positions.splice(idx, 1);
       Storage.saveSimPositions(positions);
-      // Sync with Supabase
       const closedTrade = history[0];
-      SupabaseDB.saveTrade({...closedTrade, mode: 'sim'}).catch(() => {});
+      SupabaseDB.saveTrade({ ...closedTrade, mode: 'sim' }).catch(() => {});
       SupabaseDB.deletePosition(positionId).catch(() => {});
-      SupabaseDB.saveCapital(Storage.getSimCapital() + pos.invested + pnl).catch(() => {});
+      SupabaseDB.saveCapital(Storage.getSimCapital()).catch(() => {});
       return { success: true, pnl, pnlPct, exitPrice: curr };
     },
   };
-
   const BinanceAdapter = {
     name: 'Binance', type: 'binance', connected: BinanceClient.isConfigured(),
     async placeOrder(order) {
@@ -1963,14 +2100,30 @@ const UI = (() => {
     }, 3500);
   }
 
+  function modal(title, html) {
+    const overlay = document.getElementById('modal-overlay');
+    const content = document.getElementById('modal-content');
+    if (!overlay || !content) return;
+    content.innerHTML = `
+      <div style="padding:var(--space-6);">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-4);gap:var(--space-3);">
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;">${title}</div>
+          <button class="btn btn-ghost btn-sm" id="ui-modal-close">Fermer</button>
+        </div>
+        <div>${html}</div>
+      </div>`;
+    overlay.classList.remove('hidden');
+    document.getElementById('ui-modal-close').onclick = () => overlay.classList.add('hidden');
+    overlay.onclick = e => { if (e.target === overlay) overlay.classList.add('hidden'); };
+  }
+
   function confirm(title, message, isDangerous = false) {
     return new Promise(resolve => {
       const overlay = document.getElementById('modal-overlay');
       const content = document.getElementById('modal-content');
       content.innerHTML = `
         <div style="padding:var(--space-6);">
-          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;
-            color:${isDangerous ? 'var(--real-color)' : 'var(--text-primary)'};margin-bottom:var(--space-3);">${title}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:${isDangerous ? 'var(--real-color)' : 'var(--text-primary)'};margin-bottom:var(--space-3);">${title}</div>
           <p style="font-size:var(--text-sm);color:var(--text-secondary);margin-bottom:var(--space-6);line-height:1.6;">${message}</p>
           ${isDangerous ? `<div class="warning-box danger" style="margin-bottom:var(--space-5);">⚠️ Cette action concerne des fonds RÉELS.</div>` : ''}
           <div style="display:flex;gap:var(--space-3);justify-content:flex-end;">
@@ -1980,7 +2133,7 @@ const UI = (() => {
         </div>`;
       overlay.classList.remove('hidden');
       document.getElementById('modal-cancel').onclick  = () => { overlay.classList.add('hidden'); resolve(false); };
-      document.getElementById('modal-confirm').onclick = () => { overlay.classList.add('hidden'); resolve(true);  };
+      document.getElementById('modal-confirm').onclick = () => { overlay.classList.add('hidden'); resolve(true); };
       overlay.onclick = e => { if (e.target === overlay) { overlay.classList.add('hidden'); resolve(false); } };
     });
   }
@@ -1990,23 +2143,46 @@ const UI = (() => {
       const overlay = document.getElementById('modal-overlay');
       const content = document.getElementById('modal-content');
       const settings = Storage.getSettings();
-      const price    = window.__prices[symbol] || 0;
-      const stop     = analysis.stopLoss   || (price * 0.98);
-      const tp       = analysis.takeProfit || (price * 1.05);
-      const capNum   = Storage.getSimCapital();
+      const price = getPriceForSymbol(symbol);
+      const stop = analysis?.stopLoss || null;
+      const tp = analysis?.takeProfit || null;
+      const capNum = Storage.getSimCapital();
+      const isSim = mode === 'sim';
+      const direction = analysis?.direction || 'neutral';
+
+      if (price === null || !Number.isFinite(price) || price <= 0 || stop === null || tp === null) {
+        content.innerHTML = `
+          <div style="padding:var(--space-6);">
+            <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;margin-bottom:var(--space-3);">${symbol}</div>
+            <div class="warning-box danger" style="margin-bottom:var(--space-5);">
+              Prix réel ou niveaux SL/TP indisponibles. Impossible d’ouvrir un trade tant que les données live ne sont pas chargées.
+            </div>
+            <div style="display:flex;justify-content:flex-end;">
+              <button class="btn btn-ghost" id="order-cancel">Fermer</button>
+            </div>
+          </div>`;
+        overlay.classList.remove('hidden');
+        document.getElementById('order-cancel').onclick = () => { overlay.classList.add('hidden'); resolve(null); };
+        overlay.onclick = e => { if (e.target === overlay) { overlay.classList.add('hidden'); resolve(null); } };
+        return;
+      }
+
       const riskAmount = capNum * settings.riskPerTrade;
-      const qty      = stop > 0 ? riskAmount / Math.abs(price - stop) : 1;
+      const riskPerUnit = Math.abs(price - stop);
+      if (!riskPerUnit || riskPerUnit <= 0) {
+        overlay.classList.add('hidden');
+        resolve(null);
+        return;
+      }
+
+      const qty = riskAmount / riskPerUnit;
       const invested = qty * price;
-      const isSim    = mode === 'sim';
-      const rrRatio  = analysis.rrRatio || '—';
-      const slPct    = price > 0 ? ((Math.abs(price - stop) / price) * 100).toFixed(1) : '?';
-      const tpPct    = price > 0 ? ((Math.abs(tp - price) / price) * 100).toFixed(1) : '?';
-      const direction = analysis.direction || 'neutral';
+      const rrRatio = analysis?.rrRatio || '—';
+      const slPct = ((Math.abs(price - stop) / price) * 100).toFixed(1);
+      const tpPct = ((Math.abs(tp - price) / price) * 100).toFixed(1);
 
       content.innerHTML = `
         <div style="padding:var(--space-6);">
-
-          <!-- En-tête -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-5);">
             <div style="display:flex;align-items:center;gap:var(--space-3);">
               <div style="width:42px;height:42px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border-medium);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-weight:700;color:var(--accent);">${Fmt.assetIcon(symbol)}</div>
@@ -2021,13 +2197,10 @@ const UI = (() => {
             </div>
           </div>
 
-          <!-- Résumé visuel du trade — lecture seule -->
           <div style="background:var(--bg-elevated);border-radius:var(--card-radius);padding:var(--space-4);margin-bottom:var(--space-4);">
-
-            <!-- Prix + direction -->
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-4);padding-bottom:var(--space-3);border-bottom:1px solid var(--border-subtle);">
               <div>
-                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Prix d'entrée</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Prix d'entrée réel</div>
                 <div style="font-family:var(--font-mono);font-size:var(--text-xl);font-weight:700;">${Fmt.price(price)}</div>
               </div>
               <div style="text-align:right;">
@@ -2036,7 +2209,6 @@ const UI = (() => {
               </div>
             </div>
 
-            <!-- SL / TP côte à côte -->
             <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:var(--space-3);align-items:center;margin-bottom:var(--space-4);">
               <div style="background:rgba(224,90,90,0.08);border:1px solid var(--real-border);border-radius:8px;padding:var(--space-3);">
                 <div style="font-size:var(--text-xs);color:var(--loss);font-weight:700;margin-bottom:4px;">🔴 STOP-LOSS</div>
@@ -2047,11 +2219,10 @@ const UI = (() => {
               <div style="background:rgba(0,229,160,0.08);border:1px solid var(--accent-glow);border-radius:8px;padding:var(--space-3);">
                 <div style="font-size:var(--text-xs);color:var(--profit);font-weight:700;margin-bottom:4px;">🟢 TAKE PROFIT</div>
                 <div style="font-family:var(--font-mono);font-size:var(--text-lg);font-weight:700;color:var(--profit);">${Fmt.price(tp)}</div>
-                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">+${tpPct}% · ${Fmt.currency(riskAmount * parseFloat(rrRatio) || 0)} potentiel</div>
+                <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">+${tpPct}%</div>
               </div>
             </div>
 
-            <!-- Sizing -->
             <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:var(--space-3);">
               <div style="text-align:center;">
                 <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:2px;">Montant engagé</div>
@@ -2068,23 +2239,11 @@ const UI = (() => {
             </div>
           </div>
 
-          <!-- Avertissement si capital insuffisant -->
-          ${invested > capNum ? `<div style="background:var(--real-bg);border:1px solid var(--real-border);border-radius:8px;padding:var(--space-3);margin-bottom:var(--space-4);font-size:var(--text-xs);color:var(--loss);">⚠️ Capital insuffisant. Réduisez le montant ou ajustez le risque par trade dans les paramètres.</div>` : ''}
+          ${invested > capNum ? `<div style="background:var(--real-bg);border:1px solid var(--real-border);border-radius:8px;padding:var(--space-3);margin-bottom:var(--space-4);font-size:var(--text-xs);color:var(--loss);">⚠️ Capital insuffisant.</div>` : ''}
 
-          <!-- Note algo -->
-          <div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-5);line-height:1.6;text-align:center;">
-            📐 SL calculé par l'algo : <strong>2×ATR(14)</strong> · TP : ratio R/R <strong>2.5:1</strong> · Risque : <strong>${(settings.riskPerTrade * 100).toFixed(2)}% du capital</strong>
-          </div>
-
-          <!-- Champs cachés (valeurs utilisées à la confirmation) -->
-          <input type="hidden" id="order-amount" value="${invested.toFixed(2)}"/>
-          <input type="hidden" id="order-stop"   value="${stop.toFixed(6)}"/>
-          <input type="hidden" id="order-tp"     value="${tp.toFixed(6)}"/>
-
-          <!-- Boutons -->
           <div style="display:flex;gap:var(--space-3);">
             <button class="btn btn-ghost" id="order-cancel" style="flex:1;">Annuler</button>
-            <button class="btn ${isSim ? 'btn-sim' : 'btn-real'}" id="order-confirm" style="flex:2;" ${!isSim ? 'disabled' : ''}>
+            <button class="btn ${isSim ? 'btn-sim' : 'btn-danger'}" id="order-confirm" style="flex:2;" ${(!isSim || invested > capNum) ? 'disabled' : ''}>
               ${isSim ? '⚡ Confirmer & Ouvrir le trade' : '⚠️ Non disponible en V1'}
             </button>
           </div>
@@ -2094,11 +2253,8 @@ const UI = (() => {
       document.getElementById('order-cancel').onclick = () => { overlay.classList.add('hidden'); resolve(null); };
       if (isSim) {
         document.getElementById('order-confirm').onclick = () => {
-          const amount = parseFloat(document.getElementById('order-amount').value);
-          const stopVal = parseFloat(document.getElementById('order-stop').value);
-          const tpVal   = parseFloat(document.getElementById('order-tp').value);
           overlay.classList.add('hidden');
-          resolve({ symbol, direction: analysis.direction, quantity: amount / price, entryPrice: price, stopLoss: stopVal, takeProfit: tpVal });
+          resolve({ symbol, direction: analysis.direction, quantity: qty, entryPrice: price, stopLoss: stop, takeProfit: tp });
         };
       }
       overlay.onclick = e => { if (e.target === overlay) { overlay.classList.add('hidden'); resolve(null); } };
@@ -2122,7 +2278,7 @@ const UI = (() => {
   function sparkline(candles, width = 80, height = 30) {
     if (!candles || candles.length < 2) return `<div style="width:${width}px;height:${height}px;"></div>`;
     const closes = candles.map(c => c.close);
-    const min = closes.reduce(function(a,b){return a<b?a:b;}), max = closes.reduce(function(a,b){return a>b?a:b;}), range = max - min || 1;
+    const min = closes.reduce((a,b) => a < b ? a : b), max = closes.reduce((a,b) => a > b ? a : b), range = max - min || 1;
     const pts = closes.map((v, i) => `${(i / (closes.length - 1)) * width},${height - ((v - min) / range) * height}`).join(' ');
     const color = closes[closes.length - 1] >= closes[0] ? 'var(--profit)' : 'var(--loss)';
     return `<svg width="${width}" height="${height}" style="display:block;"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5"/></svg>`;
@@ -2131,12 +2287,13 @@ const UI = (() => {
   function updateModeBanner(mode) {
     const banner = document.getElementById('mode-banner');
     if (!banner) return;
-    banner.style.display = 'none'; // Bannière masquée
+    banner.style.display = 'none';
   }
 
-  return { toast, confirm, openOrderModal, scoreRing, sparkline, updateModeBanner };
+  return { toast, modal, confirm, openOrderModal, scoreRing, sparkline, updateModeBanner };
 })();
 
+// ─── THEME LIGHT CSS (injecté dans <style> au boot) ───
 // ─── THEME LIGHT CSS (injecté dans <style> au boot) ───
 const LIGHT_THEME_CSS = `
 [data-theme="light"] {
@@ -2493,16 +2650,23 @@ const Sync = (() => {
 
   function updateLivePnL() {
     Storage.getSimPositions().forEach(pos => {
-      const curr = window.__prices[pos.symbol] || null;
-      if (!curr || curr <= 0) { resolve({ success: false, error: 'Prix réel non disponible' }); return; }
-      const pnl  = RiskCalculator.openPnL(pos.entryPrice, curr, pos.quantity, pos.direction);
-      const pnlP = RiskCalculator.openPnLPct(pos.entryPrice, curr, pos.direction);
-      const el   = document.querySelector(`[data-position-pnl="${pos.id}"]`);
-      if (el) { el.textContent = Fmt.currency(pnl); el.className = 'pnl-value ' + Fmt.pnlClass(pnl); }
-      const pEl  = document.querySelector(`[data-position-pnlpct="${pos.id}"]`);
-      if (pEl) { pEl.textContent = Fmt.pct(pnlP); pEl.className = 'pnl-pct ' + Fmt.pnlClass(pnlP); }
+      const curr = getPriceForSymbol(pos.symbol);
+      const el = document.querySelector(`[data-position-pnl="${pos.id}"]`);
+      const pEl = document.querySelector(`[data-position-pnlpct="${pos.id}"]`);
       const prEl = document.querySelector(`[data-position-price="${pos.id}"]`);
-      if (prEl) prEl.textContent = curr && curr > 0 ? Fmt.price(curr) : '⏳';
+
+      if (curr === null) {
+        if (el) { el.textContent = '—'; el.className = 'pnl-value neutral'; }
+        if (pEl) { pEl.textContent = '—'; pEl.className = 'pnl-pct neutral'; }
+        if (prEl) prEl.textContent = '—';
+        return;
+      }
+
+      const pnl = RiskCalculator.openPnL(pos.entryPrice, curr, pos.quantity, pos.direction);
+      const pnlP = RiskCalculator.openPnLPct(pos.entryPrice, curr, pos.direction);
+      if (el) { el.textContent = Fmt.currency(pnl); el.className = 'pnl-value ' + Fmt.pnlClass(pnl); }
+      if (pEl) { pEl.textContent = Fmt.pct(pnlP); pEl.className = 'pnl-pct ' + Fmt.pnlClass(pnlP); }
+      if (prEl) prEl.textContent = Fmt.price(curr);
     });
   }
 
@@ -2821,7 +2985,7 @@ function renderDashboard() {
 
   let totalPnL = 0, totalInvested = 0;
   simPos.forEach(p => {
-    const curr = window.__prices[p.symbol];
+    const curr = getPriceForSymbol(p.symbol);
     totalInvested += p.invested;
     // Only add PnL if real price available — never use entry price as current
     if (curr && curr > 0) {
@@ -3025,9 +3189,9 @@ function renderOpportunityRow(a, rank) {
 }
 
 function renderPositionCardMini(p) {
-  const curr = window.__prices[p.symbol] || null;
-  const pnl  = RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
-  const pnlP = RiskCalculator.openPnLPct(p.entryPrice, curr, p.direction);
+  const curr = getPriceForSymbol(p.symbol);
+  const pnl = curr === null ? null : RiskCalculator.openPnL(p.entryPrice, curr, p.quantity, p.direction);
+  const pnlP = curr === null ? null : RiskCalculator.openPnLPct(p.entryPrice, curr, p.direction);
   return `
     <div class="position-card sim" style="cursor:pointer;" data-screen="portefeuille">
       <div class="position-header">
@@ -3043,8 +3207,8 @@ function renderPositionCardMini(p) {
           </div>
         </div>
         <div class="position-pnl" style="text-align:right;">
-          <div class="pf-pnl-big ${Fmt.pnlClass(pnl)}" data-position-pnl="${p.id}">${Fmt.signedCurrency(pnl)}</div>
-          <div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;" class="${Fmt.pnlClass(pnlP)}" data-position-pnlpct="${p.id}">${Fmt.signedPct(pnlP)}</div>
+          <div class="pf-pnl-big ${Fmt.pnlClass(pnl)}" data-position-pnl="${p.id}">${pnl === null ? '—' : Fmt.signedCurrency(pnl)}</div>
+          <div style="font-family:var(--font-mono);font-size:var(--text-sm);font-weight:600;" class="${Fmt.pnlClass(pnlP)}" data-position-pnlpct="${p.id}">${pnlP === null ? '—' : Fmt.signedPct(pnlP)}</div>
         </div>
       </div>
     </div>`;
@@ -3242,7 +3406,7 @@ function renderOppCard(a, rank, isSolid = false, isNeutral = false, compact = fa
             <span style="font-family:var(--font-mono);font-size:var(--text-md);font-weight:700;">${a.symbol}</span>
             <span style="font-size:0.65rem;font-weight:700;padding:1px 5px;border-radius:3px;background:${a.direction === 'long' ? 'rgba(0,229,160,0.12)' : 'rgba(224,90,90,0.12)'};color:${a.direction === 'long' ? 'var(--profit)' : 'var(--loss)'};">${a.direction === 'long' ? '↑ Long' : a.direction === 'short' ? '↓ Short' : '— Neutre'}</span>
             ${isSolid ? '<span style="font-size:0.65rem;font-weight:700;padding:1px 5px;border-radius:3px;background:rgba(0,229,160,0.12);color:var(--profit);">★ Solide</span>' : ''}
-            ${a.dataWarning ? '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:var(--bg-elevated);color:var(--text-muted);">SIM</span>' : '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:rgba(0,229,160,0.10);color:var(--profit);">LIVE</span>'}
+            ${priceAvailable ? '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:rgba(0,229,160,0.10);color:var(--profit);">LIVE</span>' : '<span style="font-size:0.6rem;padding:1px 4px;border-radius:3px;background:var(--bg-elevated);color:var(--text-muted);">EN ATTENTE</span>'}
           </div>
           <div style="font-size:var(--text-xs);color:var(--text-muted);margin-top:2px;">${a.name}</div>
         </div>
@@ -3309,7 +3473,7 @@ function renderAssetDetail(params) {
   const analysis = cached || {
     symbol, name: asset.name, assetClass: asset.class,
     price: realPrice || null, // null = prix non disponible
-    change24h: 0,
+    change24h: null,
     direction: 'neutral', adjScore: 0, score: 0,
     regime: { pass: false, reasons: [] }, indicators: {}, isSolid: false,
     stopLoss: null, takeProfit: null, rrRatio: 0,
@@ -3326,8 +3490,9 @@ function renderAssetDetail(params) {
   const _capNum = typeof _simCap === 'object' ? (_simCap.current || _simCap.initial || 10000) : (parseFloat(_simCap) || 10000);
 
   // SL/TP based on real price — never on mock
-  const stopLoss   = analysis.stopLoss   || (displayPrice > 0 ? displayPrice * 0.97 : null);
-  const takeProfit = analysis.takeProfit || (displayPrice > 0 ? displayPrice * 1.06 : null);
+  const stopLoss   = analysis.stopLoss || null;
+  const takeProfit = analysis.takeProfit || null;
+  const canOpenTrade = priceAvailable && analysis.direction !== 'neutral' && stopLoss !== null && takeProfit !== null;
 
   // Alertes déjà configurées pour cet actif
   const existingAlerts = Storage.getAlerts().filter(a => a.symbol === symbol && !a.autoCreated);
@@ -3349,12 +3514,12 @@ function renderAssetDetail(params) {
             }
           </div>
           <div class="asset-detail-full">${asset.name} · ${asset.class?.toUpperCase()}</div>
-          <div style="font-size:0.6rem;margin-top:2px;">${priceAvailable ? '<span style=\"color:var(--profit);\">● Prix en direct</span>' : '<span style=\"color:var(--signal-medium);">⏳ Chargement prix réel...</span>'}</div>
+          <div style="font-size:0.6rem;margin-top:2px;">${priceAvailable ? '<span style=\"color:var(--profit);\">● Prix en direct</span>' : '<span style=\"color:var(--signal-medium);\">⏳ Prix réel indisponible pour le moment</span>'}</div>
         </div>
       </div>
       <div class="asset-price-block">
         <div class="asset-price-main" style="color:${displayPrice ? 'var(--text-primary)' : 'var(--signal-medium)'}">
-          ${displayPrice ? Fmt.price(displayPrice) : '⏳ Prix réel en cours de chargement...'}
+          ${displayPrice ? Fmt.price(displayPrice) : '—'}
         </div>
         <div class="asset-price-change ${change.cls}">${displayPrice ? change.text + ' (24h)' : ''}</div>
       </div>
@@ -3363,7 +3528,7 @@ function renderAssetDetail(params) {
     <div class="chart-container">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:var(--space-4);">
         <span class="card-title">Évolution du prix (55 jours)</span>
-        <span style="font-size:var(--text-xs);color:var(--text-muted);">Données de démonstration</span>
+        <span style="font-size:var(--text-xs);color:var(--text-muted);">Données réelles</span>
       </div>
       ${renderPriceChart(symbol)}
       <div style="display:flex;gap:var(--space-4);margin-top:var(--space-4);flex-wrap:wrap;">
@@ -3511,7 +3676,7 @@ function renderAssetDetail(params) {
     <div class="card" style="margin-bottom:var(--space-5);">
       <div class="card-header"><span class="card-title">Niveaux clés suggérés</span></div>
       <div class="grid-3">
-        <div><div class="stat-label">Prix actuel (live)</div><div class="stat-value" style="color:${displayPrice ? 'var(--text-primary)' : 'var(--signal-medium)'}">${displayPrice ? Fmt.price(displayPrice) : '⏳ En chargement...'}</div></div>
+        <div><div class="stat-label">Prix actuel (live)</div><div class="stat-value" style="color:${displayPrice ? 'var(--text-primary)' : 'var(--signal-medium)'}">${displayPrice ? Fmt.price(displayPrice) : '—'}</div></div>
         <div><div class="stat-label">Stop-loss (2×ATR)</div><div class="stat-value" style="color:var(--loss);">${stopLoss ? Fmt.price(stopLoss) : '—'}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">${stopLoss && displayPrice > 0 ? '-' + ((Math.abs(displayPrice - stopLoss) / displayPrice) * 100).toFixed(1) + '%' : ''}</div></div>
         <div><div class="stat-label">Take profit (R/R 2.5)</div><div class="stat-value" style="color:var(--profit);">${takeProfit ? Fmt.price(takeProfit) : '—'}</div><div style="font-size:var(--text-xs);color:var(--text-muted);">${takeProfit && displayPrice > 0 ? '+' + ((Math.abs(takeProfit - displayPrice) / displayPrice) * 100).toFixed(1) + '%' : ''}</div></div>
       </div>
@@ -3600,11 +3765,11 @@ function renderAssetDetail(params) {
           Capital disponible : <strong>${Fmt.currency(_capNum)}</strong><br/>
           Risque par trade : ${(settings.riskPerTrade * 100).toFixed(2)}% = ${Fmt.currency(_capNum * settings.riskPerTrade)}
         </div>
-        ${analysis.direction !== 'neutral' ? `
+        ${canOpenTrade ? `
           <button class="btn btn-sim btn-block" id="btn-open-sim" data-open-position="${symbol}" data-mode="sim">
             🎯 Ouvrir un trade d'entraînement
           </button>` : `
-          <button class="btn btn-ghost btn-block" disabled>Signal neutre — attendre</button>`
+          <button class="btn btn-ghost btn-block" disabled>${!priceAvailable ? 'Prix réel indisponible' : 'Signal ou niveaux incomplets'}</button>`
         }
       </div>
 
@@ -3665,7 +3830,7 @@ function renderAlertRow(a) {
 
 function renderPriceChart(symbol) {
   const candles = window.__ohlcCache?.[symbol];
-  if (!candles || candles.length < 5) return '<div style="height:120px;background:var(--bg-elevated);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);color:var(--text-muted);">⏳ Graphique en cours de chargement...</div>';
+  if (!candles || candles.length < 5) return '<div style="height:120px;background:var(--bg-elevated);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:var(--text-xs);color:var(--text-muted);">⏳ Graphique réel en cours de chargement...</div>';
   const closes = candles.map(c => c.close);
   const min = closes.reduce(function(a,b){return a<b?a:b;}), max = closes.reduce(function(a,b){return a>b?a:b;}), range = max - min || 1;
   const W = 600, H = 120;
@@ -3707,16 +3872,25 @@ document.addEventListener('click', async e => {
   // Bouton open sim
   const simBtn = e.target.closest('#btn-open-sim');
   if (simBtn) {
-    const symbol   = simBtn.dataset.openPosition;
-    const cached   = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
-    const analysis = cached || { symbol, direction: 'neutral', adjScore: 0, regime: { pass: false, reasons: [] }, indicators: {} };
-    const order    = await UI.openOrderModal(symbol, 'sim', analysis);
+    const symbol = simBtn.dataset.openPosition;
+    const livePrice = getPriceForSymbol(symbol);
+    if (livePrice === null) {
+      UI.toast('Prix réel indisponible — impossible d’ouvrir un trade', 'error');
+      return;
+    }
+
+    const cached = window.__MTP?.lastAnalysis?.all?.find(a => a.symbol === symbol);
+    const analysis = cached || { symbol, direction: 'neutral', adjScore: 0, regime: { pass: false, reasons: [] }, indicators: {}, stopLoss: null, takeProfit: null };
+    if (!analysis.stopLoss || !analysis.takeProfit || analysis.direction === 'neutral') {
+      UI.toast('Signal incomplet — attendre des données réelles complètes', 'warning');
+      return;
+    }
+
+    const order = await UI.openOrderModal(symbol, 'sim', analysis);
     if (!order) return;
     const result = await BrokerAdapter.placeOrder(order, 'sim');
     if (result.success) {
-      // Auto-créer alertes stop/tp pour cette position
       AlertManager.syncPositionAlerts();
-      // Request push notification permission on first trade
       if (AlertManager.getStats().permission === 'default') {
         AlertManager.requestPermission().then(ok => {
           if (ok) UI.toast('🔔 Notifications activées — vous serez alerté sur vos trades', 'success');
@@ -4463,17 +4637,24 @@ function _renderHistoryRow(t) {
 }
 
 function _enrichPosition(pos) {
-  // STRICT: real price only — never show entry price as current
-  const currentPrice = window.__prices[pos.symbol] > 0 ? window.__prices[pos.symbol] : null;
-  const priceLoaded = currentPrice !== null;
+  const currentPrice = getPriceForSymbol(pos.symbol);
+  if (currentPrice === null) {
+    return {
+      ...pos,
+      currentPrice: null,
+      pnl: null,
+      pnlPct: null,
+      invested: pos.entryPrice * pos.quantity,
+    };
+  }
+
   const dir = (pos.direction || '').toLowerCase();
-  const diff = priceLoaded ? (dir === 'long' ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice) : null;
+  const diff = dir === 'long' ? currentPrice - pos.entryPrice : pos.entryPrice - currentPrice;
   return {
     ...pos,
-    currentPrice: currentPrice, // null si prix réel non disponible — jamais entryPrice
-    priceLoaded,
-    pnl: diff !== null ? diff * pos.quantity : null,
-    pnlPct: diff !== null ? (diff / pos.entryPrice) * 100 : null,
+    currentPrice,
+    pnl: diff * pos.quantity,
+    pnlPct: (diff / pos.entryPrice) * 100,
     invested: pos.entryPrice * pos.quantity,
   };
 }
@@ -4629,7 +4810,8 @@ function _computeStats(capital, history, openPos, settings) {
   const initialCapital = parseFloat(settings.simInitialCapital) || 10000;
   let openPnl = 0;
   openPos.forEach(pos => {
-    const curr = window.__prices[pos.symbol] || null;
+    const curr = getPriceForSymbol(pos.symbol);
+    if (curr === null) return;
     const dir  = (pos.direction || '').toLowerCase();
     const diff = dir === 'long' ? curr - pos.entryPrice : pos.entryPrice - curr;
     openPnl += diff * pos.quantity;
@@ -4688,16 +4870,16 @@ function _renderEquityCurve(curve, initial) {
 }
 
 function _renderMiniPosition(pos) {
-  const curr = window.__prices[pos.symbol] > 0 ? window.__prices[pos.symbol] : pos.entryPrice;
+  const curr = getPriceForSymbol(pos.symbol);
   const dir  = (pos.direction || '').toLowerCase();
-  const diff = dir === 'long' ? curr - pos.entryPrice : pos.entryPrice - curr;
-  const pnl  = diff * pos.quantity;
+  const diff = curr === null ? null : (dir === 'long' ? curr - pos.entryPrice : pos.entryPrice - curr);
+  const pnl  = diff === null ? null : diff * pos.quantity;
   return `
     <div class="mini-pos-row" data-open-detail="${pos.symbol}" style="cursor:pointer">
       <span class="mini-pos-icon">${Fmt.assetIcon(pos.symbol)}</span>
       <span class="mini-pos-symbol">${pos.symbol}</span>
       <span class="mini-pos-dir ${dir === 'long' ? 'long' : 'short'}">${pos.direction}</span>
-      <span class="mini-pos-pnl ${Fmt.pnlClass(pnl)}">${window.__prices[pos.symbol] > 0 ? Fmt.signedCurrency(pnl) : '⏳'}</span>
+      <span class="mini-pos-pnl ${Fmt.pnlClass(pnl)}">${curr !== null ? Fmt.signedCurrency(pnl) : '⏳'}</span>
     </div>`;
 }
 
@@ -5268,7 +5450,7 @@ const WatchlistManager = (() => {
     const custom = getCustomWatchlist();
     if (custom.find(a => a.symbol === symbol)) return false;
     if (MOCK_DATA.watchlist.find(a => a.symbol === symbol)) return false;
-    custom.push({ symbol, name, class: assetClass || 'crypto', trend: 'neutral', volatility: 0.03, custom: true });
+    custom.push({ symbol, name, class: assetClass || 'crypto', custom: true });
     saveCustomWatchlist(custom);
     return true;
   }
@@ -5321,8 +5503,8 @@ const WatchlistManager = (() => {
 async function analyzeMultiTimeframe(symbol) {
   try {
     const [h1, h4] = await Promise.all([
-      TwelveDataClient.call('time_series', { symbol, interval: '1h', outputsize: 50 }, 3600000),
-      TwelveDataClient.call('time_series', { symbol, interval: '4h', outputsize: 50 }, 3600000),
+      TwelveDataClient.call('/time_series', { symbol, interval: '1h', outputsize: 50 }, 3600000),
+      TwelveDataClient.call('/time_series', { symbol, interval: '4h', outputsize: 50 }, 3600000),
     ]);
 
     const parseCandles = (data) => {
@@ -5331,7 +5513,7 @@ async function analyzeMultiTimeframe(symbol) {
         ts: new Date(v.datetime).getTime(),
         open: parseFloat(v.open), high: parseFloat(v.high),
         low: parseFloat(v.low), close: parseFloat(v.close),
-        volume: parseFloat(v.volume) || 1000000,
+        volume: Number.isFinite(parseFloat(v.volume)) ? parseFloat(v.volume) : null,
       })).reverse();
     };
 
@@ -5756,14 +5938,8 @@ const NewsEngine = (() => {
       });
     }
 
-    // Upcoming events
     lines.push('');
-    lines.push('📅 Evenements importants a surveiller :');
-    const day = d.getDay();
-    if (day === 3) lines.push('• Mercredi : Publication reserves petrole EIA');
-    if (day === 4) lines.push('• Jeudi : Decisions taux BCE possibles / NFP US');
-    if (day === 5) lines.push('• Vendredi : Cloture semaine — eviter nouveaux trades');
-    lines.push('• Suivre : decisions Fed, BCE, donnees inflation, NFP');
+    lines.push('📅 Agenda macro : verifier uniquement les événements affichés par le calendrier live quand il est disponible.');
 
     return lines.join('\n');
   }
@@ -5777,65 +5953,10 @@ const NewsEngine = (() => {
 const EconomicCalendar = (() => {
 
   function getUpcomingEvents() {
-    const now = new Date();
-    const day = now.getDay(); // 0=Sun, 1=Mon...
-    const hour = now.getHours();
-
-    // Static weekly calendar — real events rotate by weekday
-    const weeklyEvents = {
-      1: [ // Lundi
-        { time: '10:00', title: 'PMI Manufacturier Zone Euro', impact: 'medium', zone: 'EUR', symbol: null },
-        { time: '16:00', title: 'ISM Manufacturier USA', impact: 'high', zone: 'USD', symbol: null },
-      ],
-      2: [ // Mardi
-        { time: '11:00', title: 'Confiance consommateurs Zone Euro', impact: 'medium', zone: 'EUR', symbol: null },
-        { time: '14:30', title: 'Balance commerciale USA', impact: 'medium', zone: 'USD', symbol: null },
-        { time: '15:00', title: 'JOLTS Offres emploi USA', impact: 'high', zone: 'USD', symbol: null },
-      ],
-      3: [ // Mercredi
-        { time: '11:00', title: 'Inflation Zone Euro (IPC)', impact: 'high', zone: 'EUR', symbol: 'EURUSD' },
-        { time: '14:30', title: 'ADP Emploi prive USA', impact: 'high', zone: 'USD', symbol: null },
-        { time: '16:30', title: 'Stocks petrole EIA', impact: 'medium', zone: 'OIL', symbol: 'OIL' },
-        { time: '20:00', title: 'Compte-rendu Fed (FOMC Minutes)', impact: 'high', zone: 'USD', symbol: null },
-      ],
-      4: [ // Jeudi
-        { time: '08:00', title: 'Decisions BCE (si applicable)', impact: 'high', zone: 'EUR', symbol: 'EURUSD' },
-        { time: '14:30', title: 'Demandes allocations chomage USA', impact: 'high', zone: 'USD', symbol: null },
-        { time: '14:30', title: 'PIB USA (si applicable)', impact: 'high', zone: 'USD', symbol: null },
-      ],
-      5: [ // Vendredi
-        { time: '14:30', title: 'NFP — Emplois non-agricoles USA', impact: 'high', zone: 'USD', symbol: null },
-        { time: '14:30', title: 'Taux de chomage USA', impact: 'high', zone: 'USD', symbol: null },
-        { time: '16:00', title: 'Confiance consommateurs Michigan', impact: 'medium', zone: 'USD', symbol: null },
-      ],
-    };
-
-    const events = [];
-    // Today remaining events
-    const todayEvents = weeklyEvents[day] || [];
-    todayEvents.forEach(e => {
-      const [h, m] = e.time.split(':').map(Number);
-      if (h * 60 + m > hour * 60) {
-        events.push({ ...e, when: 'Aujourd\'hui ' + e.time, daysAhead: 0 });
-      }
-    });
-
-    // Next 3 days
-    for (let i = 1; i <= 3; i++) {
-      const nextDay = (day + i) % 7;
-      if (nextDay === 0 || nextDay === 6) continue; // Skip weekends
-      const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-      const dayEvents = weeklyEvents[nextDay] || [];
-      dayEvents.forEach(e => {
-        events.push({ ...e, when: dayNames[nextDay] + ' ' + e.time, daysAhead: i });
-      });
-    }
-
-    return events.slice(0, 8);
+    return [];
   }
 
   async function renderUpcomingSection() {
-    // Try Finnhub first — fallback to static calendar
     let events = null;
     try {
       const finnhubEvents = await FinnhubClient.getEconomicCalendar();
@@ -5848,9 +5969,7 @@ const EconomicCalendar = (() => {
       }
     } catch(err) {}
 
-    // Fallback to static
-    if (!events || !events.length) events = getUpcomingEvents();
-    if (!events.length) return '';
+    if (!events || !events.length) return '';
 
     const items = events.slice(0, 8).map(e => {
       const impColor = e.impact === 'high' ? 'var(--loss)' : e.impact === 'medium' ? 'var(--signal-medium)' : 'var(--text-muted)';
@@ -5879,7 +5998,7 @@ const EconomicCalendar = (() => {
       + '<div style="font-size:var(--text-xs);font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.1em;">📅 Événements à venir</div>'
       + '<div style="font-size:0.6rem;color:var(--text-muted);">Source: Finnhub</div>'
       + '</div>'
-      + '<div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);">Ces événements peuvent créer des mouvements importants. Adapter la gestion du risque en conséquence.</div>'
+      + '<div style="font-size:var(--text-xs);color:var(--text-muted);margin-bottom:var(--space-3);">Calendrier affiché uniquement si une source live le fournit.</div>'
       + items
       + '</div>';
   }
@@ -6585,14 +6704,14 @@ async function boot() {
   AlertManager.syncPositionAlerts();
 
   // 6. Router
-  Router.register('dashboard',    renderDashboard);
-  Router.register('opportunities',renderOpportunities);
-  Router.register('asset-detail', renderAssetDetail);
-  Router.register('portefeuille', () => { renderPortefeuille(); });
-  Router.register('positions',    () => { renderPortefeuille(); }); // alias
-  Router.register('simulation',   () => { renderPortefeuille(); }); // alias
-  Router.register('settings',     () => { renderSettings(); });
-  Router.register('news',         () => { renderInfoScreen(); });
+  Router.register('dashboard',     renderDashboard);
+  Router.register('opportunities', renderOpportunities);
+  Router.register('asset-detail',  renderAssetDetail);
+  Router.register('portefeuille',  () => { renderPortefeuille(); });
+  Router.register('positions',     () => { renderPortefeuille(); });
+  Router.register('simulation',    () => { renderSimulation(); });
+  Router.register('settings',      () => { renderSettings(); });
+  Router.register('news',          () => { renderInfoScreen(); });
   window.__MTP.Router = Router;
 
   // 7. Theme
@@ -6613,8 +6732,8 @@ async function boot() {
       }
     }
   } catch(e) {
-    window.__eurUsdRate = 1.08; // Safe default
-    console.warn('[Boot] EUR/USD fetch failed, using 1.08');
+    window.__eurUsdRate = null;
+    console.warn('[Boot] EUR/USD fetch failed — conversions EUR strictes désactivées');
   }
 
   // 8. Sync
