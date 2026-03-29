@@ -1,4 +1,4 @@
-const CACHE_NAME = 'manitradepro-v4.4';
+const CACHE_NAME = 'manitradepro-v4.5';
 const APP_SHELL = [
   '/ManiTradePro/',
   '/ManiTradePro/index.html',
