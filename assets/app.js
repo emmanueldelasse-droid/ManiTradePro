@@ -10,7 +10,8 @@
     autoRefreshOpportunities: true,
     showSourceBadges: true,
     showScoreBreakdown: true,
-    compactCards: false
+    compactCards: false,
+    displayCurrency: "EUR_PLUS_USD"
   };
 
   const state = {
@@ -97,6 +98,94 @@
       currency,
       maximumFractionDigits: v > 999 ? 0 : 2
     }).format(v);
+  }
+
+  function fxRateUsdToEur() {
+    return 0.92;
+  }
+
+  function priceDisplay(vUsd) {
+    if (vUsd == null || Number.isNaN(vUsd)) return "Donnee indisponible";
+    const eur = vUsd * fxRateUsdToEur();
+    const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
+    if (mode === "EUR") return money(eur, "EUR");
+    if (mode === "USD") return money(vUsd, "USD");
+    return `${money(eur, "EUR")} <span class="muted">(${money(vUsd, "USD")})</span>`;
+  }
+
+  function currencyLabel() {
+    const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
+    if (mode === "EUR") return "Euro";
+    if (mode === "USD") return "Dollar";
+    return "Euro + dollar";
+  }
+
+  function simpleDirectionLabel(direction, score) {
+    if (direction === "long") return score != null && score >= 60 ? "hausse probable" : "legere hausse";
+    if (direction === "short") return score != null && score <= 40 ? "baisse probable" : "legere baisse";
+    return "pas de tendance claire";
+  }
+
+  function simpleConfidenceLabel(value) {
+    if (value === "high") return "elevee";
+    if (value === "medium") return "moyenne";
+    if (value === "low") return "faible";
+    return "faible";
+  }
+
+  function simpleFreshnessLabel(value) {
+    if (value === "live") return "en direct";
+    if (value === "recent") return "recent";
+    return "inconnu";
+  }
+
+  function simpleScoreStatusLabel(value) {
+    if (value === "complete") return "complet";
+    if (value === "partial") return "partiel";
+    if (value === "unavailable") return "indisponible";
+    return value || "indisponible";
+  }
+
+  function simpleAssetClassLabel(value) {
+    const map = {
+      crypto: "crypto",
+      stock: "action",
+      etf: "ETF",
+      forex: "devise",
+      commodity: "matiere premiere",
+      unknown: "inconnu"
+    };
+    return map[value] || value || "inconnu";
+  }
+
+  function simpleAnalysisLabel(value) {
+    const map = {
+      "Constructive bullish bias": "biais haussier leger",
+      "Constructive bearish bias": "biais baissier leger",
+      "Bullish setup": "signal haussier",
+      "Bearish setup": "signal baissier",
+      "Early bullish setup": "debut de signal haussier",
+      "Early bearish setup": "debut de signal baissier",
+      "No clear direction": "pas de tendance claire",
+      "Positive price change": "hausse du prix",
+      "Negative price change": "baisse du prix",
+      "Flat price change": "prix stable",
+      "Real quote available": "prix reel disponible",
+      "Source temporarily unavailable": "source temporairement indisponible"
+    };
+    return map[value] || value || "Analyse indisponible";
+  }
+
+  function breakdownLabel(key) {
+    const map = {
+      regime: "contexte marche",
+      trend: "tendance",
+      momentum: "elan",
+      entryQuality: "qualite d'entree",
+      risk: "risque",
+      participation: "activite"
+    };
+    return map[key] || key;
   }
 
   function num(v, digits = 2) {
@@ -415,20 +504,20 @@
         <div class="score-box">
           ${scoreRing(item.score)}
           <div class="score-meta">
-            ${badge(item.direction || "n/a", item.direction || "")}
-            ${badge(item.scoreStatus || "n/a", statusCls)}
+            ${badge(simpleDirectionLabel(item.direction, item.score), item.direction || "")}
+            ${badge(simpleScoreStatusLabel(item.scoreStatus || "n/a"), statusCls)}
           </div>
         </div>
         <div class="price-col">
-          <div class="price">${item.price != null ? money(item.price, "USD") : "Donnee indisponible"}</div>
+          <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
           ${item.error ? `<div class="muted" style="font-size:12px;margin-top:6px">${safeText(item.error)}</div>` : ""}
         </div>
         <div class="meta-col">
-          ${badge(item.assetClass, item.assetClass)}
-          ${badge(item.confidence || "low")}
+          ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
+          ${badge(`fiabilite ${simpleConfidenceLabel(item.confidence || "low")}`)}
           ${state.settings.showSourceBadges ? badge(item.sourceUsed || "source?") : ""}
-          ${state.settings.showSourceBadges ? badge(item.freshness || "unknown", item.freshness || "") : ""}
+          ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(item.freshness || "unknown"), item.freshness || "") : ""}
         </div>
       </div>`;
   }
@@ -443,7 +532,7 @@
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
-          <div class="screen-subtitle">Socle propre, donnees reelles, suivi d'entrainement separe.</div>
+          <div class="screen-subtitle">Interface plus claire, prix reels, lecture simple.</div>
         </div>
 
         <div class="hero">
@@ -451,19 +540,19 @@
           <div class="hero-value">${stats.openCount} position${stats.openCount > 1 ? "s" : ""} ouverte${stats.openCount > 1 ? "s" : ""}</div>
           <div class="hero-meta">
             ${badge("Training", "live")}
-            ${badge(`Historique ${stats.closedCount}`, "recent")}
-            ${badge(`Realise ${money(stats.realized, "USD")}`)}
+            ${badge(`Historique des trades ${stats.closedCount}`, "recent")}
+            ${badge(`Realise ${money(stats.realized * fxRateUsdToEur(), "EUR")}`)}
           </div>
         </div>
 
         <div class="grid" style="margin-bottom:22px">
           <div class="stat-card"><div class="stat-label">Opportunites visibles</div><div class="stat-value">${state.opportunities.length}</div></div>
-          <div class="stat-card"><div class="stat-label">Fear & Greed</div><div class="stat-value">${fg ? safeText(fg.value) : "—"}</div></div>
-          <div class="stat-card"><div class="stat-label">Trending</div><div class="stat-value">${trending.length}</div></div>
-          <div class="stat-card"><div class="stat-label">Win rate training</div><div class="stat-value">${stats.winRate == null ? "—" : pct(stats.winRate)}</div></div>
+          <div class="stat-card"><div class="stat-label">Climat marche</div><div class="stat-value">${fg ? safeText(fg.value) : "—"}</div></div>
+          <div class="stat-card"><div class="stat-label">Tendances</div><div class="stat-value">${trending.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Taux de reussite training</div><div class="stat-value">${stats.winRate == null ? "—" : pct(stats.winRate)}</div></div>
         </div>
 
-        <div class="section-title"><span>Top opportunites</span><button class="btn" data-route="opportunities">Voir tout</button></div>
+        <div class="section-title"><span>Meilleures opportunites</span><button class="btn" data-route="opportunities">Voir tout</button></div>
         ${top.length ? `<div class="opp-list">${top.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite chargee.</div>`}
       </div>`;
   }
@@ -474,7 +563,7 @@
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Opportunites</div>
-          <div class="screen-subtitle">Tri propre, source, confiance, lecture rapide.</div>
+          <div class="screen-subtitle">Lecture simple, tendance, fiabilite, source.</div>
         </div>
         <div class="controls">
           ${filters.map(f => `<button class="btn ${state.opportunityFilter === f ? 'active' : ''}" data-filter="${f}">${f}</button>`).join("")}
@@ -513,7 +602,7 @@
     const d = state.detail;
     return `
       <div class="screen">
-        <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Detail actif</span></div>
+        <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Fiche actif</span></div>
         ${state.loadingDetail ? `<div class="loading-state">Chargement du detail...</div>` : ""}
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
         ${d ? `
@@ -529,60 +618,60 @@
                     </div>
                   </div>
                   <div>
-                    <div class="detail-price">${d.price != null ? money(d.price, "USD") : "Donnee indisponible"}</div>
+                    <div class="detail-price">${d.price != null ? priceDisplay(d.price) : "Donnee indisponible"}</div>
                     <div class="change ${d.change24hPct > 0 ? 'up' : d.change24hPct < 0 ? 'down' : ''}" style="text-align:right">${pct(d.change24hPct)}</div>
                   </div>
                 </div>
                 <div class="legend">
-                  ${badge(d.assetClass, d.assetClass)}
-                  ${badge(d.direction || "n/a", d.direction || "")}
-                  ${badge(d.scoreStatus || "n/a", d.scoreStatus || "")}
-                  ${badge(d.confidence || "low")}
+                  ${badge(simpleAssetClassLabel(d.assetClass), d.assetClass)}
+                  ${badge(simpleDirectionLabel(d.direction, d.score), d.direction || "")}
+                  ${badge(simpleScoreStatusLabel(d.scoreStatus || "n/a"), d.scoreStatus || "")}
+                  ${badge(`fiabilite ${simpleConfidenceLabel(d.confidence || "low")}`)}
                   ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
-                  ${state.settings.showSourceBadges ? badge(d.freshness || "unknown", d.freshness || "") : ""}
+                  ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
                 <div class="trade-actions">
-                  <button class="btn trade-btn long" data-add-trade="long">Ajouter training long</button>
-                  <button class="btn trade-btn short" data-add-trade="short">Ajouter training short</button>
+                  <button class="btn trade-btn long" data-add-trade="long">Essai achat</button>
+                  <button class="btn trade-btn short" data-add-trade="short">Essai baisse</button>
                 </div>
               </div>
 
               <div class="card">
-                <div class="section-title"><span>Graphique 90 bougies</span><span>${d.candleCount || 0} bougies</span></div>
+                <div class="section-title"><span>Evolution recente</span><span>${d.candleCount || 0} bougies</span></div>
                 ${renderChart(d.candles)}
               </div>
             </div>
 
             <div>
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Score detaille</span><span>${d.score != null ? d.score : "—"}</span></div>
+                <div class="section-title"><span>Niveau du signal</span><span>${d.score != null ? d.score : "—"}</span></div>
                 <div class="score-box" style="margin-bottom:14px">
                   ${scoreRing(d.score)}
                   <div class="score-meta">
-                    <div style="font-weight:700">${safeText(d.analysisLabel || "Analyse indisponible")}</div>
-                    <div class="muted">Confiance : ${safeText(d.confidence || "low")}</div>
+                    <div style="font-weight:700">${safeText(simpleAnalysisLabel(d.analysisLabel || "Analyse indisponible"))}</div>
+                    <div class="muted">Fiabilite : ${safeText(simpleConfidenceLabel(d.confidence || "low"))}</div>
                   </div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
                   <div class="breakdown">
                     ${Object.entries(d.breakdown || {}).map(([k, v]) => `
                       <div class="break-item">
-                        <div class="break-name">${safeText(k)}</div>
+                        <div class="break-name">${safeText(breakdownLabel(k))}</div>
                         <div class="break-value">${safeText(Math.round(v))}</div>
                       </div>`).join("")}
-                  </div>` : `<div class="muted">Le detail du score est masque dans les reglages.</div>`
+                  </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
                 }
               </div>
 
               <div class="card">
-                <div class="section-title"><span>Infos source</span></div>
+                <div class="section-title"><span>Informations</span></div>
                 <div class="kv">
-                  <div class="muted">Source utilisee</div><div>${safeText(d.sourceUsed || "—")}</div>
-                  <div class="muted">Fraicheur</div><div>${safeText(d.freshness || "unknown")}</div>
+                  <div class="muted">Source</div><div>${safeText(d.sourceUsed || "—")}</div>
+                  <div class="muted">Mise a jour</div><div>${safeText(simpleFreshnessLabel(d.freshness || "unknown"))}</div>
                   <div class="muted">Variation 24h</div><div>${pct(d.change24hPct)}</div>
-                  <div class="muted">Classe d'actif</div><div>${safeText(d.assetClass || "—")}</div>
-                  <div class="muted">Score status</div><div>${safeText(d.scoreStatus || "—")}</div>
-                  <div class="muted">Interpretation</div><div>${safeText(d.analysisLabel || "—")}</div>
+                  <div class="muted">Type d'actif</div><div>${safeText(simpleAssetClassLabel(d.assetClass || "—"))}</div>
+                  <div class="muted">Etat du signal</div><div>${safeText(simpleScoreStatusLabel(d.scoreStatus || "—"))}</div>
+                  <div class="muted">Lecture simple</div><div>${safeText(simpleAnalysisLabel(d.analysisLabel || "—"))}</div>
                 </div>
               </div>
             </div>
@@ -603,9 +692,9 @@
         </div>
         <div>${badge(position.side, position.side)}</div>
         <div>${num(position.quantity, 4)}</div>
-        <div>${money(position.entryPrice, "USD")}</div>
-        <div>${money(livePrice, "USD")}</div>
-        <div class="${(pnl || 0) >= 0 ? 'positive' : 'negative'}">${pnl == null ? "—" : money(pnl, "USD")} / ${pct(pnlPct)}</div>
+        <div>${priceDisplay(position.entryPrice)}</div>
+        <div>${priceDisplay(livePrice)}</div>
+        <div class="${(pnl || 0) >= 0 ? 'positive' : 'negative'}">${pnl == null ? "—" : money(pnl * fxRateUsdToEur(), "EUR")} / ${pct(pnlPct)}</div>
         <div><button class="btn" data-close-trade="${safeText(position.id)}">Cloturer</button></div>
       </div>`;
   }
@@ -619,9 +708,9 @@
         </div>
         <div>${badge(item.side, item.side)}</div>
         <div>${num(item.quantity, 4)}</div>
-        <div>${money(item.entryPrice, "USD")}</div>
-        <div>${money(item.exitPrice, "USD")}</div>
-        <div class="${(item.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money(item.pnl, "USD")} / ${pct(item.pnlPct)}</div>
+        <div>${priceDisplay(item.entryPrice)}</div>
+        <div>${priceDisplay(item.exitPrice)}</div>
+        <div class="${(item.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((item.pnl || 0) * fxRateUsdToEur(), "EUR")} / ${pct(item.pnlPct)}</div>
         <div>${safeText(item.sourceUsed || "training")}</div>
       </div>`;
   }
@@ -635,7 +724,7 @@
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Separation propre entre entrainement et reel. Le reel reste vide tant qu'aucune source n'est branchee.</div>
+          <div class="screen-subtitle">Separation simple entre entrainement et reel. Le reel reste vide tant qu'aucune source n'est branchee.</div>
         </div>
 
         <div class="controls">
@@ -647,14 +736,14 @@
           <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette brique est reservee pour la suite.</div>
         ` : `
           <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Positions ouvertes</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Historique ferme</div><div class="stat-value">${stats.closedCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Pnl realise</div><div class="stat-value">${money(stats.realized, "USD")}</div></div>
-            <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-value">${stats.winRate == null ? "—" : pct(stats.winRate)}</div></div>
+            <div class="stat-card"><div class="stat-label">Positions en cours</div><div class="stat-value">${stats.openCount}</div></div>
+            <div class="stat-card"><div class="stat-label">Historique des trades clos</div><div class="stat-value">${stats.closedCount}</div></div>
+            <div class="stat-card"><div class="stat-label">Gain / perte realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">Taux de reussite</div><div class="stat-value">${stats.winRate == null ? "—" : pct(stats.winRate)}</div></div>
           </div>
 
           <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Positions ouvertes</span><span>${positions.length}</span></div>
+            <div class="section-title"><span>Positions en cours</span><span>${positions.length}</span></div>
             ${positions.length ? `
               <div class="trade-table">
                 <div class="trade-row trade-head">
@@ -666,7 +755,7 @@
           </div>
 
           <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Historique</span><span>${history.length}</span></div>
+            <div class="section-title"><span>Historique des trades</span><span>${history.length}</span></div>
             ${history.length ? `
               <div class="trade-table">
                 <div class="trade-row trade-head">
@@ -685,14 +774,14 @@
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Reglages</div>
-          <div class="screen-subtitle">Les reglages pilotent l'UI sans salir la logique metier.</div>
+          <div class="screen-subtitle">Ces reglages servent juste a rendre l'app plus claire.</div>
         </div>
 
         <div class="card">
           <div class="setting-list">
             <label class="setting-row">
               <div>
-                <div class="setting-title">Refresh opportunites</div>
+                <div class="setting-title">Rafraichir les opportunites</div>
                 <div class="setting-desc">Recharge automatiquement la liste quand tu entres dans l'ecran Opportunites.</div>
               </div>
               <input type="checkbox" data-setting-toggle="autoRefreshOpportunities" ${state.settings.autoRefreshOpportunities ? "checked" : ""}>
@@ -700,7 +789,7 @@
 
             <label class="setting-row">
               <div>
-                <div class="setting-title">Afficher source et fraicheur</div>
+                <div class="setting-title">Afficher source et mise a jour</div>
                 <div class="setting-desc">Montre les badges fournisseur et fraicheur sur les cartes.</div>
               </div>
               <input type="checkbox" data-setting-toggle="showSourceBadges" ${state.settings.showSourceBadges ? "checked" : ""}>
@@ -708,7 +797,7 @@
 
             <label class="setting-row">
               <div>
-                <div class="setting-title">Afficher le breakdown du score</div>
+                <div class="setting-title">Afficher le detail du signal</div>
                 <div class="setting-desc">Affiche les sous-composants du score detaille dans la fiche actif.</div>
               </div>
               <input type="checkbox" data-setting-toggle="showScoreBreakdown" ${state.settings.showScoreBreakdown ? "checked" : ""}>
@@ -716,10 +805,22 @@
 
             <label class="setting-row">
               <div>
-                <div class="setting-title">Cartes compactes</div>
+                <div class="setting-title">Cartes plus compactes</div>
                 <div class="setting-desc">Resserre un peu les cartes opportunites.</div>
               </div>
               <input type="checkbox" data-setting-toggle="compactCards" ${state.settings.compactCards ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Devise d'affichage</div>
+                <div class="setting-desc">Choisis si tu veux voir les prix en euro, en dollar, ou les deux.</div>
+              </div>
+              <select class="setting-select" data-setting-select="displayCurrency">
+                <option value="EUR" ${state.settings.displayCurrency === "EUR" ? "selected" : ""}>Euro</option>
+                <option value="USD" ${state.settings.displayCurrency === "USD" ? "selected" : ""}>Dollar</option>
+                <option value="EUR_PLUS_USD" ${state.settings.displayCurrency === "EUR_PLUS_USD" ? "selected" : ""}>Euro + dollar</option>
+              </select>
             </label>
           </div>
         </div>
@@ -799,6 +900,15 @@
       el.addEventListener("change", () => {
         const key = el.getAttribute("data-setting-toggle");
         state.settings[key] = el.checked;
+        persistSettings();
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-setting-select]").forEach(el => {
+      el.addEventListener("change", () => {
+        const key = el.getAttribute("data-setting-select");
+        state.settings[key] = el.value;
         persistSettings();
         render();
       });

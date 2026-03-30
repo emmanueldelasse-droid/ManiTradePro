@@ -131,3 +131,12 @@ button{font:inherit} a{text-decoration:none;color:inherit}
   .trade-row,.trade-row.history{grid-template-columns:1fr}
   .setting-row{align-items:flex-start}
 }
+
+.setting-select{
+  min-width:180px;
+  background:var(--bg-secondary);
+  color:var(--text-primary);
+  border:1px solid var(--border-subtle);
+  border-radius:12px;
+  padding:10px 12px;
+}
