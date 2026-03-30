@@ -4,7 +4,9 @@
     trainingPositions: "mtp_training_positions_v1",
     trainingHistory: "mtp_training_history_v1",
     settings: "mtp_settings_v1",
-    algoJournal: "mtp_algo_journal_v1"
+    algoJournal: "mtp_algo_journal_v1",
+    budgetTracker: "mtp_budget_tracker_v1",
+    detailCache: "mtp_detail_cache_v1"
   };
 
   const defaultSettings = {
@@ -40,7 +42,9 @@
       history: []
     },
     algoJournal: [],
-    settings: loadSettings()
+    settings: loadSettings(),
+    budget: loadBudgetTracker(),
+    detailCache: readJson(STORAGE_KEYS.detailCache, {})
   };
 
   const app = document.getElementById("app");
@@ -74,6 +78,209 @@
 
   function persistSettings() {
     writeJson(STORAGE_KEYS.settings, state.settings);
+  }
+
+  function budgetDayKey() {
+    return new Date().toISOString().slice(0, 10);
+  }
+
+  function emptyBudgetTracker() {
+    return {
+      day: budgetDayKey(),
+      dailyLimit: 1800,
+      used: 0,
+      remaining: 1800,
+      byRoute: {},
+      seenEvents: [],
+      schedule: {}
+    };
+  }
+
+  function loadBudgetTracker() {
+    const stored = readJson(STORAGE_KEYS.budgetTracker, null);
+    const fresh = emptyBudgetTracker();
+    if (!stored || stored.day !== fresh.day) return fresh;
+    return {
+      ...fresh,
+      ...stored,
+      byRoute: stored.byRoute || {},
+      seenEvents: stored.seenEvents || [],
+      schedule: stored.schedule || {}
+    };
+  }
+
+  function persistBudgetTracker() {
+    writeJson(STORAGE_KEYS.budgetTracker, state.budget);
+  }
+
+  function recordBudgetUsage(headers) {
+    if (!headers) return;
+    if (state.budget.day !== budgetDayKey()) state.budget = emptyBudgetTracker();
+    const eventId = headers.get("X-MTP-Budget-Event");
+    const routeName = headers.get("X-MTP-Route-Name") || "unknown";
+    const routeCalls = Number(headers.get("X-MTP-Twelve-Calls") || "0");
+    const dailyLimit = Number(headers.get("X-MTP-Budget-Limit") || state.budget.dailyLimit || 1800);
+    state.budget.dailyLimit = dailyLimit;
+    if (!eventId) {
+      state.budget.remaining = Math.max(0, dailyLimit - state.budget.used);
+      persistBudgetTracker();
+      return;
+    }
+    if (!state.budget.seenEvents.includes(eventId)) {
+      state.budget.seenEvents.push(eventId);
+      state.budget.used += routeCalls;
+      if (!state.budget.byRoute[routeName]) state.budget.byRoute[routeName] = { calls: 0, events: 0 };
+      state.budget.byRoute[routeName].calls += routeCalls;
+      state.budget.byRoute[routeName].events += 1;
+      state.budget.seenEvents = state.budget.seenEvents.slice(-500);
+    }
+    state.budget.remaining = Math.max(0, dailyLimit - state.budget.used);
+    persistBudgetTracker();
+  }
+
+  function estimatedCostForRoute(route, symbol = null) {
+    if (route === "opportunities") return 1;
+    if (route === "detail") return symbol && ["BTC","ETH","SOL","XRP","AAVE","NEAR","BNB","ADA","DOGE","DOT","LINK","AVAX","ATOM","LTC","MATIC","ARB","OP","UNI","FIL","ETC","BCH","APT","SUI","TAO","XAUT"].includes(String(symbol).toUpperCase()) ? 0 : 2;
+    if (route === "candles") return symbol && ["BTC","ETH","SOL","XRP","AAVE","NEAR","BNB","ADA","DOGE","DOT","LINK","AVAX","ATOM","LTC","MATIC","ARB","OP","UNI","FIL","ETC","BCH","APT","SUI","TAO","XAUT"].includes(String(symbol).toUpperCase()) ? 0 : 1;
+    return 0;
+  }
+
+  function budgetAdvice() {
+    const remaining = state.budget.remaining ?? 0;
+    if (remaining <= 50) return "Budget faible : evite les refresh inutiles.";
+    if (remaining <= 200) return "Budget correct mais a surveiller.";
+    return "Budget confortable.";
+  }
+
+
+  const CRYPTO_SYMBOLS_UI = new Set(["BTC","ETH","BNB","SOL","XRP","ADA","DOGE","DOT","LINK","AVAX","ATOM","LTC","MATIC","ARB","OP","AAVE","NEAR","UNI","FIL","ETC","BCH","APT","SUI","TAO","XAUT"]);
+  const NON_CRYPTO_TRACKED_COUNT = 17;
+  const TWELVE_POLICY = {
+    opportunities: {
+      label: "Liste opportunites non-crypto",
+      cooldownMs: 15 * 60 * 1000,
+      cost: 1,
+      maxPerDay: 96
+    },
+    detail_non_crypto: {
+      label: "Fiche actif non-crypto",
+      cooldownMs: 30 * 60 * 1000,
+      cost: 1,
+      maxPerDayPerSymbol: 48
+    },
+    candles_non_crypto: {
+      label: "Bougies non-crypto",
+      cooldownMs: 12 * 60 * 60 * 1000,
+      cost: 1,
+      maxPerDayPerSymbol: 2
+    }
+  };
+
+  function isCryptoSymbol(symbol) {
+    return CRYPTO_SYMBOLS_UI.has(String(symbol || "").toUpperCase());
+  }
+
+  function scheduleKey(policyName, symbol = "") {
+    return symbol ? `${policyName}:${String(symbol).toUpperCase()}` : policyName;
+  }
+
+  function getScheduleEntry(policyName, symbol = "") {
+    return state.budget.schedule[scheduleKey(policyName, symbol)] || null;
+  }
+
+  function nextAllowedAt(policyName, symbol = "") {
+    const policy = TWELVE_POLICY[policyName];
+    const entry = getScheduleEntry(policyName, symbol);
+    if (!policy || !entry || !entry.lastAt) return 0;
+    return entry.lastAt + policy.cooldownMs;
+  }
+
+  function canRunScheduledFetch(policyName, symbol = "") {
+    const next = nextAllowedAt(policyName, symbol);
+    return Date.now() >= next;
+  }
+
+  function markScheduledFetch(policyName, symbol = "") {
+    state.budget.schedule[scheduleKey(policyName, symbol)] = {
+      lastAt: Date.now(),
+      nextAt: Date.now() + (TWELVE_POLICY[policyName]?.cooldownMs || 0)
+    };
+    persistBudgetTracker();
+  }
+
+  function formatDelay(ms) {
+    if (!ms || ms <= 0) return "maintenant";
+    const totalMinutes = Math.ceil(ms / 60000);
+    if (totalMinutes < 60) return `${totalMinutes} min`;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    if (!minutes) return `${hours} h`;
+    return `${hours} h ${minutes} min`;
+  }
+
+  function nextAllowedLabel(policyName, symbol = "") {
+    const next = nextAllowedAt(policyName, symbol);
+    if (!next) return "maintenant";
+    return formatDelay(next - Date.now());
+  }
+
+  function refreshStatusLabel(policyName, symbol = "") {
+    const next = nextAllowedAt(policyName, symbol);
+    if (!next || Date.now() >= next) return "mise a jour possible maintenant";
+    return `prochaine mise a jour dans ${formatDelay(next - Date.now())}`;
+  }
+
+  function dashboardRefreshLabel() {
+    return "Le dashboard repart toujours du dernier snapshot enregistre.";
+  }
+
+  function detailRefreshLabel(symbol = "") {
+    if (!symbol) return "Aucune fiche chargee";
+    return isCryptoSymbol(symbol)
+      ? "Les actifs crypto restent plus souples car ils ne dependent pas de Twelve."
+      : refreshStatusLabel("detail_non_crypto", symbol);
+  }
+
+  function candlesRefreshLabel(symbol = "") {
+    if (!symbol) return "Aucune bougie chargee";
+    return isCryptoSymbol(symbol)
+      ? "Les bougies crypto peuvent etre rafraichies plus souvent."
+      : refreshStatusLabel("candles_non_crypto", symbol);
+  }
+
+  function schedulerSummaryCards(symbol = "") {
+    const clean = String(symbol || "").toUpperCase();
+    return `
+      <div class="grid scheduler-grid">
+        <div class="stat-card"><div class="stat-label">Dashboard</div><div class="stat-value small">${dashboardRefreshLabel()}</div></div>
+        <div class="stat-card"><div class="stat-label">Opportunites</div><div class="stat-value small">${refreshStatusLabel("opportunities")}</div></div>
+        <div class="stat-card"><div class="stat-label">Fiche actif</div><div class="stat-value small">${detailRefreshLabel(clean)}</div></div>
+        <div class="stat-card"><div class="stat-label">Bougies</div><div class="stat-value small">${candlesRefreshLabel(clean)}</div></div>
+      </div>`;
+  }
+
+  function canSpendEstimatedBudget(route, symbol = null) {
+    const estimated = estimatedCostForRoute(route, symbol);
+    return (state.budget.remaining ?? 0) >= estimated;
+  }
+
+  function theoreticalDailyCap() {
+    return TWELVE_POLICY.opportunities.maxPerDay + (TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol * NON_CRYPTO_TRACKED_COUNT) + (TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol * NON_CRYPTO_TRACKED_COUNT);
+  }
+
+  function persistDetailCache() {
+    writeJson(STORAGE_KEYS.detailCache, state.detailCache);
+  }
+
+  function detailCacheHit(symbol) {
+    const row = state.detailCache[String(symbol || "").toUpperCase()];
+    if (!row) return null;
+    return row;
+  }
+
+  function saveDetailCache(symbol, value) {
+    state.detailCache[String(symbol || "").toUpperCase()] = value;
+    persistDetailCache();
   }
 
   function loadTradesState() {
@@ -403,6 +610,7 @@ function currentTradePlan() {
   // =========================
   async function api(path) {
     const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+    recordBudgetUsage(res.headers);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
     return data;
@@ -410,13 +618,20 @@ function currentTradePlan() {
 
   async function loadDashboard() {
     try {
-      const [opp, fg, trending, portfolio] = await Promise.all([
-        api("/api/opportunities").catch(() => null),
+      let opp = null;
+      const shouldRefreshOpp = !state.opportunities.length || canRunScheduledFetch("opportunities");
+      if (shouldRefreshOpp && canSpendEstimatedBudget("opportunities")) {
+        opp = await api("/api/opportunities").catch(() => null);
+        if (opp?.data) {
+          setOpportunities(opp.data);
+          markScheduledFetch("opportunities");
+        }
+      }
+      const [fg, trending, portfolio] = await Promise.all([
         api("/api/fear-greed").catch(() => null),
         api("/api/trending").catch(() => null),
         api("/api/portfolio/summary").catch(() => null)
       ]);
-      if (opp?.data) setOpportunities(opp.data);
       state.dashboard.fearGreed = fg?.data || null;
       state.dashboard.trending = trending?.data || [];
       state.dashboard.portfolio = portfolio?.data || null;
@@ -428,25 +643,42 @@ function currentTradePlan() {
 
   async function loadOpportunities(force = true) {
     const now = Date.now();
+
+    if (!canSpendEstimatedBudget("opportunities") && state.opportunities.length) {
+      state.error = `Budget Twelve trop faible pour relancer les opportunites maintenant (${state.budget.remaining} restant sur ${state.budget.dailyLimit}).`;
+      render();
+      return;
+    }
+
+    if (state.opportunities.length && !canRunScheduledFetch("opportunities")) {
+      state.error = `Les opportunites non-crypto se mettent a jour toutes les 15 minutes. Prochaine mise a jour dans ${nextAllowedLabel("opportunities")}.`;
+      render();
+      return;
+    }
+
     if (!force && state.opportunities.length && (now - state.opportunitiesFetchedAt) < 30000) {
       render();
       return;
     }
+
     if ((now - state.lastOpportunitiesFetchStartedAt) < 8000 && state.opportunities.length) {
       state.error = "Attends quelques secondes avant un nouveau refresh.";
       render();
       return;
     }
+
     state.lastOpportunitiesFetchStartedAt = now;
     const requestId = ++state.opportunitiesRequestId;
-    if (force) {
+    if (force && !state.opportunities.length) {
       state.loading = true;
       render();
     }
+
     try {
       const result = await api("/api/opportunities");
       if (requestId !== state.opportunitiesRequestId) return;
       setOpportunities(result.data || []);
+      markScheduledFetch("opportunities");
       state.error = null;
     } catch (e) {
       if (requestId !== state.opportunitiesRequestId) return;
@@ -461,32 +693,69 @@ function currentTradePlan() {
 
   async function loadDetail(symbol) {
     const now = Date.now();
-    if (state.detail && state.detail.symbol === symbol && (now - state.detailRequestStartedAt) < 15000) {
+    const cleanSymbol = String(symbol || "").toUpperCase();
+    const nonCrypto = !isCryptoSymbol(cleanSymbol);
+    const cachedDetail = detailCacheHit(cleanSymbol);
+
+    if (nonCrypto && cachedDetail && !canRunScheduledFetch("detail_non_crypto", cleanSymbol)) {
+      state.detail = cachedDetail;
+      state.error = `Cette fiche non-crypto se met a jour toutes les 30 minutes. Prochaine mise a jour dans ${nextAllowedLabel("detail_non_crypto", cleanSymbol)}.`;
       render();
       return;
     }
+
+    if (nonCrypto && !canSpendEstimatedBudget("detail", cleanSymbol)) {
+      if (cachedDetail) {
+        state.detail = cachedDetail;
+        state.error = `Budget Twelve trop faible. Derniere fiche conservee pour ${cleanSymbol}.`;
+        render();
+        return;
+      }
+      state.error = `Budget Twelve trop faible pour charger ${cleanSymbol} maintenant (${state.budget.remaining} restant sur ${state.budget.dailyLimit}).`;
+      render();
+      return;
+    }
+
+    if (state.detail && state.detail.symbol === cleanSymbol && (now - state.detailRequestStartedAt) < 15000) {
+      render();
+      return;
+    }
+
     if ((now - state.detailRequestStartedAt) < 6000 && state.detail) {
-      state.error = "Attends quelques secondes avant de recharger un detail.";
+      state.error = "Attends quelques secondes avant de recharger une fiche.";
       render();
       return;
     }
+
     state.detailRequestStartedAt = now;
-    state.loadingDetail = true;
-    state.detail = null;
+    state.loadingDetail = !cachedDetail;
+    if (cachedDetail) state.detail = cachedDetail;
     state.error = null;
     render();
+
     try {
       const [detail, candles] = await Promise.all([
-        api(`/api/opportunity-detail/${encodeURIComponent(symbol)}`),
-        api(`/api/candles/${encodeURIComponent(symbol)}?timeframe=1d&limit=90`).catch(() => null)
+        api(`/api/opportunity-detail/${encodeURIComponent(cleanSymbol)}`),
+        api(`/api/candles/${encodeURIComponent(cleanSymbol)}?timeframe=1d&limit=90`).catch(() => null)
       ]);
-      state.detail = {
+
+      const merged = {
         ...(detail.data || {}),
-        candles: candles?.data || []
+        candles: candles?.data || cachedDetail?.candles || []
       };
+
+      state.detail = merged;
+      saveDetailCache(cleanSymbol, merged);
+
+      if (nonCrypto) {
+        markScheduledFetch("detail_non_crypto", cleanSymbol);
+        if (candles?.data?.length) markScheduledFetch("candles_non_crypto", cleanSymbol);
+      }
+
       state.error = null;
     } catch (e) {
-      state.error = e.message || "Detail indisponible";
+      state.error = e.message || "Fiche indisponible";
+      if (cachedDetail) state.detail = cachedDetail;
     } finally {
       state.loadingDetail = false;
       render();
@@ -768,6 +1037,13 @@ function closeTrainingTrade(id, livePrice = null) {
           ${filters.map(f => `<button class="btn ${state.opportunityFilter === f ? 'active' : ''}" data-filter="${f}">${f}</button>`).join("")}
           <button class="btn" data-refresh="opportunities">Rafraichir</button>
         </div>
+        <div class="card soft-card" style="margin-bottom:14px">
+          <div class="kv">
+            <div class="muted">Liste opportunites</div><div>${refreshStatusLabel("opportunities")}</div>
+            <div class="muted">Budget restant</div><div>${state.budget.remaining} / ${state.budget.dailyLimit}</div>
+            <div class="muted">Mode dashboard</div><div>${dashboardRefreshLabel()}</div>
+          </div>
+        </div>
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
         ${state.loading ? `<div class="loading-state">Chargement des opportunites...</div>` :
           state.filteredOpportunities.length ? `<div class="opp-list">${state.filteredOpportunities.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` :
@@ -804,7 +1080,13 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Fiche actif</span></div>
         ${state.loadingDetail ? `<div class="loading-state">Chargement du detail...</div>` : ""}
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
-        ${d ? `
+        ${d ? `<div class="card soft-card" style="margin-bottom:14px">
+              <div class="kv">
+                <div class="muted">Fiche actif</div><div>${detailRefreshLabel(d.symbol)}</div>
+                <div class="muted">Bougies</div><div>${candlesRefreshLabel(d.symbol)}</div>
+                <div class="muted">Budget restant</div><div>${state.budget.remaining} / ${state.budget.dailyLimit}</div>
+              </div>
+            </div>
           <div class="detail-layout">
             <div>
               <div class="card" style="margin-bottom:18px">
@@ -969,7 +1251,7 @@ function renderHistoryRow(item) {
             <div class="stat-card"><div class="stat-label">Positions en cours</div><div class="stat-value">${stats.openCount}</div></div>
             <div class="stat-card"><div class="stat-label">Historique des trades</div><div class="stat-value">${stats.closedCount}</div></div>
             <div class="stat-card"><div class="stat-label">Gain / perte realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Taux de reussite</div><div class="stat-value">${stats.winRate == null ? "—" : pct(stats.winRate)}</div></div>
+            <div class="stat-card"><div class="stat-label">Budget Twelve</div><div class="stat-value">${state.budget.remaining}</div></div>
           </div>
 
           <div class="card" style="margin-top:18px">
@@ -1012,7 +1294,7 @@ function renderHistoryRow(item) {
             <label class="setting-row">
               <div>
                 <div class="setting-title">Rafraichir les opportunites</div>
-                <div class="setting-desc">Recharge automatiquement la liste quand tu entres dans l'ecran Opportunites.</div>
+                <div class="setting-desc">Recharge automatiquement la liste quand le delai minimum Twelve est termine.</div>
               </div>
               <input type="checkbox" data-setting-toggle="autoRefreshOpportunities" ${state.settings.autoRefreshOpportunities ? "checked" : ""}>
             </label>
@@ -1054,6 +1336,29 @@ function renderHistoryRow(item) {
             </label>
           </div>
         </div>
+
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Budget Twelve</span><span>${state.budget.remaining}/${state.budget.dailyLimit}</span></div>
+          <div class="grid trades-stats">
+            <div class="stat-card"><div class="stat-label">Utilises</div><div class="stat-value">${state.budget.used}</div></div>
+            <div class="stat-card"><div class="stat-label">Restants</div><div class="stat-value">${state.budget.remaining}</div></div>
+            <div class="stat-card"><div class="stat-label">Plafond theorique app</div><div class="stat-value">${theoreticalDailyCap()}</div></div>
+            <div class="stat-card"><div class="stat-label">Etat</div><div class="stat-value">${safeText(budgetAdvice())}</div></div>
+          </div>
+          <div class="kv" style="margin-top:14px">
+            <div class="muted">Opportunites non-crypto</div><div>1 appel Twelve max toutes les 15 min (${TWELVE_POLICY.opportunities.maxPerDay}/jour)</div>
+            <div class="muted">Prochaine opportunites</div><div>${nextAllowedLabel("opportunities")}</div>
+            <div class="muted">Fiche actif non-crypto</div><div>1 appel Twelve max toutes les 30 min et par actif (${TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
+            <div class="muted">Bougies non-crypto</div><div>1 appel Twelve max toutes les 12 h et par actif (${TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
+            <div class="muted">Logique</div><div>Impossible depuis l'app de relancer Twelve avant la fin du delai prevu pour chaque categorie.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Compteurs de prochaine mise a jour</span><span>toutes les pages</span></div>
+          ${schedulerSummaryCards(state.selectedSymbol)}
+        </div>
+
       </div>`;
   }
 
@@ -1157,6 +1462,11 @@ function renderHistoryRow(item) {
     render();
     await loadDashboard();
     render();
+    setInterval(() => {
+      if (["dashboard", "opportunities", "asset-detail", "settings"].includes(state.route)) {
+        render();
+      }
+    }, 30000);
   }
 
   if ("serviceWorker" in navigator) {
