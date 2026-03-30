@@ -157,3 +157,62 @@ button{font:inherit} a{text-decoration:none;color:inherit}
 
 .scheduler-grid .stat-value.small{font-size:.95rem;line-height:1.35;white-space:normal}
 .soft-card{background:rgba(255,255,255,0.02)}
+
+
+.countdown-strip{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  padding:14px 16px;
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:16px;
+  background:rgba(255,255,255,.03);
+}
+
+.countdown-strip.dual{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+}
+
+.countdown-left,.countdown-item{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  min-width:0;
+}
+
+.countdown-right,
+.countdown-item strong{
+  font-family:var(--font-mono);
+  font-size:1rem;
+  font-weight:700;
+  color:var(--text-primary);
+}
+
+.countdown-title,
+.countdown-label{
+  color:var(--text-secondary);
+  font-size:.92rem;
+}
+
+.countdown-dot{
+  width:10px;
+  height:10px;
+  border-radius:999px;
+  background:var(--profit);
+  box-shadow:0 0 10px rgba(0,229,160,.45);
+  flex:0 0 auto;
+}
+
+@media (max-width:860px){
+  .countdown-strip,
+  .countdown-strip.dual{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+  }
+}
+
+.priority-note{margin:-6px 0 12px 2px;font-size:.86rem}
+.opp-note{font-size:12px;margin-top:6px}

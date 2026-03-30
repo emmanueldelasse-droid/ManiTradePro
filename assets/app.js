@@ -6,7 +6,8 @@
     settings: "mtp_settings_v1",
     algoJournal: "mtp_algo_journal_v1",
     budgetTracker: "mtp_budget_tracker_v1",
-    detailCache: "mtp_detail_cache_v1"
+    detailCache: "mtp_detail_cache_v1",
+    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1"
   };
 
   const defaultSettings = {
@@ -44,7 +45,8 @@
     algoJournal: [],
     settings: loadSettings(),
     budget: loadBudgetTracker(),
-    detailCache: readJson(STORAGE_KEYS.detailCache, {})
+    detailCache: readJson(STORAGE_KEYS.detailCache, {}),
+    opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, [])
   };
 
   const app = document.getElementById("app");
@@ -92,7 +94,13 @@
       remaining: 1800,
       byRoute: {},
       seenEvents: [],
-      schedule: {}
+      schedule: {},
+      pools: {
+        opportunities: { reserved: 800, used: 0 },
+        detail: { reserved: 450, used: 0 },
+        candles: { reserved: 200, used: 0 },
+        reserve: { reserved: 350, used: 0 }
+      }
     };
   }
 
@@ -105,12 +113,25 @@
       ...stored,
       byRoute: stored.byRoute || {},
       seenEvents: stored.seenEvents || [],
-      schedule: stored.schedule || {}
+      schedule: stored.schedule || {},
+      pools: {
+        opportunities: { ...fresh.pools.opportunities, ...((stored.pools || {}).opportunities || {}) },
+        detail: { ...fresh.pools.detail, ...((stored.pools || {}).detail || {}) },
+        candles: { ...fresh.pools.candles, ...((stored.pools || {}).candles || {}) },
+        reserve: { ...fresh.pools.reserve, ...((stored.pools || {}).reserve || {}) }
+      }
     };
   }
 
   function persistBudgetTracker() {
     writeJson(STORAGE_KEYS.budgetTracker, state.budget);
+  }
+
+  function routePoolName(routeName = "") {
+    if (routeName === "opportunities") return "opportunities";
+    if (routeName === "detail" || routeName === "quote") return "detail";
+    if (routeName === "candles") return "candles";
+    return "reserve";
   }
 
   function recordBudgetUsage(headers) {
@@ -132,6 +153,8 @@
       if (!state.budget.byRoute[routeName]) state.budget.byRoute[routeName] = { calls: 0, events: 0 };
       state.budget.byRoute[routeName].calls += routeCalls;
       state.budget.byRoute[routeName].events += 1;
+      const pool = routePoolName(routeName);
+      if (state.budget.pools[pool]) state.budget.pools[pool].used += routeCalls;
       state.budget.seenEvents = state.budget.seenEvents.slice(-500);
     }
     state.budget.remaining = Math.max(0, dailyLimit - state.budget.used);
@@ -158,15 +181,15 @@
   const TWELVE_POLICY = {
     opportunities: {
       label: "Liste opportunites non-crypto",
-      cooldownMs: 15 * 60 * 1000,
+      cooldownMs: 5 * 60 * 1000,
       cost: 1,
-      maxPerDay: 96
+      maxPerDay: 288
     },
     detail_non_crypto: {
       label: "Fiche actif non-crypto",
-      cooldownMs: 30 * 60 * 1000,
+      cooldownMs: 60 * 60 * 1000,
       cost: 1,
-      maxPerDayPerSymbol: 48
+      maxPerDayPerSymbol: 24
     },
     candles_non_crypto: {
       label: "Bougies non-crypto",
@@ -230,6 +253,12 @@
     return `prochaine mise a jour dans ${formatDelay(next - Date.now())}`;
   }
 
+  function countdownOnlyLabel(policyName, symbol = "") {
+    const next = nextAllowedAt(policyName, symbol);
+    if (!next || Date.now() >= next) return "maintenant";
+    return `dans ${formatDelay(next - Date.now())}`;
+  }
+
   function dashboardRefreshLabel() {
     return "Le dashboard repart toujours du dernier snapshot enregistre.";
   }
@@ -259,13 +288,31 @@
       </div>`;
   }
 
+  function poolRemaining(poolName) {
+    const pool = state.budget.pools?.[poolName];
+    if (!pool) return state.budget.remaining ?? 0;
+    return Math.max(0, (pool.reserved || 0) - (pool.used || 0));
+  }
+
   function canSpendEstimatedBudget(route, symbol = null) {
     const estimated = estimatedCostForRoute(route, symbol);
-    return (state.budget.remaining ?? 0) >= estimated;
+    const globalRemaining = state.budget.remaining ?? 0;
+    if (globalRemaining < estimated) return false;
+
+    if (route === "opportunities") {
+      return poolRemaining("opportunities") >= estimated || globalRemaining > 250;
+    }
+    if (route === "detail") {
+      return poolRemaining("detail") >= estimated || globalRemaining > 200;
+    }
+    if (route === "candles") {
+      return poolRemaining("candles") >= estimated || globalRemaining > 300;
+    }
+    return globalRemaining >= estimated;
   }
 
   function theoreticalDailyCap() {
-    return TWELVE_POLICY.opportunities.maxPerDay + (TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol * NON_CRYPTO_TRACKED_COUNT) + (TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol * NON_CRYPTO_TRACKED_COUNT);
+    return (state.budget.pools.opportunities.reserved || 0) + (state.budget.pools.detail.reserved || 0) + (state.budget.pools.candles.reserved || 0) + (state.budget.pools.reserve.reserved || 0);
   }
 
   function persistDetailCache() {
@@ -279,8 +326,32 @@
   }
 
   function saveDetailCache(symbol, value) {
-    state.detailCache[String(symbol || "").toUpperCase()] = value;
+    const clean = String(symbol || "").toUpperCase();
+    state.detailCache[clean] = value;
     persistDetailCache();
+    if (value && value.price != null) {
+      const currentList = (state.opportunitiesSnapshot || []).slice();
+      const idx = currentList.findIndex(x => String(x.symbol || "").toUpperCase() === clean);
+      const patch = normalizeOpportunity({
+        symbol: value.symbol,
+        name: value.name,
+        assetClass: value.assetClass,
+        price: value.price,
+        change24hPct: value.change24hPct,
+        score: value.score,
+        scoreStatus: value.scoreStatus,
+        direction: value.direction,
+        analysisLabel: value.analysisLabel,
+        confidence: value.confidence,
+        sourceUsed: value.sourceUsed,
+        freshness: value.freshness
+      });
+      if (idx >= 0) currentList[idx] = mergeOpportunityWithStored(currentList[idx], patch);
+      else currentList.push(patch);
+      saveOpportunitiesSnapshot(currentList);
+      state.opportunities = state.opportunities.map(item => String(item.symbol || "").toUpperCase() === clean ? mergeOpportunityWithStored(item, patch) : item);
+      applyFilter();
+    }
   }
 
   function loadTradesState() {
@@ -599,8 +670,61 @@ function currentTradePlan() {
     };
   }
 
+
+  function saveOpportunitiesSnapshot(rows) {
+    state.opportunitiesSnapshot = rows;
+    writeJson(STORAGE_KEYS.opportunitiesSnapshot, rows);
+  }
+
+  function mergeOpportunityWithStored(current, stored) {
+    if (!stored) return current;
+    const keepCurrentLive = current.price != null;
+    if (keepCurrentLive) return current;
+    const merged = { ...stored, ...current };
+    merged.price = stored.price ?? current.price;
+    merged.change24hPct = stored.change24hPct ?? current.change24hPct;
+    merged.score = stored.score ?? current.score;
+    merged.scoreStatus = stored.scoreStatus || current.scoreStatus;
+    merged.direction = stored.direction || current.direction;
+    merged.analysisLabel = stored.analysisLabel || current.analysisLabel;
+    merged.confidence = stored.confidence || current.confidence;
+    merged.sourceUsed = stored.sourceUsed || current.sourceUsed;
+    merged.freshness = stored.freshness || current.freshness || "cache";
+    merged.error = null;
+    merged.fromStoredCache = true;
+    return merged;
+  }
+
+  function backfillOpportunities(rows) {
+    const snapshotMap = new Map((state.opportunitiesSnapshot || []).map(x => [String(x.symbol || "").toUpperCase(), x]));
+    const detailMap = new Map(Object.values(state.detailCache || {}).map(x => [String(x.symbol || "").toUpperCase(), x]));
+    return (rows || []).map((item) => {
+      const clean = String(item?.symbol || "").toUpperCase();
+      if (!clean) return item;
+      const detail = detailMap.get(clean);
+      const snap = snapshotMap.get(clean);
+      const stored = detail && detail.price != null ? {
+        symbol: detail.symbol,
+        name: detail.name,
+        assetClass: detail.assetClass,
+        price: detail.price,
+        change24hPct: detail.change24hPct,
+        score: detail.score,
+        scoreStatus: detail.scoreStatus,
+        direction: detail.direction,
+        analysisLabel: detail.analysisLabel,
+        confidence: detail.confidence,
+        sourceUsed: detail.sourceUsed,
+        freshness: detail.freshness
+      } : snap;
+      return mergeOpportunityWithStored(item, stored);
+    });
+  }
+
   function setOpportunities(rows) {
-    state.opportunities = Array.isArray(rows) ? rows.map(normalizeOpportunity) : [];
+    const prepared = Array.isArray(rows) ? backfillOpportunities(rows).map(normalizeOpportunity) : [];
+    state.opportunities = prepared;
+    saveOpportunitiesSnapshot(prepared);
     applyFilter();
     state.opportunitiesFetchedAt = Date.now();
   }
@@ -618,15 +742,6 @@ function currentTradePlan() {
 
   async function loadDashboard() {
     try {
-      let opp = null;
-      const shouldRefreshOpp = !state.opportunities.length || canRunScheduledFetch("opportunities");
-      if (shouldRefreshOpp && canSpendEstimatedBudget("opportunities")) {
-        opp = await api("/api/opportunities").catch(() => null);
-        if (opp?.data) {
-          setOpportunities(opp.data);
-          markScheduledFetch("opportunities");
-        }
-      }
       const [fg, trending, portfolio] = await Promise.all([
         api("/api/fear-greed").catch(() => null),
         api("/api/trending").catch(() => null),
@@ -645,13 +760,13 @@ function currentTradePlan() {
     const now = Date.now();
 
     if (!canSpendEstimatedBudget("opportunities") && state.opportunities.length) {
-      state.error = `Budget Twelve trop faible pour relancer les opportunites maintenant (${state.budget.remaining} restant sur ${state.budget.dailyLimit}).`;
+      state.error = null;
       render();
       return;
     }
 
     if (state.opportunities.length && !canRunScheduledFetch("opportunities")) {
-      state.error = `Les opportunites non-crypto se mettent a jour toutes les 15 minutes. Prochaine mise a jour dans ${nextAllowedLabel("opportunities")}.`;
+      state.error = null;
       render();
       return;
     }
@@ -979,7 +1094,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="price-col">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
-          ${item.error ? `<div class="muted" style="font-size:12px;margin-top:6px">${safeText(item.error)}</div>` : ""}
+          ${item.error ? `<div class="muted opp-note">${safeText(item.error.includes("source") || item.error.includes("quota") || item.error.includes("limit") ? "donnee conservee ou nouvelle mise a jour plus tard" : item.error)}</div>` : ""}
         </div>
         <div class="meta-col">
           ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
@@ -1037,13 +1152,14 @@ function closeTrainingTrade(id, livePrice = null) {
           ${filters.map(f => `<button class="btn ${state.opportunityFilter === f ? 'active' : ''}" data-filter="${f}">${f}</button>`).join("")}
           <button class="btn" data-refresh="opportunities">Rafraichir</button>
         </div>
-        <div class="card soft-card" style="margin-bottom:14px">
-          <div class="kv">
-            <div class="muted">Liste opportunites</div><div>${refreshStatusLabel("opportunities")}</div>
-            <div class="muted">Budget restant</div><div>${state.budget.remaining} / ${state.budget.dailyLimit}</div>
-            <div class="muted">Mode dashboard</div><div>${dashboardRefreshLabel()}</div>
+        <div class="countdown-strip" style="margin-bottom:14px">
+          <div class="countdown-left">
+            <span class="countdown-dot"></span>
+            <span class="countdown-title">Prochaine mise a jour</span>
           </div>
+          <div class="countdown-right">${countdownOnlyLabel("opportunities")}</div>
         </div>
+        <div class="muted priority-note">Priorite de l'app : la page Opportunites garde toujours la derniere donnee connue avant toute autre page non-crypto.</div>
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
         ${state.loading ? `<div class="loading-state">Chargement des opportunites...</div>` :
           state.filteredOpportunities.length ? `<div class="opp-list">${state.filteredOpportunities.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` :
@@ -1080,11 +1196,16 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Fiche actif</span></div>
         ${state.loadingDetail ? `<div class="loading-state">Chargement du detail...</div>` : ""}
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
-        ${d ? `<div class="card soft-card" style="margin-bottom:14px">
-              <div class="kv">
-                <div class="muted">Fiche actif</div><div>${detailRefreshLabel(d.symbol)}</div>
-                <div class="muted">Bougies</div><div>${candlesRefreshLabel(d.symbol)}</div>
-                <div class="muted">Budget restant</div><div>${state.budget.remaining} / ${state.budget.dailyLimit}</div>
+        ${d ? `<div class="countdown-strip dual" style="margin-bottom:14px">
+              <div class="countdown-item">
+                <span class="countdown-dot"></span>
+                <span class="countdown-label">Fiche actif</span>
+                <strong>${isCryptoSymbol(d.symbol) ? "souple" : countdownOnlyLabel("detail_non_crypto", d.symbol)}</strong>
+              </div>
+              <div class="countdown-item">
+                <span class="countdown-dot"></span>
+                <span class="countdown-label">Bougies</span>
+                <strong>${isCryptoSymbol(d.symbol) ? "souple" : countdownOnlyLabel("candles_non_crypto", d.symbol)}</strong>
               </div>
             </div>
           <div class="detail-layout">
@@ -1342,12 +1463,12 @@ function renderHistoryRow(item) {
           <div class="grid trades-stats">
             <div class="stat-card"><div class="stat-label">Utilises</div><div class="stat-value">${state.budget.used}</div></div>
             <div class="stat-card"><div class="stat-label">Restants</div><div class="stat-value">${state.budget.remaining}</div></div>
-            <div class="stat-card"><div class="stat-label">Plafond theorique app</div><div class="stat-value">${theoreticalDailyCap()}</div></div>
+            <div class="stat-card"><div class="stat-label">Pool opportunites</div><div class="stat-value">${poolRemaining("opportunities")}</div></div>
             <div class="stat-card"><div class="stat-label">Etat</div><div class="stat-value">${safeText(budgetAdvice())}</div></div>
           </div>
           <div class="kv" style="margin-top:14px">
             <div class="muted">Opportunites non-crypto</div><div>1 appel Twelve max toutes les 15 min (${TWELVE_POLICY.opportunities.maxPerDay}/jour)</div>
-            <div class="muted">Prochaine opportunites</div><div>${nextAllowedLabel("opportunities")}</div>
+            <div class="muted">Prochaine opportunites</div><div>${countdownOnlyLabel("opportunities")}</div>
             <div class="muted">Fiche actif non-crypto</div><div>1 appel Twelve max toutes les 30 min et par actif (${TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
             <div class="muted">Bougies non-crypto</div><div>1 appel Twelve max toutes les 12 h et par actif (${TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
             <div class="muted">Logique</div><div>Impossible depuis l'app de relancer Twelve avant la fin du delai prevu pour chaque categorie.</div>
@@ -1459,6 +1580,10 @@ function renderHistoryRow(item) {
 
   async function boot() {
     loadTradesState();
+    if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
+      state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);
+      applyFilter();
+    }
     render();
     await loadDashboard();
     render();
