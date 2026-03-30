@@ -3,7 +3,8 @@
   const STORAGE_KEYS = {
     trainingPositions: "mtp_training_positions_v1",
     trainingHistory: "mtp_training_history_v1",
-    settings: "mtp_settings_v1"
+    settings: "mtp_settings_v1",
+    algoJournal: "mtp_algo_journal_v1"
   };
 
   const defaultSettings = {
@@ -38,6 +39,7 @@
       positions: [],
       history: []
     },
+    algoJournal: [],
     settings: loadSettings()
   };
 
@@ -77,11 +79,13 @@
   function loadTradesState() {
     state.trades.positions = readJson(STORAGE_KEYS.trainingPositions, []);
     state.trades.history = readJson(STORAGE_KEYS.trainingHistory, []);
+    state.algoJournal = readJson(STORAGE_KEYS.algoJournal, []);
   }
 
   function persistTradesState() {
     writeJson(STORAGE_KEYS.trainingPositions, state.trades.positions);
     writeJson(STORAGE_KEYS.trainingHistory, state.trades.history);
+    writeJson(STORAGE_KEYS.algoJournal, state.algoJournal);
   }
 
   // =========================
@@ -247,6 +251,129 @@
       </div>`;
   }
 
+
+function simpleSideLabel(side) {
+  if (side === "long") return "hausse";
+  if (side === "short") return "baisse";
+  return "neutre";
+}
+
+function horizonLabel(days) {
+  if (days <= 2) return "court terme";
+  if (days <= 10) return "quelques jours";
+  return "quelques semaines";
+}
+
+function averageRange(candles, count = 14) {
+  const recent = (candles || []).slice(-count);
+  if (!recent.length) return null;
+  const ranges = recent
+    .map((c) => (Number.isFinite(c?.high) && Number.isFinite(c?.low)) ? (c.high - c.low) : null)
+    .filter((v) => v != null);
+  if (!ranges.length) return null;
+  return ranges.reduce((a, b) => a + b, 0) / ranges.length;
+}
+
+function generateTradePlan(detail) {
+  if (!detail || detail.price == null) return null;
+
+  const score = detail.score ?? null;
+  const direction = detail.direction ?? null;
+  const confidence = detail.confidence || "low";
+  const breakdown = detail.breakdown || {};
+  const momentum = breakdown.momentum ?? 50;
+  const entryQuality = breakdown.entryQuality ?? 50;
+  const trend = breakdown.trend ?? 50;
+  const regime = breakdown.regime ?? 50;
+  const risk = breakdown.risk ?? 50;
+
+  const avgRange = averageRange(detail.candles || [], 14);
+  const fallbackVol = detail.price * 0.025;
+  const vol = avgRange && avgRange > 0 ? avgRange : fallbackVol;
+
+  let decision = "Aucun trade conseille";
+  let side = null;
+  let reason = "Le signal est trop faible ou trop flou.";
+  let urgency = "a surveiller";
+  let timing = "moyen";
+
+  if (score != null && score >= 65 && direction === "long" && entryQuality >= 58 && risk >= 45) {
+    decision = "Trade conseille";
+    side = "long";
+    reason = "Hausse probable, entree encore correcte et risque acceptable.";
+    urgency = "a prendre maintenant";
+    timing = entryQuality >= 68 ? "bon" : "moyen";
+  } else if (score != null && score <= 35 && direction === "short" && entryQuality >= 55 && risk >= 45) {
+    decision = "Trade conseille";
+    side = "short";
+    reason = "Baisse probable, timing correct et risque encore acceptable.";
+    urgency = "a prendre maintenant";
+    timing = entryQuality >= 68 ? "bon" : "moyen";
+  } else if (score != null && ((direction === "long" && score >= 54) || (direction === "short" && score <= 46))) {
+    decision = "Trade possible";
+    side = direction;
+    reason = "Le signal existe, mais il n'est pas encore assez propre pour etre fort.";
+    urgency = "a envisager";
+    timing = entryQuality >= 62 ? "bon" : "moyen";
+  } else if (score != null && momentum >= 58 && trend >= 48 && regime >= 48) {
+    decision = "A surveiller";
+    side = "long";
+    reason = "Le contexte devient interessant, mais l'entree n'est pas encore assez propre.";
+    urgency = "a surveiller";
+    timing = "trop tot";
+  } else if (score != null && momentum <= 42 && trend <= 48 && regime <= 48) {
+    decision = "A surveiller";
+    side = "short";
+    reason = "Le biais baissier se construit, mais le trade n'est pas encore assez net.";
+    urgency = "a surveiller";
+    timing = "trop tot";
+  }
+
+  if (!side) {
+    return {
+      decision,
+      side: null,
+      entry: null,
+      stopLoss: null,
+      takeProfit: null,
+      rr: null,
+      confidence: simpleConfidenceLabel(confidence),
+      urgency,
+      timing,
+      horizon: "a definir",
+      reason,
+      refusalReason: "Pas de trade conseille tant que le signal n'est pas plus propre."
+    };
+  }
+
+  const riskDistance = Math.max(vol * 0.9, detail.price * 0.012);
+  const rewardDistance = decision === "Trade conseille" ? riskDistance * 2.2 : riskDistance * 1.6;
+  const entry = detail.price;
+  const stopLoss = side === "long" ? entry - riskDistance : entry + riskDistance;
+  const takeProfit = side === "long" ? entry + rewardDistance : entry - rewardDistance;
+  const rr = rewardDistance / riskDistance;
+  const horizonDays = decision === "Trade conseille" ? (detail.assetClass === "crypto" ? 2 : 4) : 7;
+
+  return {
+    decision,
+    side,
+    entry,
+    stopLoss,
+    takeProfit,
+    rr,
+    confidence: simpleConfidenceLabel(confidence),
+    urgency,
+    timing,
+    horizon: horizonLabel(horizonDays),
+    reason,
+    refusalReason: null
+  };
+}
+
+function currentTradePlan() {
+  return generateTradePlan(state.detail);
+}
+
   function normalizeOpportunity(item) {
     return {
       symbol: item?.symbol || "",
@@ -378,32 +505,104 @@
     return { pnl, pnlPct };
   }
 
-  function addTrainingTradeFromDetail(side) {
-    const d = state.detail;
-    if (!d || d.price == null) {
-      state.error = "Impossible d'ajouter ce trade pour le moment.";
-      render();
-      return;
-    }
-    const quantity = d.price > 500 ? 1 : d.price > 50 ? 2 : 10;
-    const position = {
-      id: uid("pos"),
-      symbol: d.symbol,
-      name: d.name,
-      assetClass: d.assetClass,
-      side,
-      quantity,
-      entryPrice: d.price,
-      openedAt: nowIso(),
-      sourceUsed: d.sourceUsed || null
-    };
-    state.trades.positions.unshift(position);
-    persistTradesState();
-    state.error = `Trade d'entrainement ajoute : ${d.symbol} (${side})`;
-    render();
-  }
 
-  function closeTrainingTrade(id, livePrice = null) {
+function addTrainingTradeFromDetail(side) {
+  const d = state.detail;
+  if (!d || d.price == null) {
+    state.error = "Impossible d'ajouter ce trade pour le moment.";
+    render();
+    return;
+  }
+  const quantity = d.price > 500 ? 1 : d.price > 50 ? 2 : 10;
+  const position = {
+    id: uid("pos"),
+    symbol: d.symbol,
+    name: d.name,
+    assetClass: d.assetClass,
+    side,
+    quantity,
+    entryPrice: d.price,
+    openedAt: nowIso(),
+    sourceUsed: d.sourceUsed || null,
+    stopLoss: null,
+    takeProfit: null,
+    tradeDecision: "manuel",
+    tradeReason: "Trade cree manuellement depuis la fiche actif.",
+    rr: null,
+    horizon: null
+  };
+  state.trades.positions.unshift(position);
+  state.algoJournal.unshift({
+    id: uid("algo"),
+    symbol: d.symbol,
+    createdAt: nowIso(),
+    mode: "manuel",
+    score: d.score ?? null,
+    decision: "manuel",
+    side,
+    entry: d.price,
+    stopLoss: null,
+    takeProfit: null,
+    rr: null,
+    confidence: simpleConfidenceLabel(d.confidence || "low"),
+    reason: "Trade manuel depuis la fiche actif."
+  });
+  persistTradesState();
+  state.error = `Trade d'entrainement ajoute : ${d.symbol} (${simpleSideLabel(side)})`;
+  render();
+}
+
+function createRecommendedTrade() {
+  const d = state.detail;
+  const plan = currentTradePlan();
+  if (!d || !plan || !plan.side || plan.decision === "Aucun trade conseille") {
+    state.error = "Aucun trade conseille pour le moment.";
+    render();
+    return;
+  }
+  const quantity = d.price > 500 ? 1 : d.price > 50 ? 2 : 10;
+  const position = {
+    id: uid("pos"),
+    symbol: d.symbol,
+    name: d.name,
+    assetClass: d.assetClass,
+    side: plan.side,
+    quantity,
+    entryPrice: plan.entry,
+    openedAt: nowIso(),
+    sourceUsed: d.sourceUsed || null,
+    stopLoss: plan.stopLoss,
+    takeProfit: plan.takeProfit,
+    tradeDecision: plan.decision,
+    tradeReason: plan.reason,
+    rr: plan.rr,
+    horizon: plan.horizon,
+    confidence: plan.confidence,
+    algoScore: d.score ?? null
+  };
+  state.trades.positions.unshift(position);
+  state.algoJournal.unshift({
+    id: uid("algo"),
+    symbol: d.symbol,
+    createdAt: nowIso(),
+    mode: "conseille",
+    score: d.score ?? null,
+    decision: plan.decision,
+    side: plan.side,
+    entry: plan.entry,
+    stopLoss: plan.stopLoss,
+    takeProfit: plan.takeProfit,
+    rr: plan.rr,
+    confidence: plan.confidence,
+    reason: plan.reason,
+    horizon: plan.horizon
+  });
+  persistTradesState();
+  state.error = `Trade conseille cree : ${d.symbol} (${simpleSideLabel(plan.side)})`;
+  render();
+}
+
+function closeTrainingTrade(id, livePrice = null) {
     const idx = state.trades.positions.findIndex((p) => p.id === id);
     if (idx === -1) return;
     const position = state.trades.positions[idx];
@@ -630,10 +829,31 @@
                   ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
-                <div class="trade-actions">
-                  <button class="btn trade-btn long" data-add-trade="long">Essai achat</button>
-                  <button class="btn trade-btn short" data-add-trade="short">Essai baisse</button>
-                </div>
+                ${(() => {
+                  const plan = currentTradePlan();
+                  return `
+                    <div class="plan-card">
+                      <div class="section-title"><span>Plan propose par l'algo</span><span>${safeText(plan?.decision || "—")}</span></div>
+                      <div class="kv plan-grid">
+                        <div class="muted">Decision</div><div>${safeText(plan?.decision || "—")}</div>
+                        <div class="muted">Sens</div><div>${safeText(plan?.side ? simpleSideLabel(plan.side) : "aucun")}</div>
+                        <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
+                        <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
+                        <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
+                        <div class="muted">Ratio gain / risque</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
+                        <div class="muted">Fiabilite</div><div>${safeText(plan?.confidence || "—")}</div>
+                        <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
+                        <div class="muted">Timing</div><div>${safeText(plan?.timing || "—")}</div>
+                        <div class="muted">Priorite</div><div>${safeText(plan?.urgency || "—")}</div>
+                      </div>
+                      <div class="plan-reason">${safeText(plan?.reason || plan?.refusalReason || "Pas d'analyse disponible.")}</div>
+                      <div class="trade-actions">
+                        <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side ? "disabled" : ""}>Creer le trade conseille</button>
+                        <button class="btn trade-btn long" data-add-trade="long">Parier sur la hausse</button>
+                        <button class="btn trade-btn short" data-add-trade="short">Parier sur la baisse</button>
+                      </div>
+                    </div>`;
+                })()}
               </div>
 
               <div class="card">
@@ -650,6 +870,7 @@
                   <div class="score-meta">
                     <div style="font-weight:700">${safeText(simpleAnalysisLabel(d.analysisLabel || "Analyse indisponible"))}</div>
                     <div class="muted">Fiabilite : ${safeText(simpleConfidenceLabel(d.confidence || "low"))}</div>
+                    <div class="muted">Decision : ${safeText(currentTradePlan()?.decision || "—")}</div>
                   </div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
@@ -680,26 +901,35 @@
       </div>`;
   }
 
-  function renderPositionRow(position) {
-    const liveMatch = state.opportunities.find((o) => o.symbol === position.symbol);
-    const livePrice = liveMatch?.price ?? position.entryPrice;
-    const { pnl, pnlPct } = getOpenPnl(position, livePrice);
-    return `
-      <div class="trade-row">
-        <div>
-          <div class="trade-symbol">${safeText(position.symbol)}</div>
-          <div class="trade-sub">${safeText(position.name || "")}</div>
-        </div>
-        <div>${badge(position.side, position.side)}</div>
-        <div>${num(position.quantity, 4)}</div>
-        <div>${priceDisplay(position.entryPrice)}</div>
-        <div>${priceDisplay(livePrice)}</div>
-        <div class="${(pnl || 0) >= 0 ? 'positive' : 'negative'}">${pnl == null ? "—" : money(pnl * fxRateUsdToEur(), "EUR")} / ${pct(pnlPct)}</div>
-        <div><button class="btn" data-close-trade="${safeText(position.id)}">Cloturer</button></div>
-      </div>`;
-  }
 
-  function renderHistoryRow(item) {
+function renderPositionRow(position) {
+  const liveMatch = state.opportunities.find((o) => o.symbol === position.symbol);
+  const livePrice = liveMatch?.price ?? position.entryPrice;
+  const { pnl, pnlPct } = getOpenPnl(position, livePrice);
+  return `
+    <div class="trade-row trade-row-wide">
+      <div>
+        <div class="trade-symbol">${safeText(position.symbol)}</div>
+        <div class="trade-sub">${safeText(position.name || "")}</div>
+      </div>
+      <div>${badge(simpleSideLabel(position.side), position.side)}</div>
+      <div>${num(position.quantity, 4)}</div>
+      <div>${priceDisplay(position.entryPrice)}</div>
+      <div>${priceDisplay(livePrice)}</div>
+      <div>${position.stopLoss != null ? priceDisplay(position.stopLoss) : "—"}</div>
+      <div>${position.takeProfit != null ? priceDisplay(position.takeProfit) : "—"}</div>
+      <div>${position.rr != null ? num(position.rr, 2) : "—"}</div>
+      <div class="${(pnl || 0) >= 0 ? 'positive' : 'negative'}">${pnl == null ? "—" : money(pnl * fxRateUsdToEur(), "EUR")} / ${pct(pnlPct)}</div>
+      <div><button class="btn" data-close-trade="${safeText(position.id)}">Cloturer</button></div>
+    </div>
+    <div class="trade-note">
+      <span class="muted">Decision : </span>${safeText(position.tradeDecision || "manuel")} ·
+      <span class="muted">Horizon : </span>${safeText(position.horizon || "—")} ·
+      <span class="muted">Raison : </span>${safeText(position.tradeReason || "—")}
+    </div>`;
+}
+
+function renderHistoryRow(item) {
     return `
       <div class="trade-row history">
         <div>
@@ -737,7 +967,7 @@
         ` : `
           <div class="grid trades-stats">
             <div class="stat-card"><div class="stat-label">Positions en cours</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Historique des trades clos</div><div class="stat-value">${stats.closedCount}</div></div>
+            <div class="stat-card"><div class="stat-label">Historique des trades</div><div class="stat-value">${stats.closedCount}</div></div>
             <div class="stat-card"><div class="stat-label">Gain / perte realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
             <div class="stat-card"><div class="stat-label">Taux de reussite</div><div class="stat-value">${stats.winRate == null ? "—" : pct(stats.winRate)}</div></div>
           </div>
@@ -747,11 +977,11 @@
             ${positions.length ? `
               <div class="trade-table">
                 <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Qté</div><div>Entrée</div><div>Live</div><div>Pnl</div><div>Action</div>
+                  <div>Actif</div><div>Sens</div><div>Qte</div><div>Entree</div><div>Live</div><div>Stop</div><div>Objectif</div><div>R/R</div><div>Pnl</div><div>Action</div>
                 </div>
                 ${positions.map(renderPositionRow).join("")}
               </div>
-            ` : `<div class="empty-state">Aucune position ouverte. Ouvre un actif puis ajoute un trade d'entrainement.</div>`}
+            ` : `<div class="empty-state">Aucune position ouverte. Ouvre une fiche actif puis cree le trade conseille ou parie sur la hausse / la baisse.</div>`}
           </div>
 
           <div class="card" style="margin-top:18px">
@@ -759,7 +989,7 @@
             ${history.length ? `
               <div class="trade-table">
                 <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Qté</div><div>Entrée</div><div>Sortie</div><div>Pnl</div><div>Source</div>
+                  <div>Actif</div><div>Sens</div><div>Qte</div><div>Entree</div><div>Sortie</div><div>Stop</div><div>Objectif</div><div>R/R</div><div>Pnl</div><div>Source</div>
                 </div>
                 ${history.map(renderHistoryRow).join("")}
               </div>
@@ -882,6 +1112,13 @@
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
         addTrainingTradeFromDetail(el.getAttribute("data-add-trade"));
+      });
+    });
+
+    app.querySelectorAll("[data-create-trade-plan]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        createRecommendedTrade();
       });
     });
 
