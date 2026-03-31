@@ -583,30 +583,58 @@ function planSummaryText(plan) {
 
 function lightweightTradePlan(item) {
   if (!item || item.price == null || typeof item.score !== "number") return null;
-  const score = Number(item.score || 0);
-  const dir = String(item.direction || "neutral");
+  return generateTradePlan(normalizeDetailForOfficialScore(item));
+}
+
+
+function computeOfficialTradeScore(detail) {
+  if (!detail) return null;
+  const rawScore = Number(detail.score ?? 0);
+  const direction = String(detail.direction || "neutral");
+  const breakdown = detail.breakdown || {};
+  const momentum = Number(breakdown.momentum ?? 50);
+  const entryQuality = Number(breakdown.entryQuality ?? 50);
+  const trend = Number(breakdown.trend ?? 50);
+  const regime = Number(breakdown.regime ?? 50);
+  const risk = Number(breakdown.risk ?? 50);
+  const participation = Number(breakdown.participation ?? 50);
+
+  const finalScore = computeOfficialTradeScore(normalized);
+  return Math.max(0, Math.min(100, finalScore));
+}
+
+function normalizeDetailForOfficialScore(item) {
+  if (!item) return null;
+  const score = Number(item.score ?? 0);
+  const direction = String(item.direction || "neutral");
+  const existing = item.breakdown || {};
   const synthetic = {
-    ...item,
-    breakdown: {
-      regime: 50,
-      trend: dir === "long" ? Math.max(50, score) : dir === "short" ? Math.max(50, 100 - score) : 50,
-      momentum: dir === "long" ? Math.max(50, score) : dir === "short" ? Math.max(50, 100 - score) : 50,
-      entryQuality: 50,
-      risk: 50,
-      participation: 50
-    },
-    candles: []
+    regime: existing.regime ?? 50,
+    trend: existing.trend ?? (direction === "long" ? Math.max(50, score) : direction === "short" ? Math.max(50, 100 - score) : 50),
+    momentum: existing.momentum ?? (direction === "long" ? Math.max(50, score) : direction === "short" ? Math.max(50, 100 - score) : 50),
+    entryQuality: existing.entryQuality ?? 50,
+    risk: existing.risk ?? 50,
+    participation: existing.participation ?? 50
   };
-  return generateTradePlan(synthetic);
+  return { ...item, breakdown: synthetic, candles: item.candles || [] };
+}
+
+function officialTradeDecision(item) {
+  const finalScore = computeOfficialTradeScore(normalizeDetailForOfficialScore(item));
+  if (finalScore == null) return "Pas de trade";
+  if (finalScore >= 70) return "Trade propose";
+  if (finalScore >= 55) return "A surveiller";
+  return "Pas de trade";
 }
 
 function generateTradePlan(detail) {
   if (!detail || detail.price == null) return null;
 
-  const rawScore = Number(detail.score ?? 0);
-  const direction = String(detail.direction || "neutral");
-  const confidenceRaw = detail.confidence || "low";
-  const breakdown = detail.breakdown || {};
+  const normalized = normalizeDetailForOfficialScore(detail);
+  const rawScore = Number(normalized.score ?? 0);
+  const direction = String(normalized.direction || "neutral");
+  const confidenceRaw = normalized.confidence || "low";
+  const breakdown = normalized.breakdown || {};
   const momentum = Number(breakdown.momentum ?? 50);
   const entryQuality = Number(breakdown.entryQuality ?? 50);
   const trend = Number(breakdown.trend ?? 50);
@@ -627,20 +655,7 @@ function generateTradePlan(detail) {
   if (risk <= 42) aiContext.push("risque eleve");
   if (participation >= 70) aiContext.push("activite suffisante");
 
-  const directionQuality =
-    direction === "long" ? rawScore :
-    direction === "short" ? (100 - rawScore) :
-    35;
-
-  const finalScore = Math.round(
-    regime * 0.14 +
-    trend * 0.20 +
-    momentum * 0.16 +
-    entryQuality * 0.22 +
-    risk * 0.18 +
-    participation * 0.05 +
-    directionQuality * 0.05
-  );
+  const finalScore = computeOfficialTradeScore(normalized);
 
   let decision = decisionFromReliability(finalScore);
   let side = direction === "neutral" ? null : direction;
@@ -1217,9 +1232,9 @@ function closeTrainingTrade(id, livePrice = null) {
           </div>
         </div>
         <div class="score-box">
-          ${scoreRing(lightweightTradePlan(item)?.finalScore ?? item.score)}
+          ${scoreRing(computeOfficialTradeScore(normalizeDetailForOfficialScore(item)) ?? item.score)}
           <div class="score-meta">
-            ${badge((lightweightTradePlan(item)?.decision || "Pas de trade"), (lightweightTradePlan(item)?.decision || ""))}
+            ${badge((officialTradeDecision(item) || "Pas de trade"), (officialTradeDecision(item) || ""))}
             ${badge(simpleDirectionLabel(item.direction, item.score), item.direction || "")}
           </div>
         </div>
@@ -1473,7 +1488,7 @@ function renderDashboard() {
                         <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
                         <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
                         <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        <div class="muted">Fiabilite du trade</div><div>${plan?.finalScore != null ? `${num(plan.finalScore, 0)}/100` : "—"}</div>
+                        <div class="muted">Fiabilite du trade</div><div>${computeOfficialTradeScore(normalizeDetailForOfficialScore(d)) != null ? `${num(computeOfficialTradeScore(normalizeDetailForOfficialScore(d)), 0)}/100` : "—"}</div>
                         <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
                         <div class="muted">Contexte</div><div>${safeText(planSummaryText(plan))}</div>
                         <div class="muted">Resume</div><div>${safeText(plan?.aiSummary || "—")}</div>
@@ -1522,9 +1537,9 @@ function renderDashboard() {
 
             <div>
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Fiabilite du trade</span><span>${currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—"}</span></div>
+                <div class="section-title"><span>Fiabilite du trade</span><span>${computeOfficialTradeScore(normalizeDetailForOfficialScore(d)) != null ? computeOfficialTradeScore(normalizeDetailForOfficialScore(d)) : "—"}</span></div>
                 <div class="score-box" style="margin-bottom:14px">
-                  ${scoreRing(currentTradePlan()?.finalScore ?? d.score)}
+                  ${scoreRing(computeOfficialTradeScore(normalizeDetailForOfficialScore(d)) ?? d.score)}
                   <div class="score-meta">
                     <div style="font-weight:700">${safeText(simpleAnalysisLabel(d.analysisLabel || "Analyse indisponible"))}</div>
                     <div class="muted">Fiabilite : ${safeText(simpleConfidenceLabel(d.confidence || "low"))}</div>
