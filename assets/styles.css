@@ -266,3 +266,17 @@ button{font:inherit} a{text-decoration:none;color:inherit}
 }
 
 .countdown-right,.countdown-strip,.priority-note{display:none !important}
+
+.dashboard-hero-card{padding:18px}
+.dashboard-hero-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.dashboard-hero-title{font-size:1.5rem;font-weight:800}
+.dashboard-hero-subtitle{margin-top:8px;color:var(--text-secondary);max-width:680px;line-height:1.45}
+.dashboard-grid{display:grid;grid-template-columns:1.2fr 1fr;gap:18px}
+.top-pick-box{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+@media (max-width:860px){
+  .dashboard-hero-top{flex-direction:column}
+  .dashboard-grid{grid-template-columns:1fr}
+  .top-pick-box{flex-direction:column}
+}
+
+.score-meta .badge{white-space:nowrap}
