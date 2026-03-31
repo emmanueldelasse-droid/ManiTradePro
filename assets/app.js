@@ -816,12 +816,22 @@ function detailEngineInputFor(item) {
 
 
 
+function rowIsUnavailable(item) {
+  if (!item) return true;
+  if (item.status === "unavailable") return true;
+  if (item.scoreStatus === "unavailable") return true;
+  if (item.error && item.price == null && item.score == null && item.officialScore == null) return true;
+  return false;
+}
+
 function rowDecisionLabel(item) {
-  return rowTradePlan(item)?.decision || "Analyse en cours";
+  if (rowIsUnavailable(item)) return "Indisponible";
+  return rowTradePlan(item)?.decision || "Pas de trade";
 }
 
 function rowTrendLabel(item) {
-  return rowTradePlan(item)?.trendLabel || "analyse en cours";
+  if (rowIsUnavailable(item)) return compactError(item?.error) || "source indisponible";
+  return rowTradePlan(item)?.trendLabel || "pas de tendance claire";
 }
 
 async function hydrateNonCryptoRows(rows) { return; }
@@ -873,6 +883,8 @@ function currentTradePlan() {
       freshness: item?.freshness || "unknown",
       breakdown: item?.breakdown || null,
       error: compactError(item?.error || null),
+      status: item?.status || null,
+      reasonShort: item?.reasonShort || null,
       officialScore: item?.officialScore ?? null,
       officialDecision: item?.officialDecision || null,
       officialTrendLabel: item?.officialTrendLabel || null,
@@ -1415,12 +1427,10 @@ function applyFilter() {
 
   function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
-    const clean = String(item.symbol || "").toUpperCase();
-    const plan = rowTradePlan(item);
-    const isHydrating = !!state.nonCryptoHydration[clean];
-    const scoreValue = item?.officialScore ?? plan?.finalScore ?? null;
-    const decisionLabel = isHydrating && !plan ? "Analyse en cours" : (item?.officialDecision || plan?.decision || "Analyse en cours");
-    const trendLabel = isHydrating && !plan ? "chargement detail" : (item?.officialDecision === "A surveiller" && (item?.officialWaitFor || plan?.waitFor) ? simpleWaitForText({waitFor: item?.officialWaitFor || plan?.waitFor}) : (item?.officialTrendLabel || plan?.trendLabel || "analyse en cours"));
+    const scoreValue = item?.officialScore ?? item?.score ?? null;
+    const decisionLabel = rowDecisionLabel(item);
+    const trendLabel = rowTrendLabel(item);
+    const note = item?.reasonShort || item?.error || null;
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}">
@@ -1442,7 +1452,7 @@ function applyFilter() {
         <div class="price-col">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
-          ${item.error ? `<div class="muted opp-note">${safeText(item.error.includes("source") || item.error.includes("quota") || item.error.includes("limit") ? "nouvelle mise a jour plus tard" : item.error)}</div>` : ""}
+          ${note ? `<div class="muted opp-note">${safeText(note)}</div>` : ""}
         </div>
         <div class="meta-col">
           ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
@@ -1613,7 +1623,7 @@ function renderDashboard() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Opportunites</div>
-          <div class="screen-subtitle">Lecture simple, tri par decision, priorites visuelles.</div>
+          <div class="screen-subtitle">Lecture simple, tri par decision, priorites visuelles. Si une source echoue, l'actif passe en indisponible.</div>
         </div>
 
         <div class="opp-toolbar">
