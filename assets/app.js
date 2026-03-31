@@ -25,8 +25,10 @@
     opportunityFilter: "all",
     selectedSymbol: null,
     detail: null,
+    aiReview: null,
     loading: false,
     loadingDetail: false,
+    loadingAiReview: false,
     error: null,
     opportunitiesRequestId: 0,
     opportunitiesFetchedAt: 0,
@@ -552,59 +554,109 @@ function averageRange(candles, count = 14) {
   return ranges.reduce((a, b) => a + b, 0) / ranges.length;
 }
 
+function decisionBadgeClass(decision) {
+  if (decision === "Trade conseille") return "decision-strong";
+  if (decision === "Trade possible") return "decision-medium";
+  if (decision === "A surveiller") return "decision-watch";
+  if (decision === "A eviter") return "decision-avoid";
+  return "decision-none";
+}
+
 function generateTradePlan(detail) {
   if (!detail || detail.price == null) return null;
 
   const score = detail.score ?? null;
   const direction = detail.direction ?? null;
-  const confidence = detail.confidence || "low";
+  const confidenceRaw = detail.confidence || "low";
   const breakdown = detail.breakdown || {};
   const momentum = breakdown.momentum ?? 50;
   const entryQuality = breakdown.entryQuality ?? 50;
   const trend = breakdown.trend ?? 50;
   const regime = breakdown.regime ?? 50;
   const risk = breakdown.risk ?? 50;
+  const participation = breakdown.participation ?? 50;
 
   const avgRange = averageRange(detail.candles || [], 14);
-  const fallbackVol = detail.price * 0.025;
+  const fallbackVol = detail.price * (detail.assetClass === "crypto" ? 0.028 : 0.018);
   const vol = avgRange && avgRange > 0 ? avgRange : fallbackVol;
+
+  const aiContext = [];
+  if (regime >= 58) aiContext.push("contexte porteur");
+  if (regime <= 42) aiContext.push("contexte fragile");
+  if (entryQuality >= 65) aiContext.push("entree propre");
+  if (entryQuality <= 45) aiContext.push("entree delicate");
+  if (risk >= 62) aiContext.push("risque encore acceptable");
+  if (risk <= 42) aiContext.push("risque eleve");
+  if (participation >= 70) aiContext.push("activite suffisante");
 
   let decision = "Aucun trade conseille";
   let side = null;
   let reason = "Le signal est trop faible ou trop flou.";
-  let urgency = "a surveiller";
+  let urgency = "attendre";
   let timing = "moyen";
+  let aiSummary = "Pas de configuration assez propre pour proposer un trade prudent.";
+  let safety = "faible";
+  let refusalReason = "Pas de trade conseille tant que le signal n'est pas plus propre.";
 
-  if (score != null && score >= 65 && direction === "long" && entryQuality >= 58 && risk >= 45) {
+  const bullishStrong = direction === "long" && score != null && score >= 63 && momentum >= 58 && entryQuality >= 58 && risk >= 45;
+  const bearishStrong = direction === "short" && score != null && score <= 37 && momentum <= 42 && entryQuality >= 55 && risk >= 45;
+  const bullishPossible = direction === "long" && score != null && score >= 54 && entryQuality >= 52;
+  const bearishPossible = direction === "short" && score != null && score <= 46 && entryQuality >= 52;
+
+  if (bullishStrong) {
     decision = "Trade conseille";
     side = "long";
     reason = "Hausse probable, entree encore correcte et risque acceptable.";
-    urgency = "a prendre maintenant";
-    timing = entryQuality >= 68 ? "bon" : "moyen";
-  } else if (score != null && score <= 35 && direction === "short" && entryQuality >= 55 && risk >= 45) {
+    urgency = "maintenant";
+    timing = entryQuality >= 68 ? "bon" : "correct";
+    aiSummary = "L'IA valide un setup haussier prudent : contexte lisible, timing acceptable et risque cadre.";
+    safety = "elevee";
+    refusalReason = null;
+  } else if (bearishStrong) {
     decision = "Trade conseille";
     side = "short";
     reason = "Baisse probable, timing correct et risque encore acceptable.";
-    urgency = "a prendre maintenant";
-    timing = entryQuality >= 68 ? "bon" : "moyen";
-  } else if (score != null && ((direction === "long" && score >= 54) || (direction === "short" && score <= 46))) {
+    urgency = "maintenant";
+    timing = entryQuality >= 68 ? "bon" : "correct";
+    aiSummary = "L'IA valide un setup baissier prudent : signal net, risque contenu et plan defendable.";
+    safety = "elevee";
+    refusalReason = null;
+  } else if (bullishPossible) {
     decision = "Trade possible";
-    side = direction;
-    reason = "Le signal existe, mais il n'est pas encore assez propre pour etre fort.";
-    urgency = "a envisager";
-    timing = entryQuality >= 62 ? "bon" : "moyen";
-  } else if (score != null && momentum >= 58 && trend >= 48 && regime >= 48) {
-    decision = "A surveiller";
     side = "long";
+    reason = "Le signal haussier existe, mais il n'est pas encore assez propre pour etre fort.";
+    urgency = "a envisager";
+    timing = entryQuality >= 60 ? "correct" : "moyen";
+    aiSummary = "L'IA voit une base haussiere, mais prefere encore rester selective.";
+    safety = "moyenne";
+    refusalReason = "Attendre un meilleur timing ou un signal plus net.";
+  } else if (bearishPossible) {
+    decision = "Trade possible";
+    side = "short";
+    reason = "Le signal baissier existe, mais il manque encore un peu de proprete.";
+    urgency = "a envisager";
+    timing = entryQuality >= 60 ? "correct" : "moyen";
+    aiSummary = "L'IA voit une base baissiere, mais ne veut pas forcer le trade trop tot.";
+    safety = "moyenne";
+    refusalReason = "Attendre un mouvement plus propre avant de se positionner.";
+  } else if (score != null && ((momentum >= 56 && trend >= 48) || (momentum <= 44 && trend <= 52))) {
+    decision = "A surveiller";
+    side = direction === "neutral" ? null : direction;
     reason = "Le contexte devient interessant, mais l'entree n'est pas encore assez propre.";
     urgency = "a surveiller";
     timing = "trop tot";
-  } else if (score != null && momentum <= 42 && trend <= 48 && regime <= 48) {
-    decision = "A surveiller";
-    side = "short";
-    reason = "Le biais baissier se construit, mais le trade n'est pas encore assez net.";
-    urgency = "a surveiller";
-    timing = "trop tot";
+    aiSummary = "L'IA prefere surveiller l'actif plutot que forcer un trade mediocre.";
+    safety = "moyenne";
+    refusalReason = "Le contexte existe, mais pas encore le bon point d'entree.";
+  } else if (score != null) {
+    decision = "A eviter";
+    side = null;
+    reason = "Le risque et la qualite du signal ne justifient pas une prise de position prudente.";
+    urgency = "ne rien faire";
+    timing = "mauvais";
+    aiSummary = "L'IA refuse le trade : signal confus, timing faible ou risque trop eleve.";
+    safety = "faible";
+    refusalReason = "Trade refuse : meilleur choix = ne rien faire pour l'instant.";
   }
 
   if (!side) {
@@ -615,22 +667,35 @@ function generateTradePlan(detail) {
       stopLoss: null,
       takeProfit: null,
       rr: null,
-      confidence: simpleConfidenceLabel(confidence),
+      confidence: simpleConfidenceLabel(confidenceRaw),
       urgency,
       timing,
       horizon: "a definir",
       reason,
-      refusalReason: "Pas de trade conseille tant que le signal n'est pas plus propre."
+      refusalReason,
+      aiSummary,
+      safety,
+      aiContext
     };
   }
 
-  const riskDistance = Math.max(vol * 0.9, detail.price * 0.012);
-  const rewardDistance = decision === "Trade conseille" ? riskDistance * 2.2 : riskDistance * 1.6;
+  const riskDistance = Math.max(vol * (detail.assetClass === "crypto" ? 1.0 : 0.85), detail.price * (detail.assetClass === "crypto" ? 0.013 : 0.009));
+  const rewardMultiplier = decision === "Trade conseille" ? 2.4 : 1.8;
+  const rewardDistance = riskDistance * rewardMultiplier;
   const entry = detail.price;
   const stopLoss = side === "long" ? entry - riskDistance : entry + riskDistance;
   const takeProfit = side === "long" ? entry + rewardDistance : entry - rewardDistance;
   const rr = rewardDistance / riskDistance;
-  const horizonDays = decision === "Trade conseille" ? (detail.assetClass === "crypto" ? 2 : 4) : 7;
+  const horizonDays = decision === "Trade conseille" ? (detail.assetClass === "crypto" ? 2 : 4) : (detail.assetClass === "crypto" ? 4 : 7);
+
+  if (rr < 1.6 && decision === "Trade conseille") {
+    decision = "Trade possible";
+    urgency = "a envisager";
+    safety = "moyenne";
+    reason = "Le signal est correct mais le ratio gain/risque n'est pas assez fort pour un vrai trade prudent.";
+    aiSummary = "L'IA degrade le signal : ratio gain/risque trop moyen pour etre classe en trade conseille.";
+    refusalReason = "Attendre un meilleur point d'entree pour ameliorer le ratio gain/risque.";
+  }
 
   return {
     decision,
@@ -639,12 +704,15 @@ function generateTradePlan(detail) {
     stopLoss,
     takeProfit,
     rr,
-    confidence: simpleConfidenceLabel(confidence),
+    confidence: simpleConfidenceLabel(confidenceRaw),
     urgency,
     timing,
     horizon: horizonLabel(horizonDays),
     reason,
-    refusalReason: null
+    refusalReason,
+    aiSummary,
+    safety,
+    aiContext
   };
 }
 
@@ -738,6 +806,61 @@ function currentTradePlan() {
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
     return data;
+  }
+
+  async function apiPost(path, payload) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+    return data;
+  }
+
+  async function loadAiReview(detail, localPlan) {
+    if (!detail) return null;
+    state.loadingAiReview = true;
+    state.aiReview = null;
+    render();
+    try {
+      const payload = {
+        symbol: detail.symbol,
+        detail: {
+          symbol: detail.symbol,
+          name: detail.name,
+          assetClass: detail.assetClass,
+          price: detail.price,
+          change24hPct: detail.change24hPct,
+          score: detail.score,
+          scoreStatus: detail.scoreStatus,
+          direction: detail.direction,
+          analysisLabel: detail.analysisLabel,
+          confidence: detail.confidence,
+          breakdown: detail.breakdown || {},
+          sourceUsed: detail.sourceUsed,
+          freshness: detail.freshness
+        },
+        localPlan
+      };
+      const review = await apiPost("/api/ai/trade-review", payload);
+      state.aiReview = review?.data || null;
+    } catch (e) {
+      state.aiReview = {
+        provider: "local_ui_fallback",
+        externalAiUsed: false,
+        decision: localPlan?.decision || "Aucun trade conseille",
+        prudence: localPlan?.safety || "moyenne",
+        reason: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
+        invalidation: localPlan?.refusalReason || "Attendre un signal plus propre.",
+        summary: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
+        warning: "Pont IA externe indisponible."
+      };
+    } finally {
+      state.loadingAiReview = false;
+      render();
+    }
   }
 
   async function loadDashboard() {
@@ -868,6 +991,7 @@ function currentTradePlan() {
       }
 
       state.error = null;
+      loadAiReview(merged, currentTradePlan());
     } catch (e) {
       state.error = e.message || "Fiche indisponible";
       if (cachedDetail) state.detail = cachedDetail;
@@ -929,7 +1053,9 @@ function addTrainingTradeFromDetail(side) {
     takeProfit: null,
     rr: null,
     confidence: simpleConfidenceLabel(d.confidence || "low"),
-    reason: "Trade manuel depuis la fiche actif."
+    reason: "Trade manuel depuis la fiche actif.",
+    aiSummary: "Decision manuelle hors moteur prudent.",
+    safety: "non evalue"
   });
   persistTradesState();
   state.error = `Trade d'entrainement ajoute : ${d.symbol} (${simpleSideLabel(side)})`;
@@ -939,8 +1065,8 @@ function addTrainingTradeFromDetail(side) {
 function createRecommendedTrade() {
   const d = state.detail;
   const plan = currentTradePlan();
-  if (!d || !plan || !plan.side || plan.decision === "Aucun trade conseille") {
-    state.error = "Aucun trade conseille pour le moment.";
+  if (!d || !plan || !plan.side || plan.decision === "Aucun trade conseille" || plan.decision === "A eviter") {
+    state.error = "Aucun trade prudent conseille pour le moment.";
     render();
     return;
   }
@@ -979,7 +1105,10 @@ function createRecommendedTrade() {
     rr: plan.rr,
     confidence: plan.confidence,
     reason: plan.reason,
-    horizon: plan.horizon
+    horizon: plan.horizon,
+    aiSummary: state.aiReview?.summary || plan.aiSummary,
+    safety: state.aiReview?.prudence || plan.safety,
+    aiProvider: state.aiReview?.provider || "local_plan"
   });
   persistTradesState();
   state.error = `Trade conseille cree : ${d.symbol} (${simpleSideLabel(plan.side)})`;
@@ -1033,8 +1162,10 @@ function closeTrainingTrade(id, livePrice = null) {
 
     if (route === "opportunities") {
       state.error = null;
+      state.aiReview = null;
       loadOpportunities(true);
     } else if (route === "asset-detail" && symbol) {
+      state.aiReview = null;
       loadDetail(symbol);
     } else {
       render();
@@ -1094,7 +1225,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="price-col">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
-          ${item.error ? `<div class="muted opp-note">${safeText(item.error.includes("source") || item.error.includes("quota") || item.error.includes("limit") ? "donnee conservee ou nouvelle mise a jour plus tard" : item.error)}</div>` : ""}
+          ${item.error ? `<div class="muted opp-note">${safeText(item.error.includes("source") || item.error.includes("quota") || item.error.includes("limit") ? "nouvelle mise a jour plus tard" : item.error)}</div>` : ""}
         </div>
         <div class="meta-col">
           ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
@@ -1105,8 +1236,37 @@ function closeTrainingTrade(id, livePrice = null) {
       </div>`;
   }
 
+
+  function prudentShortlist(limit = 5) {
+    return (state.opportunities || [])
+      .filter(x => x && x.price != null)
+      .map((item) => {
+        const pseudoDetail = {
+          ...item,
+          candles: [],
+          breakdown: item.breakdown || {}
+        };
+        const plan = generateTradePlan(pseudoDetail);
+        return { ...item, plan };
+      })
+      .filter(x => x.plan && (x.plan.decision === "Trade conseille" || x.plan.decision === "Trade possible"))
+      .sort((a, b) => {
+        const aw = a.plan?.decision === "Trade conseille" ? 2 : 1;
+        const bw = b.plan?.decision === "Trade conseille" ? 2 : 1;
+        if (bw !== aw) return bw - aw;
+        return (b.score || 0) - (a.score || 0);
+      })
+      .slice(0, limit);
+  }
+
+  function algoJournalPreview(limit = 4) {
+    return (state.algoJournal || []).slice(0, limit);
+  }
+
   function renderDashboard() {
     const top = state.opportunities.filter(x => x.price != null).slice(0, 5);
+    const prudent = prudentShortlist(5);
+    const journalPreview = algoJournalPreview(4);
     const fg = state.dashboard.fearGreed;
     const trending = state.dashboard.trending;
     const stats = trainingStats();
@@ -1116,6 +1276,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
           <div class="screen-subtitle">Interface plus claire, prix reels, lecture simple.</div>
+          <div class="muted" style="margin-top:6px">Quand une fiche actif est ouverte, l'app peut demander une validation finale a une IA externe si CLAUDE_API_KEY est configuree.</div>
         </div>
 
         <div class="hero">
@@ -1137,6 +1298,40 @@ function closeTrainingTrade(id, livePrice = null) {
 
         <div class="section-title"><span>Meilleures opportunites</span><button class="btn" data-route="opportunities">Voir tout</button></div>
         ${top.length ? `<div class="opp-list">${top.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite chargee.</div>`}
+
+        <div class="section-title" style="margin-top:22px"><span>Trades prudents proposes</span><span>${prudent.length}</span></div>
+        ${prudent.length ? `<div class="ai-shortlist">
+          ${prudent.map((item) => `
+            <div class="ai-card" data-symbol="${safeText(item.symbol)}">
+              <div class="ai-top">
+                <div>
+                  <div class="trade-symbol">${safeText(item.symbol)}</div>
+                  <div class="trade-sub">${safeText(item.name || "")}</div>
+                </div>
+                ${badge(item.plan.decision, decisionBadgeClass(item.plan.decision))}
+              </div>
+              <div class="ai-body">
+                <div><span class="muted">Tendance</span><br>${safeText(simpleSideLabel(item.plan.side || item.direction))}</div>
+                <div><span class="muted">Fiabilite</span><br>${safeText(item.plan.confidence || "—")}</div>
+                <div><span class="muted">Priorite</span><br>${safeText(item.plan.urgency || "—")}</div>
+                <div><span class="muted">Signal</span><br>${item.score != null ? safeText(item.score) : "—"}</div>
+              </div>
+              <div class="ai-summary">${safeText(item.plan.aiSummary || item.plan.reason || "")}</div>
+            </div>`).join("")}
+        </div>` : `<div class="empty-state">Aucun trade prudent propose pour le moment.</div>`}
+
+        <div class="section-title" style="margin-top:22px"><span>Dernieres decisions algo</span><span>${journalPreview.length}</span></div>
+        ${journalPreview.length ? `<div class="algo-feed">
+          ${journalPreview.map((row) => `
+            <div class="algo-row">
+              <div>
+                <div class="trade-symbol">${safeText(row.symbol)}</div>
+                <div class="trade-sub">${new Date(row.createdAt).toLocaleString("fr-FR")}</div>
+              </div>
+              <div>${badge(row.decision || "—", decisionBadgeClass(row.decision || ""))}</div>
+              <div class="muted">${safeText(row.reason || "—")}</div>
+            </div>`).join("")}
+        </div>` : `<div class="empty-state">Aucune decision algo enregistree pour le moment.</div>`}
       </div>`;
   }
 
@@ -1250,13 +1445,41 @@ function closeTrainingTrade(id, livePrice = null) {
                         <div class="muted">Priorite</div><div>${safeText(plan?.urgency || "—")}</div>
                       </div>
                       <div class="plan-reason">${safeText(plan?.reason || plan?.refusalReason || "Pas d'analyse disponible.")}</div>
+                      <div class="plan-ai-summary">
+                        <div class="muted">Lecture IA</div>
+                        <div>${safeText(plan?.aiSummary || "Pas d'avis complementaire.")}</div>
+                      </div>
+                      <div class="plan-context">
+                        ${(plan?.aiContext || []).map(label => `<span class="mini-pill">${safeText(label)}</span>`).join("")}
+                        ${plan?.safety ? `<span class="mini-pill strong">niveau prudent : ${safeText(plan.safety)}</span>` : ""}
+                      </div>
                       <div class="trade-actions">
-                        <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side ? "disabled" : ""}>Creer le trade conseille</button>
+                        <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side || plan.decision === "A eviter" || plan.decision === "Aucun trade conseille" ? "disabled" : ""}>Creer le trade conseille</button>
                         <button class="btn trade-btn long" data-add-trade="long">Parier sur la hausse</button>
                         <button class="btn trade-btn short" data-add-trade="short">Parier sur la baisse</button>
                       </div>
                     </div>`;
                 })()}
+              </div>
+
+              <div class="card" style="margin-bottom:18px">
+                <div class="section-title"><span>Validation IA externe</span><span>${state.loadingAiReview ? "analyse..." : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local")}</span></div>
+                ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
+                  <div class="ai-review-box">
+                    <div class="legend">
+                      ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}
+                      ${badge(`prudence ${state.aiReview.prudence || "—"}`)}
+                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : "fallback local")}
+                    </div>
+                    <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
+                    <div class="kv" style="margin-top:12px">
+                      <div class="muted">Raison</div><div>${safeText(state.aiReview.reason || "—")}</div>
+                      <div class="muted">Invalidation</div><div>${safeText(state.aiReview.invalidation || "—")}</div>
+                      <div class="muted">Source</div><div>${safeText(state.aiReview.provider || "—")}</div>
+                    </div>
+                    ${state.aiReview.warning ? `<div class="muted" style="margin-top:10px">${safeText(state.aiReview.warning)}</div>` : ""}
+                  </div>
+                ` : `<div class="empty-state">Aucune validation IA disponible pour le moment.</div>`}
               </div>
 
               <div class="card">
@@ -1274,6 +1497,7 @@ function closeTrainingTrade(id, livePrice = null) {
                     <div style="font-weight:700">${safeText(simpleAnalysisLabel(d.analysisLabel || "Analyse indisponible"))}</div>
                     <div class="muted">Fiabilite : ${safeText(simpleConfidenceLabel(d.confidence || "low"))}</div>
                     <div class="muted">Decision : ${safeText(currentTradePlan()?.decision || "—")}</div>
+                    <div class="muted">Lecture IA : ${safeText(currentTradePlan()?.safety ? `niveau prudent ${currentTradePlan().safety}` : "—")}</div>
                   </div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
@@ -1408,6 +1632,7 @@ function renderHistoryRow(item) {
         <div class="screen-header">
           <div class="screen-title">Reglages</div>
           <div class="screen-subtitle">Ces reglages servent juste a rendre l'app plus claire.</div>
+          <div class="muted" style="margin-top:6px">IA externe : l'app utilisera Claude si la cle CLAUDE_API_KEY est bien configuree dans le worker, sinon elle retombe sur un filtre prudent local.</div>
         </div>
 
         <div class="card">
@@ -1530,7 +1755,7 @@ function renderHistoryRow(item) {
       el.addEventListener("click", () => loadOpportunities(true));
     });
 
-    app.querySelectorAll(".opp-row[data-symbol]").forEach(el => {
+    app.querySelectorAll(".opp-row[data-symbol], .ai-card[data-symbol]").forEach(el => {
       el.addEventListener("click", () => navigate("asset-detail", el.getAttribute("data-symbol")));
     });
 
