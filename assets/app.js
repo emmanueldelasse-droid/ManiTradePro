@@ -175,9 +175,8 @@
     const remaining = state.budget.remaining ?? 0;
     if (remaining <= 50) return "Budget faible : evite les refresh inutiles.";
     if (remaining <= 200) return "Budget correct mais a surveiller.";
-    return "Budget confortable.";
+    return "Application stable.";
   }
-
 
   const CRYPTO_SYMBOLS_UI = new Set(["BTC","ETH","BNB","SOL","XRP","ADA","DOGE","DOT","LINK","AVAX","ATOM","LTC","MATIC","ARB","OP","AAVE","NEAR","UNI","FIL","ETC","BCH","APT","SUI","TAO","XAUT"]);
   const NON_CRYPTO_TRACKED_COUNT = 17;
@@ -532,7 +531,6 @@
       </div>`;
   }
 
-
 function simpleSideLabel(side) {
   if (side === "long") return "hausse";
   if (side === "short") return "baisse";
@@ -739,7 +737,6 @@ function currentTradePlan() {
     };
   }
 
-
   function saveOpportunitiesSnapshot(rows) {
     state.opportunitiesSnapshot = rows;
     writeJson(STORAGE_KEYS.opportunitiesSnapshot, rows);
@@ -938,7 +935,6 @@ function currentTradePlan() {
 
     if (nonCrypto && cachedDetail && !canRunScheduledFetch("detail_non_crypto", cleanSymbol)) {
       state.detail = cachedDetail;
-      state.error = `Cette fiche non-crypto se met a jour toutes les 30 minutes. Prochaine mise a jour dans ${nextAllowedLabel("detail_non_crypto", cleanSymbol)}.`;
       render();
       return;
     }
@@ -946,11 +942,9 @@ function currentTradePlan() {
     if (nonCrypto && !canSpendEstimatedBudget("detail", cleanSymbol)) {
       if (cachedDetail) {
         state.detail = cachedDetail;
-        state.error = `Budget Twelve trop faible. Derniere fiche conservee pour ${cleanSymbol}.`;
         render();
         return;
       }
-      state.error = `Budget Twelve trop faible pour charger ${cleanSymbol} maintenant (${state.budget.remaining} restant sur ${state.budget.dailyLimit}).`;
       render();
       return;
     }
@@ -1013,7 +1007,6 @@ function currentTradePlan() {
     const pnlPct = invested ? (pnl / invested) * 100 : null;
     return { pnl, pnlPct };
   }
-
 
 function addTrainingTradeFromDetail(side) {
   const d = state.detail;
@@ -1237,7 +1230,6 @@ function closeTrainingTrade(id, livePrice = null) {
       </div>`;
   }
 
-
   function prudentShortlist(limit = 5) {
     return (state.opportunities || [])
       .filter(x => x && x.price != null)
@@ -1277,7 +1269,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
           <div class="screen-subtitle">Interface plus claire, prix reels, lecture simple.</div>
-          <div class="muted" style="margin-top:6px">Les opportunites et la fiche actif reposent maintenant sur le meme snapshot marche par actif. Quand une fiche actif est ouverte, l'app peut demander une validation finale a une IA externe si CLAUDE_API_KEY est configuree.</div>
+          
         </div>
 
         <div class="hero">
@@ -1348,12 +1340,7 @@ function closeTrainingTrade(id, livePrice = null) {
           ${filters.map(f => `<button class="btn ${state.opportunityFilter === f ? 'active' : ''}" data-filter="${f}">${f}</button>`).join("")}
           <button class="btn" data-refresh="opportunities">Rafraichir</button>
         </div>
-        <div class="muted priority-note">Lecture unifiee : la liste Opportunites et la Fiche actif reutilisent la meme base marche par actif.</div><div class="countdown-strip" style="margin-bottom:14px">
-          <div class="countdown-left">
-            <span class="countdown-dot"></span>
-            <span class="countdown-title">Prochaine mise a jour</span>
-          </div>
-          <div class="countdown-right">${countdownOnlyLabel("opportunities")}</div>
+        <div class="countdown-right">${countdownOnlyLabel("opportunities")}</div>
         </div>
         <div class="muted priority-note">Priorite de l'app : la page Opportunites garde toujours la derniere donnee connue avant toute autre page non-crypto.</div>
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
@@ -1392,13 +1379,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Fiche actif</span></div>
         ${state.loadingDetail ? `<div class="loading-state">Chargement du detail...</div>` : ""}
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
-        ${d ? `<div class="muted priority-note">Base unifiee : meme snapshot marche pour cette fiche et pour la liste Opportunites.</div><div class="countdown-strip dual" style="margin-bottom:14px">
-              <div class="countdown-item">
-                <span class="countdown-dot"></span>
-                <span class="countdown-label">Fiche actif</span>
-                <strong>${isCryptoSymbol(d.symbol) ? "souple" : countdownOnlyLabel("detail_non_crypto", d.symbol)}</strong>
-              </div>
-              <div class="countdown-item">
+        ${d ? `<div class="countdown-item">
                 <span class="countdown-dot"></span>
                 <span class="countdown-label">Bougies</span>
                 <strong>${isCryptoSymbol(d.symbol) ? "souple" : countdownOnlyLabel("candles_non_crypto", d.symbol)}</strong>
@@ -1528,8 +1509,6 @@ function closeTrainingTrade(id, livePrice = null) {
         ` : (!state.loadingDetail ? `<div class="empty-state">Aucun detail charge.</div>` : "")}
       </div>`;
   }
-
-
 
 function tradeStatusMeta(position) {
   const opp = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === position.symbol) : null;
@@ -1711,7 +1690,6 @@ function renderHistoryRow(item) {
       </div>`;
   }
 
-
   function algoDecisionCounts() {
     const rows = Array.isArray(state.algoJournal) ? state.algoJournal : [];
     const out = { total: rows.length, conseille: 0, possible: 0, surveiller: 0, eviter: 0, aucun: 0, manuel: 0 };
@@ -1788,7 +1766,6 @@ function renderHistoryRow(item) {
             <div class="stat-card"><div class="stat-label">Positions en cours</div><div class="stat-value">${stats.openCount}</div></div>
             <div class="stat-card"><div class="stat-label">Historique des trades</div><div class="stat-value">${stats.closedCount}</div></div>
             <div class="stat-card"><div class="stat-label">Gain / perte realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Budget Twelve</div><div class="stat-value">${state.budget.remaining}</div></div>
           </div>
 
           <div class="grid trades-stats" style="margin-top:14px">
@@ -1927,11 +1904,7 @@ function renderHistoryRow(item) {
         </div>
 
         <div class="card" style="margin-top:18px">
-          <div class="section-title"><span>Budget Twelve</span><span>${state.budget.remaining}/${state.budget.dailyLimit}</span></div>
           <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Utilises</div><div class="stat-value">${state.budget.used}</div></div>
-            <div class="stat-card"><div class="stat-label">Restants</div><div class="stat-value">${state.budget.remaining}</div></div>
-            <div class="stat-card"><div class="stat-label">Pool opportunites</div><div class="stat-value">${poolRemaining("opportunities")}</div></div>
             <div class="stat-card"><div class="stat-label">Etat</div><div class="stat-value">${safeText(budgetAdvice())}</div></div>
           </div>
           <div class="kv" style="margin-top:14px">
