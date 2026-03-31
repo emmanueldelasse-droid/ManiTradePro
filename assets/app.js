@@ -49,7 +49,8 @@
     settings: loadSettings(),
     budget: loadBudgetTracker(),
     detailCache: readJson(STORAGE_KEYS.detailCache, {}),
-    opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, [])
+    opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, []),
+    nonCryptoHydration: {}
   };
 
   const app = document.getElementById("app");
@@ -329,11 +330,14 @@
 
   function saveDetailCache(symbol, value) {
     const clean = String(symbol || "").toUpperCase();
+    if (!clean) return;
     state.detailCache[clean] = value;
     persistDetailCache();
+
     if (value && value.price != null) {
       const currentList = (state.opportunitiesSnapshot || []).slice();
       const idx = currentList.findIndex(x => String(x.symbol || "").toUpperCase() === clean);
+
       const patch = normalizeOpportunity({
         symbol: value.symbol,
         name: value.name,
@@ -349,10 +353,14 @@
         sourceUsed: value.sourceUsed,
         freshness: value.freshness
       });
-      if (idx >= 0) currentList[idx] = mergeOpportunityWithStored(currentList[idx], patch);
+
+      if (idx >= 0) currentList[idx] = { ...currentList[idx], ...patch };
       else currentList.push(patch);
+
       saveOpportunitiesSnapshot(currentList);
-      state.opportunities = state.opportunities.map(item => String(item.symbol || "").toUpperCase() === clean ? mergeOpportunityWithStored(item, patch) : item);
+      state.opportunities = state.opportunities.map(item =>
+        String(item.symbol || "").toUpperCase() === clean ? { ...item, ...patch } : item
+      );
       applyFilter();
     }
   }
@@ -724,28 +732,70 @@ function generateTradePlan(detail) {
 }
 
 
-function getBestTradeEngineInput(item) {
+function hasRichBreakdown(item) {
+  const b = item?.breakdown || null;
+  return !!(b && ["regime", "trend", "momentum", "entryQuality", "risk", "participation"].every((k) => typeof b[k] === "number"));
+}
+
+function detailEngineInputFor(item) {
   if (!item) return null;
   const clean = String(item.symbol || "").toUpperCase();
   const cached = clean ? detailCacheHit(clean) : null;
-  if (cached && cached.price != null) {
-    return {
-      ...cached,
-      breakdown: cached.breakdown || item.breakdown || {},
-      candles: cached.candles || []
-    };
+  if (cached && cached.price != null && hasRichBreakdown(cached)) {
+    return { ...cached, candles: cached.candles || [] };
   }
-  return {
-    ...item,
-    breakdown: item.breakdown || {},
-    candles: item.candles || []
-  };
+  if (hasRichBreakdown(item) && item.price != null) {
+    return { ...item, candles: item.candles || [] };
+  }
+  return null;
 }
 
 function rowTradePlan(item) {
-  const source = getBestTradeEngineInput(item);
-  if (!source || source.price == null) return null;
+  const source = detailEngineInputFor(item);
+  if (!source) return null;
   return generateTradePlan(source);
+}
+
+function rowDecisionLabel(item) {
+  return rowTradePlan(item)?.decision || "Analyse en cours";
+}
+
+function rowTrendLabel(item) {
+  return rowTradePlan(item)?.trendLabel || "analyse en cours";
+}
+
+async function hydrateNonCryptoRows(rows) {
+  const queue = (rows || [])
+    .filter((item) => item && item.assetClass !== "crypto" && item.price != null)
+    .slice(0, 12);
+
+  for (const item of queue) {
+    const clean = String(item.symbol || "").toUpperCase();
+    if (!clean || state.nonCryptoHydration[clean]) continue;
+    const cached = detailCacheHit(clean);
+    if (cached && cached.price != null && hasRichBreakdown(cached)) continue;
+
+    state.nonCryptoHydration[clean] = true;
+    render();
+
+    try {
+      const detail = await api(`/api/opportunity-detail/${encodeURIComponent(clean)}`);
+      const merged = {
+        ...(detail?.data || {}),
+        candles: cached?.candles || []
+      };
+      saveDetailCache(clean, merged);
+    } catch (e) {
+      const note = compactError(e?.message || "Analyse indisponible");
+      state.opportunities = state.opportunities.map((row) =>
+        String(row.symbol || "").toUpperCase() === clean ? { ...row, error: note } : row
+      );
+      applyFilter();
+    } finally {
+      delete state.nonCryptoHydration[clean];
+      render();
+    }
+  }
 }
 
 function currentTradePlan() {
@@ -778,9 +828,7 @@ function currentTradePlan() {
 
   function mergeOpportunityWithStored(current, stored) {
     if (!stored) return current;
-    const keepCurrentLive = current.price != null;
-    if (keepCurrentLive) return current;
-    const merged = { ...stored, ...current };
+    const merged = { ...current, ...stored };
     merged.price = stored.price ?? current.price;
     merged.change24hPct = stored.change24hPct ?? current.change24hPct;
     merged.score = stored.score ?? current.score;
@@ -791,7 +839,7 @@ function currentTradePlan() {
     merged.breakdown = stored.breakdown || current.breakdown || null;
     merged.sourceUsed = stored.sourceUsed || current.sourceUsed;
     merged.freshness = stored.freshness || current.freshness || "cache";
-    merged.error = null;
+    merged.error = current.error && stored.price == null ? current.error : null;
     merged.fromStoredCache = true;
     return merged;
   }
@@ -804,7 +852,7 @@ function currentTradePlan() {
       if (!clean) return item;
       const detail = detailMap.get(clean);
       const snap = snapshotMap.get(clean);
-      const stored = detail && detail.price != null ? {
+      const stored = detail && detail.price != null ? normalizeOpportunity({
         symbol: detail.symbol,
         name: detail.name,
         assetClass: detail.assetClass,
@@ -818,7 +866,7 @@ function currentTradePlan() {
         breakdown: detail.breakdown || null,
         sourceUsed: detail.sourceUsed,
         freshness: detail.freshness
-      } : snap;
+      }) : snap;
       return mergeOpportunityWithStored(item, stored);
     });
   }
@@ -829,6 +877,7 @@ function currentTradePlan() {
     saveOpportunitiesSnapshot(prepared);
     applyFilter();
     state.opportunitiesFetchedAt = Date.now();
+    hydrateNonCryptoRows(prepared);
   }
 
   // =========================
@@ -969,7 +1018,7 @@ function currentTradePlan() {
     const nonCrypto = !isCryptoSymbol(cleanSymbol);
     const cachedDetail = detailCacheHit(cleanSymbol);
 
-    if (nonCrypto && cachedDetail && !canRunScheduledFetch("detail_non_crypto", cleanSymbol)) {
+    if (nonCrypto && cachedDetail && hasRichBreakdown(cachedDetail) && !canRunScheduledFetch("detail_non_crypto", cleanSymbol)) {
       state.detail = cachedDetail;
       render();
       return;
@@ -1234,7 +1283,13 @@ function closeTrainingTrade(id, livePrice = null) {
 
   function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
-    const statusCls = item.scoreStatus === "complete" ? "complete" : item.scoreStatus === "partial" ? "partial" : "unavailable";
+    const clean = String(item.symbol || "").toUpperCase();
+    const plan = rowTradePlan(item);
+    const isHydrating = !!state.nonCryptoHydration[clean];
+    const scoreValue = plan?.finalScore ?? null;
+    const decisionLabel = isHydrating && !plan ? "Analyse en cours" : (plan?.decision || "Analyse en cours");
+    const trendLabel = isHydrating && !plan ? "chargement detail" : (plan?.trendLabel || "analyse en cours");
+
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}">
         <div class="opp-rank">#${rank}</div>
@@ -1246,10 +1301,10 @@ function closeTrainingTrade(id, livePrice = null) {
           </div>
         </div>
         <div class="score-box">
-          ${scoreRing(rowTradePlan(item)?.finalScore ?? item.score)}
+          ${scoreRing(scoreValue)}
           <div class="score-meta">
-            ${badge((rowTradePlan(item)?.decision || "Pas de trade"), (rowTradePlan(item)?.decision || ""))}
-            ${badge(simpleDirectionLabel(item.direction, rowTradePlan(item)?.finalScore ?? item.score), item.direction || "")}
+            ${badge(decisionLabel, decisionLabel)}
+            ${badge(trendLabel, item.direction || "")}
           </div>
         </div>
         <div class="price-col">
@@ -1369,14 +1424,14 @@ function renderDashboard() {
                   <div class="trade-sub">${safeText(topPick.name || "Actif")}</div>
                 </div>
                 <div class="legend">
-                  ${badge(rowTradePlan(topPick)?.trendLabel || detectedTrendLabel(topPick?.direction || "neutral"))}
+                  ${badge(rowTradePlan(topPick)?.trendLabel || "analyse en cours")}
                   ${badge(topPick.confidence || "fiabilite")}
                 </div>
               </div>
               <div class="kv" style="margin-top:14px">
                 <div class="muted">Prix</div><div>${priceDisplay(topPick.price)}</div>
                 <div class="muted">Variation 24h</div><div>${pct(topPick.change24hPct)}</div>
-                <div class="muted">Tendance</div><div>${safeText(rowTradePlan(topPick)?.trendLabel || detectedTrendLabel(topPick?.direction || "neutral"))}</div>
+                <div class="muted">Tendance</div><div>${safeText(rowTradePlan(topPick)?.trendLabel || "analyse en cours")}</div>
                 <div class="muted">Source</div><div>${safeText(topPick.sourceUsed || "—")}</div>
               </div>
               <div class="trade-actions" style="margin-top:14px">
