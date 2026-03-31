@@ -278,3 +278,5 @@ button{font:inherit} a{text-decoration:none;color:inherit}
   .dashboard-grid{grid-template-columns:1fr}
   .top-pick-box{flex-direction:column}
 }
+
+.score-meta .badge{white-space:nowrap}
