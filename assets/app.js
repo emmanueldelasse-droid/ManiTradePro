@@ -445,7 +445,7 @@
   function simpleAnalysisLabel(value) {
     const map = {
       "Constructive bullish bias": "biais haussier leger",
-      "Constructive bearish bias": "biais baissier leger",
+      "baisse probable": "biais baissier leger",
       "Bullish setup": "signal haussier",
       "Bearish setup": "signal baissier",
       "Early bullish setup": "debut de signal haussier",
@@ -588,7 +588,7 @@ function generateTradePlan(detail) {
   if (risk <= 42) aiContext.push("risque eleve");
   if (participation >= 70) aiContext.push("activite suffisante");
 
-  let decision = "Aucun trade conseille";
+  let decision = "Pas de trade conseille";
   let side = null;
   let reason = "Le signal est trop faible ou trop flou.";
   let urgency = "attendre";
@@ -848,7 +848,7 @@ function currentTradePlan() {
       state.aiReview = {
         provider: "local_ui_fallback",
         externalAiUsed: false,
-        decision: localPlan?.decision || "Aucun trade conseille",
+        decision: localPlan?.decision || "Pas de trade conseille",
         prudence: localPlan?.safety || "moyenne",
         reason: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
         invalidation: localPlan?.refusalReason || "Attendre un signal plus propre.",
@@ -1059,7 +1059,7 @@ function addTrainingTradeFromDetail(side) {
 function createRecommendedTrade() {
   const d = state.detail;
   const plan = currentTradePlan();
-  if (!d || !plan || !plan.side || plan.decision === "Aucun trade conseille" || plan.decision === "A eviter") {
+  if (!d || !plan || !plan.side || plan.decision === "Pas de trade conseille" || plan.decision === "A eviter") {
     state.error = "Aucun trade prudent conseille pour le moment.";
     render();
     return;
@@ -1434,7 +1434,7 @@ function closeTrainingTrade(id, livePrice = null) {
                         ${plan?.safety ? `<span class="mini-pill strong">niveau prudent : ${safeText(plan.safety)}</span>` : ""}
                       </div>
                       <div class="trade-actions">
-                        <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side || plan.decision === "A eviter" || plan.decision === "Aucun trade conseille" ? "disabled" : ""}>Creer le trade conseille</button>
+                        <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side || plan.decision === "A eviter" || plan.decision === "Pas de trade conseille" ? "disabled" : ""}>Creer le trade conseille</button>
                         <button class="btn trade-btn long" data-add-trade="long">Parier sur la hausse</button>
                         <button class="btn trade-btn short" data-add-trade="short">Parier sur la baisse</button>
                       </div>
@@ -1470,7 +1470,7 @@ function closeTrainingTrade(id, livePrice = null) {
 
             <div>
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Niveau du signal</span><span>${d.score != null ? d.score : "—"}</span></div>
+                <div class="section-title"><span>Lecture du signal</span><span>${d.score != null ? d.score : "—"}</span></div>
                 <div class="score-box" style="margin-bottom:14px">
                   ${scoreRing(d.score)}
                   <div class="score-meta">

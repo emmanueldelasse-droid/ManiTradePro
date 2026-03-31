@@ -266,3 +266,17 @@ button{font:inherit} a{text-decoration:none;color:inherit}
 }
 
 .countdown-right,.countdown-strip,.priority-note{display:none !important}
+
+.decision-summary-box{display:flex;flex-direction:column;gap:12px}
+.decision-summary-main{display:flex;flex-direction:column;gap:8px}
+.decision-title{font-size:1.05rem;font-weight:700}
+.decision-text{color:var(--text-secondary);line-height:1.45}
+.trade-plan-hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.plan-hero-card{padding:14px;border:1px solid var(--border-subtle);border-radius:16px;background:rgba(255,255,255,.02)}
+.plan-label{font-size:.78rem;color:var(--text-secondary);margin-bottom:6px}
+.plan-value{font-size:1.02rem;font-weight:700}
+.why-list{display:flex;flex-direction:column;gap:10px}
+.why-row{padding:12px 14px;border:1px solid var(--border-subtle);border-radius:14px;background:rgba(255,255,255,.02)}
+@media (max-width:860px){
+  .trade-plan-hero{grid-template-columns:1fr 1fr}
+}
