@@ -1530,31 +1530,169 @@ function closeTrainingTrade(id, livePrice = null) {
   }
 
 
+
+function tradeStatusMeta(position) {
+  const opp = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === position.symbol) : null;
+  const livePrice = opp?.price ?? position.entryPrice ?? null;
+  const hasTarget = position.takeProfit != null && Number.isFinite(Number(position.takeProfit));
+  const hasStop = position.stopLoss != null && Number.isFinite(Number(position.stopLoss));
+  const pnlPctLive = livePrice == null || position.entryPrice == null ? null :
+    (position.side === "long"
+      ? ((livePrice - position.entryPrice) / position.entryPrice) * 100
+      : ((position.entryPrice - livePrice) / position.entryPrice) * 100);
+
+  let label = "stable";
+  let text = "Trade en attente";
+  let badgeClass = "neutral";
+
+  if (pnlPctLive != null && pnlPctLive >= 2) {
+    label = "gain";
+    text = "Trade en gain";
+    badgeClass = "positive";
+  } else if (pnlPctLive != null && pnlPctLive <= -1.5) {
+    label = "pressure";
+    text = "Sous pression";
+    badgeClass = "negative";
+  }
+
+  let stopDistancePct = null;
+  if (hasStop && livePrice != null) {
+    stopDistancePct = position.side === "long"
+      ? ((livePrice - position.stopLoss) / livePrice) * 100
+      : ((position.stopLoss - livePrice) / livePrice) * 100;
+    if (stopDistancePct <= 1.2) {
+      label = "near_stop";
+      text = "Proche du stop";
+      badgeClass = "negative";
+    }
+  }
+
+  let targetDistancePct = null;
+  if (hasTarget && livePrice != null) {
+    targetDistancePct = position.side === "long"
+      ? ((position.takeProfit - livePrice) / livePrice) * 100
+      : ((livePrice - position.takeProfit) / livePrice) * 100;
+    if (targetDistancePct <= 1.5 && targetDistancePct >= -1) {
+      label = "near_target";
+      text = "Proche de l'objectif";
+      badgeClass = "positive";
+    }
+  }
+
+  return { livePrice, pnlPctLive, stopDistancePct, targetDistancePct, label, text, badgeClass };
+}
+
+function partialClosePosition(positionId, percent = 50) {
+  const idx = state.trades.positions.findIndex((p) => p.id === positionId);
+  if (idx === -1) return;
+  const position = state.trades.positions[idx];
+  const meta = tradeStatusMeta(position);
+  const livePrice = meta.livePrice ?? position.entryPrice;
+  const ratio = Math.max(0.1, Math.min(1, percent / 100));
+  const closeQty = Number(position.quantity || 0) * ratio;
+  if (!Number.isFinite(closeQty) || closeQty <= 0) return;
+
+  const remainingQty = Number(position.quantity || 0) - closeQty;
+  const pnl = position.side === "long"
+    ? (livePrice - position.entryPrice) * closeQty
+    : (position.entryPrice - livePrice) * closeQty;
+  const pnlPct = position.entryPrice ? ((pnl / (position.entryPrice * closeQty)) * 100) : null;
+
+  state.trades.history.unshift({
+    id: `${position.id}:partial:${Date.now()}`,
+    symbol: position.symbol,
+    side: position.side,
+    quantity: closeQty,
+    entryPrice: position.entryPrice,
+    exitPrice: livePrice,
+    pnl,
+    pnlPct,
+    closedAt: new Date().toISOString(),
+    sourceUsed: position.sourceUsed || "training",
+    closeType: "Partielle 50%"
+  });
+
+  if (remainingQty <= 0.0000001) {
+    state.trades.positions.splice(idx, 1);
+  } else {
+    state.trades.positions[idx] = {
+      ...position,
+      quantity: remainingQty,
+      partialClosedAt: new Date().toISOString()
+    };
+  }
+
+  state.error = null;
+  saveAppState();
+  render();
+}
+
+function closeTradePosition(positionId) {
+  const idx = state.trades.positions.findIndex((p) => p.id === positionId);
+  if (idx === -1) return;
+  const position = state.trades.positions[idx];
+  const meta = tradeStatusMeta(position);
+  const livePrice = meta.livePrice ?? position.entryPrice;
+  const pnl = position.side === "long"
+    ? (livePrice - position.entryPrice) * position.quantity
+    : (position.entryPrice - livePrice) * position.quantity;
+  const pnlPct = position.entryPrice ? ((pnl / (position.entryPrice * position.quantity)) * 100) : null;
+
+  state.trades.history.unshift({
+    id: `${position.id}:full:${Date.now()}`,
+    symbol: position.symbol,
+    side: position.side,
+    quantity: position.quantity,
+    entryPrice: position.entryPrice,
+    exitPrice: livePrice,
+    pnl,
+    pnlPct,
+    closedAt: new Date().toISOString(),
+    sourceUsed: position.sourceUsed || "training",
+    closeType: "Complete"
+  });
+
+  state.trades.positions.splice(idx, 1);
+  state.error = null;
+  saveAppState();
+  render();
+}
+
 function renderPositionRow(position) {
-  const liveMatch = state.opportunities.find((o) => o.symbol === position.symbol);
-  const livePrice = liveMatch?.price ?? position.entryPrice;
-  const { pnl, pnlPct } = getOpenPnl(position, livePrice);
-  return `
-    <div class="trade-row trade-row-wide">
+  const meta = tradeStatusMeta(position);
+  return `<div class="trade-row trade-card-row">
+    <div class="trade-card-top">
       <div>
         <div class="trade-symbol">${safeText(position.symbol)}</div>
-        <div class="trade-sub">${safeText(position.name || "")}</div>
+        <div class="trade-sub">${safeText(position.tradeDecision || "Trade manuel")}</div>
       </div>
-      <div>${badge(simpleSideLabel(position.side), position.side)}</div>
-      <div>${num(position.quantity, 4)}</div>
-      <div>${priceDisplay(position.entryPrice)}</div>
-      <div>${priceDisplay(livePrice)}</div>
-      <div>${position.stopLoss != null ? priceDisplay(position.stopLoss) : "—"}</div>
-      <div>${position.takeProfit != null ? priceDisplay(position.takeProfit) : "—"}</div>
-      <div>${position.rr != null ? num(position.rr, 2) : "—"}</div>
-      <div class="${(pnl || 0) >= 0 ? 'positive' : 'negative'}">${pnl == null ? "—" : money(pnl * fxRateUsdToEur(), "EUR")} / ${pct(pnlPct)}</div>
-      <div><button class="btn" data-close-trade="${safeText(position.id)}">Cloturer</button></div>
+      <div class="trade-card-badges">
+        ${badge(simpleSideLabel(position.side), position.side)}
+        ${badge(meta.text, meta.badgeClass)}
+      </div>
     </div>
-    <div class="trade-note">
-      <span class="muted">Decision : </span>${safeText(position.tradeDecision || "manuel")} ·
-      <span class="muted">Horizon : </span>${safeText(position.horizon || "—")} ·
-      <span class="muted">Raison : </span>${safeText(position.tradeReason || "—")}
-    </div>`;
+
+    <div class="trade-plan-grid">
+      <div><span class="muted">Entree</span><br>${priceDisplay(position.entryPrice)}</div>
+      <div><span class="muted">Stop</span><br>${position.stopLoss == null ? "—" : priceDisplay(position.stopLoss)}</div>
+      <div><span class="muted">Objectif</span><br>${position.takeProfit == null ? "—" : priceDisplay(position.takeProfit)}</div>
+      <div><span class="muted">Ratio</span><br>${position.rr == null ? "—" : num(position.rr, 2)}</div>
+      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
+      <div><span class="muted">P/L live</span><br>${meta.pnlPctLive == null ? "—" : pct(meta.pnlPctLive)}</div>
+    </div>
+
+    <div class="trade-plan-grid compact">
+      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
+      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
+      <div><span class="muted">Horizon</span><br>${safeText(position.horizon || "—")}</div>
+      <div><span class="muted">Raison</span><br>${safeText(position.tradeReason || "—")}</div>
+    </div>
+
+    <div class="trade-actions split">
+      <button class="btn trade-btn secondary" data-close-half="${safeText(position.id)}">Cloturer 50%</button>
+      <button class="btn trade-btn primary" data-close-trade="${safeText(position.id)}">Cloturer</button>
+    </div>
+  </div>`;
 }
 
 function renderHistoryRow(item) {
@@ -1569,7 +1707,7 @@ function renderHistoryRow(item) {
         <div>${priceDisplay(item.entryPrice)}</div>
         <div>${priceDisplay(item.exitPrice)}</div>
         <div class="${(item.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((item.pnl || 0) * fxRateUsdToEur(), "EUR")} / ${pct(item.pnlPct)}</div>
-        <div>${safeText(item.sourceUsed || "training")}</div>
+        <div>${safeText(item.closeType || item.sourceUsed || "training")}</div>
       </div>`;
   }
 
