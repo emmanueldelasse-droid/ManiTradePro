@@ -280,3 +280,11 @@ button{font:inherit} a{text-decoration:none;color:inherit}
 }
 
 .score-meta .badge{white-space:nowrap}
+
+.opp-toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+.filter-group{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--border-subtle);background:rgba(255,255,255,.03);color:var(--text-primary);padding:8px 12px;border-radius:12px;cursor:pointer}
+.chip.active{background:rgba(0,229,160,.12);border-color:rgba(0,229,160,.3);color:var(--profit)}
+.opp-section{margin-bottom:18px}
+.opp-section-subtitle{color:var(--text-secondary);font-size:.9rem;margin:-6px 0 10px 0}
+.opp-overview-text{color:var(--text-secondary);line-height:1.45}

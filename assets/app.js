@@ -1227,7 +1227,58 @@ function closeTrainingTrade(id, livePrice = null) {
     };
   }
 
-  function applyFilter() {
+  
+function groupedOpportunities(rows) {
+  const items = Array.isArray(rows) ? rows.slice() : [];
+  const buckets = {
+    proposed: [],
+    watch: [],
+    noTrade: [],
+  };
+
+  items.forEach((item) => {
+    const plan = rowTradePlan(item);
+    const decision = String(plan?.decision || "");
+    const score = plan?.finalScore ?? -1;
+    const enriched = { ...item, _plan: plan, _score: score };
+
+    if (decision === "Trade propose") {
+      buckets.proposed.push(enriched);
+    } else if (decision === "A surveiller") {
+      buckets.watch.push(enriched);
+    } else {
+      buckets.noTrade.push(enriched);
+    }
+  });
+
+  const sorter = (a, b) => {
+    if ((b._score ?? -1) !== (a._score ?? -1)) return (b._score ?? -1) - (a._score ?? -1);
+    return String(a.symbol || "").localeCompare(String(b.symbol || ""));
+  };
+
+  buckets.proposed.sort(sorter);
+  buckets.watch.sort(sorter);
+  buckets.noTrade.sort(sorter);
+
+  return buckets;
+}
+
+function renderOpportunitySection(title, subtitle, rows, baseRank = 1, emptyText = "Aucun actif dans cette section.") {
+  return `
+    <section class="opp-section">
+      <div class="section-title">
+        <span>${safeText(title)}</span>
+        <span>${rows.length}</span>
+      </div>
+      <div class="opp-section-subtitle">${safeText(subtitle)}</div>
+      ${rows.length
+        ? `<div class="opp-list">${rows.map((item, idx) => renderOppRow(item, baseRank + idx)).join("")}</div>`
+        : `<div class="empty-state">${safeText(emptyText)}</div>`}
+    </section>
+  `;
+}
+
+function applyFilter() {
     const f = state.opportunityFilter;
     state.filteredOpportunities = state.opportunities.filter(item => f === "all" ? true : item.assetClass === f);
   }
@@ -1467,23 +1518,81 @@ function renderDashboard() {
   }
 
   function renderOpportunities() {
-    const filters = ["all", "crypto", "stock", "etf", "forex", "commodity"];
+    const groups = groupedOpportunities(state.filteredOpportunities || []);
+    const total = (state.filteredOpportunities || []).length;
+    const visibleHydrating = (state.filteredOpportunities || []).filter((item) => !!state.nonCryptoHydration[String(item?.symbol || "").toUpperCase()]).length;
+
     return `
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Opportunites</div>
-          <div class="screen-subtitle">Lecture simple, tendance, fiabilite, source.</div>
+          <div class="screen-subtitle">Lecture simple, tri par decision, priorites visuelles.</div>
         </div>
-        <div class="controls">
-          ${filters.map(f => `<button class="btn ${state.opportunityFilter === f ? 'active' : ''}" data-filter="${f}">${f}</button>`).join("")}
-          <button class="btn" data-refresh="opportunities">Rafraichir</button>
+
+        <div class="opp-toolbar">
+          <div class="filter-group">
+            ${["all","crypto","stock","etf","forex","commodity"].map((f) => `
+              <button class="chip ${state.opportunityFilter === f ? "active" : ""}" data-filter="${f}">
+                ${f === "all" ? "all" : f}
+              </button>
+            `).join("")}
+            <button class="chip" data-refresh="opps">Rafraichir</button>
+          </div>
         </div>
+
+        <div class="grid trades-stats" style="margin-bottom:18px">
+          <div class="stat-card">
+            <div class="stat-label">Trades proposes</div>
+            <div class="stat-value">${groups.proposed.length}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">A surveiller</div>
+            <div class="stat-value">${groups.watch.length}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Pas de trade</div>
+            <div class="stat-value">${groups.noTrade.length}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Analyses en cours</div>
+            <div class="stat-value">${visibleHydrating}</div>
+          </div>
         </div>
-        ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
-        ${state.loading ? `<div class="loading-state">Chargement des opportunites...</div>` :
-          state.filteredOpportunities.length ? `<div class="opp-list">${state.filteredOpportunities.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` :
-          `<div class="empty-state">Aucune opportunite disponible.</div>`
-        }
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title"><span>Lecture rapide</span><span>${total}</span></div>
+          <div class="opp-overview-text">
+            ${groups.proposed.length
+              ? `${groups.proposed.length} actif${groups.proposed.length > 1 ? "s" : ""} ressort${groups.proposed.length > 1 ? "ent" : ""} comme prioritaire${groups.proposed.length > 1 ? "s" : ""}.`
+              : groups.watch.length
+                ? `Aucun trade propose net. ${groups.watch.length} actif${groups.watch.length > 1 ? "s sont" : " est"} surtout a surveiller.`
+                : "Aucun trade propre pour le moment. La liste est plutot defensive."}
+          </div>
+        </div>
+
+        ${renderOpportunitySection(
+          "Trades proposes",
+          "Actifs a regarder en premier.",
+          groups.proposed,
+          1,
+          "Aucun trade propose pour le moment."
+        )}
+
+        ${renderOpportunitySection(
+          "A surveiller",
+          "Setups a suivre, mais pas encore assez propres pour ouvrir.",
+          groups.watch,
+          groups.proposed.length + 1,
+          "Aucun actif a surveiller pour le moment."
+        )}
+
+        ${renderOpportunitySection(
+          "Pas de trade",
+          "Actifs non prioritaires ou encore trop faibles.",
+          groups.noTrade,
+          groups.proposed.length + groups.watch.length + 1,
+          "Aucun actif dans cette section."
+        )}
       </div>`;
   }
 
