@@ -420,7 +420,7 @@
   function simpleFreshnessLabel(value) {
     if (value === "live") return "en direct";
     if (value === "recent") return "recent";
-    return "inconnu";
+    return "indispo";
   }
 
   function simpleScoreStatusLabel(value) {
@@ -437,9 +437,9 @@
       etf: "ETF",
       forex: "devise",
       commodity: "matiere premiere",
-      unknown: "inconnu"
+      unknown: "indispo"
     };
-    return map[value] || value || "inconnu";
+    return map[value] || value || "indispo";
   }
 
   function simpleAnalysisLabel(value) {
@@ -496,7 +496,7 @@
     if (!msg) return null;
     if (msg.includes("Minute quota reached")) return "Quota minute atteint";
     if (msg.includes("Provider key rejected")) return "Cle fournisseur refusee";
-    if (msg.includes("Cloudflare subrequest limit reached")) return "Limite Cloudflare atteinte";
+    if (msg.includes("Cloudflare subrequest limit reached")) return "source temporairement saturee";
     if (msg.includes("Provider plan limit")) return "Limite fournisseur";
     if (msg.includes("temporarily unavailable")) return "Source temporairement indisponible";
     if (msg.length > 90) return msg.slice(0, 87) + "...";
@@ -1230,7 +1230,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="meta-col">
           ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
           ${badge(`fiabilite ${simpleConfidenceLabel(item.confidence || "low")}`)}
-          ${state.settings.showSourceBadges ? badge(item.sourceUsed || "source?") : ""}
+          ${state.settings.showSourceBadges ? badge(item.sourceUsed || "source") : ""}
           ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(item.freshness || "unknown"), item.freshness || "") : ""}
         </div>
       </div>`;
@@ -1424,7 +1424,7 @@ function closeTrainingTrade(id, livePrice = null) {
                   ${badge(simpleDirectionLabel(d.direction, d.score), d.direction || "")}
                   ${badge(simpleScoreStatusLabel(d.scoreStatus || "n/a"), d.scoreStatus || "")}
                   ${badge(`fiabilite ${simpleConfidenceLabel(d.confidence || "low")}`)}
-                  ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
+                  ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source") : ""}
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
                 ${(() => {
