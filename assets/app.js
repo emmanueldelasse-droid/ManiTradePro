@@ -1276,7 +1276,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
           <div class="screen-subtitle">Interface plus claire, prix reels, lecture simple.</div>
-          <div class="muted" style="margin-top:6px">Quand une fiche actif est ouverte, l'app peut demander une validation finale a une IA externe si CLAUDE_API_KEY est configuree.</div>
+          <div class="muted" style="margin-top:6px">Les opportunites et la fiche actif reposent maintenant sur le meme snapshot marche par actif. Quand une fiche actif est ouverte, l'app peut demander une validation finale a une IA externe si CLAUDE_API_KEY est configuree.</div>
         </div>
 
         <div class="hero">
@@ -1347,7 +1347,7 @@ function closeTrainingTrade(id, livePrice = null) {
           ${filters.map(f => `<button class="btn ${state.opportunityFilter === f ? 'active' : ''}" data-filter="${f}">${f}</button>`).join("")}
           <button class="btn" data-refresh="opportunities">Rafraichir</button>
         </div>
-        <div class="countdown-strip" style="margin-bottom:14px">
+        <div class="muted priority-note">Lecture unifiee : la liste Opportunites et la Fiche actif reutilisent la meme base marche par actif.</div><div class="countdown-strip" style="margin-bottom:14px">
           <div class="countdown-left">
             <span class="countdown-dot"></span>
             <span class="countdown-title">Prochaine mise a jour</span>
@@ -1391,7 +1391,7 @@ function closeTrainingTrade(id, livePrice = null) {
         <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Fiche actif</span></div>
         ${state.loadingDetail ? `<div class="loading-state">Chargement du detail...</div>` : ""}
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
-        ${d ? `<div class="countdown-strip dual" style="margin-bottom:14px">
+        ${d ? `<div class="muted priority-note">Base unifiee : meme snapshot marche pour cette fiche et pour la liste Opportunites.</div><div class="countdown-strip dual" style="margin-bottom:14px">
               <div class="countdown-item">
                 <span class="countdown-dot"></span>
                 <span class="countdown-label">Fiche actif</span>
@@ -1632,7 +1632,7 @@ function renderHistoryRow(item) {
         <div class="screen-header">
           <div class="screen-title">Reglages</div>
           <div class="screen-subtitle">Ces reglages servent juste a rendre l'app plus claire.</div>
-          <div class="muted" style="margin-top:6px">IA externe : l'app utilisera Claude si la cle CLAUDE_API_KEY est bien configuree dans le worker, sinon elle retombe sur un filtre prudent local.</div>
+          <div class="muted" style="margin-top:6px">Base marche unifiee : Opportunites et Fiche actif reutilisent le meme snapshot marche par actif. IA externe : l'app utilisera Claude si la cle CLAUDE_API_KEY est bien configuree dans le worker, sinon elle retombe sur un filtre prudent local.</div>
         </div>
 
         <div class="card">
