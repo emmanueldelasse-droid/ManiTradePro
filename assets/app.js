@@ -338,28 +338,44 @@
       const currentList = (state.opportunitiesSnapshot || []).slice();
       const idx = currentList.findIndex(x => String(x.symbol || "").toUpperCase() === clean);
 
+      const existingRow = idx >= 0 ? currentList[idx] : (state.opportunities || []).find(x => String(x.symbol || "").toUpperCase() === clean) || null;
+
       const patch = normalizeOpportunity({
         symbol: value.symbol,
         name: value.name,
         assetClass: value.assetClass,
         price: value.price,
         change24hPct: value.change24hPct,
-        score: value.score,
-        scoreStatus: value.scoreStatus,
-        direction: value.direction,
-        analysisLabel: value.analysisLabel,
-        confidence: value.confidence,
-        breakdown: value.breakdown || null,
-        sourceUsed: value.sourceUsed,
-        freshness: value.freshness
+        score: value.score ?? existingRow?.score ?? null,
+        scoreStatus: value.scoreStatus || existingRow?.scoreStatus || null,
+        direction: value.direction || existingRow?.direction || null,
+        analysisLabel: value.analysisLabel || existingRow?.analysisLabel || null,
+        confidence: value.confidence || existingRow?.confidence || null,
+        breakdown: value.breakdown || existingRow?.breakdown || null,
+        sourceUsed: value.sourceUsed || existingRow?.sourceUsed || null,
+        freshness: value.freshness || existingRow?.freshness || null,
+        officialScore: value.officialScore ?? existingRow?.officialScore ?? value.score ?? existingRow?.score ?? null,
+        officialDecision: value.officialDecision || existingRow?.officialDecision || null,
+        officialTrendLabel: value.officialTrendLabel || existingRow?.officialTrendLabel || null,
+        officialWaitFor: value.officialWaitFor || existingRow?.officialWaitFor || null
       });
 
-      if (idx >= 0) currentList[idx] = { ...currentList[idx], ...patch };
-      else currentList.push(patch);
+      const mergedRow = existingRow ? {
+        ...existingRow,
+        ...patch,
+        score: patch.score ?? existingRow.score ?? null,
+        officialScore: patch.officialScore ?? existingRow.officialScore ?? patch.score ?? existingRow.score ?? null,
+        officialDecision: patch.officialDecision || existingRow.officialDecision || null,
+        officialTrendLabel: patch.officialTrendLabel || existingRow.officialTrendLabel || null,
+        officialWaitFor: patch.officialWaitFor || existingRow.officialWaitFor || null
+      } : patch;
+
+      if (idx >= 0) currentList[idx] = mergedRow;
+      else currentList.push(mergedRow);
 
       saveOpportunitiesSnapshot(currentList);
       state.opportunities = state.opportunities.map(item =>
-        String(item.symbol || "").toUpperCase() === clean ? { ...item, ...patch } : item
+        String(item.symbol || "").toUpperCase() === clean ? mergedRow : item
       );
       applyFilter();
     }
@@ -814,19 +830,19 @@ function hasOfficialOpportunityPayload(item) {
 }
 
 function rowTradePlan(item) {
-  if (!item || item.officialScore == null) return null;
-  const score = Number(item.officialScore);
+  if (!item) return null;
+  const score = item.officialScore != null ? Number(item.officialScore) : (item.score != null ? Number(item.score) : null);
+  if (score == null || Number.isNaN(score)) return null;
+
   const direction = item.direction || "neutral";
-  let decision = item.officialDecision || "Pas de trade";
-  if (!item.officialDecision) {
+  let decision = item.officialDecision || null;
+  if (!decision) {
     if (score >= 70 && direction !== "neutral") decision = "Trade propose";
     else if (score >= 55) decision = "A surveiller";
     else decision = "Pas de trade";
   }
-  let trendLabel = item.officialTrendLabel;
-  if (!trendLabel) {
-    trendLabel = detectedTrendLabel(direction);
-  }
+
+  const trendLabel = item.officialTrendLabel || detectedTrendLabel(direction);
   return {
     finalScore: score,
     decision,
@@ -1087,7 +1103,7 @@ function currentTradePlan() {
 
     state.detailRequestStartedAt = now;
     state.loadingDetail = !cachedDetail;
-    if (cachedDetail) state.detail = lockDetailToOfficialRow(cachedDetail);
+    if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? cachedDetail.score ?? null });
     state.error = null;
     render();
 
@@ -1102,7 +1118,7 @@ function currentTradePlan() {
         candles: candles?.data || cachedDetail?.candles || []
       };
 
-      state.detail = lockDetailToOfficialRow(merged);
+      state.detail = lockDetailToOfficialRow({ ...merged, officialScore: merged.officialScore ?? merged.score ?? null });
       saveDetailCache(cleanSymbol, merged);
 
       if (nonCrypto) {
@@ -1114,7 +1130,7 @@ function currentTradePlan() {
       loadAiReview(merged, currentTradePlan());
     } catch (e) {
       state.error = e.message || "Fiche indisponible";
-      if (cachedDetail) state.detail = lockDetailToOfficialRow(cachedDetail);
+      if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? cachedDetail.score ?? null });
     } finally {
       state.loadingDetail = false;
       render();
@@ -1770,8 +1786,8 @@ function officialPlanForDetail(detail) {
   const locked = lockDetailToOfficialRow(detail);
   const plan = computeOfficialPlan(locked);
   if (!plan) return plan;
-  if (locked?.officialScore != null) plan.finalScore = locked.officialScore;
-  else if (locked?.score != null) plan.finalScore = locked.score;
+  if (locked?.officialScore != null) plan.finalScore = Number(locked.officialScore);
+  else if (locked?.score != null) plan.finalScore = Number(locked.score);
   if (locked?.officialDecision) plan.decision = locked.officialDecision;
   if (locked?.officialTrendLabel) plan.trendLabel = locked.officialTrendLabel;
   if (locked?.officialWaitFor) plan.waitFor = locked.officialWaitFor;
