@@ -334,20 +334,65 @@
     if (value && value.price != null) {
       const currentList = (state.opportunitiesSnapshot || []).slice();
       const idx = currentList.findIndex(x => String(x.symbol || "").toUpperCase() === clean);
-      const patch = normalizeOpportunity({
-        symbol: value.symbol,
-        name: value.name,
-        assetClass: value.assetClass,
-        price: value.price,
-        change24hPct: value.change24hPct,
-        score: value.score,
-        scoreStatus: value.scoreStatus,
-        direction: value.direction,
-        analysisLabel: value.analysisLabel,
-        confidence: value.confidence,
-        sourceUsed: value.sourceUsed,
-        freshness: value.freshness
-      });
+      const existingOfficial = findOfficialListState(clean);
+      const patch = {
+        ...normalizeOpportunity({
+          symbol: value.symbol,
+          name: value.name,
+          assetClass: value.assetClass,
+          price: value.price,
+          change24hPct: value.change24hPct,
+          score: value.score,
+          scoreStatus: value.scoreStatus,
+          direction: value.direction,
+          analysisLabel: value.analysisLabel,
+          confidence: value.confidence,
+          sourceUsed: value.sourceUsed,
+          freshness: value.freshness
+        }),
+        officialTradeScore: existingOfficial?.officialTradeScore ?? normalizeOpportunity({
+          symbol: value.symbol,
+          name: value.name,
+          assetClass: value.assetClass,
+          price: value.price,
+          change24hPct: value.change24hPct,
+          score: value.score,
+          scoreStatus: value.scoreStatus,
+          direction: value.direction,
+          analysisLabel: value.analysisLabel,
+          confidence: value.confidence,
+          sourceUsed: value.sourceUsed,
+          freshness: value.freshness
+        }).officialTradeScore,
+        officialTradeDecision: existingOfficial?.officialTradeDecision ?? normalizeOpportunity({
+          symbol: value.symbol,
+          name: value.name,
+          assetClass: value.assetClass,
+          price: value.price,
+          change24hPct: value.change24hPct,
+          score: value.score,
+          scoreStatus: value.scoreStatus,
+          direction: value.direction,
+          analysisLabel: value.analysisLabel,
+          confidence: value.confidence,
+          sourceUsed: value.sourceUsed,
+          freshness: value.freshness
+        }).officialTradeDecision,
+        officialTrendLabel: existingOfficial?.officialTrendLabel ?? normalizeOpportunity({
+          symbol: value.symbol,
+          name: value.name,
+          assetClass: value.assetClass,
+          price: value.price,
+          change24hPct: value.change24hPct,
+          score: value.score,
+          scoreStatus: value.scoreStatus,
+          direction: value.direction,
+          analysisLabel: value.analysisLabel,
+          confidence: value.confidence,
+          sourceUsed: value.sourceUsed,
+          freshness: value.freshness
+        }).officialTrendLabel
+      };
       if (idx >= 0) currentList[idx] = mergeOpportunityWithStored(currentList[idx], patch);
       else currentList.push(patch);
       saveOpportunitiesSnapshot(currentList);
@@ -563,6 +608,7 @@ function decisionBadgeClass(decision) {
 
 
 
+
 function normalizedDetailForScore(item) {
   if (!item) return null;
   const existing = item.breakdown || {};
@@ -579,19 +625,63 @@ function normalizedDetailForScore(item) {
   };
 }
 
-function officialTradeScore(item) {
+function computeOfficialTradeState(item) {
   const source = normalizedDetailForScore(item);
-  if (!source || source.price == null) return null;
+  if (!source || source.price == null) {
+    return {
+      officialTradeScore: null,
+      officialTradeDecision: "Pas de trade",
+      officialTrendLabel: detectedTrendLabel(source?.direction || "neutral")
+    };
+  }
   const plan = generateTradePlan(source);
-  return plan?.finalScore ?? null;
+  return {
+    officialTradeScore: plan?.finalScore ?? null,
+    officialTradeDecision: plan?.decision || "Pas de trade",
+    officialTrendLabel: plan?.trendLabel || detectedTrendLabel(source.direction || "neutral")
+  };
+}
+
+function officialTradeScore(item) {
+  if (item?.officialTradeScore != null) return item.officialTradeScore;
+  return computeOfficialTradeState(item).officialTradeScore;
 }
 
 function officialTradeDecision(item) {
-  const source = normalizedDetailForScore(item);
-  if (!source || source.price == null) return "Pas de trade";
-  const plan = generateTradePlan(source);
-  return plan?.decision || "Pas de trade";
+  if (item?.officialTradeDecision) return item.officialTradeDecision;
+  return computeOfficialTradeState(item).officialTradeDecision;
 }
+
+function officialTrendLabel(item) {
+  if (item?.officialTrendLabel) return item.officialTrendLabel;
+  return computeOfficialTradeState(item).officialTrendLabel;
+}
+
+function findOfficialListState(symbol) {
+  const clean = String(symbol || "").toUpperCase();
+  if (!clean) return null;
+  const current = (state.opportunities || []).find((x) => String(x?.symbol || "").toUpperCase() == clean);
+  if (current?.officialTradeScore != null) return current;
+  const snap = (state.opportunitiesSnapshot || []).find((x) => String(x?.symbol || "").toUpperCase() == clean);
+  if (snap?.officialTradeScore != null) return snap;
+  return null;
+}
+
+function applyOfficialStateToDetail(detail) {
+  if (!detail) return detail;
+  const official = findOfficialListState(detail.symbol);
+  if (!official) {
+    const computed = computeOfficialTradeState(detail);
+    return { ...detail, ...computed };
+  }
+  return {
+    ...detail,
+    officialTradeScore: official.officialTradeScore,
+    officialTradeDecision: official.officialTradeDecision,
+    officialTrendLabel: official.officialTrendLabel
+  };
+}
+
 
 function detectedTrendLabel(direction) {
   if (direction === "long") return "tendance haussiere";
@@ -754,11 +844,24 @@ function generateTradePlan(detail) {
 }
 
 function currentTradePlan() {
-  return generateTradePlan(state.detail);
+  const detail = applyOfficialStateToDetail(state.detail);
+  const plan = generateTradePlan(detail);
+  if (!plan) return plan;
+  if (detail?.officialTradeScore != null) plan.finalScore = detail.officialTradeScore;
+  if (detail?.officialTradeDecision) plan.decision = detail.officialTradeDecision;
+  if (detail?.officialTrendLabel) plan.trendLabel = detail.officialTrendLabel;
+  if (plan.decision !== "Trade propose") {
+    plan.side = null;
+    plan.entry = null;
+    plan.stopLoss = null;
+    plan.takeProfit = null;
+    plan.rr = null;
+  }
+  return plan;
 }
 
   function normalizeOpportunity(item) {
-    return {
+    const base = {
       symbol: item?.symbol || "",
       name: item?.name || "Nom indisponible",
       assetClass: item?.assetClass || "unknown",
@@ -773,6 +876,7 @@ function currentTradePlan() {
       freshness: item?.freshness || "unknown",
       error: compactError(item?.error || null)
     };
+    return { ...base, ...computeOfficialTradeState(base) };
   }
 
   function saveOpportunitiesSnapshot(rows) {
@@ -794,6 +898,9 @@ function currentTradePlan() {
     merged.confidence = stored.confidence || current.confidence;
     merged.sourceUsed = stored.sourceUsed || current.sourceUsed;
     merged.freshness = stored.freshness || current.freshness || "cache";
+    merged.officialTradeScore = stored.officialTradeScore ?? current.officialTradeScore ?? merged.officialTradeScore;
+    merged.officialTradeDecision = stored.officialTradeDecision || current.officialTradeDecision || merged.officialTradeDecision;
+    merged.officialTrendLabel = stored.officialTrendLabel || current.officialTrendLabel || merged.officialTrendLabel;
     merged.error = null;
     merged.fromStoredCache = true;
     return merged;
@@ -1010,10 +1117,10 @@ function currentTradePlan() {
         api(`/api/candles/${encodeURIComponent(cleanSymbol)}?timeframe=1d&limit=90`).catch(() => null)
       ]);
 
-      const merged = {
+      const merged = applyOfficialStateToDetail({
         ...(detail.data || {}),
         candles: candles?.data || cachedDetail?.candles || []
-      };
+      });
 
       state.detail = merged;
       saveDetailCache(cleanSymbol, merged);
@@ -1027,7 +1134,7 @@ function currentTradePlan() {
       loadAiReview(merged, currentTradePlan());
     } catch (e) {
       state.error = e.message || "Fiche indisponible";
-      if (cachedDetail) state.detail = cachedDetail;
+      if (cachedDetail) state.detail = applyOfficialStateToDetail(cachedDetail);
     } finally {
       state.loadingDetail = false;
       render();
@@ -1251,7 +1358,7 @@ function closeTrainingTrade(id, livePrice = null) {
           ${scoreRing(lightweightTradePlan(item)?.finalScore ?? item.score)}
           <div class="score-meta">
             ${badge((lightweightTradePlan(item)?.decision || "Pas de trade"), (lightweightTradePlan(item)?.decision || ""))}
-            ${badge(simpleDirectionLabel(item.direction, officialTradeScore(item) ?? item.score), item.direction || "")}
+            ${badge(simpleDirectionLabel(item.direction, item.officialTradeScore ?? item.score), item.direction || "")}
           </div>
         </div>
         <div class="price-col">
