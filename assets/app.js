@@ -553,6 +553,26 @@ function averageRange(candles, count = 14) {
   return ranges.reduce((a, b) => a + b, 0) / ranges.length;
 }
 
+
+function coherentSignalLabel(item) {
+  const score = Number(item?.score ?? 0);
+  const dir = String(item?.direction || "").toLowerCase();
+
+  if (!Number.isFinite(score) || score <= 0) return "pas de tendance claire";
+  if (!dir || dir === "neutral") return score >= 55 ? "tendance moderee" : "pas de tendance claire";
+
+  if (score < 45) {
+    return dir === "short" ? "biais baissier leger" : "biais haussier leger";
+  }
+  if (score < 55) {
+    return dir === "short" ? "pression baissiere" : "pression haussiere";
+  }
+  if (score < 70) {
+    return dir === "short" ? "baisse probable" : "hausse probable";
+  }
+  return dir === "short" ? "signal baissier fort" : "signal haussier fort";
+}
+
 function decisionBadgeClass(decision) {
   if (decision === "Trade conseille") return "decision-strong";
   if (decision === "Trade possible") return "decision-medium";
@@ -1333,14 +1353,14 @@ function renderDashboard() {
                   <div class="trade-sub">${safeText(topPick.name || "Actif")}</div>
                 </div>
                 <div class="legend">
-                  ${badge(topPick.analysisLabel || "lecture")}
+                  ${badge(coherentSignalLabel(topPick))}
                   ${badge(topPick.confidence || "fiabilite")}
                 </div>
               </div>
               <div class="kv" style="margin-top:14px">
                 <div class="muted">Prix</div><div>${priceDisplay(topPick.price)}</div>
                 <div class="muted">Variation 24h</div><div>${pct(topPick.change24hPct)}</div>
-                <div class="muted">Lecture</div><div>${safeText(topPick.analysisLabel || "—")}</div>
+                <div class="muted">Lecture</div><div>${safeText(coherentSignalLabel(topPick))}</div>
                 <div class="muted">Source</div><div>${safeText(topPick.sourceUsed || "—")}</div>
               </div>
               <div class="trade-actions" style="margin-top:14px">
