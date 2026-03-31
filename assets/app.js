@@ -15,7 +15,8 @@
     showSourceBadges: true,
     showScoreBreakdown: true,
     compactCards: false,
-    displayCurrency: "EUR_PLUS_USD"
+    displayCurrency: "EUR_PLUS_USD",
+    showAlgoJournal: true
   };
 
   const state = {
@@ -1576,6 +1577,9 @@ function renderHistoryRow(item) {
     const stats = trainingStats();
     const positions = state.trades.positions;
     const history = state.trades.history;
+    const algoCounts = algoDecisionCounts();
+    const insights = groupedHistoryInsights();
+    const riskRows = openPositionsRiskView();
 
     return `
       <div class="screen">
@@ -1597,6 +1601,57 @@ function renderHistoryRow(item) {
             <div class="stat-card"><div class="stat-label">Historique des trades</div><div class="stat-value">${stats.closedCount}</div></div>
             <div class="stat-card"><div class="stat-label">Gain / perte realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
             <div class="stat-card"><div class="stat-label">Budget Twelve</div><div class="stat-value">${state.budget.remaining}</div></div>
+          </div>
+
+          <div class="grid trades-stats" style="margin-top:14px">
+            <div class="stat-card"><div class="stat-label">Trades conseilles</div><div class="stat-value">${algoCounts.conseille}</div></div>
+            <div class="stat-card"><div class="stat-label">Trades possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
+            <div class="stat-card"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
+            <div class="stat-card"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
+          </div>
+
+          <div class="risk-layout">
+            <div class="card" style="margin-top:18px">
+              <div class="section-title"><span>Risque positions ouvertes</span><span>${riskRows.length}</span></div>
+              ${riskRows.length ? `
+                <div class="risk-list">
+                  ${riskRows.slice(0, 8).map((row) => `
+                    <div class="risk-row">
+                      <div>
+                        <div class="trade-symbol">${safeText(row.symbol)}</div>
+                        <div class="trade-sub">${safeText(row.tradeDecision || "manuel")}</div>
+                      </div>
+                      <div>${badge(simpleSideLabel(row.side), row.side)}</div>
+                      <div>${row.distanceToStop == null ? "stop indispo" : `${num(row.distanceToStop, 2)}% avant stop`}</div>
+                    </div>
+                  `).join("")}
+                </div>
+              ` : `<div class="empty-state">Aucune position ouverte pour le moment.</div>`}
+            </div>
+
+            <div class="card" style="margin-top:18px">
+              <div class="section-title"><span>Lecture performance</span><span>historique</span></div>
+              <div class="perf-columns">
+                <div>
+                  <div class="muted" style="margin-bottom:8px">Meilleurs actifs clotures</div>
+                  ${insights.best.length ? insights.best.map((row) => `
+                    <div class="mini-perf-row">
+                      <span>${safeText(row.symbol)}</span>
+                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
+                    </div>
+                  `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
+                </div>
+                <div>
+                  <div class="muted" style="margin-bottom:8px">Actifs les plus faibles</div>
+                  ${insights.worst.length ? insights.worst.map((row) => `
+                    <div class="mini-perf-row">
+                      <span>${safeText(row.symbol)}</span>
+                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
+                    </div>
+                  `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div class="card" style="margin-top:18px">
