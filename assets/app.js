@@ -1256,75 +1256,122 @@ function closeTrainingTrade(id, livePrice = null) {
     return (state.algoJournal || []).slice(0, limit);
   }
 
-  function renderDashboard() {
-    const top = state.opportunities.filter(x => x.price != null).slice(0, 5);
-    const prudent = prudentShortlist(5);
-    const journalPreview = algoJournalPreview(4);
-    const fg = state.dashboard.fearGreed;
-    const trending = state.dashboard.trending;
+  
+function dashboardSignalSummary(opps) {
+  const rows = Array.isArray(opps) ? opps : [];
+  const tradables = rows.filter((x) => x && typeof x.score === "number");
+  const bullish = tradables.filter((x) => String(x.direction || "").toLowerCase() === "long").length;
+  const bearish = tradables.filter((x) => String(x.direction || "").toLowerCase() === "short").length;
+  const neutral = Math.max(0, tradables.length - bullish - bearish);
+
+  let title = "Lecture prudente";
+  let text = "Peu de signaux vraiment propres pour le moment.";
+
+  if (bullish >= 3 && bullish > bearish) {
+    title = "Biais haussier";
+    text = "Les opportunites les plus fortes restent orientees vers la hausse.";
+  } else if (bearish >= 3 && bearish > bullish) {
+    title = "Biais baissier";
+    text = "Les signaux visibles restent plutot orientes vers la baisse.";
+  } else if (tradables.length >= 5) {
+    title = "Marche partage";
+    text = "Le marche envoie des signaux melanges, sans domination nette.";
+  }
+
+  return { title, text, bullish, bearish, neutral, tradables: tradables.length };
+}
+
+function dashboardTopPick(opps) {
+  const rows = Array.isArray(opps) ? opps.filter((x) => typeof x?.score === "number") : [];
+  rows.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
+  return rows[0] || null;
+}
+
+
+function renderDashboard() {
     const stats = trainingStats();
+    const summary = dashboardSignalSummary(state.opportunities);
+    const topPick = dashboardTopPick(state.opportunities);
+    const topRows = state.opportunities.slice(0, 5);
+    const recentAlgo = state.algoJournal.slice(0, 3);
 
     return `
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
-          <div class="screen-subtitle">Interface plus claire, prix reels, lecture simple.</div>
-          
+          <div class="screen-subtitle">Vue rapide, lecture simple, priorites utiles.</div>
         </div>
 
-        <div class="hero">
-          <div class="hero-label">Entrainement</div>
-          <div class="hero-value">${stats.openCount} position${stats.openCount > 1 ? "s" : ""} ouverte${stats.openCount > 1 ? "s" : ""}</div>
-          <div class="hero-meta">
-            ${badge("Training", "live")}
-            ${badge(`Historique des trades ${stats.closedCount}`, "recent")}
-            ${badge(`Realise ${money(stats.realized * fxRateUsdToEur(), "EUR")}`)}
+        <div class="card dashboard-hero-card" style="margin-bottom:18px">
+          <div class="dashboard-hero-top">
+            <div>
+              <div class="dashboard-hero-title">${stats.openCount} position${stats.openCount > 1 ? "s ouvertes" : " ouverte"}</div>
+              <div class="dashboard-hero-subtitle">${summary.title} · ${summary.text}</div>
+            </div>
+            <div class="legend">
+              ${badge("Training")}
+              ${badge(`${stats.closedCount} trade${stats.closedCount > 1 ? "s" : ""} cloture${stats.closedCount > 1 ? "s" : ""}`)}
+              ${badge(`${money(stats.realized * fxRateUsdToEur(), "EUR")} realise`)}
+            </div>
           </div>
         </div>
 
-        <div class="grid" style="margin-bottom:22px">
+        <div class="grid trades-stats" style="margin-bottom:18px">
           <div class="stat-card"><div class="stat-label">Opportunites visibles</div><div class="stat-value">${state.opportunities.length}</div></div>
-          <div class="stat-card"><div class="stat-label">Climat marche</div><div class="stat-value">${fg ? safeText(fg.value) : "—"}</div></div>
-          <div class="stat-card"><div class="stat-label">Tendances</div><div class="stat-value">${trending.length}</div></div>
-          <div class="stat-card"><div class="stat-label">Taux de reussite training</div><div class="stat-value">${stats.winRate == null ? "—" : pct(stats.winRate)}</div></div>
+          <div class="stat-card"><div class="stat-label">Hausse</div><div class="stat-value">${summary.bullish}</div></div>
+          <div class="stat-card"><div class="stat-label">Baisse</div><div class="stat-value">${summary.bearish}</div></div>
+          <div class="stat-card"><div class="stat-label">Neutre</div><div class="stat-value">${summary.neutral}</div></div>
         </div>
 
-        <div class="section-title"><span>Meilleures opportunites</span><button class="btn" data-route="opportunities">Voir tout</button></div>
-        ${top.length ? `<div class="opp-list">${top.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite chargee.</div>`}
-
-        <div class="section-title" style="margin-top:22px"><span>Trades prudents proposes</span><span>${prudent.length}</span></div>
-        ${prudent.length ? `<div class="ai-shortlist">
-          ${prudent.map((item) => `
-            <div class="ai-card" data-symbol="${safeText(item.symbol)}">
-              <div class="ai-top">
+        <div class="dashboard-grid">
+          <div class="card">
+            <div class="section-title"><span>Meilleure opportunite du moment</span><span>${topPick ? topPick.symbol : "—"}</span></div>
+            ${topPick ? `
+              <div class="top-pick-box">
                 <div>
-                  <div class="trade-symbol">${safeText(item.symbol)}</div>
-                  <div class="trade-sub">${safeText(item.name || "")}</div>
+                  <div class="trade-symbol">${safeText(topPick.symbol)}</div>
+                  <div class="trade-sub">${safeText(topPick.name || "Actif")}</div>
                 </div>
-                ${badge(item.plan.decision, decisionBadgeClass(item.plan.decision))}
+                <div class="legend">
+                  ${badge(topPick.analysisLabel || "lecture")}
+                  ${badge(topPick.confidence || "fiabilite")}
+                </div>
               </div>
-              <div class="ai-body">
-                <div><span class="muted">Tendance</span><br>${safeText(simpleSideLabel(item.plan.side || item.direction))}</div>
-                <div><span class="muted">Fiabilite</span><br>${safeText(item.plan.confidence || "—")}</div>
-                <div><span class="muted">Priorite</span><br>${safeText(item.plan.urgency || "—")}</div>
-                <div><span class="muted">Signal</span><br>${item.score != null ? safeText(item.score) : "—"}</div>
+              <div class="kv" style="margin-top:14px">
+                <div class="muted">Prix</div><div>${priceDisplay(topPick.price)}</div>
+                <div class="muted">Variation 24h</div><div>${pct(topPick.change24hPct)}</div>
+                <div class="muted">Lecture</div><div>${safeText(topPick.analysisLabel || "—")}</div>
+                <div class="muted">Source</div><div>${safeText(topPick.sourceUsed || "—")}</div>
               </div>
-              <div class="ai-summary">${safeText(item.plan.aiSummary || item.plan.reason || "")}</div>
-            </div>`).join("")}
-        </div>` : `<div class="empty-state">Aucun trade prudent propose pour le moment.</div>`}
+              <div class="trade-actions" style="margin-top:14px">
+                <button class="btn trade-btn primary" data-open-symbol="${safeText(topPick.symbol)}">Ouvrir la fiche</button>
+              </div>
+            ` : `<div class="empty-state">Aucune opportunite assez lisible pour le moment.</div>`}
+          </div>
 
-        <div class="section-title" style="margin-top:22px"><span>Dernieres decisions algo</span><span>${journalPreview.length}</span></div>
-        ${journalPreview.length ? `<div class="algo-feed">
-          ${journalPreview.map((row) => `
-            <div class="algo-row">
-              <div>
-                <div class="trade-symbol">${safeText(row.symbol)}</div>
-                <div class="trade-sub">${new Date(row.createdAt).toLocaleString("fr-FR")}</div>
+          <div class="card">
+            <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
+            ${recentAlgo.length ? `
+              <div class="algo-feed">
+                ${recentAlgo.map((row) => `
+                  <div class="algo-row full">
+                    <div>
+                      <div class="trade-symbol">${safeText(row.symbol)}</div>
+                      <div class="trade-sub">${new Date(row.createdAt).toLocaleString("fr-FR")}</div>
+                    </div>
+                    <div>${badge(row.decision || "—", decisionBadgeClass(row.decision || ""))}</div>
+                    <div class="muted">${safeText(row.aiSummary || row.reason || "—")}</div>
+                  </div>
+                `).join("")}
               </div>
-              <div>${badge(row.decision || "—", decisionBadgeClass(row.decision || ""))}</div>
-              <div class="muted">${safeText(row.reason || "—")}</div>
-            </div>`).join("")}
-        </div>` : `<div class="empty-state">Aucune decision algo enregistree pour le moment.</div>`}
+            ` : `<div class="empty-state">Aucune decision recente pour le moment.</div>`}
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Meilleures opportunites</span><span>${topRows.length}</span></div>
+          ${topRows.length ? `<div class="opp-list">${topRows.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite disponible.</div>`}
+        </div>
       </div>`;
   }
 
