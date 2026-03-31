@@ -1573,13 +1573,63 @@ function renderHistoryRow(item) {
       </div>`;
   }
 
+
+  function algoDecisionCounts() {
+    const rows = Array.isArray(state.algoJournal) ? state.algoJournal : [];
+    const out = { total: rows.length, conseille: 0, possible: 0, surveiller: 0, eviter: 0, aucun: 0, manuel: 0 };
+    for (const row of rows) {
+      const d = String(row?.decision || "").toLowerCase();
+      if (d.includes("trade conseille")) out.conseille += 1;
+      else if (d.includes("trade possible")) out.possible += 1;
+      else if (d.includes("surveiller")) out.surveiller += 1;
+      else if (d.includes("eviter")) out.eviter += 1;
+      else if (d.includes("aucun")) out.aucun += 1;
+      else if (d.includes("manuel")) out.manuel += 1;
+    }
+    return out;
+  }
+
+  function groupedHistoryInsights() {
+    const history = Array.isArray(state.trades?.history) ? state.trades.history : [];
+    const bySymbol = {};
+    for (const row of history) {
+      const key = String(row?.symbol || "").toUpperCase();
+      if (!key) continue;
+      if (!bySymbol[key]) bySymbol[key] = { symbol: key, count: 0, pnl: 0, wins: 0 };
+      bySymbol[key].count += 1;
+      bySymbol[key].pnl += Number(row?.pnl || 0);
+      if (Number(row?.pnl || 0) > 0) bySymbol[key].wins += 1;
+    }
+    const arr = Object.values(bySymbol).map((x) => ({ ...x, winRate: x.count ? (x.wins / x.count) * 100 : null }));
+    arr.sort((a, b) => Number(b.pnl || 0) - Number(a.pnl || 0));
+    return { best: arr.slice(0, 3), worst: arr.slice(-3).reverse() };
+  }
+
+  function openPositionsRiskView() {
+    const positions = Array.isArray(state.trades?.positions) ? state.trades.positions : [];
+    return positions.map((p) => {
+      const liveMatch = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === p.symbol) : null;
+      const livePrice = liveMatch?.price ?? p.entryPrice ?? null;
+      const distanceToStop = (p.stopLoss == null || livePrice == null)
+        ? null
+        : (p.side === "long"
+            ? ((livePrice - p.stopLoss) / livePrice) * 100
+            : ((p.stopLoss - livePrice) / livePrice) * 100);
+      return { ...p, livePrice, distanceToStop };
+    }).sort((a, b) => {
+      const av = a.distanceToStop == null ? 999 : a.distanceToStop;
+      const bv = b.distanceToStop == null ? 999 : b.distanceToStop;
+      return av - bv;
+    });
+  }
+
   function renderPortfolio() {
     const stats = trainingStats();
     const positions = state.trades.positions;
     const history = state.trades.history;
-    const algoCounts = algoDecisionCounts();
-    const insights = groupedHistoryInsights();
-    const riskRows = openPositionsRiskView();
+    const algoCounts = (typeof algoDecisionCounts === "function") ? algoDecisionCounts() : { total: 0, conseille: 0, possible: 0, surveiller: 0, eviter: 0, aucun: 0, manuel: 0 };
+    const insights = (typeof groupedHistoryInsights === "function") ? groupedHistoryInsights() : { best: [], worst: [] };
+    const riskRows = (typeof openPositionsRiskView === "function") ? openPositionsRiskView() : [];
 
     return `
       <div class="screen">
