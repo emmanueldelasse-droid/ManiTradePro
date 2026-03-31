@@ -288,3 +288,6 @@ button{font:inherit} a{text-decoration:none;color:inherit}
 .opp-section{margin-bottom:18px}
 .opp-section-subtitle{color:var(--text-secondary);font-size:.9rem;margin:-6px 0 10px 0}
 .opp-overview-text{color:var(--text-secondary);line-height:1.45}
+
+.signal-headline{line-height:1.4}
+.plan-grid .muted{color:var(--text-secondary)}

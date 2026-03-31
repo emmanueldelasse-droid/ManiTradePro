@@ -629,12 +629,12 @@ function generateTradePlan(detail) {
 
   const aiContext = [];
   if (regime >= 58) aiContext.push("contexte porteur");
-  if (regime <= 42) aiContext.push("contexte fragile");
-  if (entryQuality >= 65) aiContext.push("entree propre");
+  if (regime <= 42) aiContext.push("contexte moyen");
+  if (entryQuality >= 65) aiContext.push("entree correcte");
   if (entryQuality <= 45) aiContext.push("entree delicate");
-  if (risk >= 60) aiContext.push("risque acceptable");
+  if (risk >= 60) aiContext.push("risque correct");
   if (risk <= 42) aiContext.push("risque eleve");
-  if (participation >= 70) aiContext.push("activite suffisante");
+  if (participation >= 70) aiContext.push("marche assez actif");
 
   const directionQuality =
     direction === "long" ? rawScore :
@@ -662,7 +662,7 @@ function generateTradePlan(detail) {
   let refusalReason = null;
 
   if (decision === "Trade propose" && side) {
-    reason = `${trendLabel}, entree encore exploitable et risque acceptable.`;
+    reason = `${trendLabel}, entree encore exploitable et risque correct.`;
     aiSummary = `Le moteur detecte une ${trendLabel} et juge le plan assez fiable pour ouvrir un trade.`;
   } else if (decision === "A surveiller") {
     side = null;
@@ -938,7 +938,7 @@ function currentTradePlan() {
         reason: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
         invalidation: localPlan?.refusalReason || "Attendre un signal plus propre.",
         summary: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
-        warning: "Pont IA externe indisponible."
+        warning: "Pont Analyse externe indisponible."
       };
     } finally {
       state.loadingAiReview = false;
@@ -1617,7 +1617,36 @@ function renderDashboard() {
       </div>`;
   }
 
-  function renderDetail() {
+  
+function simpleReliabilityLabel(score) {
+  if (score == null) return "indisponible";
+  if (score >= 70) return "elevee";
+  if (score >= 55) return "moyenne";
+  return "faible";
+}
+
+function simpleTrendWord(label) {
+  const text = String(label || "").toLowerCase();
+  if (text.includes("haussi")) return "hausse";
+  if (text.includes("baissi")) return "baisse";
+  return "neutre";
+}
+
+function simpleDecisionSentence(plan) {
+  const decision = String(plan?.decision || "").toLowerCase();
+  if (decision.includes("trade propose")) return "Le trade semble assez propre pour etre envisage maintenant.";
+  if (decision.includes("surveiller")) return "Le signal existe, mais il vaut mieux attendre encore.";
+  return "Le signal n'est pas assez propre pour prendre position maintenant.";
+}
+
+function simpleContextSentence(plan) {
+  const trend = simpleTrendWord(plan?.trendLabel || "");
+  if (trend === "hausse") return "Le marche montre plutot une hausse.";
+  if (trend === "baisse") return "Le marche montre plutot une baisse.";
+  return "Le marche n'a pas de direction claire.";
+}
+
+function renderDetail() {
     const d = state.detail;
     return `
       <div class="screen">
@@ -1660,25 +1689,25 @@ function renderDashboard() {
                     <div class="plan-card">
                       <div class="section-title"><span>Decision automatique</span><span>${safeText(plan?.decision || "—")}</span></div>
                       <div class="kv plan-grid">
-                        <div class="muted">Decision</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
-                        <div class="muted">Tendance detectee</div><div>${safeText(plan?.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</div>
+                        <div class="muted">Decision simple</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
+                        <div class="muted">Tendance</div><div>${safeText(simpleTrendWord(plan?.trendLabel || detectedTrendLabel(d.direction || "neutral")))}</div>
                         <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
                         <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
                         <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
                         <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        <div class="muted">Fiabilite du trade</div><div>${plan?.finalScore != null ? `${num(plan.finalScore, 0)}/100` : "—"}</div>
+                        <div class="muted">Niveau de fiabilite</div><div>${plan?.finalScore != null ? `${num(plan.finalScore, 0)}/100 · ${safeText(simpleReliabilityLabel(plan.finalScore))}` : "—"}</div>
                         <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
-                        <div class="muted">Contexte</div><div>${safeText(planSummaryText(plan))}</div>
-                        <div class="muted">Resume</div><div>${safeText(plan?.aiSummary || "—")}</div>
+                        <div class="muted">En clair</div><div>${safeText(simpleDecisionSentence(plan))}</div>
+                        <div class="muted">Resume simple</div><div>${safeText(simpleContextSentence(plan))} ${safeText(plan?.aiSummary || "")}</div>
                       </div>
                       <div class="plan-reason">${safeText(plan?.reason || plan?.refusalReason || "Pas d'analyse disponible.")}</div>
                       <div class="plan-ai-summary">
-                        <div class="muted">Resume de l'analyse</div>
+                        <div class="muted">Resume court</div>
                         <div>${safeText(plan?.aiSummary || "Pas d'avis complementaire.")}</div>
                       </div>
                       <div class="plan-context">
                         ${(plan?.aiContext || []).map(label => `<span class="mini-pill">${safeText(label)}</span>`).join("")}
-                        ${plan?.safety ? `<span class="mini-pill strong">niveau prudent : ${safeText(plan.safety)}</span>` : ""}
+                        ${plan?.safety ? `<span class="mini-pill strong">niveau : ${safeText(plan.safety)}</span>` : ""}
                       </div>
                       <div class="trade-actions">
                         <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side || plan.decision !== "Trade propose" ? "disabled" : ""}>Ouvrir le trade propose</button>
@@ -1698,9 +1727,9 @@ function renderDashboard() {
                     </div>
                     <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
                     <div class="kv" style="margin-top:12px">
-                      <div class="muted">Raison</div><div>${safeText(state.aiReview.reason || "—")}</div>
-                      <div class="muted">Invalidation</div><div>${safeText(state.aiReview.invalidation || "—")}</div>
-                      <div class="muted">Source utilisee</div><div>${safeText(state.aiReview.provider || "—")}</div>
+                      <div class="muted">Pourquoi</div><div>${safeText(state.aiReview.reason || "—")}</div>
+                      <div class="muted">Ce qui bloque</div><div>${safeText(state.aiReview.invalidation || "—")}</div>
+                      <div class="muted">Source</div><div>${safeText(state.aiReview.provider || "—")}</div>
                     </div>
                     ${state.aiReview.warning ? `<div class="muted" style="margin-top:10px">${safeText(state.aiReview.warning)}</div>` : ""}
                   </div>
@@ -1715,14 +1744,14 @@ function renderDashboard() {
 
             <div>
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Fiabilite du trade</span><span>${currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—"}</span></div>
+                <div class="section-title"><span>Lecture simple</span><span>${currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—"}</span></div>
                 <div class="score-box" style="margin-bottom:14px">
                   ${scoreRing(currentTradePlan()?.finalScore ?? d.score)}
                   <div class="score-meta">
                     <div style="font-weight:700">${safeText(simpleAnalysisLabel(d.analysisLabel || "Analyse indisponible"))}</div>
                     <div class="muted">Fiabilite : ${safeText(simpleConfidenceLabel(d.confidence || "low"))}</div>
                     <div class="muted">Decision : ${safeText(currentTradePlan()?.decision || "—")}</div>
-                    <div class="muted">Tendance : ${safeText(currentTradePlan()?.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</div>
+                    <div class="muted">Tendance : ${safeText(simpleTrendWord(currentTradePlan()?.trendLabel || detectedTrendLabel(d.direction || "neutral")))}</div>
                   </div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
@@ -1739,12 +1768,12 @@ function renderDashboard() {
               <div class="card">
                 <div class="section-title"><span>Informations</span></div>
                 <div class="kv">
-                  <div class="muted">Source utilisee</div><div>${safeText(d.sourceUsed || "—")}</div>
-                  <div class="muted">Fraicheur</div><div>${safeText(simpleFreshnessLabel(d.freshness || "unknown"))}</div>
+                  <div class="muted">Source</div><div>${safeText(d.sourceUsed || "—")}</div>
+                  <div class="muted">Mise a jour</div><div>${safeText(simpleFreshnessLabel(d.freshness || "unknown"))}</div>
                   <div class="muted">Variation 24h</div><div>${pct(d.change24hPct)}</div>
-                  <div class="muted">Type actif</div><div>${safeText(simpleAssetClassLabel(d.assetClass || "—"))}</div>
+                  <div class="muted">Type</div><div>${safeText(simpleAssetClassLabel(d.assetClass || "—"))}</div>
                   <div class="muted">Etat</div><div>${safeText(simpleScoreStatusLabel(d.scoreStatus || "—"))}</div>
-                  <div class="muted">Resume de l'analyse</div><div>${safeText(simpleAnalysisLabel(d.analysisLabel || "—"))}</div>
+                  <div class="muted">Resume court</div><div>${safeText(simpleAnalysisLabel(d.analysisLabel || "—"))}</div>
                 </div>
               </div>
             </div>
@@ -1907,7 +1936,7 @@ function renderPositionRow(position) {
       <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
       <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
       <div><span class="muted">Horizon</span><br>${safeText(position.horizon || "—")}</div>
-      <div><span class="muted">Raison</span><br>${safeText(position.tradeReason || "—")}</div>
+      <div><span class="muted">Pourquoi</span><br>${safeText(position.tradeReason || "—")}</div>
     </div>
 
     <div class="trade-actions split">
