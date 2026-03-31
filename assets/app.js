@@ -1103,7 +1103,7 @@ function currentTradePlan() {
 
     state.detailRequestStartedAt = now;
     state.loadingDetail = !cachedDetail;
-    if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? cachedDetail.score ?? null });
+    if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? findOfficialOpportunity(cleanSymbol)?.officialScore ?? cachedDetail.score ?? null });
     state.error = null;
     render();
 
@@ -1118,7 +1118,7 @@ function currentTradePlan() {
         candles: candles?.data || cachedDetail?.candles || []
       };
 
-      state.detail = lockDetailToOfficialRow({ ...merged, officialScore: merged.officialScore ?? merged.score ?? null });
+      state.detail = lockDetailToOfficialRow({ ...merged, officialScore: merged.officialScore ?? findOfficialOpportunity(cleanSymbol)?.officialScore ?? merged.score ?? null });
       saveDetailCache(cleanSymbol, merged);
 
       if (nonCrypto) {
@@ -1130,7 +1130,7 @@ function currentTradePlan() {
       loadAiReview(merged, currentTradePlan());
     } catch (e) {
       state.error = e.message || "Fiche indisponible";
-      if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? cachedDetail.score ?? null });
+      if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? findOfficialOpportunity(cleanSymbol)?.officialScore ?? cachedDetail.score ?? null });
     } finally {
       state.loadingDetail = false;
       render();
@@ -1782,15 +1782,29 @@ function lockDetailToOfficialRow(detail) {
   };
 }
 
+
+function strictDisplayScore(detail) {
+  if (!detail) return null;
+  const locked = lockDetailToOfficialRow(detail);
+  if (locked?.officialScore != null && !Number.isNaN(Number(locked.officialScore))) return Number(locked.officialScore);
+  if (locked?.score != null && !Number.isNaN(Number(locked.score))) return Number(locked.score);
+  return null;
+}
+
 function officialPlanForDetail(detail) {
   const locked = lockDetailToOfficialRow(detail);
   const plan = computeOfficialPlan(locked);
   if (!plan) return plan;
-  if (locked?.officialScore != null) plan.finalScore = Number(locked.officialScore);
-  else if (locked?.score != null) plan.finalScore = Number(locked.score);
+
+  const displayScore = strictDisplayScore(locked);
+  if (displayScore != null) {
+    plan.finalScore = displayScore;
+  }
+
   if (locked?.officialDecision) plan.decision = locked.officialDecision;
   if (locked?.officialTrendLabel) plan.trendLabel = locked.officialTrendLabel;
   if (locked?.officialWaitFor) plan.waitFor = locked.officialWaitFor;
+
   return plan;
 }
 
@@ -1892,7 +1906,7 @@ function renderDetail() {
 
             <div>
               <div class="card conclusion-card" style="margin-bottom:18px">
-                <div class="section-title"><span>Conclusion</span><span>${state.detail?.officialScore != null ? state.detail.officialScore : (currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—")}/100</span></div>
+                <div class="section-title"><span>Conclusion</span><span>${strictDisplayScore(state.detail) != null ? strictDisplayScore(state.detail) : (currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—")}/100</span></div>
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
