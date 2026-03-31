@@ -264,3 +264,5 @@ button{font:inherit} a{text-decoration:none;color:inherit}
   .trade-plan-grid,.trade-plan-grid.compact{grid-template-columns:1fr 1fr}
   .trade-actions.split{justify-content:stretch;flex-direction:column}
 }
+
+.countdown-right,.countdown-strip,.priority-note{display:none !important}

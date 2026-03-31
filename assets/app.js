@@ -182,19 +182,19 @@
   const NON_CRYPTO_TRACKED_COUNT = 17;
   const TWELVE_POLICY = {
     opportunities: {
-      label: "Liste opportunites non-crypto",
+      label: "",
       cooldownMs: 5 * 60 * 1000,
       cost: 1,
       maxPerDay: 288
     },
     detail_non_crypto: {
-      label: "Fiche actif non-crypto",
+      label: "",
       cooldownMs: 60 * 60 * 1000,
       cost: 1,
       maxPerDayPerSymbol: 24
     },
     candles_non_crypto: {
-      label: "Bougies non-crypto",
+      label: "",
       cooldownMs: 12 * 60 * 60 * 1000,
       cost: 1,
       maxPerDayPerSymbol: 2
@@ -1340,9 +1340,7 @@ function closeTrainingTrade(id, livePrice = null) {
           ${filters.map(f => `<button class="btn ${state.opportunityFilter === f ? 'active' : ''}" data-filter="${f}">${f}</button>`).join("")}
           <button class="btn" data-refresh="opportunities">Rafraichir</button>
         </div>
-        <div class="countdown-right">${countdownOnlyLabel("opportunities")}</div>
         </div>
-        <div class="muted priority-note">Priorite de l'app : la page Opportunites garde toujours la derniere donnee connue avant toute autre page non-crypto.</div>
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
         ${state.loading ? `<div class="loading-state">Chargement des opportunites...</div>` :
           state.filteredOpportunities.length ? `<div class="opp-list">${state.filteredOpportunities.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` :
@@ -1852,7 +1850,7 @@ function renderHistoryRow(item) {
         <div class="screen-header">
           <div class="screen-title">Reglages</div>
           <div class="screen-subtitle">Ces reglages servent juste a rendre l'app plus claire.</div>
-          <div class="muted" style="margin-top:6px">Base marche unifiee : Opportunites et Fiche actif reutilisent le meme snapshot marche par actif. IA externe : l'app utilisera Claude si la cle CLAUDE_API_KEY est bien configuree dans le worker, sinon elle retombe sur un filtre prudent local.</div>
+          
         </div>
 
         <div class="card">
@@ -1909,16 +1907,11 @@ function renderHistoryRow(item) {
           </div>
           <div class="kv" style="margin-top:14px">
             <div class="muted">Opportunites non-crypto</div><div>1 appel Twelve max toutes les 15 min (${TWELVE_POLICY.opportunities.maxPerDay}/jour)</div>
-            <div class="muted">Prochaine opportunites</div><div>${countdownOnlyLabel("opportunities")}</div>
-            <div class="muted">Fiche actif non-crypto</div><div>1 appel Twelve max toutes les 30 min et par actif (${TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
-            <div class="muted">Bougies non-crypto</div><div>1 appel Twelve max toutes les 12 h et par actif (${TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
-            <div class="muted">Logique</div><div>Impossible depuis l'app de relancer Twelve avant la fin du delai prevu pour chaque categorie.</div>
+            <div class="muted"></div><div>${countdownOnlyLabel("opportunities")}</div>
+            <div class="muted"></div><div>1 appel Twelve max toutes les 30 min et par actif (${TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
+            <div class="muted"></div><div>1 appel Twelve max toutes les 12 h et par actif (${TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
+            <div class="muted">Logique</div><div></div>
           </div>
-        </div>
-
-        <div class="card" style="margin-top:18px">
-          <div class="section-title"><span>Compteurs de prochaine mise a jour</span><span>toutes les pages</span></div>
-          ${schedulerSummaryCards(state.selectedSymbol)}
         </div>
 
       </div>`;
