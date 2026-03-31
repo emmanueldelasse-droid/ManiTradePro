@@ -1370,141 +1370,150 @@ function closeTrainingTrade(id, livePrice = null) {
       </div>`;
   }
 
-  function renderDetail() {
+  
+function renderDetail() {
     const d = state.detail;
+    if (!d) return `<div class="screen"><div class="empty-state">Aucune fiche chargee.</div></div>`;
+    const plan = buildTrainingTradePlan(d);
+    const summary = simpleDecisionSummary(plan);
+    const reasons = whyTradeReasons(plan, d);
+
     return `
       <div class="screen">
-        <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Fiche actif</span></div>
-        ${state.loadingDetail ? `<div class="loading-state">Chargement du detail...</div>` : ""}
-        ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
-        ${d ? `<div class="countdown-item">
-                <span class="countdown-dot"></span>
-                <span class="countdown-label">Bougies</span>
-                <strong>${isCryptoSymbol(d.symbol) ? "souple" : countdownOnlyLabel("candles_non_crypto", d.symbol)}</strong>
-              </div>
-            </div>
-          <div class="detail-layout">
-            <div>
-              <div class="card" style="margin-bottom:18px">
-                <div class="detail-head">
-                  <div class="detail-title-wrap">
-                    <div class="detail-icon">${safeText((d.symbol || "").slice(0, 4))}</div>
+        <div class="screen-header">
+          <div class="controls">
+            <button class="btn" data-route="opportunities">← Retour</button>
+          </div>
+          <div class="screen-subtitle">Fiche actif</div>
+        </div>
+
+        <div class="detail-layout">
+          <div class="detail-main">
+            <div class="card detail-hero-card" style="margin-bottom:18px">
+              <div class="detail-hero-top">
+                <div>
+                  <div class="detail-symbol-line">
+                    <div class="asset-avatar">${safeText(d.symbol)}</div>
                     <div>
                       <div class="detail-title">${safeText(d.symbol)}</div>
-                      <div class="detail-sub">${safeText(d.name || "")}</div>
+                      <div class="detail-subtitle">${safeText(d.name || "Actif")}</div>
                     </div>
                   </div>
-                  <div>
-                    <div class="detail-price">${d.price != null ? priceDisplay(d.price) : "Donnee indisponible"}</div>
-                    <div class="change ${d.change24hPct > 0 ? 'up' : d.change24hPct < 0 ? 'down' : ''}" style="text-align:right">${pct(d.change24hPct)}</div>
+                  <div class="legend" style="margin-top:10px">
+                    ${badge(d.assetClass || "actif")}
+                    ${badge(d.analysisLabel || "lecture")}
+                    ${badge(d.scoreStatus || "etat")}
+                    ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source") : ""}
+                    ${state.settings.showSourceBadges ? badge(d.freshness || "mise a jour") : ""}
                   </div>
                 </div>
-                <div class="legend">
-                  ${badge(simpleAssetClassLabel(d.assetClass), d.assetClass)}
-                  ${badge(simpleDirectionLabel(d.direction, d.score), d.direction || "")}
-                  ${badge(simpleScoreStatusLabel(d.scoreStatus || "n/a"), d.scoreStatus || "")}
-                  ${badge(`fiabilite ${simpleConfidenceLabel(d.confidence || "low")}`)}
-                  ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
-                  ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
+                <div class="detail-price-box">
+                  <div class="detail-price-main">${priceDisplay(d.price)}</div>
+                  <div class="${(d.change24hPct || 0) >= 0 ? 'positive' : 'negative'}">${pct(d.change24hPct)}</div>
                 </div>
-                ${(() => {
-                  const plan = currentTradePlan();
-                  return `
-                    <div class="plan-card">
-                      <div class="section-title"><span>Plan propose par l'algo</span><span>${safeText(plan?.decision || "—")}</span></div>
-                      <div class="kv plan-grid">
-                        <div class="muted">Decision</div><div>${safeText(plan?.decision || "—")}</div>
-                        <div class="muted">Sens</div><div>${safeText(plan?.side ? simpleSideLabel(plan.side) : "aucun")}</div>
-                        <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
-                        <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
-                        <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
-                        <div class="muted">Ratio gain / risque</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        <div class="muted">Fiabilite</div><div>${safeText(plan?.confidence || "—")}</div>
-                        <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
-                        <div class="muted">Timing</div><div>${safeText(plan?.timing || "—")}</div>
-                        <div class="muted">Priorite</div><div>${safeText(plan?.urgency || "—")}</div>
-                      </div>
-                      <div class="plan-reason">${safeText(plan?.reason || plan?.refusalReason || "Pas d'analyse disponible.")}</div>
-                      <div class="plan-ai-summary">
-                        <div class="muted">Lecture IA</div>
-                        <div>${safeText(plan?.aiSummary || "Pas d'avis complementaire.")}</div>
-                      </div>
-                      <div class="plan-context">
-                        ${(plan?.aiContext || []).map(label => `<span class="mini-pill">${safeText(label)}</span>`).join("")}
-                        ${plan?.safety ? `<span class="mini-pill strong">niveau prudent : ${safeText(plan.safety)}</span>` : ""}
-                      </div>
-                      <div class="trade-actions">
-                        <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side || plan.decision === "A eviter" || plan.decision === "Pas de trade conseille" ? "disabled" : ""}>Creer le trade conseille</button>
-                        <button class="btn trade-btn long" data-add-trade="long">Parier sur la hausse</button>
-                        <button class="btn trade-btn short" data-add-trade="short">Parier sur la baisse</button>
-                      </div>
-                    </div>`;
-                })()}
-              </div>
-
-              <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Validation IA externe</span><span>${state.loadingAiReview ? "analyse..." : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local")}</span></div>
-                ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
-                  <div class="ai-review-box">
-                    <div class="legend">
-                      ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}
-                      ${badge(`prudence ${state.aiReview.prudence || "—"}`)}
-                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : "fallback local")}
-                    </div>
-                    <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
-                    <div class="kv" style="margin-top:12px">
-                      <div class="muted">Raison</div><div>${safeText(state.aiReview.reason || "—")}</div>
-                      <div class="muted">Invalidation</div><div>${safeText(state.aiReview.invalidation || "—")}</div>
-                      <div class="muted">Source</div><div>${safeText(state.aiReview.provider || "—")}</div>
-                    </div>
-                    ${state.aiReview.warning ? `<div class="muted" style="margin-top:10px">${safeText(state.aiReview.warning)}</div>` : ""}
-                  </div>
-                ` : `<div class="empty-state">Aucune validation IA disponible pour le moment.</div>`}
-              </div>
-
-              <div class="card">
-                <div class="section-title"><span>Evolution recente</span><span>${d.candleCount || 0} bougies</span></div>
-                ${renderChart(d.candles)}
               </div>
             </div>
 
-            <div>
-              <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Lecture du signal</span><span>${d.score != null ? d.score : "—"}</span></div>
-                <div class="score-box" style="margin-bottom:14px">
-                  ${scoreRing(d.score)}
-                  <div class="score-meta">
-                    <div style="font-weight:700">${safeText(simpleAnalysisLabel(d.analysisLabel || "Analyse indisponible"))}</div>
-                    <div class="muted">Fiabilite : ${safeText(simpleConfidenceLabel(d.confidence || "low"))}</div>
-                    <div class="muted">Decision : ${safeText(currentTradePlan()?.decision || "—")}</div>
-                    <div class="muted">Lecture IA : ${safeText(currentTradePlan()?.safety ? `niveau prudent ${currentTradePlan().safety}` : "—")}</div>
-                  </div>
+            <div class="card" style="margin-bottom:18px">
+              <div class="section-title"><span>Lecture simple</span><span>${safeText(summary.title)}</span></div>
+              <div class="decision-summary-box">
+                <div class="decision-summary-main">
+                  <div class="decision-title">${safeText(summary.title)}</div>
+                  <div class="decision-text">${safeText(summary.text)}</div>
                 </div>
-                ${state.settings.showScoreBreakdown ? `
-                  <div class="breakdown">
-                    ${Object.entries(d.breakdown || {}).map(([k, v]) => `
-                      <div class="break-item">
-                        <div class="break-name">${safeText(breakdownLabel(k))}</div>
-                        <div class="break-value">${safeText(Math.round(v))}</div>
-                      </div>`).join("")}
-                  </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
-                }
+                <div class="legend">
+                  ${badge(plan.decision || "—", decisionBadgeClass(plan.decision || ""))}
+                  ${badge(simpleSideLabel(plan.side || "long"), plan.side || "neutral")}
+                  ${badge(plan.rr == null ? "ratio indispo" : `ratio ${num(plan.rr, 2)}`)}
+                </div>
               </div>
+            </div>
 
-              <div class="card">
-                <div class="section-title"><span>Informations</span></div>
-                <div class="kv">
-                  <div class="muted">Source</div><div>${safeText(d.sourceUsed || "—")}</div>
-                  <div class="muted">Mise a jour</div><div>${safeText(simpleFreshnessLabel(d.freshness || "unknown"))}</div>
-                  <div class="muted">Variation 24h</div><div>${pct(d.change24hPct)}</div>
-                  <div class="muted">Type d'actif</div><div>${safeText(simpleAssetClassLabel(d.assetClass || "—"))}</div>
-                  <div class="muted">Etat du signal</div><div>${safeText(simpleScoreStatusLabel(d.scoreStatus || "—"))}</div>
-                  <div class="muted">Lecture simple</div><div>${safeText(simpleAnalysisLabel(d.analysisLabel || "—"))}</div>
+            <div class="card" style="margin-bottom:18px">
+              <div class="section-title"><span>Plan de trade</span><span>${safeText(plan.decision || "—")}</span></div>
+              <div class="trade-plan-hero">
+                <div class="plan-hero-card">
+                  <div class="plan-label">Entree</div>
+                  <div class="plan-value">${plan.entry == null ? "—" : priceDisplay(plan.entry)}</div>
                 </div>
+                <div class="plan-hero-card">
+                  <div class="plan-label">Stop</div>
+                  <div class="plan-value">${plan.stop == null ? "—" : priceDisplay(plan.stop)}</div>
+                </div>
+                <div class="plan-hero-card">
+                  <div class="plan-label">Objectif</div>
+                  <div class="plan-value">${plan.target == null ? "—" : priceDisplay(plan.target)}</div>
+                </div>
+                <div class="plan-hero-card">
+                  <div class="plan-label">Ratio</div>
+                  <div class="plan-value">${plan.rr == null ? "—" : num(plan.rr, 2)}</div>
+                </div>
+              </div>
+              <div class="kv" style="margin-top:14px">
+                <div class="muted">Decision</div><div>${safeText(plan.decision || "Pas de trade conseille")}</div>
+                <div class="muted">Sens</div><div>${safeText(simpleSideLabel(plan.side || "long"))}</div>
+                <div class="muted">Horizon</div><div>${safeText(plan.horizon || "—")}</div>
+                <div class="muted">Raison principale</div><div>${safeText(plan.reason || "—")}</div>
+              </div>
+              <div class="trade-actions" style="margin-top:14px">
+                <button class="btn trade-btn secondary" data-add-training="long">Tester achat</button>
+                <button class="btn trade-btn primary" data-add-training="short">Tester baisse</button>
+              </div>
+            </div>
+
+            <div class="card" style="margin-bottom:18px">
+              <div class="section-title"><span>Pourquoi ce choix</span><span>${(plan.decision || "").toLowerCase().includes("conseille") ? "lecture moteur" : "freins principaux"}</span></div>
+              <div class="why-list">
+                ${reasons.map((item) => `<div class="why-row">${safeText(item)}</div>`).join("")}
+              </div>
+            </div>
+
+            ${d.aiValidation ? `
+            <div class="card" style="margin-bottom:18px">
+              <div class="section-title"><span>Validation externe</span><span>${safeText(d.aiValidation.mode || "local")}</span></div>
+              <div class="kv">
+                <div class="muted">Conclusion</div><div>${safeText(d.aiValidation.summary || "—")}</div>
+                <div class="muted">Raison</div><div>${safeText(d.aiValidation.reason || "—")}</div>
+                <div class="muted">Source</div><div>${safeText(d.aiValidation.source || "fallback local")}</div>
+              </div>
+            </div>` : ``}
+
+            <div class="card">
+              <div class="section-title"><span>Evolution recente</span><span>${(d.candles || []).length} bougies</span></div>
+              ${renderChart(d.candles || [])}
+            </div>
+          </div>
+
+          <div class="detail-side">
+            <div class="card" style="margin-bottom:18px">
+              <div class="section-title"><span>Lecture du signal</span><span>${num(d.score || 0, 0)}</span></div>
+              <div class="signal-summary">
+                <div class="signal-headline">${safeText(d.analysisLabel || "Lecture indisponible")}</div>
+                <div class="signal-subline">Fiabilite : ${safeText(d.confidence || "—")}</div>
+              </div>
+              ${state.settings.showScoreBreakdown ? `
+              <div class="score-grid">
+                <div class="score-box"><span>Contexte</span><strong>${num(d.breakdown?.regime ?? 0, 0)}</strong></div>
+                <div class="score-box"><span>Tendance</span><strong>${num(d.breakdown?.trend ?? 0, 0)}</strong></div>
+                <div class="score-box"><span>Elan</span><strong>${num(d.breakdown?.momentum ?? 0, 0)}</strong></div>
+                <div class="score-box"><span>Entree</span><strong>${num(d.breakdown?.entryQuality ?? 0, 0)}</strong></div>
+                <div class="score-box"><span>Risque</span><strong>${num(d.breakdown?.risk ?? 0, 0)}</strong></div>
+                <div class="score-box"><span>Activite</span><strong>${num(d.breakdown?.participation ?? 0, 0)}</strong></div>
+              </div>` : ``}
+            </div>
+
+            <div class="card">
+              <div class="section-title"><span>Informations</span><span>${safeText(d.assetClass || "actif")}</span></div>
+              <div class="kv">
+                ${state.settings.showSourceBadges ? `<div class="muted">Source</div><div>${safeText(d.sourceUsed || "—")}</div>` : ``}
+                ${state.settings.showSourceBadges ? `<div class="muted">Mise a jour</div><div>${safeText(d.freshness || "—")}</div>` : ``}
+                <div class="muted">Variation 24h</div><div>${pct(d.change24hPct)}</div>
+                <div class="muted">Etat du signal</div><div>${safeText(d.scoreStatus || "—")}</div>
+                <div class="muted">Lecture simple</div><div>${safeText(d.analysisLabel || "—")}</div>
               </div>
             </div>
           </div>
-        ` : (!state.loadingDetail ? `<div class="empty-state">Aucun detail charge.</div>` : "")}
+        </div>
       </div>`;
   }
 

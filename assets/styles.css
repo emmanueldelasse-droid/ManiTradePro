@@ -280,3 +280,34 @@ button{font:inherit} a{text-decoration:none;color:inherit}
 @media (max-width:860px){
   .trade-plan-hero{grid-template-columns:1fr 1fr}
 }
+
+.detail-hero-card{padding:18px}
+.detail-hero-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}
+.detail-symbol-line{display:flex;gap:12px;align-items:center}
+.asset-avatar{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;background:rgba(0,229,160,.12);color:var(--profit);font-weight:700}
+.detail-title{font-size:1.2rem;font-weight:700}
+.detail-subtitle{color:var(--text-secondary);font-size:.92rem}
+.detail-price-box{text-align:right}
+.detail-price-main{font-size:1.5rem;font-weight:800}
+.decision-summary-box{display:flex;flex-direction:column;gap:12px}
+.decision-summary-main{display:flex;flex-direction:column;gap:8px}
+.decision-title{font-size:1.05rem;font-weight:700}
+.decision-text{color:var(--text-secondary);line-height:1.45}
+.trade-plan-hero{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.plan-hero-card{padding:14px;border:1px solid var(--border-subtle);border-radius:16px;background:rgba(255,255,255,.02)}
+.plan-label{font-size:.78rem;color:var(--text-secondary);margin-bottom:6px}
+.plan-value{font-size:1.02rem;font-weight:700}
+.why-list{display:flex;flex-direction:column;gap:10px}
+.why-row{padding:12px 14px;border:1px solid var(--border-subtle);border-radius:14px;background:rgba(255,255,255,.02)}
+.signal-summary{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+.signal-headline{font-weight:700;font-size:1rem}
+.signal-subline{color:var(--text-secondary)}
+.score-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.score-box{padding:12px;border:1px solid var(--border-subtle);border-radius:14px;background:rgba(255,255,255,.02);display:flex;justify-content:space-between;align-items:center}
+.score-box span{color:var(--text-secondary);font-size:.84rem}
+.score-box strong{font-size:1rem}
+@media (max-width:860px){
+  .detail-hero-top{flex-direction:column}
+  .detail-price-box{text-align:left}
+  .trade-plan-hero{grid-template-columns:1fr 1fr}
+}
