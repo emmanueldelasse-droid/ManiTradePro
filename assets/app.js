@@ -796,11 +796,7 @@ function detailEngineInputFor(item) {
   return null;
 }
 
-function rowTradePlan(item) {
-  const source = detailEngineInputFor(item);
-  if (!source) return null;
-  return generateTradePlan(source);
-}
+
 
 function rowDecisionLabel(item) {
   return rowTradePlan(item)?.decision || "Analyse en cours";
@@ -810,38 +806,33 @@ function rowTrendLabel(item) {
   return rowTradePlan(item)?.trendLabel || "analyse en cours";
 }
 
-async function hydrateNonCryptoRows(rows) {
-  const queue = (rows || [])
-    .filter((item) => item && item.assetClass !== "crypto" && item.price != null)
-    .slice(0, 12);
+async function hydrateNonCryptoRows(rows) { return; }
 
-  for (const item of queue) {
-    const clean = String(item.symbol || "").toUpperCase();
-    if (!clean || state.nonCryptoHydration[clean]) continue;
-    const cached = detailCacheHit(clean);
-    if (cached && cached.price != null && hasRichBreakdown(cached)) continue;
 
-    state.nonCryptoHydration[clean] = true;
-    render();
+function hasOfficialOpportunityPayload(item) {
+  return item && item.officialScore != null && !!item.officialDecision;
+}
 
-    try {
-      const detail = await api(`/api/opportunity-detail/${encodeURIComponent(clean)}`);
-      const merged = {
-        ...(detail?.data || {}),
-        candles: cached?.candles || []
-      };
-      saveDetailCache(clean, merged);
-    } catch (e) {
-      const note = compactError(e?.message || "Analyse indisponible");
-      state.opportunities = state.opportunities.map((row) =>
-        String(row.symbol || "").toUpperCase() === clean ? { ...row, error: note } : row
-      );
-      applyFilter();
-    } finally {
-      delete state.nonCryptoHydration[clean];
-      render();
-    }
+function rowTradePlan(item) {
+  if (!item || item.officialScore == null) return null;
+  const score = Number(item.officialScore);
+  const direction = item.direction || "neutral";
+  let decision = item.officialDecision || "Pas de trade";
+  if (!item.officialDecision) {
+    if (score >= 70 && direction !== "neutral") decision = "Trade propose";
+    else if (score >= 55) decision = "A surveiller";
+    else decision = "Pas de trade";
   }
+  let trendLabel = item.officialTrendLabel;
+  if (!trendLabel) {
+    trendLabel = detectedTrendLabel(direction);
+  }
+  return {
+    finalScore: score,
+    decision,
+    trendLabel,
+    waitFor: item.officialWaitFor || null
+  };
 }
 
 function currentTradePlan() {
@@ -849,7 +840,7 @@ function currentTradePlan() {
 }
 
   function normalizeOpportunity(item) {
-    const base = {
+    return {
       symbol: item?.symbol || "",
       name: item?.name || "Nom indisponible",
       assetClass: item?.assetClass || "unknown",
@@ -869,7 +860,6 @@ function currentTradePlan() {
       officialTrendLabel: item?.officialTrendLabel || null,
       officialWaitFor: item?.officialWaitFor || null
     };
-    return applyOfficialPlanToRow(base);
   }
 
   function saveOpportunitiesSnapshot(rows) {
@@ -928,7 +918,6 @@ function currentTradePlan() {
     saveOpportunitiesSnapshot(prepared);
     applyFilter();
     state.opportunitiesFetchedAt = Date.now();
-    hydrateNonCryptoRows(prepared);
   }
 
   // =========================
@@ -1708,7 +1697,7 @@ function simpleBlockerText(plan) {
 }
 
 function actionNowLabel(plan) {
-  const decision = String(plan?.decision || "");
+  const decision = String(item?.officialDecision || plan?.decision || "");
   if (decision === "Trade propose") return "Ouvrir le trade";
   if (decision === "A surveiller" && String(plan?.waitFor || "").includes("meilleur point d'entree")) return "Attendre un meilleur point d'entree";
   if (decision === "A surveiller") return "Surveiller";
@@ -1716,7 +1705,7 @@ function actionNowLabel(plan) {
 }
 
 function simpleDecisionTitle(plan) {
-  const decision = String(plan?.decision || "");
+  const decision = String(item?.officialDecision || plan?.decision || "");
   if (decision === "Trade propose") return "Trade propose";
   if (decision === "A surveiller") return "A surveiller";
   return "Pas de trade";
@@ -1750,22 +1739,9 @@ function simpleWaitForText(plan) {
 }
 
 
-function computeOfficialPlan(detail) {
-  if (!detail || detail.price == null) return null;
-  return generateTradePlan(detail);
-}
+function computeOfficialPlan(detail) { return detail ? generateTradePlan(detail) : null; }
 
-function applyOfficialPlanToRow(item) {
-  if (!item) return item;
-  const plan = computeOfficialPlan(item);
-  return {
-    ...item,
-    officialScore: plan?.finalScore ?? null,
-    officialDecision: plan?.decision || "Analyse en cours",
-    officialTrendLabel: plan?.trendLabel || detectedTrendLabel(item.direction || "neutral"),
-    officialWaitFor: plan?.waitFor || null
-  };
-}
+function applyOfficialPlanToRow(item) { return item; }
 
 function findOfficialOpportunity(symbol) {
   const clean = String(symbol || "").toUpperCase();
@@ -1783,10 +1759,10 @@ function lockDetailToOfficialRow(detail) {
   if (!row) return detail;
   return {
     ...detail,
-    officialScore: row.officialScore ?? null,
-    officialDecision: row.officialDecision || null,
-    officialTrendLabel: row.officialTrendLabel || null,
-    officialWaitFor: row.officialWaitFor || null
+    officialScore: row.officialScore ?? detail.officialScore ?? null,
+    officialDecision: row.officialDecision || detail.officialDecision || null,
+    officialTrendLabel: row.officialTrendLabel || detail.officialTrendLabel || null,
+    officialWaitFor: row.officialWaitFor || detail.officialWaitFor || null
   };
 }
 
@@ -1795,6 +1771,7 @@ function officialPlanForDetail(detail) {
   const plan = computeOfficialPlan(locked);
   if (!plan) return plan;
   if (locked?.officialScore != null) plan.finalScore = locked.officialScore;
+  else if (locked?.score != null) plan.finalScore = locked.score;
   if (locked?.officialDecision) plan.decision = locked.officialDecision;
   if (locked?.officialTrendLabel) plan.trendLabel = locked.officialTrendLabel;
   if (locked?.officialWaitFor) plan.waitFor = locked.officialWaitFor;
