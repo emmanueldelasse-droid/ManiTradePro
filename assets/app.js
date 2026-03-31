@@ -1850,7 +1850,6 @@ function renderHistoryRow(item) {
         <div class="screen-header">
           <div class="screen-title">Reglages</div>
           <div class="screen-subtitle">Ces reglages servent juste a rendre l'app plus claire.</div>
-          
         </div>
 
         <div class="card">
@@ -1900,20 +1899,6 @@ function renderHistoryRow(item) {
             </label>
           </div>
         </div>
-
-        <div class="card" style="margin-top:18px">
-          <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Etat</div><div class="stat-value">${safeText(budgetAdvice())}</div></div>
-          </div>
-          <div class="kv" style="margin-top:14px">
-            <div class="muted"></div><div> (${TWELVE_POLICY.opportunities.maxPerDay}/jour)</div>
-            <div class="muted"></div><div>${countdownOnlyLabel("opportunities")}</div>
-            <div class="muted"></div><div> (${TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
-            <div class="muted"></div><div> (${TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
-            <div class="muted">Logique</div><div></div>
-          </div>
-        </div>
-
       </div>`;
   }
 
