@@ -34,6 +34,8 @@
     opportunitiesRequestId: 0,
     opportunitiesFetchedAt: 0,
     lastOpportunitiesFetchStartedAt: 0,
+    opportunitiesRefreshing: false,
+    opportunitiesLastGoodAt: 0,
     detailRequestStartedAt: 0,
     dashboard: {
       fearGreed: null,
@@ -934,13 +936,24 @@ function currentTradePlan() {
     saveOpportunitiesSnapshot(prepared);
     applyFilter();
     state.opportunitiesFetchedAt = Date.now();
+    state.opportunitiesLastGoodAt = state.opportunitiesFetchedAt;
   }
 
   // =========================
   // api
   // =========================
-  async function api(path) {
-    const res = await fetch(`${API_BASE}${path}`, { cache: "no-store" });
+  async function api(path, timeoutMs = 12000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let res;
+    try {
+      res = await fetch(`${API_BASE}${path}`, { cache: "no-store", signal: controller.signal });
+    } catch (e) {
+      clearTimeout(timer);
+      if (e && e.name === "AbortError") throw new Error("Delai depasse");
+      throw e;
+    }
+    clearTimeout(timer);
     recordBudgetUsage(res.headers);
     const data = await res.json();
     if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
@@ -1046,24 +1059,35 @@ function currentTradePlan() {
 
     state.lastOpportunitiesFetchStartedAt = now;
     const requestId = ++state.opportunitiesRequestId;
-    if (force && !state.opportunities.length) {
+    const hasVisibleRows = Array.isArray(state.opportunities) && state.opportunities.length > 0;
+
+    state.opportunitiesRefreshing = true;
+    if (force && !hasVisibleRows) {
       state.loading = true;
-      render();
     }
+    render();
 
     try {
-      const result = await api("/api/opportunities");
+      const result = await api("/api/opportunities", 12000);
       if (requestId !== state.opportunitiesRequestId) return;
-      setOpportunities(result.data || []);
+      const rows = Array.isArray(result?.data) ? result.data : [];
+      if (rows.length) {
+        setOpportunities(rows);
+        state.opportunitiesLastGoodAt = Date.now();
+      }
       markScheduledFetch("opportunities");
       state.error = null;
     } catch (e) {
       if (requestId !== state.opportunitiesRequestId) return;
-      state.error = e.message || "Chargement impossible";
-      if (!state.opportunities.length) setOpportunities([]);
+      if (!state.opportunities.length && state.opportunitiesSnapshot?.length) {
+        state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);
+        applyFilter();
+      }
+      state.error = state.opportunities.length ? "Mise a jour impossible pour le moment. Derniere liste conservee." : (e.message || "Chargement impossible");
     } finally {
       if (requestId !== state.opportunitiesRequestId) return;
       state.loading = false;
+      state.opportunitiesRefreshing = false;
       render();
     }
   }
@@ -1349,6 +1373,7 @@ function applyFilter() {
     if (route === "opportunities") {
       state.error = null;
       state.aiReview = null;
+      render();
       loadOpportunities(true);
     } else if (route === "asset-detail" && symbol) {
       state.aiReview = null;
@@ -1514,6 +1539,12 @@ function renderDashboard() {
           </div>
         </div>
 
+        ${state.opportunitiesRefreshing ? `
+          <div class="card" style="margin-bottom:12px;padding:12px 16px">
+            <div class="muted">Mise a jour en cours. La derniere liste valide reste affichee.</div>
+          </div>
+        ` : ""}
+
         <div class="grid trades-stats" style="margin-bottom:18px">
           <div class="stat-card"><div class="stat-label">Opportunites visibles</div><div class="stat-value">${state.opportunities.length}</div></div>
           <div class="stat-card"><div class="stat-label">Hausse</div><div class="stat-value">${summary.bullish}</div></div>
@@ -1595,6 +1626,12 @@ function renderDashboard() {
             <button class="chip" data-refresh="opps">Rafraichir</button>
           </div>
         </div>
+
+        ${state.opportunitiesRefreshing ? `
+          <div class="card" style="margin-bottom:12px;padding:12px 16px">
+            <div class="muted">Mise a jour en cours. La derniere liste valide reste affichee.</div>
+          </div>
+        ` : ""}
 
         <div class="grid trades-stats" style="margin-bottom:18px">
           <div class="stat-card">
