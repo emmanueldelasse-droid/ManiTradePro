@@ -1646,6 +1646,30 @@ function simpleContextSentence(plan) {
   return "Le marche n'a pas de direction claire.";
 }
 
+
+function simpleBlockerText(plan) {
+  const score = Number(plan?.finalScore ?? 0);
+  const trend = simpleTrendWord(plan?.trendLabel || "");
+  if (String(plan?.decision || "") === "Trade propose") return "Rien de bloquant pour le moment.";
+  if (score < 40) return "Le signal est trop faible pour prendre position.";
+  if (trend === "hausse" || trend === "baisse") return "La tendance existe, mais l'entree n'est pas assez propre.";
+  return "Le marche reste trop flou pour proposer un trade.";
+}
+
+function actionNowLabel(plan) {
+  const decision = String(plan?.decision || "");
+  if (decision === "Trade propose") return "Ouvrir le trade";
+  if (decision === "A surveiller") return "Surveiller";
+  return "Ne rien faire";
+}
+
+function simpleDecisionTitle(plan) {
+  const decision = String(plan?.decision || "");
+  if (decision === "Trade propose") return "Trade propose";
+  if (decision === "A surveiller") return "A surveiller";
+  return "Pas de trade";
+}
+
 function renderDetail() {
     const d = state.detail;
     return `
@@ -1710,7 +1734,7 @@ function renderDetail() {
                         ${plan?.safety ? `<span class="mini-pill strong">niveau : ${safeText(plan.safety)}</span>` : ""}
                       </div>
                       <div class="trade-actions">
-                        <button class="btn trade-btn primary" data-create-trade-plan ${!plan || !plan.side || plan.decision !== "Trade propose" ? "disabled" : ""}>Ouvrir le trade propose</button>
+                        ${plan && plan.decision === "Trade propose" && plan.side ? `<button class="btn trade-btn primary" data-create-trade-plan>Ouvrir le trade propose</button>` : ""}
                       </div>
                     </div>`;
                 })()}
@@ -1743,37 +1767,46 @@ function renderDetail() {
             </div>
 
             <div>
-              <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Lecture simple</span><span>${currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—"}</span></div>
-                <div class="score-box" style="margin-bottom:14px">
-                  ${scoreRing(currentTradePlan()?.finalScore ?? d.score)}
-                  <div class="score-meta">
-                    <div style="font-weight:700">${safeText(simpleAnalysisLabel(d.analysisLabel || "Analyse indisponible"))}</div>
-                    <div class="muted">Fiabilite : ${safeText(simpleConfidenceLabel(d.confidence || "low"))}</div>
-                    <div class="muted">Decision : ${safeText(currentTradePlan()?.decision || "—")}</div>
-                    <div class="muted">Tendance : ${safeText(simpleTrendWord(currentTradePlan()?.trendLabel || detectedTrendLabel(d.direction || "neutral")))}</div>
+              <div class="card conclusion-card" style="margin-bottom:18px">
+                <div class="section-title"><span>Conclusion</span><span>${currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—"}/100</span></div>
+                <div class="conclusion-top">
+                  <div class="conclusion-main">
+                    <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
+                    <div class="conclusion-line">Fiabilite du trade : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore))}</strong></div>
+                    <div class="conclusion-line">Tendance : <strong>${safeText(simpleTrendWord(currentTradePlan()?.trendLabel || detectedTrendLabel(d.direction || "neutral")))}</strong></div>
+                    <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
+                  </div>
+                  <div class="conclusion-score">
+                    ${scoreRing(currentTradePlan()?.finalScore ?? d.score)}
                   </div>
                 </div>
+                <div class="conclusion-text">
+                  <div class="muted">Pourquoi</div>
+                  <div>${safeText(simpleDecisionSentence(currentTradePlan()))}</div>
+                </div>
+                <div class="conclusion-text">
+                  <div class="muted">Ce qui bloque</div>
+                  <div>${safeText(simpleBlockerText(currentTradePlan()))}</div>
+                </div>
                 ${state.settings.showScoreBreakdown ? `
-                  <div class="breakdown">
-                    ${Object.entries(d.breakdown || {}).map(([k, v]) => `
-                      <div class="break-item">
-                        <div class="break-name">${safeText(breakdownLabel(k))}</div>
-                        <div class="break-value">${safeText(Math.round(v))}</div>
-                      </div>`).join("")}
+                  <div class="breakdown" style="margin-top:14px">
+                    <div class="break-item"><div class="break-name">Contexte</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.regime))}</div></div>
+                    <div class="break-item"><div class="break-name">Tendance</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.trend))}</div></div>
+                    <div class="break-item"><div class="break-name">Elan</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.momentum))}</div></div>
+                    <div class="break-item"><div class="break-name">Entree</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.entryQuality))}</div></div>
+                    <div class="break-item"><div class="break-name">Risque</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.risk))}</div></div>
+                    <div class="break-item"><div class="break-name">Activite</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.participation))}</div></div>
                   </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
                 }
               </div>
 
               <div class="card">
-                <div class="section-title"><span>Informations</span></div>
+                <div class="section-title"><span>Informations utiles</span></div>
                 <div class="kv">
                   <div class="muted">Source</div><div>${safeText(d.sourceUsed || "—")}</div>
                   <div class="muted">Mise a jour</div><div>${safeText(simpleFreshnessLabel(d.freshness || "unknown"))}</div>
                   <div class="muted">Variation 24h</div><div>${pct(d.change24hPct)}</div>
                   <div class="muted">Type</div><div>${safeText(simpleAssetClassLabel(d.assetClass || "—"))}</div>
-                  <div class="muted">Etat</div><div>${safeText(simpleScoreStatusLabel(d.scoreStatus || "—"))}</div>
-                  <div class="muted">Resume court</div><div>${safeText(simpleAnalysisLabel(d.analysisLabel || "—"))}</div>
                 </div>
               </div>
             </div>

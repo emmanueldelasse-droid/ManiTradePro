@@ -291,3 +291,13 @@ button{font:inherit} a{text-decoration:none;color:inherit}
 
 .signal-headline{line-height:1.4}
 .plan-grid .muted{color:var(--text-secondary)}
+
+.conclusion-card{padding:18px}
+.conclusion-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.conclusion-main{display:flex;flex-direction:column;gap:8px}
+.conclusion-decision{font-size:1.35rem;font-weight:800}
+.conclusion-line{color:var(--text-primary)}
+.conclusion-text{margin-top:14px;padding-top:12px;border-top:1px solid var(--border-subtle)}
+@media (max-width:860px){
+  .conclusion-top{flex-direction:column}
+}
