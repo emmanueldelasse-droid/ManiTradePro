@@ -562,6 +562,37 @@ function decisionBadgeClass(decision) {
 }
 
 
+
+function normalizedDetailForScore(item) {
+  if (!item) return null;
+  const existing = item.breakdown || {};
+  return {
+    ...item,
+    breakdown: {
+      regime: existing.regime ?? 50,
+      trend: existing.trend ?? 50,
+      momentum: existing.momentum ?? 50,
+      entryQuality: existing.entryQuality ?? 50,
+      risk: existing.risk ?? 50,
+      participation: existing.participation ?? 50
+    }
+  };
+}
+
+function officialTradeScore(item) {
+  const source = normalizedDetailForScore(item);
+  if (!source || source.price == null) return null;
+  const plan = generateTradePlan(source);
+  return plan?.finalScore ?? null;
+}
+
+function officialTradeDecision(item) {
+  const source = normalizedDetailForScore(item);
+  if (!source || source.price == null) return "Pas de trade";
+  const plan = generateTradePlan(source);
+  return plan?.decision || "Pas de trade";
+}
+
 function detectedTrendLabel(direction) {
   if (direction === "long") return "tendance haussiere";
   if (direction === "short") return "tendance baissiere";
@@ -1220,7 +1251,7 @@ function closeTrainingTrade(id, livePrice = null) {
           ${scoreRing(lightweightTradePlan(item)?.finalScore ?? item.score)}
           <div class="score-meta">
             ${badge((lightweightTradePlan(item)?.decision || "Pas de trade"), (lightweightTradePlan(item)?.decision || ""))}
-            ${badge(simpleDirectionLabel(item.direction, item.score), item.direction || "")}
+            ${badge(simpleDirectionLabel(item.direction, officialTradeScore(item) ?? item.score), item.direction || "")}
           </div>
         </div>
         <div class="price-col">
