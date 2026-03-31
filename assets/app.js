@@ -1708,7 +1708,7 @@ function simpleBlockerText(plan) {
 }
 
 function actionNowLabel(plan) {
-  const decision = String(item?.officialDecision || plan?.decision || "");
+  const decision = String(plan?.decision || "");
   if (decision === "Trade propose") return "Ouvrir le trade";
   if (decision === "A surveiller" && String(plan?.waitFor || "").includes("meilleur point d'entree")) return "Attendre un meilleur point d'entree";
   if (decision === "A surveiller") return "Surveiller";
@@ -1716,7 +1716,7 @@ function actionNowLabel(plan) {
 }
 
 function simpleDecisionTitle(plan) {
-  const decision = String(item?.officialDecision || plan?.decision || "");
+  const decision = String(plan?.decision || "");
   if (decision === "Trade propose") return "Trade propose";
   if (decision === "A surveiller") return "A surveiller";
   return "Pas de trade";
