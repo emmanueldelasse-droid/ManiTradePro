@@ -654,26 +654,68 @@ function generateTradePlan(detail) {
   let decision = decisionFromReliability(finalScore);
   let side = direction === "neutral" ? null : direction;
   let urgency = decision === "Trade propose" ? "maintenant" : decision === "A surveiller" ? "attendre" : "ne rien faire";
-  let timing = entryQuality >= 65 ? "bon" : entryQuality >= 55 ? "correct" : "faible";
+  let timing = entryQuality >= 70 ? "bon" : entryQuality >= 55 ? "moyen" : "mauvais";
   let trendLabel = detectedTrendLabel(direction);
   let safety = finalScore >= 70 ? "elevee" : finalScore >= 55 ? "moyenne" : "faible";
   let reason = "";
   let aiSummary = "";
   let refusalReason = null;
+  let blockerType = null;
+  let waitFor = null;
 
   if (decision === "Trade propose" && side) {
     reason = `${trendLabel}, entree encore exploitable et risque correct.`;
     aiSummary = `Le moteur detecte une ${trendLabel} et juge le plan assez fiable pour ouvrir un trade.`;
+    blockerType = "aucun";
+    waitFor = "rien de special";
   } else if (decision === "A surveiller") {
     side = null;
-    reason = `${trendLabel}, mais la fiabilite reste insuffisante pour ouvrir un trade maintenant.`;
-    aiSummary = `Le contexte est interessant, mais le moteur prefere attendre une configuration plus propre.`;
-    refusalReason = "Trade non ouvert : fiabilite encore trop moyenne.";
+    if (entryQuality < 55) {
+      blockerType = "timing";
+      waitFor = "attendre un meilleur point d'entree";
+      reason = `${trendLabel}, mais le timing d'entree reste moyen.`;
+      aiSummary = `Le scenario existe, mais le moteur prefere attendre un meilleur point d'entree.`;
+      refusalReason = "Trade non ouvert : timing encore trop moyen.";
+    } else if (risk < 50) {
+      blockerType = "risque";
+      waitFor = "attendre un risque plus propre";
+      reason = `${trendLabel}, mais le risque reste trop present pour entrer maintenant.`;
+      aiSummary = `Le signal existe, mais le risque reste encore trop important.`;
+      refusalReason = "Trade non ouvert : risque encore trop eleve.";
+    } else {
+      blockerType = "confirmation";
+      waitFor = "attendre une confirmation de marche";
+      reason = `${trendLabel}, mais le signal demande encore une confirmation.`;
+      aiSummary = `Le contexte est interessant, mais le moteur prefere attendre une confirmation plus nette.`;
+      refusalReason = "Trade non ouvert : confirmation encore insuffisante.";
+    }
   } else {
     side = null;
-    reason = `${trendLabel}, mais le trade n'est pas assez fiable pour etre propose.`;
-    aiSummary = `Le moteur refuse le trade car la fiabilite globale reste trop faible.`;
-    refusalReason = "Pas de trade : fiabilite trop basse.";
+    if (trend < 45 && momentum < 45) {
+      blockerType = "signal";
+      waitFor = "attendre un signal plus clair";
+      reason = `${trendLabel}, mais le mouvement reste trop faible pour proposer un trade.`;
+      aiSummary = `Le moteur refuse le trade car le signal reste trop faible.`;
+      refusalReason = "Pas de trade : signal trop faible.";
+    } else if (entryQuality < 45) {
+      blockerType = "timing";
+      waitFor = "attendre un meilleur point d'entree";
+      reason = `${trendLabel}, mais l'entree est trop mauvaise pour etre exploitee.`;
+      aiSummary = `Le moteur refuse le trade car le timing d'entree est mauvais.`;
+      refusalReason = "Pas de trade : timing d'entree mauvais.";
+    } else if (risk < 45) {
+      blockerType = "risque";
+      waitFor = "attendre moins de risque";
+      reason = `${trendLabel}, mais le risque reste trop eleve.`;
+      aiSummary = `Le moteur refuse le trade car le risque reste trop eleve.`;
+      refusalReason = "Pas de trade : risque trop eleve.";
+    } else {
+      blockerType = "ratio";
+      waitFor = "attendre un meilleur ratio gain / risque";
+      reason = `${trendLabel}, mais le trade n'offre pas encore un plan assez propre.`;
+      aiSummary = `Le moteur refuse le trade car le plan global reste trop faible.`;
+      refusalReason = "Pas de trade : plan encore insuffisant.";
+    }
   }
 
   if (!side) {
@@ -694,7 +736,9 @@ function generateTradePlan(detail) {
       safety,
       aiContext,
       finalScore,
-      trendLabel
+      trendLabel,
+      blockerType,
+      waitFor
     };
   }
 
@@ -727,7 +771,9 @@ function generateTradePlan(detail) {
     safety,
     aiContext,
     finalScore,
-    trendLabel
+    trendLabel,
+    blockerType,
+    waitFor
   };
 }
 
@@ -803,7 +849,7 @@ function currentTradePlan() {
 }
 
   function normalizeOpportunity(item) {
-    return {
+    const base = {
       symbol: item?.symbol || "",
       name: item?.name || "Nom indisponible",
       assetClass: item?.assetClass || "unknown",
@@ -817,8 +863,13 @@ function currentTradePlan() {
       sourceUsed: item?.sourceUsed || null,
       freshness: item?.freshness || "unknown",
       breakdown: item?.breakdown || null,
-      error: compactError(item?.error || null)
+      error: compactError(item?.error || null),
+      officialScore: item?.officialScore ?? null,
+      officialDecision: item?.officialDecision || null,
+      officialTrendLabel: item?.officialTrendLabel || null,
+      officialWaitFor: item?.officialWaitFor || null
     };
+    return applyOfficialPlanToRow(base);
   }
 
   function saveOpportunitiesSnapshot(rows) {
@@ -1019,14 +1070,14 @@ function currentTradePlan() {
     const cachedDetail = detailCacheHit(cleanSymbol);
 
     if (nonCrypto && cachedDetail && hasRichBreakdown(cachedDetail) && !canRunScheduledFetch("detail_non_crypto", cleanSymbol)) {
-      state.detail = cachedDetail;
+      state.detail = lockDetailToOfficialRow(cachedDetail);
       render();
       return;
     }
 
     if (nonCrypto && !canSpendEstimatedBudget("detail", cleanSymbol)) {
       if (cachedDetail) {
-        state.detail = cachedDetail;
+        state.detail = lockDetailToOfficialRow(cachedDetail);
         render();
         return;
       }
@@ -1047,7 +1098,7 @@ function currentTradePlan() {
 
     state.detailRequestStartedAt = now;
     state.loadingDetail = !cachedDetail;
-    if (cachedDetail) state.detail = cachedDetail;
+    if (cachedDetail) state.detail = lockDetailToOfficialRow(cachedDetail);
     state.error = null;
     render();
 
@@ -1062,7 +1113,7 @@ function currentTradePlan() {
         candles: candles?.data || cachedDetail?.candles || []
       };
 
-      state.detail = merged;
+      state.detail = lockDetailToOfficialRow(merged);
       saveDetailCache(cleanSymbol, merged);
 
       if (nonCrypto) {
@@ -1074,7 +1125,7 @@ function currentTradePlan() {
       loadAiReview(merged, currentTradePlan());
     } catch (e) {
       state.error = e.message || "Fiche indisponible";
-      if (cachedDetail) state.detail = cachedDetail;
+      if (cachedDetail) state.detail = lockDetailToOfficialRow(cachedDetail);
     } finally {
       state.loadingDetail = false;
       render();
@@ -1238,8 +1289,8 @@ function groupedOpportunities(rows) {
 
   items.forEach((item) => {
     const plan = rowTradePlan(item);
-    const decision = String(plan?.decision || "");
-    const score = plan?.finalScore ?? -1;
+    const decision = String(item?.officialDecision || plan?.decision || "");
+    const score = item?.officialScore ?? plan?.finalScore ?? -1;
     const enriched = { ...item, _plan: plan, _score: score };
 
     if (decision === "Trade propose") {
@@ -1337,9 +1388,9 @@ function applyFilter() {
     const clean = String(item.symbol || "").toUpperCase();
     const plan = rowTradePlan(item);
     const isHydrating = !!state.nonCryptoHydration[clean];
-    const scoreValue = plan?.finalScore ?? null;
-    const decisionLabel = isHydrating && !plan ? "Analyse en cours" : (plan?.decision || "Analyse en cours");
-    const trendLabel = isHydrating && !plan ? "chargement detail" : (plan?.trendLabel || "analyse en cours");
+    const scoreValue = item?.officialScore ?? plan?.finalScore ?? null;
+    const decisionLabel = isHydrating && !plan ? "Analyse en cours" : (item?.officialDecision || plan?.decision || "Analyse en cours");
+    const trendLabel = isHydrating && !plan ? "chargement detail" : (item?.officialDecision === "A surveiller" && (item?.officialWaitFor || plan?.waitFor) ? simpleWaitForText({waitFor: item?.officialWaitFor || plan?.waitFor}) : (item?.officialTrendLabel || plan?.trendLabel || "analyse en cours"));
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}">
@@ -1635,7 +1686,7 @@ function simpleTrendWord(label) {
 function simpleDecisionSentence(plan) {
   const decision = String(plan?.decision || "").toLowerCase();
   if (decision.includes("trade propose")) return "Le trade semble assez propre pour etre envisage maintenant.";
-  if (decision.includes("surveiller")) return "Le signal existe, mais il vaut mieux attendre encore.";
+  if (decision.includes("surveiller")) return "Le scenario existe, mais il vaut mieux attendre encore.";
   return "Le signal n'est pas assez propre pour prendre position maintenant.";
 }
 
@@ -1657,17 +1708,97 @@ function simpleBlockerText(plan) {
 }
 
 function actionNowLabel(plan) {
-  const decision = String(plan?.decision || "");
+  const decision = String(item?.officialDecision || plan?.decision || "");
   if (decision === "Trade propose") return "Ouvrir le trade";
+  if (decision === "A surveiller" && String(plan?.waitFor || "").includes("meilleur point d'entree")) return "Attendre un meilleur point d'entree";
   if (decision === "A surveiller") return "Surveiller";
   return "Ne rien faire";
 }
 
 function simpleDecisionTitle(plan) {
-  const decision = String(plan?.decision || "");
+  const decision = String(item?.officialDecision || plan?.decision || "");
   if (decision === "Trade propose") return "Trade propose";
   if (decision === "A surveiller") return "A surveiller";
   return "Pas de trade";
+}
+
+
+function simpleTimingLabel(plan) {
+  const timing = String(plan?.timing || "").toLowerCase();
+  if (timing === "bon") return "bon";
+  if (timing === "moyen" || timing === "correct") return "moyen";
+  if (timing === "mauvais" || timing === "faible") return "mauvais";
+  return "a confirmer";
+}
+
+function simpleTrendStrengthLabel(detail) {
+  const value = Number(detail?.breakdown?.trend ?? 0);
+  if (value >= 70) return "forte";
+  if (value >= 55) return "moyenne";
+  return "faible";
+}
+
+function simpleWaitForText(plan) {
+  const wait = String(plan?.waitFor || "");
+  if (!wait) return "rien de special";
+  if (wait.includes("meilleur point d'entree")) return "un meilleur point d'entree";
+  if (wait.includes("confirmation")) return "une confirmation plus nette";
+  if (wait.includes("risque")) return "moins de risque";
+  if (wait.includes("ratio")) return "un meilleur ratio";
+  if (wait.includes("signal")) return "un signal plus clair";
+  return wait;
+}
+
+
+function computeOfficialPlan(detail) {
+  if (!detail || detail.price == null) return null;
+  return generateTradePlan(detail);
+}
+
+function applyOfficialPlanToRow(item) {
+  if (!item) return item;
+  const plan = computeOfficialPlan(item);
+  return {
+    ...item,
+    officialScore: plan?.finalScore ?? null,
+    officialDecision: plan?.decision || "Analyse en cours",
+    officialTrendLabel: plan?.trendLabel || detectedTrendLabel(item.direction || "neutral"),
+    officialWaitFor: plan?.waitFor || null
+  };
+}
+
+function findOfficialOpportunity(symbol) {
+  const clean = String(symbol || "").toUpperCase();
+  if (!clean) return null;
+  const rows = Array.isArray(state.opportunities) ? state.opportunities : [];
+  const snap = Array.isArray(state.opportunitiesSnapshot) ? state.opportunitiesSnapshot : [];
+  return rows.find((x) => String(x?.symbol || "").toUpperCase() === clean) ||
+         snap.find((x) => String(x?.symbol || "").toUpperCase() === clean) ||
+         null;
+}
+
+function lockDetailToOfficialRow(detail) {
+  if (!detail) return detail;
+  const row = findOfficialOpportunity(detail.symbol);
+  if (!row) return detail;
+  return {
+    ...detail,
+    officialScore: row.officialScore ?? null,
+    officialDecision: row.officialDecision || null,
+    officialTrendLabel: row.officialTrendLabel || null,
+    officialWaitFor: row.officialWaitFor || null
+  };
+}
+
+function officialPlanForDetail(detail) {
+  const locked = lockDetailToOfficialRow(detail);
+  const plan = computeOfficialPlan(locked);
+  if (!plan) return plan;
+  if (locked?.officialScore != null) plan.finalScore = locked.officialScore;
+  if (locked?.officialDecision) plan.decision = locked.officialDecision;
+  if (locked?.officialTrendLabel) plan.trendLabel = locked.officialTrendLabel;
+  if (locked?.officialWaitFor) plan.waitFor = locked.officialWaitFor;
+  return plan;
 }
 
 function renderDetail() {
@@ -1768,12 +1899,14 @@ function renderDetail() {
 
             <div>
               <div class="card conclusion-card" style="margin-bottom:18px">
-                <div class="section-title"><span>Conclusion</span><span>${currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—"}/100</span></div>
+                <div class="section-title"><span>Conclusion</span><span>${state.detail?.officialScore != null ? state.detail.officialScore : (currentTradePlan()?.finalScore != null ? currentTradePlan().finalScore : "—")}/100</span></div>
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
                     <div class="conclusion-line">Fiabilite du trade : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore))}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(simpleTrendWord(currentTradePlan()?.trendLabel || detectedTrendLabel(d.direction || "neutral")))}</strong></div>
+                    <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
+                    <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
                     <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
                   </div>
                   <div class="conclusion-score">
@@ -1787,6 +1920,10 @@ function renderDetail() {
                 <div class="conclusion-text">
                   <div class="muted">Ce qui bloque</div>
                   <div>${safeText(simpleBlockerText(currentTradePlan()))}</div>
+                </div>
+                <div class="conclusion-text">
+                  <div class="muted">Ce qu'il faut attendre</div>
+                  <div>${safeText(simpleWaitForText(currentTradePlan()))}</div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
                   <div class="breakdown" style="margin-top:14px">
