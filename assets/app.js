@@ -173,9 +173,9 @@
 
   function budgetAdvice() {
     const remaining = state.budget.remaining ?? 0;
-    if (remaining <= 50) return "Budget faible : evite les refresh inutiles.";
-    if (remaining <= 200) return "Budget correct mais a surveiller.";
-    return "Application stable.";
+    if (remaining <= 50) return "";
+    if (remaining <= 200) return "";
+    return "";
   }
 
   const CRYPTO_SYMBOLS_UI = new Set(["BTC","ETH","BNB","SOL","XRP","ADA","DOGE","DOT","LINK","AVAX","ATOM","LTC","MATIC","ARB","OP","AAVE","NEAR","UNI","FIL","ETC","BCH","APT","SUI","TAO","XAUT"]);
@@ -1906,10 +1906,10 @@ function renderHistoryRow(item) {
             <div class="stat-card"><div class="stat-label">Etat</div><div class="stat-value">${safeText(budgetAdvice())}</div></div>
           </div>
           <div class="kv" style="margin-top:14px">
-            <div class="muted">Opportunites non-crypto</div><div>1 appel Twelve max toutes les 15 min (${TWELVE_POLICY.opportunities.maxPerDay}/jour)</div>
+            <div class="muted"></div><div> (${TWELVE_POLICY.opportunities.maxPerDay}/jour)</div>
             <div class="muted"></div><div>${countdownOnlyLabel("opportunities")}</div>
-            <div class="muted"></div><div>1 appel Twelve max toutes les 30 min et par actif (${TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
-            <div class="muted"></div><div>1 appel Twelve max toutes les 12 h et par actif (${TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
+            <div class="muted"></div><div> (${TWELVE_POLICY.detail_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
+            <div class="muted"></div><div> (${TWELVE_POLICY.candles_non_crypto.maxPerDayPerSymbol}/jour/actif)</div>
             <div class="muted">Logique</div><div></div>
           </div>
         </div>
