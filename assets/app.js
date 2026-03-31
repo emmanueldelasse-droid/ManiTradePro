@@ -1942,34 +1942,65 @@ function closeTradePosition(positionId) {
   render();
 }
 
+
+function tradeHealthLabel(meta) {
+  if (!meta) return "en attente";
+  if (meta.label === "gain" || meta.label === "near_target") return "ca se passe bien";
+  if (meta.label === "pressure" || meta.label === "near_stop") return "a surveiller";
+  return "en attente";
+}
+
+function actionTradeSummary(meta) {
+  if (!meta) return "Attendre.";
+  if (meta.label === "near_stop") return "Proche du stop, a surveiller de pres.";
+  if (meta.label === "near_target") return "Proche de l'objectif.";
+  if (meta.label === "gain") return "Le trade est en gain.";
+  if (meta.label === "pressure") return "Le trade est sous pression.";
+  return "Le trade evolue sans signal fort.";
+}
+
+function tradePnlText(meta) {
+  if (!meta || meta.pnlPctLive == null) return "P/L live indisponible";
+  return `P/L live ${pct(meta.pnlPctLive)}`;
+}
+
+function historyResultLabel(item) {
+  const pnl = Number(item?.pnl || 0);
+  if (pnl > 0) return "gain";
+  if (pnl < 0) return "perte";
+  return "neutre";
+}
+
 function renderPositionRow(position) {
   const meta = tradeStatusMeta(position);
-  return `<div class="trade-row trade-card-row">
+  return `<div class="trade-row trade-card-row simple-trade-card">
     <div class="trade-card-top">
       <div>
         <div class="trade-symbol">${safeText(position.symbol)}</div>
-        <div class="trade-sub">${safeText(position.tradeDecision || "Trade manuel")}</div>
+        <div class="trade-sub">${safeText(position.tradeDecision || "Trade ouvert")}</div>
       </div>
       <div class="trade-card-badges">
         ${badge(simpleSideLabel(position.side), position.side)}
-        ${badge(meta.text, meta.badgeClass)}
+        ${badge(tradeHealthLabel(meta), meta.badgeClass)}
       </div>
     </div>
 
-    <div class="trade-plan-grid">
-      <div><span class="muted">Entree</span><br>${priceDisplay(position.entryPrice)}</div>
+    <div class="trade-summary-line">${safeText(actionTradeSummary(meta))}</div>
+
+    <div class="trade-plan-grid compact">
+      <div><span class="muted">Prix d'entree</span><br>${priceDisplay(position.entryPrice)}</div>
+      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
       <div><span class="muted">Stop</span><br>${position.stopLoss == null ? "—" : priceDisplay(position.stopLoss)}</div>
       <div><span class="muted">Objectif</span><br>${position.takeProfit == null ? "—" : priceDisplay(position.takeProfit)}</div>
-      <div><span class="muted">Ratio</span><br>${position.rr == null ? "—" : num(position.rr, 2)}</div>
-      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">P/L live</span><br>${meta.pnlPctLive == null ? "—" : pct(meta.pnlPctLive)}</div>
+      <div><span class="muted">Etat du trade</span><br>${safeText(tradeHealthLabel(meta))}</div>
+      <div><span class="muted">Resultat live</span><br>${safeText(tradePnlText(meta))}</div>
+      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
+      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
     </div>
 
     <div class="trade-plan-grid compact">
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
       <div><span class="muted">Horizon</span><br>${safeText(position.horizon || "—")}</div>
-      <div><span class="muted">Pourquoi</span><br>${safeText(position.tradeReason || "—")}</div>
+      <div style="grid-column: span 3"><span class="muted">Pourquoi</span><br>${safeText(position.tradeReason || "Pas de commentaire pour le moment.")}</div>
     </div>
 
     <div class="trade-actions split">
@@ -1981,16 +2012,16 @@ function renderPositionRow(position) {
 
 function renderHistoryRow(item) {
     return `
-      <div class="trade-row history">
+      <div class="trade-row history simple-history-row">
         <div>
           <div class="trade-symbol">${safeText(item.symbol)}</div>
           <div class="trade-sub">${new Date(item.closedAt).toLocaleString("fr-FR")}</div>
         </div>
-        <div>${badge(item.side, item.side)}</div>
-        <div>${num(item.quantity, 4)}</div>
+        <div>${badge(simpleSideLabel(item.side), item.side)}</div>
+        <div>${badge(historyResultLabel(item), (Number(item.pnl || 0) >= 0 ? "positive" : "negative"))}</div>
         <div>${priceDisplay(item.entryPrice)}</div>
         <div>${priceDisplay(item.exitPrice)}</div>
-        <div class="${(item.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((item.pnl || 0) * fxRateUsdToEur(), "EUR")} / ${pct(item.pnlPct)}</div>
+        <div class="${(item.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((item.pnl || 0) * fxRateUsdToEur(), "EUR")} · ${pct(item.pnlPct)}</div>
         <div>${safeText(item.closeType || item.sourceUsed || "training")}</div>
       </div>`;
   }
@@ -2056,7 +2087,7 @@ function renderHistoryRow(item) {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Separation simple entre entrainement et reel. Le reel reste vide tant qu'aucune source n'est branchee.</div>
+          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller.</div>
         </div>
 
         <div class="controls">
@@ -2065,34 +2096,43 @@ function renderHistoryRow(item) {
         </div>
 
         ${state.trades.mode === "real" ? `
-          <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette brique est reservee pour la suite.</div>
+          <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette partie restera vide tant qu'aucune source reelle n'est connectee.</div>
         ` : `
           <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Positions en cours</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Historique des trades</div><div class="stat-value">${stats.closedCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Gain / perte realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
+            <div class="stat-card"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
+            <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
           </div>
 
           <div class="grid trades-stats" style="margin-top:14px">
-            <div class="stat-card"><div class="stat-label">Trades conseilles</div><div class="stat-value">${algoCounts.conseille}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
+            <div class="stat-card"><div class="stat-label">Trades proposes</div><div class="stat-value">${algoCounts.conseille}</div></div>
+            <div class="stat-card"><div class="stat-label">Possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
             <div class="stat-card"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
             <div class="stat-card"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
           </div>
 
+          <div class="card" style="margin-top:18px">
+            <div class="section-title"><span>Lecture rapide</span><span>${positions.length}</span></div>
+            <div class="portfolio-overview-text">
+              ${positions.length
+                ? `${positions.length} trade${positions.length > 1 ? "s sont" : " est"} ouvert${positions.length > 1 ? "s" : ""}. ${riskRows.length ? `${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length} position${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s sont" : " est"} proche${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s" : ""} du stop.` : ""}`
+                : "Aucun trade ouvert pour le moment."}
+            </div>
+          </div>
+
           <div class="risk-layout">
             <div class="card" style="margin-top:18px">
-              <div class="section-title"><span>Risque positions ouvertes</span><span>${riskRows.length}</span></div>
+              <div class="section-title"><span>Positions a surveiller</span><span>${riskRows.length}</span></div>
               ${riskRows.length ? `
                 <div class="risk-list">
                   ${riskRows.slice(0, 8).map((row) => `
                     <div class="risk-row">
                       <div>
                         <div class="trade-symbol">${safeText(row.symbol)}</div>
-                        <div class="trade-sub">${safeText(row.tradeDecision || "manuel")}</div>
+                        <div class="trade-sub">${safeText(row.tradeDecision || "trade ouvert")}</div>
                       </div>
                       <div>${badge(simpleSideLabel(row.side), row.side)}</div>
-                      <div>${row.distanceToStop == null ? "stop indispo" : `${num(row.distanceToStop, 2)}% avant stop`}</div>
+                      <div>${row.distanceToStop == null ? "stop indisponible" : `${num(row.distanceToStop, 2)}% avant stop`}</div>
                     </div>
                   `).join("")}
                 </div>
@@ -2100,10 +2140,10 @@ function renderHistoryRow(item) {
             </div>
 
             <div class="card" style="margin-top:18px">
-              <div class="section-title"><span>Lecture performance</span><span>historique</span></div>
+              <div class="section-title"><span>Bilan rapide</span><span>historique</span></div>
               <div class="perf-columns">
                 <div>
-                  <div class="muted" style="margin-bottom:8px">Meilleurs actifs clotures</div>
+                  <div class="muted" style="margin-bottom:8px">Actifs qui ont le mieux marche</div>
                   ${insights.best.length ? insights.best.map((row) => `
                     <div class="mini-perf-row">
                       <span>${safeText(row.symbol)}</span>
@@ -2112,7 +2152,7 @@ function renderHistoryRow(item) {
                   `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
                 </div>
                 <div>
-                  <div class="muted" style="margin-bottom:8px">Actifs les plus faibles</div>
+                  <div class="muted" style="margin-bottom:8px">Actifs les plus difficiles</div>
                   ${insights.worst.length ? insights.worst.map((row) => `
                     <div class="mini-perf-row">
                       <span>${safeText(row.symbol)}</span>
@@ -2125,23 +2165,20 @@ function renderHistoryRow(item) {
           </div>
 
           <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Positions en cours</span><span>${positions.length}</span></div>
+            <div class="section-title"><span>Trades ouverts</span><span>${positions.length}</span></div>
             ${positions.length ? `
-              <div class="trade-table">
-                <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Qte</div><div>Entree</div><div>Live</div><div>Stop</div><div>Objectif</div><div>R/R</div><div>Pnl</div><div>Action</div>
-                </div>
+              <div class="trade-table simplified-open-trades">
                 ${positions.map(renderPositionRow).join("")}
               </div>
-            ` : `<div class="empty-state">Aucune position ouverte. Ouvre une fiche actif puis cree le trade conseille ou parie sur la hausse / la baisse.</div>`}
+            ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
           </div>
 
           <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Historique des trades</span><span>${history.length}</span></div>
+            <div class="section-title"><span>Trades clotures</span><span>${history.length}</span></div>
             ${history.length ? `
-              <div class="trade-table">
+              <div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Qte</div><div>Entree</div><div>Sortie</div><div>Stop</div><div>Objectif</div><div>R/R</div><div>Pnl</div><div>Source utilisee</div>
+                  <div>Actif</div><div>Sens</div><div>Resultat</div><div>Entree</div><div>Sortie</div><div>P/L</div><div>Cloture</div>
                 </div>
                 ${history.map(renderHistoryRow).join("")}
               </div>
