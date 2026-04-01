@@ -397,9 +397,9 @@
   }
 
   function simpleDirectionLabel(direction, score) {
-    if (direction === "long") return score != null && score >= 60 ? "hausse probable" : "legere hausse";
-    if (direction === "short") return score != null && score <= 40 ? "baisse probable" : "legere baisse";
-    return "pas de tendance claire";
+    if (direction === "long") return "tendance haussiere";
+    if (direction === "short") return "tendance baissiere";
+    return "tendance neutre";
   }
 
   function simpleConfidenceLabel(value) {
@@ -442,7 +442,7 @@
       "Bearish setup": "baisse probable",
       "Early bullish setup": "debut de hausse probable",
       "Early bearish setup": "debut de baisse probable",
-      "No clear direction": "pas de tendance claire",
+      "No clear direction": "tendance neutre",
       "Positive price change": "hausse du prix",
       "Negative price change": "baisse du prix",
       "Flat price change": "prix stable",
@@ -1582,7 +1582,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "A surveiller",
-          "Setups a suivre, mais pas encore assez propres pour ouvrir.",
+          "Actifs a surveiller avant ouverture.",
           groups.watch,
           groups.proposed.length + 1,
           "Aucun actif a surveiller pour le moment."
