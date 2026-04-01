@@ -332,52 +332,17 @@
 
   function saveDetailCache(symbol, value) {
     const clean = String(symbol || "").toUpperCase();
-    if (!clean) return;
+    if (!clean || !value) return;
     state.detailCache[clean] = value;
     persistDetailCache();
 
-    if (value && value.price != null) {
-      const currentList = (state.opportunitiesSnapshot || []).slice();
-      const idx = currentList.findIndex(x => String(x.symbol || "").toUpperCase() === clean);
-
-      const existingRow = idx >= 0 ? currentList[idx] : (state.opportunities || []).find(x => String(x.symbol || "").toUpperCase() === clean) || null;
-
-      const patch = normalizeOpportunity({
-        symbol: value.symbol,
-        name: value.name,
-        assetClass: value.assetClass,
-        price: value.price,
-        change24hPct: value.change24hPct,
-        score: value.score ?? existingRow?.score ?? null,
-        scoreStatus: value.scoreStatus || existingRow?.scoreStatus || null,
-        direction: value.direction || existingRow?.direction || null,
-        analysisLabel: value.analysisLabel || existingRow?.analysisLabel || null,
-        confidence: value.confidence || existingRow?.confidence || null,
-        breakdown: value.breakdown || existingRow?.breakdown || null,
-        sourceUsed: value.sourceUsed || existingRow?.sourceUsed || null,
-        freshness: value.freshness || existingRow?.freshness || null,
-        officialScore: value.officialScore ?? existingRow?.officialScore ?? value.score ?? existingRow?.score ?? null,
-        officialDecision: value.officialDecision || existingRow?.officialDecision || null,
-        officialTrendLabel: value.officialTrendLabel || existingRow?.officialTrendLabel || null,
-        officialWaitFor: value.officialWaitFor || existingRow?.officialWaitFor || null
-      });
-
-      const mergedRow = existingRow ? {
-        ...existingRow,
-        ...patch,
-        score: patch.score ?? existingRow.score ?? null,
-        officialScore: patch.officialScore ?? existingRow.officialScore ?? patch.score ?? existingRow.score ?? null,
-        officialDecision: patch.officialDecision || existingRow.officialDecision || null,
-        officialTrendLabel: patch.officialTrendLabel || existingRow.officialTrendLabel || null,
-        officialWaitFor: patch.officialWaitFor || existingRow.officialWaitFor || null
-      } : patch;
-
-      if (idx >= 0) currentList[idx] = mergedRow;
-      else currentList.push(mergedRow);
-
+    const currentList = (state.opportunitiesSnapshot || []).slice();
+    const idx = currentList.findIndex(x => String(x.symbol || "").toUpperCase() === clean);
+    if (idx >= 0) {
+      currentList[idx] = mergeOpportunityWithStored(currentList[idx], value);
       saveOpportunitiesSnapshot(currentList);
       state.opportunities = state.opportunities.map(item =>
-        String(item.symbol || "").toUpperCase() === clean ? mergedRow : item
+        String(item.symbol || "").toUpperCase() === clean ? currentList[idx] : item
       );
       applyFilter();
     }
@@ -824,47 +789,29 @@ function rowIsUnavailable(item) {
   return false;
 }
 
+function rowIsUnavailable(item) {
+  return !item || item.status === "unavailable" || item.scoreStatus === "unavailable";
+}
+
 function rowDecisionLabel(item) {
   if (rowIsUnavailable(item)) return "Indisponible";
-  return rowTradePlan(item)?.decision || "Pas de trade";
+  return item?.decision || "Pas de trade";
 }
 
 function rowTrendLabel(item) {
-  if (rowIsUnavailable(item)) return compactError(item?.error) || "source indisponible";
-  return rowTradePlan(item)?.trendLabel || "pas de tendance claire";
+  if (rowIsUnavailable(item)) return compactError(item?.error || item?.reasonShort || "Source temporairement indisponible") || "indisponible";
+  return item?.trendLabel || "tendance neutre";
 }
 
 async function hydrateNonCryptoRows(rows) { return; }
 
-
-function hasOfficialOpportunityPayload(item) {
-  return item && item.officialScore != null && !!item.officialDecision;
-}
-
 function rowTradePlan(item) {
-  if (!item) return null;
-  const score = item.officialScore != null ? Number(item.officialScore) : (item.score != null ? Number(item.score) : null);
-  if (score == null || Number.isNaN(score)) return null;
-
-  const direction = item.direction || "neutral";
-  let decision = item.officialDecision || null;
-  if (!decision) {
-    if (score >= 70 && direction !== "neutral") decision = "Trade propose";
-    else if (score >= 55) decision = "A surveiller";
-    else decision = "Pas de trade";
-  }
-
-  const trendLabel = item.officialTrendLabel || detectedTrendLabel(direction);
-  return {
-    finalScore: score,
-    decision,
-    trendLabel,
-    waitFor: item.officialWaitFor || null
-  };
+  if (!item || !item.plan) return null;
+  return item.plan;
 }
 
 function currentTradePlan() {
-  return officialPlanForDetail(state.detail);
+  return state.detail?.plan || null;
 }
 
   function normalizeOpportunity(item) {
@@ -874,21 +821,22 @@ function currentTradePlan() {
       assetClass: item?.assetClass || "unknown",
       price: typeof item?.price === "number" ? item.price : null,
       change24hPct: typeof item?.change24hPct === "number" ? item.change24hPct : null,
-      score: typeof item?.score === "number" ? item.score : null,
-      scoreStatus: item?.scoreStatus || (item?.price != null ? "partial" : "unavailable"),
-      direction: item?.direction || (item?.score == null ? null : "neutral"),
-      analysisLabel: item?.analysisLabel || (item?.price != null ? "Real quote available" : "Source temporarily unavailable"),
-      confidence: item?.confidence || (item?.price != null ? "medium" : "low"),
       sourceUsed: item?.sourceUsed || null,
       freshness: item?.freshness || "unknown",
+      status: item?.status || (item?.price != null ? "ok" : "unavailable"),
+      score: typeof item?.score === "number" ? item.score : null,
+      scoreStatus: item?.scoreStatus || (item?.price != null ? "complete" : "unavailable"),
+      direction: item?.direction || "neutral",
+      analysisLabel: item?.analysisLabel || null,
+      confidence: item?.confidence || "low",
+      confidenceLabel: item?.confidenceLabel || simpleConfidenceLabel(item?.confidence || "low"),
       breakdown: item?.breakdown || null,
-      error: compactError(item?.error || null),
-      status: item?.status || null,
       reasonShort: item?.reasonShort || null,
-      officialScore: item?.officialScore ?? null,
-      officialDecision: item?.officialDecision || null,
-      officialTrendLabel: item?.officialTrendLabel || null,
-      officialWaitFor: item?.officialWaitFor || null
+      decision: item?.decision || null,
+      trendLabel: item?.trendLabel || null,
+      plan: item?.plan || null,
+      candles: Array.isArray(item?.candles) ? item.candles : [],
+      error: compactError(item?.error || item?.reasonShort || null)
     };
   }
 
@@ -899,46 +847,28 @@ function currentTradePlan() {
 
   function mergeOpportunityWithStored(current, stored) {
     if (!stored) return current;
-    const merged = { ...current, ...stored };
-    merged.price = stored.price ?? current.price;
-    merged.change24hPct = stored.change24hPct ?? current.change24hPct;
-    merged.score = stored.score ?? current.score;
-    merged.scoreStatus = stored.scoreStatus || current.scoreStatus;
-    merged.direction = stored.direction || current.direction;
-    merged.analysisLabel = stored.analysisLabel || current.analysisLabel;
-    merged.confidence = stored.confidence || current.confidence;
-    merged.breakdown = stored.breakdown || current.breakdown || null;
-    merged.sourceUsed = stored.sourceUsed || current.sourceUsed;
-    merged.freshness = stored.freshness || current.freshness || "cache";
-    merged.error = current.error && stored.price == null ? current.error : null;
-    merged.fromStoredCache = true;
-    return merged;
+    return normalizeOpportunity({
+      ...current,
+      ...stored,
+      price: stored.price ?? current.price,
+      change24hPct: stored.change24hPct ?? current.change24hPct,
+      score: stored.score ?? current.score,
+      decision: stored.decision || current.decision || null,
+      trendLabel: stored.trendLabel || current.trendLabel || null,
+      reasonShort: stored.reasonShort || current.reasonShort || null,
+      plan: stored.plan || current.plan || null,
+      status: stored.status || current.status || null,
+      freshness: stored.freshness || current.freshness || "unknown"
+    });
   }
 
   function backfillOpportunities(rows) {
     const snapshotMap = new Map((state.opportunitiesSnapshot || []).map(x => [String(x.symbol || "").toUpperCase(), x]));
-    const detailMap = new Map(Object.values(state.detailCache || {}).map(x => [String(x.symbol || "").toUpperCase(), x]));
     return (rows || []).map((item) => {
       const clean = String(item?.symbol || "").toUpperCase();
       if (!clean) return item;
-      const detail = detailMap.get(clean);
       const snap = snapshotMap.get(clean);
-      const stored = detail && detail.price != null ? normalizeOpportunity({
-        symbol: detail.symbol,
-        name: detail.name,
-        assetClass: detail.assetClass,
-        price: detail.price,
-        change24hPct: detail.change24hPct,
-        score: detail.score,
-        scoreStatus: detail.scoreStatus,
-        direction: detail.direction,
-        analysisLabel: detail.analysisLabel,
-        confidence: detail.confidence,
-        breakdown: detail.breakdown || null,
-        sourceUsed: detail.sourceUsed,
-        freshness: detail.freshness
-      }) : snap;
-      return mergeOpportunityWithStored(item, stored);
+      return snap ? mergeOpportunityWithStored(item, snap) : item;
     });
   }
 
@@ -1107,39 +1037,16 @@ function currentTradePlan() {
   async function loadDetail(symbol) {
     const now = Date.now();
     const cleanSymbol = String(symbol || "").toUpperCase();
-    const nonCrypto = !isCryptoSymbol(cleanSymbol);
     const cachedDetail = detailCacheHit(cleanSymbol);
-
-    if (nonCrypto && cachedDetail && hasRichBreakdown(cachedDetail) && !canRunScheduledFetch("detail_non_crypto", cleanSymbol)) {
-      state.detail = lockDetailToOfficialRow(cachedDetail);
-      render();
-      return;
-    }
-
-    if (nonCrypto && !canSpendEstimatedBudget("detail", cleanSymbol)) {
-      if (cachedDetail) {
-        state.detail = lockDetailToOfficialRow(cachedDetail);
-        render();
-        return;
-      }
-      render();
-      return;
-    }
 
     if (state.detail && state.detail.symbol === cleanSymbol && (now - state.detailRequestStartedAt) < 15000) {
       render();
       return;
     }
 
-    if ((now - state.detailRequestStartedAt) < 6000 && state.detail) {
-      state.error = "Attends quelques secondes avant de recharger une fiche.";
-      render();
-      return;
-    }
-
     state.detailRequestStartedAt = now;
     state.loadingDetail = !cachedDetail;
-    if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? findOfficialOpportunity(cleanSymbol)?.officialScore ?? cachedDetail.score ?? null });
+    if (cachedDetail) state.detail = normalizeOpportunity(cachedDetail);
     state.error = null;
     render();
 
@@ -1149,24 +1056,25 @@ function currentTradePlan() {
         api(`/api/candles/${encodeURIComponent(cleanSymbol)}?timeframe=1d&limit=90`).catch(() => null)
       ]);
 
-      const merged = {
+      const merged = normalizeOpportunity({
         ...(detail.data || {}),
-        candles: candles?.data || cachedDetail?.candles || []
-      };
+        candles: Array.isArray(detail?.data?.candles) && detail.data.candles.length
+          ? detail.data.candles
+          : (candles?.data || cachedDetail?.candles || [])
+      });
 
-      state.detail = lockDetailToOfficialRow({ ...merged, officialScore: merged.officialScore ?? findOfficialOpportunity(cleanSymbol)?.officialScore ?? merged.score ?? null });
+      state.detail = merged;
       saveDetailCache(cleanSymbol, merged);
-
-      if (nonCrypto) {
-        markScheduledFetch("detail_non_crypto", cleanSymbol);
-        if (candles?.data?.length) markScheduledFetch("candles_non_crypto", cleanSymbol);
-      }
-
       state.error = null;
-      loadAiReview(merged, currentTradePlan());
+
+      if (merged.status === "ok" && merged.plan) {
+        loadAiReview(merged, merged.plan);
+      } else {
+        state.aiReview = null;
+      }
     } catch (e) {
       state.error = e.message || "Fiche indisponible";
-      if (cachedDetail) state.detail = lockDetailToOfficialRow({ ...cachedDetail, officialScore: cachedDetail.officialScore ?? findOfficialOpportunity(cleanSymbol)?.officialScore ?? cachedDetail.score ?? null });
+      if (cachedDetail) state.detail = normalizeOpportunity(cachedDetail);
     } finally {
       state.loadingDetail = false;
       render();
@@ -1322,25 +1230,16 @@ function closeTrainingTrade(id, livePrice = null) {
   
 function groupedOpportunities(rows) {
   const items = Array.isArray(rows) ? rows.slice() : [];
-  const buckets = {
-    proposed: [],
-    watch: [],
-    noTrade: [],
-  };
+  const buckets = { proposed: [], watch: [], noTrade: [] };
 
   items.forEach((item) => {
-    const plan = rowTradePlan(item);
-    const decision = String(item?.officialDecision || plan?.decision || "");
-    const score = item?.officialScore ?? plan?.finalScore ?? -1;
-    const enriched = { ...item, _plan: plan, _score: score };
+    const decision = rowDecisionLabel(item);
+    const score = typeof item?.score === "number" ? item.score : -1;
+    const enriched = { ...item, _score: score };
 
-    if (decision === "Trade propose") {
-      buckets.proposed.push(enriched);
-    } else if (decision === "A surveiller") {
-      buckets.watch.push(enriched);
-    } else {
-      buckets.noTrade.push(enriched);
-    }
+    if (decision === "Trade propose") buckets.proposed.push(enriched);
+    else if (decision === "A surveiller") buckets.watch.push(enriched);
+    else buckets.noTrade.push(enriched);
   });
 
   const sorter = (a, b) => {
@@ -1427,7 +1326,7 @@ function applyFilter() {
 
   function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
-    const scoreValue = item?.officialScore ?? item?.score ?? null;
+    const scoreValue = typeof item?.score === "number" ? item.score : null;
     const decisionLabel = rowDecisionLabel(item);
     const trendLabel = rowTrendLabel(item);
     const note = item?.reasonShort || item?.error || null;
@@ -1456,7 +1355,7 @@ function applyFilter() {
         </div>
         <div class="meta-col">
           ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
-          ${badge(`fiabilite ${simpleConfidenceLabel(item.confidence || "low")}`)}
+          ${badge(`fiabilite ${safeText(item.confidenceLabel || simpleConfidenceLabel(item.confidence || "low"))}`)}
           ${state.settings.showSourceBadges ? badge(item.sourceUsed || "source?") : ""}
           ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(item.freshness || "unknown"), item.freshness || "") : ""}
         </div>
@@ -1623,7 +1522,7 @@ function renderDashboard() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Opportunites</div>
-          <div class="screen-subtitle">Lecture simple, tri par decision, priorites visuelles. Si une source echoue, l'actif passe en indisponible.</div>
+          <div class="screen-subtitle">Lecture simple. Le worker fournit directement le score, la decision et la tendance.</div>
         </div>
 
         <div class="opp-toolbar">
@@ -1886,9 +1785,9 @@ function renderDetail() {
                 </div>
                 <div class="legend">
                   ${badge(simpleAssetClassLabel(d.assetClass), d.assetClass)}
-                  ${badge(simpleDirectionLabel(d.direction, d.score), d.direction || "")}
+                  ${badge(d.trendLabel || simpleDirectionLabel(d.direction, d.score), d.direction || "")}
                   ${badge(simpleScoreStatusLabel(d.scoreStatus || "n/a"), d.scoreStatus || "")}
-                  ${badge(`fiabilite ${simpleConfidenceLabel(d.confidence || "low")}`)}
+                  ${badge(`fiabilite ${safeText(d.confidenceLabel || simpleConfidenceLabel(d.confidence || "low"))}`)}
                   ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
