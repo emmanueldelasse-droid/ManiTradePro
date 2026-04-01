@@ -10,6 +10,16 @@
     opportunitiesSnapshot: "mtp_opportunities_snapshot_v1"
   };
 
+  const TRADE_STORAGE = {
+    positions: ["mtp_trades_positions", "mtp_training_positions_v2", STORAGE_KEYS.trainingPositions],
+    history: ["mtp_trades_history", "mtp_training_history_v2", STORAGE_KEYS.trainingHistory],
+    algoJournal: ["mtp_trades_algo_journal", "mtp_algo_journal_v2", STORAGE_KEYS.algoJournal],
+    positionsBackup: "mtp_trades_positions_backup",
+    historyBackup: "mtp_trades_history_backup",
+    algoJournalBackup: "mtp_trades_algo_journal_backup",
+    meta: "mtp_trades_meta"
+  };
+
   const defaultSettings = {
     autoRefreshOpportunities: true,
     showSourceBadges: true,
@@ -79,6 +89,35 @@
   function writeJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
   }
+
+  function removeJson(key) {
+    try { localStorage.removeItem(key); } catch {}
+  }
+
+  function readJsonFromKeys(keys, fallback) {
+    for (const key of keys || []) {
+      const value = readJson(key, undefined);
+      if (value !== undefined) return value;
+    }
+    return fallback;
+  }
+
+  function writeJsonToKeys(keys, value) {
+    for (const key of keys || []) writeJson(key, value);
+  }
+
+  function saveTradesMeta(extra = {}) {
+    writeJson(TRADE_STORAGE.meta, {
+      updatedAt: Date.now(),
+      schema: "mestrades_v1",
+      ...extra
+    });
+  }
+
+  function loadTradesMeta() {
+    return readJson(TRADE_STORAGE.meta, {});
+  }
+
 
   function loadSettings() {
     return { ...defaultSettings, ...readJson(STORAGE_KEYS.settings, {}) };
@@ -349,15 +388,45 @@
   }
 
   function loadTradesState() {
-    state.trades.positions = readJson(STORAGE_KEYS.trainingPositions, []);
-    state.trades.history = readJson(STORAGE_KEYS.trainingHistory, []);
-    state.algoJournal = readJson(STORAGE_KEYS.algoJournal, []);
+    const rawPositions = readJsonFromKeys(TRADE_STORAGE.positions, []);
+    const rawHistory = readJsonFromKeys(TRADE_STORAGE.history, []);
+    const rawAlgo = readJsonFromKeys(TRADE_STORAGE.algoJournal, []);
+
+    state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
+    state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
+    state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
+
+    // Warm the current versioned keys too, so older/newer builds keep seeing the same trades.
+    writeJsonToKeys(TRADE_STORAGE.positions, state.trades.positions);
+    writeJsonToKeys(TRADE_STORAGE.history, state.trades.history);
+    writeJsonToKeys(TRADE_STORAGE.algoJournal, state.algoJournal);
+    writeJson(TRADE_STORAGE.positionsBackup, state.trades.positions);
+    writeJson(TRADE_STORAGE.historyBackup, state.trades.history);
+    writeJson(TRADE_STORAGE.algoJournalBackup, state.algoJournal);
+    saveTradesMeta({ migratedAt: Date.now() });
   }
 
   function persistTradesState() {
-    writeJson(STORAGE_KEYS.trainingPositions, state.trades.positions);
-    writeJson(STORAGE_KEYS.trainingHistory, state.trades.history);
-    writeJson(STORAGE_KEYS.algoJournal, state.algoJournal);
+    const positions = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
+    const history = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : [];
+    const algoJournal = Array.isArray(state.algoJournal) ? state.algoJournal : [];
+
+    state.trades.positions = positions;
+    state.trades.history = history;
+    state.algoJournal = algoJournal;
+
+    writeJsonToKeys(TRADE_STORAGE.positions, positions);
+    writeJsonToKeys(TRADE_STORAGE.history, history);
+    writeJsonToKeys(TRADE_STORAGE.algoJournal, algoJournal);
+
+    writeJson(TRADE_STORAGE.positionsBackup, positions);
+    writeJson(TRADE_STORAGE.historyBackup, history);
+    writeJson(TRADE_STORAGE.algoJournalBackup, algoJournal);
+    saveTradesMeta({
+      positionsCount: positions.length,
+      historyCount: history.length,
+      algoCount: algoJournal.length
+    });
   }
 
   // =========================
@@ -2220,6 +2289,22 @@ function normalizeOpenPositionsState(){
   state.openPositions = state.openPositions.map(normalizePositionRecord);
 }
 
+function restoreTradesFromBackupIfEmpty() {
+  const backupPositions = readJson(TRADE_STORAGE.positionsBackup, []);
+  const backupHistory = readJson(TRADE_STORAGE.historyBackup, []);
+  const backupAlgo = readJson(TRADE_STORAGE.algoJournalBackup, []);
+
+  if (!state.trades.positions.length && Array.isArray(backupPositions) && backupPositions.length) {
+    state.trades.positions = backupPositions.map(normalizePositionRecord);
+  }
+  if (!state.trades.history.length && Array.isArray(backupHistory) && backupHistory.length) {
+    state.trades.history = backupHistory.map((x) => normalizePositionRecord(x));
+  }
+  if (!state.algoJournal.length && Array.isArray(backupAlgo) && backupAlgo.length) {
+    state.algoJournal = backupAlgo;
+  }
+}
+
 
 function openPositionsRiskView() {
     const positions = Array.isArray(state.trades?.positions) ? state.trades.positions : [];
@@ -2240,6 +2325,7 @@ function openPositionsRiskView() {
   }
 
   function renderPortfolio() {
+    restoreTradesFromBackupIfEmpty();
     const stats = trainingStats();
     const positions = state.trades.positions;
     const history = state.trades.history;
@@ -2251,7 +2337,8 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller.</div>
+          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. Les trades sont maintenant sauvegardes avec un snapshot d'analyse, une execution et un etat live.</div>
+          ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
         </div>
 
         <div class="controls">
