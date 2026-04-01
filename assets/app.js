@@ -7,7 +7,8 @@
     algoJournal: "mtp_algo_journal_v1",
     budgetTracker: "mtp_budget_tracker_v1",
     detailCache: "mtp_detail_cache_v1",
-    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1"
+    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1",
+    trainingCapital: "mtp_training_capital_v1"
   };
 
   const TRADE_STORAGE = {
@@ -73,6 +74,7 @@
     budget: loadBudgetTracker(),
     detailCache: readJson(STORAGE_KEYS.detailCache, {}),
     opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, []),
+    trainingCapital: loadTrainingCapital(),
     nonCryptoHydration: {}
   };
 
@@ -124,6 +126,32 @@
       ...extra
     });
   }
+
+  function loadTrainingCapital() {
+    const raw = readJson(STORAGE_KEYS.trainingCapital, null);
+    const startingBalanceEur = Number(raw?.startingBalanceEur);
+    return {
+      startingBalanceEur: Number.isFinite(startingBalanceEur) && startingBalanceEur > 0 ? startingBalanceEur : 10000,
+      updatedAt: raw?.updatedAt || null
+    };
+  }
+
+  function persistTrainingCapital() {
+    state.trainingCapital = {
+      startingBalanceEur: Number(state.trainingCapital?.startingBalanceEur || 10000),
+      updatedAt: Date.now()
+    };
+    writeJson(STORAGE_KEYS.trainingCapital, state.trainingCapital);
+  }
+
+  function resetTrainingCapital() {
+    state.trainingCapital = {
+      startingBalanceEur: 10000,
+      updatedAt: Date.now()
+    };
+    writeJson(STORAGE_KEYS.trainingCapital, state.trainingCapital);
+  }
+
 
   function loadTradesMeta() {
     return readJson(TRADE_STORAGE.meta, {});
@@ -1260,6 +1288,12 @@ function addTrainingTradeFromDetail(side) {
     return;
   }
   const quantity = d.price > 500 ? 1 : d.price > 50 ? 2 : 10;
+  const investedUsd = d.price * quantity;
+  if (!canOpenTrainingTrade(d.price, quantity)) {
+    state.error = "Capital fictif insuffisant pour ouvrir ce trade d'entrainement.";
+    render();
+    return;
+  }
   const position = {
     id: uid("pos"),
     symbol: d.symbol,
@@ -1268,6 +1302,7 @@ function addTrainingTradeFromDetail(side) {
     side,
     quantity,
     entryPrice: d.price,
+    invested: investedUsd,
     openedAt: nowIso(),
     sourceUsed: d.sourceUsed || null,
     stopLoss: null,
@@ -1275,7 +1310,13 @@ function addTrainingTradeFromDetail(side) {
     tradeDecision: "manuel",
     tradeReason: "Trade cree manuellement depuis la fiche actif.",
     rr: null,
-    horizon: null
+    horizon: null,
+    execution: {
+      openedAt: nowIso(),
+      entryPrice: d.price,
+      quantity,
+      invested: investedUsd
+    }
   };
   state.trades.positions.unshift(position);
   state.algoJournal.unshift({
@@ -1309,6 +1350,12 @@ function createRecommendedTrade() {
     return;
   }
   const quantity = d.price > 500 ? 1 : d.price > 50 ? 2 : 10;
+  const investedUsd = plan.entry * quantity;
+  if (!canOpenTrainingTrade(plan.entry, quantity)) {
+    state.error = "Capital fictif insuffisant pour ouvrir ce trade propose.";
+    render();
+    return;
+  }
   const position = {
     id: uid("pos"),
     symbol: d.symbol,
@@ -1317,6 +1364,7 @@ function createRecommendedTrade() {
     side: plan.side,
     quantity,
     entryPrice: plan.entry,
+    invested: investedUsd,
     openedAt: nowIso(),
     sourceUsed: d.sourceUsed || null,
     stopLoss: plan.stopLoss,
@@ -1326,7 +1374,13 @@ function createRecommendedTrade() {
     rr: plan.rr,
     horizon: plan.horizon,
     confidence: plan.confidence,
-    algoScore: d.score ?? null
+    algoScore: d.score ?? null,
+    execution: {
+      openedAt: nowIso(),
+      entryPrice: plan.entry,
+      quantity,
+      invested: investedUsd
+    }
   };
   state.trades.positions.unshift(position);
   state.algoJournal.unshift({
@@ -1364,12 +1418,44 @@ function closeTrainingTrade(id, livePrice = null) {
       exitPrice,
       closedAt: nowIso(),
       pnl,
-      pnlPct
+      pnlPct,
+      closeType: "Cloture manuelle"
     };
     state.trades.positions.splice(idx, 1);
     state.trades.history.unshift(closed);
     persistTradesState();
     render();
+  }
+
+  function trainingWallet() {
+    const positions = Array.isArray(state.trades?.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
+    const history = Array.isArray(state.trades?.history) ? state.trades.history.map(normalizePositionRecord) : [];
+    const startingBalanceEur = Number(state.trainingCapital?.startingBalanceEur || 10000);
+
+    const engagedEur = positions.reduce((sum, p) => {
+      const investedUsd = Number((p.execution || {}).invested ?? p.invested);
+      return sum + ((Number.isFinite(investedUsd) && investedUsd > 0) ? investedUsd * fxRateUsdToEur() : 0);
+    }, 0);
+
+    const realizedEur = history.reduce((sum, row) => sum + (Number(row?.pnl || 0) * fxRateUsdToEur()), 0);
+    const unrealizedEur = positions.reduce((sum, p) => sum + (Number((p.live || {}).pnl || 0) * fxRateUsdToEur()), 0);
+    const availableEur = startingBalanceEur + realizedEur - engagedEur;
+    const equityEur = startingBalanceEur + realizedEur + unrealizedEur;
+
+    return {
+      startingBalanceEur,
+      engagedEur,
+      realizedEur,
+      unrealizedEur,
+      availableEur,
+      equityEur
+    };
+  }
+
+  function canOpenTrainingTrade(entryPriceUsd, quantity) {
+    const wallet = trainingWallet();
+    const requiredEur = Number(entryPriceUsd || 0) * Number(quantity || 0) * fxRateUsdToEur();
+    return Number.isFinite(requiredEur) && requiredEur > 0 && wallet.availableEur >= requiredEur;
   }
 
   function trainingStats() {
@@ -1382,6 +1468,7 @@ function closeTrainingTrade(id, livePrice = null) {
     const total = history.length;
     const grossWin = winsRows.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
     const grossLossAbs = Math.abs(lossRows.reduce((sum, t) => sum + Number(t.pnl || 0), 0));
+    const wallet = trainingWallet();
     return {
       openCount: positions.length,
       closedCount: history.length,
@@ -1389,7 +1476,8 @@ function closeTrainingTrade(id, livePrice = null) {
       winRate: total ? (wins / total) * 100 : null,
       avgWin: winsRows.length ? grossWin / winsRows.length : null,
       avgLoss: lossRows.length ? lossRows.reduce((sum, t) => sum + Number(t.pnl || 0), 0) / lossRows.length : null,
-      profitFactor: grossLossAbs > 0 ? grossWin / grossLossAbs : (grossWin > 0 ? 999 : null)
+      profitFactor: grossLossAbs > 0 ? grossWin / grossLossAbs : (grossWin > 0 ? 999 : null),
+      wallet
     };
   }
 
@@ -2156,7 +2244,7 @@ function partialClosePosition(positionId, percent = 50) {
     pnlPct,
     closedAt: new Date().toISOString(),
     sourceUsed: position.sourceUsed || "training",
-    closeType: "Partielle 50%"
+    closeType: "Cloture partielle 50%"
   });
 
   if (remainingQty <= 0.0000001) {
@@ -2170,7 +2258,7 @@ function partialClosePosition(positionId, percent = 50) {
   }
 
   state.error = null;
-  saveAppState();
+  persistTradesState();
   render();
 }
 
@@ -2201,7 +2289,7 @@ function closeTradePosition(positionId) {
 
   state.trades.positions.splice(idx, 1);
   state.error = null;
-  saveAppState();
+  persistTradesState();
   render();
 }
 
@@ -2592,7 +2680,7 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts.</div>
+          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts. Le mode entrainement suit maintenant un vrai capital fictif.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${
             state.trades.remoteStatus === "connected"
@@ -2606,18 +2694,24 @@ function openPositionsRiskView() {
         <div class="controls">
           <button class="btn ${state.trades.mode === 'training' ? 'active' : ''}" data-trade-mode="training">Entrainement</button>
           <button class="btn ${state.trades.mode === 'real' ? 'active' : ''}" data-trade-mode="real">Reel</button>
+          <button class="btn" data-reset-training-capital>Reinitialiser capital fictif</button>
         </div>
 
         ${state.trades.mode === "real" ? `
           <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette partie restera vide tant qu'aucune source reelle n'est connectee.</div>
         ` : `
           <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.realized * fxRateUsdToEur(), "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">Capital de depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
+            <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
           </div>
 
           <div class="grid trades-stats" style="margin-top:14px">
+            <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
+            <div class="stat-card"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
             <div class="stat-card"><div class="stat-label">Trades proposes</div><div class="stat-value">${algoCounts.conseille}</div></div>
             <div class="stat-card"><div class="stat-label">Possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
             <div class="stat-card"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
@@ -2851,6 +2945,17 @@ function openPositionsRiskView() {
 
     app.querySelectorAll("[data-close-trade]").forEach(el => {
       el.addEventListener("click", () => closeTrainingTrade(el.getAttribute("data-close-trade")));
+    });
+
+    app.querySelectorAll("[data-close-half]").forEach(el => {
+      el.addEventListener("click", () => partialClosePosition(el.getAttribute("data-close-half"), 50));
+    });
+
+    app.querySelectorAll("[data-reset-training-capital]").forEach(el => {
+      el.addEventListener("click", () => {
+        resetTrainingCapital();
+        render();
+      });
     });
 
     app.querySelectorAll("[data-trade-mode]").forEach(el => {
