@@ -1522,7 +1522,7 @@ function renderDashboard() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Opportunites</div>
-          <div class="screen-subtitle">Lecture simple. Le worker fournit directement le score, la decision et la tendance. Tests actifs ajoutes : MA + AMD. Tests actifs ajoutes : MA + AMD. Tests actifs ajoutes : MA + AMD. Tests actifs ajoutes : NVDA, SPY, lot TLT + V, puis lot MA + AMD.</div>
+          <div class="screen-subtitle">Lecture simple. Le worker fournit directement le score, la decision et la tendance.</div>
         </div>
 
         <div class="opp-toolbar">
