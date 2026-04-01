@@ -2213,6 +2213,10 @@ function renderPositionRow(position) {
   const exec = p.execution || {};
   const live = p.live || {};
   const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
+  const scoreValue = displayScoreValue(p);
+  const ratioValue = displayRatioValue(p);
+  const investedValue = displayInvestedValue(p);
+  const trendDisplay = safeText(snap.trendLabel || p.trendLabel || "—");
 
   return `<div class="trade-row trade-card-row simple-trade-card">
     <div class="trade-card-top">
@@ -2222,7 +2226,7 @@ function renderPositionRow(position) {
       </div>
       <div class="trade-card-badges">
         ${badge(simpleSideLabel(p.side), p.side)}
-        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
+        ${badge(trendDisplay, "neutral")}
         ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
@@ -2231,14 +2235,14 @@ function renderPositionRow(position) {
 
     <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
     <div class="trade-plan-grid compact">
-      <div><span class="muted">Score d'entree</span><br>${snap.score == null ? "—" : `${num(snap.score, 0)}/100`}</div>
+      <div><span class="muted">Score d'entree</span><br>${scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`}</div>
       <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
-      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
+      <div><span class="muted">Tendance</span><br>${trendDisplay}</div>
       <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
       <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
       <div><span class="muted">Stop</span><br>${snap.stopLoss == null && p.stopLoss == null ? "—" : priceDisplay(snap.stopLoss ?? p.stopLoss)}</div>
       <div><span class="muted">Objectif</span><br>${snap.takeProfit == null && p.takeProfit == null ? "—" : priceDisplay(snap.takeProfit ?? p.takeProfit)}</div>
-      <div><span class="muted">Ratio</span><br>${snap.ratio == null ? "—" : num(snap.ratio, 2)}</div>
+      <div><span class="muted">Ratio</span><br>${ratioValue == null ? "—" : num(ratioValue, 2)}</div>
     </div>
 
     <div class="muted" style="margin:14px 0 6px">Etat live</div>
@@ -2250,7 +2254,7 @@ function renderPositionRow(position) {
       <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
       <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
       <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-      <div><span class="muted">Investi</span><br>${exec.invested == null ? "—" : money(exec.invested * fxRateUsdToEur(), "EUR")}</div>
+      <div><span class="muted">Investi</span><br>${investedValue == null ? "—" : money(investedValue * fxRateUsdToEur(), "EUR")}</div>
     </div>
 
     <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
@@ -2270,6 +2274,7 @@ function renderPositionRow(position) {
 function renderHistoryRow(item) {
     const p = normalizePositionRecord(item);
     const snap = p.analysisSnapshot || {};
+    const scoreValue = displayScoreValue(p);
     return `
       <div class="trade-row history simple-history-row">
         <div>
@@ -2281,8 +2286,8 @@ function renderHistoryRow(item) {
         <div>${priceDisplay(p.entryPrice)}</div>
         <div>${priceDisplay(p.exitPrice)}</div>
         <div class="${(p.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((p.pnl || 0) * fxRateUsdToEur(), "EUR")} · ${pct(p.pnlPct)}</div>
-        <div>${safeText(snap.score == null ? "—" : `${num(snap.score, 0)}/100`)}</div>
-        <div>${safeText(p.closeType || p.sourceUsed || "training")}</div>
+        <div>${safeText(scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`)}</div>
+        <div>${safeText(historyCloseLabel(p))}</div>
       </div>`;
   }
 
@@ -2323,6 +2328,42 @@ function renderHistoryRow(item) {
     if (meta.targetDistancePct != null && meta.targetDistancePct <= 5) return "proche objectif";
     if (meta.livePnlPct != null && meta.livePnlPct > 0) return "en suivi";
     return "en attente";
+  }
+
+  function displayScoreValue(position){
+    const snap = position?.analysisSnapshot || {};
+    const raw = Number(snap?.score ?? position?.score);
+    if (!Number.isFinite(raw) || raw <= 0) return null;
+    return raw;
+  }
+
+  function displayRatioValue(position){
+    const snap = position?.analysisSnapshot || {};
+    const explicit = Number(snap?.ratio ?? position?.rrRatio);
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+
+    const entry = Number(position?.execution?.entryPrice ?? snap?.entry ?? position?.entryPrice);
+    const stop = Number(snap?.stopLoss ?? position?.stopLoss);
+    const target = Number(snap?.takeProfit ?? position?.takeProfit);
+    if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(target)) return null;
+    const risk = Math.abs(entry - stop);
+    const reward = Math.abs(target - entry);
+    if (!(risk > 0) || !(reward > 0)) return null;
+    return reward / risk;
+  }
+
+  function displayInvestedValue(position){
+    const exec = position?.execution || {};
+    const direct = Number(exec?.invested ?? position?.invested);
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    const entry = Number(exec?.entryPrice ?? position?.analysisSnapshot?.entry ?? position?.entryPrice);
+    const qty = Number(exec?.quantity ?? position?.quantity);
+    if (Number.isFinite(entry) && entry > 0 && Number.isFinite(qty) && qty > 0) return entry * qty;
+    return null;
+  }
+
+  function historyCloseLabel(position){
+    return position?.closeType || position?.sourceUsed || position?.analysisSnapshot?.sourceUsed || "training";
   }
 
   
@@ -2545,7 +2586,7 @@ function openPositionsRiskView() {
             ${history.length ? `
               <div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Resultat</div><div>Entree</div><div>Sortie</div><div>P/L</div><div>Cloture</div>
+                  <div>Actif</div><div>Sens</div><div>Resultat</div><div>Entree</div><div>Sortie</div><div>P/L</div><div>Source / cloture</div>
                 </div>
                 ${history.map(renderHistoryRow).join("")}
               </div>
