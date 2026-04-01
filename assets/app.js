@@ -2067,7 +2067,7 @@ function renderPositionRow(position) {
     <div class="trade-card-top">
       <div>
         <div class="trade-symbol">${safeText(position.symbol)}</div>
-        <div class="trade-sub">${safeText(position.tradeDecision || "Trade ouvert")}</div>
+        <div class="trade-sub">${safeText(position.analysisSnapshot?.decision || position.tradeDecision || "Trade ouvert")}</div>
       </div>
       <div class="trade-card-badges">
         ${badge(simpleSideLabel(position.side), position.side)}
@@ -2089,8 +2089,8 @@ function renderPositionRow(position) {
     </div>
 
     <div class="trade-plan-grid compact">
-      <div><span class="muted">Horizon</span><br>${safeText(position.horizon || "—")}</div>
-      <div style="grid-column: span 3"><span class="muted">Pourquoi</span><br>${safeText(position.tradeReason || "Pas de commentaire pour le moment.")}</div>
+      <div><span class="muted">Horizon</span><br>${safeText(position.analysisSnapshot?.horizon || position.horizon || "—")}</div>
+      <div style="grid-column: span 3"><span class="muted">Pourquoi</span><br>${safeText(position.analysisSnapshot?.reason || position.tradeReason || "Pas de commentaire pour le moment.")}</div>
     </div>
 
     <div class="trade-actions split">
@@ -2147,7 +2147,81 @@ function renderHistoryRow(item) {
     return { best: arr.slice(0, 3), worst: arr.slice(-3).reverse() };
   }
 
-  function openPositionsRiskView() {
+  
+function createAnalysisSnapshotFromOpportunity(detail){
+  if (!detail || typeof detail !== "object") return null;
+  const plan = typeof currentTradePlan === "function" ? currentTradePlan(detail) : null;
+  return {
+    symbol: detail.symbol || null,
+    name: detail.name || detail.label || detail.symbol || null,
+    score: Number.isFinite(Number(detail.score)) ? Number(detail.score) : null,
+    decision: plan?.decision || detail.decision || null,
+    trendLabel: plan?.trendLabel || detail.trendLabel || detectedTrendLabel(detail.direction || "neutral"),
+    direction: detail.direction || null,
+    entry: Number.isFinite(Number(plan?.entry)) ? Number(plan.entry) : null,
+    stopLoss: Number.isFinite(Number(plan?.stopLoss)) ? Number(plan.stopLoss) : null,
+    takeProfit: Number.isFinite(Number(plan?.takeProfit)) ? Number(plan.takeProfit) : null,
+    ratio: Number.isFinite(Number(plan?.ratio)) ? Number(plan.ratio) : null,
+    horizon: plan?.horizon || detail.horizon || null,
+    reason: plan?.reason || detail.reason || detail.summary || null,
+    scoreBreakdown: detail.scoreBreakdown || null,
+    sourceUsed: detail.source || detail.sourceUsed || null,
+    analysisTimestamp: Date.now()
+  };
+}
+
+function normalizePositionRecord(position){
+  if (!position || typeof position !== "object") return position;
+  const legacy = position.analysisSnapshot || null;
+  const snapshot = legacy || {
+    symbol: position.symbol || null,
+    name: position.name || position.symbol || null,
+    score: Number.isFinite(Number(position.score)) ? Number(position.score) : null,
+    decision: position.analysisSnapshot?.decision || position.tradeDecision || null,
+    trendLabel: position.trendLabel || detectedTrendLabel(position.direction || "neutral"),
+    direction: position.direction || null,
+    entry: Number.isFinite(Number(position.entryPrice)) ? Number(position.entryPrice) : null,
+    stopLoss: Number.isFinite(Number(position.stopLoss)) ? Number(position.stopLoss) : null,
+    takeProfit: Number.isFinite(Number(position.takeProfit)) ? Number(position.takeProfit) : null,
+    ratio: Number.isFinite(Number(position.rrRatio)) ? Number(position.rrRatio) : null,
+    horizon: position.analysisSnapshot?.horizon || position.horizon || null,
+    reason: position.analysisSnapshot?.reason || position.tradeReason || null,
+    scoreBreakdown: position.scoreBreakdown || null,
+    sourceUsed: position.source || null,
+    analysisTimestamp: position.openedAt || Date.now()
+  };
+  return {
+    ...position,
+    analysisSnapshot: snapshot,
+    execution: position.execution || {
+      openedAt: position.openedAt || Date.now(),
+      entryPrice: Number.isFinite(Number(position.entryPrice)) ? Number(position.entryPrice) : null,
+      quantity: Number.isFinite(Number(position.quantity)) ? Number(position.quantity) : null,
+      invested: Number.isFinite(Number(position.invested)) ? Number(position.invested) : null,
+    },
+    live: position.live || {
+      updatedAt: Date.now(),
+      price: null,
+      pnl: null,
+      pnlPct: null,
+    },
+    tradeDecision: snapshot.decision || position.analysisSnapshot?.decision || position.tradeDecision || null,
+    tradeReason: snapshot.reason || position.analysisSnapshot?.reason || position.tradeReason || null,
+    trendLabel: snapshot.trendLabel || position.trendLabel || null,
+    horizon: snapshot.horizon || position.analysisSnapshot?.horizon || position.horizon || null,
+    stopLoss: Number.isFinite(Number(snapshot.stopLoss)) ? Number(snapshot.stopLoss) : position.stopLoss,
+    takeProfit: Number.isFinite(Number(snapshot.takeProfit)) ? Number(snapshot.takeProfit) : position.takeProfit,
+    score: Number.isFinite(Number(snapshot.score)) ? Number(snapshot.score) : position.score,
+  };
+}
+
+function normalizeOpenPositionsState(){
+  if (!state || !Array.isArray(state.openPositions)) return;
+  state.openPositions = state.openPositions.map(normalizePositionRecord);
+}
+
+
+function openPositionsRiskView() {
     const positions = Array.isArray(state.trades?.positions) ? state.trades.positions : [];
     return positions.map((p) => {
       const liveMatch = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === p.symbol) : null;
