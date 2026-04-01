@@ -1798,7 +1798,7 @@ function renderDetail() {
                       <div class="section-title"><span>Decision automatique</span><span>${safeText(plan?.decision || "—")}</span></div>
                       <div class="kv plan-grid">
                         <div class="muted">Decision simple</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
-                        <div class="muted">Tendance</div><div>${safeText(simpleTrendWord(plan?.trendLabel || detectedTrendLabel(d.direction || "neutral")))}</div>
+                        <div class="muted">Tendance</div><div>${safeText(plan?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</div>
                         <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
                         <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
                         <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
