@@ -1521,13 +1521,20 @@ function closeTrainingTrade(id, livePrice = null) {
     const positions = state.trades.positions;
     const history = state.trades.history;
     const realized = history.reduce((sum, t) => sum + (t.pnl || 0), 0);
-    const wins = history.filter((t) => (t.pnl || 0) > 0).length;
+    const winsRows = history.filter((t) => Number(t.pnl || 0) > 0);
+    const lossRows = history.filter((t) => Number(t.pnl || 0) < 0);
+    const wins = winsRows.length;
     const total = history.length;
+    const grossWin = winsRows.reduce((sum, t) => sum + Number(t.pnl || 0), 0);
+    const grossLossAbs = Math.abs(lossRows.reduce((sum, t) => sum + Number(t.pnl || 0), 0));
     return {
       openCount: positions.length,
       closedCount: history.length,
       realized,
-      winRate: total ? (wins / total) * 100 : null
+      winRate: total ? (wins / total) * 100 : null,
+      avgWin: winsRows.length ? grossWin / winsRows.length : null,
+      avgLoss: lossRows.length ? lossRows.reduce((sum, t) => sum + Number(t.pnl || 0), 0) / lossRows.length : null,
+      profitFactor: grossLossAbs > 0 ? grossWin / grossLossAbs : (grossWin > 0 ? 999 : null)
     };
   }
 
@@ -2366,57 +2373,82 @@ function historyResultLabel(item) {
 }
 
 function renderPositionRow(position) {
-  const meta = tradeStatusMeta(position);
+  const p = normalizePositionRecord(position);
+  const meta = tradeStatusMeta(p);
+  const snap = p.analysisSnapshot || {};
+  const exec = p.execution || {};
+  const live = p.live || {};
+  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
+
   return `<div class="trade-row trade-card-row simple-trade-card">
     <div class="trade-card-top">
       <div>
-        <div class="trade-symbol">${safeText(position.symbol)}</div>
-        <div class="trade-sub">${safeText(position.analysisSnapshot?.decision || position.tradeDecision || "Trade ouvert")}</div>
+        <div class="trade-symbol">${safeText(p.symbol)}</div>
+        <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
       </div>
       <div class="trade-card-badges">
-        ${badge(simpleSideLabel(position.side), position.side)}
-        ${badge(tradeHealthLabel(meta), meta.badgeClass)}
+        ${badge(simpleSideLabel(p.side), p.side)}
+        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
+        ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
 
     <div class="trade-summary-line">${safeText(actionTradeSummary(meta))}</div>
 
+    <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
     <div class="trade-plan-grid compact">
-      <div><span class="muted">Prix d'entree</span><br>${priceDisplay(position.entryPrice)}</div>
-      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">Stop</span><br>${position.stopLoss == null ? "—" : priceDisplay(position.stopLoss)}</div>
-      <div><span class="muted">Objectif</span><br>${position.takeProfit == null ? "—" : priceDisplay(position.takeProfit)}</div>
-      <div><span class="muted">Etat du trade</span><br>${safeText(tradeHealthLabel(meta))}</div>
-      <div><span class="muted">Resultat live</span><br>${safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
+      <div><span class="muted">Score d'entree</span><br>${snap.score == null ? "—" : `${num(snap.score, 0)}/100`}</div>
+      <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
+      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
+      <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
+      <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
+      <div><span class="muted">Stop</span><br>${snap.stopLoss == null && p.stopLoss == null ? "—" : priceDisplay(snap.stopLoss ?? p.stopLoss)}</div>
+      <div><span class="muted">Objectif</span><br>${snap.takeProfit == null && p.takeProfit == null ? "—" : priceDisplay(snap.takeProfit ?? p.takeProfit)}</div>
+      <div><span class="muted">Ratio</span><br>${snap.ratio == null ? "—" : num(snap.ratio, 2)}</div>
     </div>
 
+    <div class="muted" style="margin:14px 0 6px">Etat live</div>
     <div class="trade-plan-grid compact">
-      <div><span class="muted">Horizon</span><br>${safeText(position.analysisSnapshot?.horizon || position.horizon || "—")}</div>
-      <div style="grid-column: span 3"><span class="muted">Pourquoi</span><br>${safeText(position.analysisSnapshot?.reason || position.tradeReason || "Pas de commentaire pour le moment.")}</div>
+      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
+      <div><span class="muted">P/L live</span><br>${safeText(tradePnlText(meta))}</div>
+      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
+      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
+      <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
+      <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
+      <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
+      <div><span class="muted">Investi</span><br>${exec.invested == null ? "—" : money(exec.invested * fxRateUsdToEur(), "EUR")}</div>
+    </div>
+
+    <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
+    <div class="trade-plan-grid compact">
+      <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
+      <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
+      <div style="grid-column: span 2"><span class="muted">Pourquoi</span><br>${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
     </div>
 
     <div class="trade-actions split">
-      <button class="btn trade-btn secondary" data-close-half="${safeText(position.id)}">Cloturer 50%</button>
-      <button class="btn trade-btn primary" data-close-trade="${safeText(position.id)}">Cloturer</button>
+      <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
+      <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
     </div>
   </div>`;
 }
 
 function renderHistoryRow(item) {
+    const p = normalizePositionRecord(item);
+    const snap = p.analysisSnapshot || {};
     return `
       <div class="trade-row history simple-history-row">
         <div>
-          <div class="trade-symbol">${safeText(item.symbol)}</div>
-          <div class="trade-sub">${new Date(item.closedAt).toLocaleString("fr-FR")}</div>
+          <div class="trade-symbol">${safeText(p.symbol)}</div>
+          <div class="trade-sub">${p.closedAt ? new Date(p.closedAt).toLocaleString("fr-FR") : "date indisponible"}</div>
         </div>
-        <div>${badge(simpleSideLabel(item.side), item.side)}</div>
-        <div>${badge(historyResultLabel(item), (Number(item.pnl || 0) >= 0 ? "positive" : "negative"))}</div>
-        <div>${priceDisplay(item.entryPrice)}</div>
-        <div>${priceDisplay(item.exitPrice)}</div>
-        <div class="${(item.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((item.pnl || 0) * fxRateUsdToEur(), "EUR")} · ${pct(item.pnlPct)}</div>
-        <div>${safeText(item.closeType || item.sourceUsed || "training")}</div>
+        <div>${badge(simpleSideLabel(p.side), p.side)}</div>
+        <div>${badge(historyResultLabel(p), (Number(p.pnl || 0) >= 0 ? "positive" : "negative"))}</div>
+        <div>${priceDisplay(p.entryPrice)}</div>
+        <div>${priceDisplay(p.exitPrice)}</div>
+        <div class="${(p.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((p.pnl || 0) * fxRateUsdToEur(), "EUR")} · ${pct(p.pnlPct)}</div>
+        <div>${safeText(snap.score == null ? "—" : `${num(snap.score, 0)}/100`)}</div>
+        <div>${safeText(p.closeType || p.sourceUsed || "training")}</div>
       </div>`;
   }
 
@@ -2449,6 +2481,14 @@ function renderHistoryRow(item) {
     const arr = Object.values(bySymbol).map((x) => ({ ...x, winRate: x.count ? (x.wins / x.count) * 100 : null }));
     arr.sort((a, b) => Number(b.pnl || 0) - Number(a.pnl || 0));
     return { best: arr.slice(0, 3), worst: arr.slice(-3).reverse() };
+  }
+
+  function tradeOperationalLabel(meta) {
+    if (!meta) return "a surveiller";
+    if (meta.stopDistancePct != null && meta.stopDistancePct <= 5) return "proche stop";
+    if (meta.targetDistancePct != null && meta.targetDistancePct <= 5) return "proche objectif";
+    if (meta.livePnlPct != null && meta.livePnlPct > 0) return "en suivi";
+    return "en attente";
   }
 
   
@@ -2572,7 +2612,7 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. Les trades sont maintenant sauvegardes avec un snapshot d'analyse, une execution et un etat live.</div>
+          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat Supabase : ${
             state.trades.remoteStatus === "connected"
