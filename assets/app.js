@@ -26,7 +26,10 @@
     showScoreBreakdown: true,
     compactCards: false,
     displayCurrency: "EUR_PLUS_USD",
-    showAlgoJournal: true
+    showAlgoJournal: true,
+    supabaseEnabled: false,
+    supabaseUrl: "",
+    supabaseAnonKey: ""
   };
 
   const state = {
@@ -55,7 +58,10 @@
     trades: {
       mode: "training",
       positions: [],
-      history: []
+      history: [],
+      remoteStatus: "local_only",
+      remoteError: null,
+      lastRemoteSyncAt: null
     },
     algoJournal: [],
     settings: loadSettings(),
@@ -116,6 +122,231 @@
 
   function loadTradesMeta() {
     return readJson(TRADE_STORAGE.meta, {});
+  }
+
+  const SUPABASE_TABLES = {
+    positions: "mtp_positions",
+    trades: "mtp_trades"
+  };
+
+  function supabaseConfig() {
+    return {
+      enabled: !!state.settings.supabaseEnabled,
+      url: String(state.settings.supabaseUrl || "").trim().replace(/\/$/, ""),
+      key: String(state.settings.supabaseAnonKey || "").trim()
+    };
+  }
+
+  function supabaseReady() {
+    const cfg = supabaseConfig();
+    return !!(cfg.enabled && cfg.url && cfg.key);
+  }
+
+  function supabaseHeaders(extra = {}) {
+    const cfg = supabaseConfig();
+    return {
+      "Content-Type": "application/json",
+      "apikey": cfg.key,
+      "Authorization": `Bearer ${cfg.key}`,
+      ...extra
+    };
+  }
+
+  async function supabaseFetch(path, options = {}) {
+    const cfg = supabaseConfig();
+    if (!supabaseReady()) throw new Error("supabase_not_configured");
+    const res = await fetch(`${cfg.url}/rest/v1/${path}`, {
+      ...options,
+      headers: supabaseHeaders(options.headers || {})
+    });
+    if (!res.ok) {
+      const txt = await res.text().catch(() => "");
+      throw new Error(`supabase_${res.status}:${txt || res.statusText}`);
+    }
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) return res.json();
+    return res.text();
+  }
+
+  function mapPositionToSupabase(position) {
+    const p = normalizePositionRecord(position);
+    return {
+      id: p.id,
+      symbol: p.symbol || null,
+      name: p.name || null,
+      mode: "training",
+      status: "open",
+      side: p.side || null,
+      asset_class: p.assetClass || null,
+      quantity: Number.isFinite(Number(p.quantity)) ? Number(p.quantity) : null,
+      entry_price: Number.isFinite(Number(p.execution?.entryPrice ?? p.entryPrice)) ? Number(p.execution?.entryPrice ?? p.entryPrice) : null,
+      invested: Number.isFinite(Number(p.execution?.invested ?? p.invested)) ? Number(p.execution?.invested ?? p.invested) : null,
+      stop_loss: Number.isFinite(Number(p.analysisSnapshot?.stopLoss ?? p.stopLoss)) ? Number(p.analysisSnapshot?.stopLoss ?? p.stopLoss) : null,
+      take_profit: Number.isFinite(Number(p.analysisSnapshot?.takeProfit ?? p.takeProfit)) ? Number(p.analysisSnapshot?.takeProfit ?? p.takeProfit) : null,
+      score: Number.isFinite(Number(p.analysisSnapshot?.score ?? p.score)) ? Number(p.analysisSnapshot?.score ?? p.score) : null,
+      trend_label: p.analysisSnapshot?.trendLabel || p.trendLabel || null,
+      trade_decision: p.analysisSnapshot?.decision || p.tradeDecision || null,
+      trade_reason: p.analysisSnapshot?.reason || p.tradeReason || null,
+      horizon: p.analysisSnapshot?.horizon || p.horizon || null,
+      source_used: p.analysisSnapshot?.sourceUsed || p.sourceUsed || null,
+      opened_at: p.execution?.openedAt || p.openedAt || null,
+      analysis_snapshot: p.analysisSnapshot || null,
+      execution: p.execution || null,
+      live: p.live || null,
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  function mapSupabasePositionToLocal(row) {
+    return normalizePositionRecord({
+      id: row.id,
+      symbol: row.symbol,
+      name: row.name,
+      assetClass: row.asset_class || null,
+      side: row.side || null,
+      quantity: row.quantity,
+      entryPrice: row.entry_price,
+      invested: row.invested,
+      stopLoss: row.stop_loss,
+      takeProfit: row.take_profit,
+      tradeDecision: row.trade_decision,
+      tradeReason: row.trade_reason,
+      trendLabel: row.trend_label,
+      horizon: row.horizon,
+      sourceUsed: row.source_used,
+      openedAt: row.opened_at,
+      score: row.score,
+      analysisSnapshot: row.analysis_snapshot || null,
+      execution: row.execution || null,
+      live: row.live || null
+    });
+  }
+
+  function mapHistoryTradeToSupabase(trade) {
+    const t = normalizePositionRecord(trade);
+    return {
+      id: t.id,
+      symbol: t.symbol || null,
+      name: t.name || null,
+      mode: "training",
+      status: "closed",
+      side: t.side || null,
+      asset_class: t.assetClass || null,
+      quantity: Number.isFinite(Number(t.quantity)) ? Number(t.quantity) : null,
+      entry_price: Number.isFinite(Number(t.execution?.entryPrice ?? t.entryPrice)) ? Number(t.execution?.entryPrice ?? t.entryPrice) : null,
+      exit_price: Number.isFinite(Number(t.exitPrice)) ? Number(t.exitPrice) : null,
+      invested: Number.isFinite(Number(t.execution?.invested ?? t.invested)) ? Number(t.execution?.invested ?? t.invested) : null,
+      stop_loss: Number.isFinite(Number(t.analysisSnapshot?.stopLoss ?? t.stopLoss)) ? Number(t.analysisSnapshot?.stopLoss ?? t.stopLoss) : null,
+      take_profit: Number.isFinite(Number(t.analysisSnapshot?.takeProfit ?? t.takeProfit)) ? Number(t.analysisSnapshot?.takeProfit ?? t.takeProfit) : null,
+      score: Number.isFinite(Number(t.analysisSnapshot?.score ?? t.score)) ? Number(t.analysisSnapshot?.score ?? t.score) : null,
+      trend_label: t.analysisSnapshot?.trendLabel || t.trendLabel || null,
+      trade_decision: t.analysisSnapshot?.decision || t.tradeDecision || null,
+      trade_reason: t.analysisSnapshot?.reason || t.tradeReason || null,
+      horizon: t.analysisSnapshot?.horizon || t.horizon || null,
+      source_used: t.analysisSnapshot?.sourceUsed || t.sourceUsed || null,
+      opened_at: t.execution?.openedAt || t.openedAt || null,
+      closed_at: t.closedAt || null,
+      pnl: Number.isFinite(Number(t.pnl)) ? Number(t.pnl) : null,
+      pnl_pct: Number.isFinite(Number(t.pnlPct)) ? Number(t.pnlPct) : null,
+      analysis_snapshot: t.analysisSnapshot || null,
+      execution: t.execution || null,
+      live: t.live || null,
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  function mapSupabaseTradeToLocal(row) {
+    return normalizePositionRecord({
+      id: row.id,
+      symbol: row.symbol,
+      name: row.name,
+      assetClass: row.asset_class || null,
+      side: row.side || null,
+      quantity: row.quantity,
+      entryPrice: row.entry_price,
+      invested: row.invested,
+      stopLoss: row.stop_loss,
+      takeProfit: row.take_profit,
+      tradeDecision: row.trade_decision,
+      tradeReason: row.trade_reason,
+      trendLabel: row.trend_label,
+      horizon: row.horizon,
+      sourceUsed: row.source_used,
+      openedAt: row.opened_at,
+      closedAt: row.closed_at,
+      exitPrice: row.exit_price,
+      pnl: row.pnl,
+      pnlPct: row.pnl_pct,
+      score: row.score,
+      analysisSnapshot: row.analysis_snapshot || null,
+      execution: row.execution || null,
+      live: row.live || null
+    });
+  }
+
+  async function loadTradesFromSupabase() {
+    if (!supabaseReady()) return false;
+    try {
+      const positions = await supabaseFetch(`${SUPABASE_TABLES.positions}?mode=eq.training&status=eq.open&order=opened_at.desc`);
+      const history = await supabaseFetch(`${SUPABASE_TABLES.trades}?mode=eq.training&status=eq.closed&order=closed_at.desc`);
+      state.trades.positions = Array.isArray(positions) ? positions.map(mapSupabasePositionToLocal) : [];
+      state.trades.history = Array.isArray(history) ? history.map(mapSupabaseTradeToLocal) : [];
+      state.trades.remoteStatus = "connected";
+      state.trades.remoteError = null;
+      state.trades.lastRemoteSyncAt = Date.now();
+      return true;
+    } catch (err) {
+      state.trades.remoteStatus = "fallback_local";
+      state.trades.remoteError = err?.message || "supabase_load_failed";
+      return false;
+    }
+  }
+
+  async function syncTradesToSupabase() {
+    if (!supabaseReady()) return false;
+    try {
+      const openRows = (state.trades.positions || []).map(mapPositionToSupabase);
+      const historyRows = (state.trades.history || []).map(mapHistoryTradeToSupabase);
+
+      if (openRows.length) {
+        await supabaseFetch(`${SUPABASE_TABLES.positions}?on_conflict=id`, {
+          method: "POST",
+          headers: {
+            "Prefer": "resolution=merge-duplicates,return=representation"
+          },
+          body: JSON.stringify(openRows)
+        });
+      }
+
+      if (historyRows.length) {
+        await supabaseFetch(`${SUPABASE_TABLES.trades}?on_conflict=id`, {
+          method: "POST",
+          headers: {
+            "Prefer": "resolution=merge-duplicates,return=representation"
+          },
+          body: JSON.stringify(historyRows)
+        });
+      }
+
+      // Remove closed ids from open positions table.
+      const closedIds = historyRows.map((x) => x.id).filter(Boolean);
+      if (closedIds.length) {
+        const encoded = closedIds.map((x) => `"${String(x).replace(/"/g, '\"')}"`).join(",");
+        await supabaseFetch(`${SUPABASE_TABLES.positions}?id=in.(${encoded})`, {
+          method: "DELETE",
+          headers: { "Prefer": "return=minimal" }
+        });
+      }
+
+      state.trades.remoteStatus = "connected";
+      state.trades.remoteError = null;
+      state.trades.lastRemoteSyncAt = Date.now();
+      return true;
+    } catch (err) {
+      state.trades.remoteStatus = "fallback_local";
+      state.trades.remoteError = err?.message || "supabase_sync_failed";
+      return false;
+    }
   }
 
 
@@ -387,13 +618,16 @@
     }
   }
 
-  function loadTradesState() {
+  async function loadTradesState() {
+    const loadedRemote = await loadTradesFromSupabase();
     const rawPositions = readJsonFromKeys(TRADE_STORAGE.positions, []);
     const rawHistory = readJsonFromKeys(TRADE_STORAGE.history, []);
     const rawAlgo = readJsonFromKeys(TRADE_STORAGE.algoJournal, []);
 
-    state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
-    state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
+    if (!loadedRemote) {
+      state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
+      state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
+    }
     state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
 
     // Warm the current versioned keys too, so older/newer builds keep seeing the same trades.
@@ -427,6 +661,7 @@
       historyCount: history.length,
       algoCount: algoJournal.length
     });
+    syncTradesToSupabase().catch(() => {});
   }
 
   // =========================
@@ -2339,6 +2574,13 @@ function openPositionsRiskView() {
           <div class="screen-title">Mes trades</div>
           <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. Les trades sont maintenant sauvegardes avec un snapshot d'analyse, une execution et un etat live.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
+          <div class="muted">Etat Supabase : ${
+            state.trades.remoteStatus === "connected"
+              ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
+              : state.trades.remoteStatus === "fallback_local"
+                ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
+                : "local uniquement"
+          }</div>
         </div>
 
         <div class="controls">
@@ -2494,6 +2736,43 @@ function openPositionsRiskView() {
             </label>
           </div>
         </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-title">Supabase trades</div>
+          <div class="setting-list">
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Activer Supabase pour les trades</div>
+                <div class="setting-desc">Les trades ouverts et clotures seront lus et sauvegardes sur Supabase. Le local reste en secours.</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="supabaseEnabled" ${state.settings.supabaseEnabled ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row">
+              <div style="width:100%">
+                <div class="setting-title">URL Supabase</div>
+                <div class="setting-desc">Exemple : https://xxxx.supabase.co</div>
+                <input class="setting-input" data-setting-input="supabaseUrl" value="${safeText(state.settings.supabaseUrl || "")}" placeholder="https://xxxxx.supabase.co" style="width:100%;margin-top:8px">
+              </div>
+            </label>
+
+            <label class="setting-row">
+              <div style="width:100%">
+                <div class="setting-title">Anon key Supabase</div>
+                <div class="setting-desc">Cle publique anon utilisee par le frontend.</div>
+                <input class="setting-input" data-setting-input="supabaseAnonKey" value="${safeText(state.settings.supabaseAnonKey || "")}" placeholder="eyJ..." style="width:100%;margin-top:8px">
+              </div>
+            </label>
+
+            <div class="muted">
+              Etat distant : ${
+                state.trades.remoteStatus === "connected" ? "connecte" :
+                state.trades.remoteStatus === "fallback_local" ? `fallback local (${safeText(state.trades.remoteError || "erreur")})` :
+                "local uniquement"
+              }
+            </div>
+          </div>
+        </div>
       </div>`;
   }
 
@@ -2590,10 +2869,20 @@ function openPositionsRiskView() {
         render();
       });
     });
+
+    app.querySelectorAll("[data-setting-input]").forEach(el => {
+      const save = () => {
+        const key = el.getAttribute("data-setting-input");
+        state.settings[key] = el.value;
+        persistSettings();
+      };
+      el.addEventListener("change", save);
+      el.addEventListener("blur", save);
+    });
   }
 
   async function boot() {
-    loadTradesState();
+    await loadTradesState();
     if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
       state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);
       applyFilter();
