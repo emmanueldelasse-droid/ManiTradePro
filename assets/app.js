@@ -63,6 +63,11 @@
       remoteError: null,
       lastRemoteSyncAt: null
     },
+    tradeLive: {
+      lastRunAt: 0,
+      bySymbol: {},
+      running: false
+    },
     algoJournal: [],
     settings: loadSettings(),
     budget: loadBudgetTracker(),
@@ -496,6 +501,22 @@
       algoCount: algoJournal.length
     });
     syncTradesToSupabase().catch(() => {});
+  }
+
+  function persistTradesLocalCache() {
+    const positions = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
+    const history = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : [];
+    state.trades.positions = positions;
+    state.trades.history = history;
+    writeJsonToKeys(TRADE_STORAGE.positions, positions);
+    writeJsonToKeys(TRADE_STORAGE.history, history);
+    writeJson(TRADE_STORAGE.positionsBackup, positions);
+    writeJson(TRADE_STORAGE.historyBackup, history);
+    saveTradesMeta({
+      positionsCount: positions.length,
+      historyCount: history.length,
+      liveUpdatedAt: Date.now()
+    });
   }
 
   // =========================
@@ -2051,14 +2072,21 @@ function renderDetail() {
   }
 
 function tradeStatusMeta(position) {
-  const opp = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === position.symbol) : null;
-  const livePrice = opp?.price ?? position.entryPrice ?? null;
-  const hasTarget = position.takeProfit != null && Number.isFinite(Number(position.takeProfit));
-  const hasStop = position.stopLoss != null && Number.isFinite(Number(position.stopLoss));
-  const pnlPctLive = livePrice == null || position.entryPrice == null ? null :
-    (position.side === "long"
-      ? ((livePrice - position.entryPrice) / position.entryPrice) * 100
-      : ((position.entryPrice - livePrice) / position.entryPrice) * 100);
+  const p = normalizePositionRecord(position);
+  const snap = p.analysisSnapshot || {};
+  const exec = p.execution || {};
+  const live = p.live || {};
+  const opp = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === p.symbol) : null;
+  const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const stopLoss = Number(snap.stopLoss ?? p.stopLoss);
+  const takeProfit = Number(snap.takeProfit ?? p.takeProfit);
+  const livePrice = opp?.price ?? live?.price ?? (Number.isFinite(entryPrice) ? entryPrice : null);
+  const hasTarget = Number.isFinite(takeProfit);
+  const hasStop = Number.isFinite(stopLoss);
+  const pnlPctLive = livePrice == null || !Number.isFinite(entryPrice) ? null :
+    (p.side === "short"
+      ? ((entryPrice - livePrice) / entryPrice) * 100
+      : ((livePrice - entryPrice) / entryPrice) * 100);
 
   let label = "stable";
   let text = "Trade en attente";
@@ -2076,9 +2104,9 @@ function tradeStatusMeta(position) {
 
   let stopDistancePct = null;
   if (hasStop && livePrice != null) {
-    stopDistancePct = position.side === "long"
-      ? ((livePrice - position.stopLoss) / livePrice) * 100
-      : ((position.stopLoss - livePrice) / livePrice) * 100;
+    stopDistancePct = p.side === "short"
+      ? ((stopLoss - livePrice) / livePrice) * 100
+      : ((livePrice - stopLoss) / livePrice) * 100;
     if (stopDistancePct <= 1.2) {
       label = "near_stop";
       text = "Proche du stop";
@@ -2088,9 +2116,9 @@ function tradeStatusMeta(position) {
 
   let targetDistancePct = null;
   if (hasTarget && livePrice != null) {
-    targetDistancePct = position.side === "long"
-      ? ((position.takeProfit - livePrice) / livePrice) * 100
-      : ((livePrice - position.takeProfit) / livePrice) * 100;
+    targetDistancePct = p.side === "short"
+      ? ((livePrice - takeProfit) / livePrice) * 100
+      : ((takeProfit - livePrice) / livePrice) * 100;
     if (targetDistancePct <= 1.5 && targetDistancePct >= -1) {
       label = "near_target";
       text = "Proche de l'objectif";
@@ -2213,10 +2241,6 @@ function renderPositionRow(position) {
   const exec = p.execution || {};
   const live = p.live || {};
   const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
-  const scoreValue = displayScoreValue(p);
-  const ratioValue = displayRatioValue(p);
-  const investedValue = displayInvestedValue(p);
-  const trendDisplay = safeText(snap.trendLabel || p.trendLabel || "—");
 
   return `<div class="trade-row trade-card-row simple-trade-card">
     <div class="trade-card-top">
@@ -2226,7 +2250,7 @@ function renderPositionRow(position) {
       </div>
       <div class="trade-card-badges">
         ${badge(simpleSideLabel(p.side), p.side)}
-        ${badge(trendDisplay, "neutral")}
+        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
         ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
@@ -2235,26 +2259,26 @@ function renderPositionRow(position) {
 
     <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
     <div class="trade-plan-grid compact">
-      <div><span class="muted">Score d'entree</span><br>${scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`}</div>
+      <div><span class="muted">Score d'entree</span><br>${snap.score == null ? "—" : `${num(snap.score, 0)}/100`}</div>
       <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
-      <div><span class="muted">Tendance</span><br>${trendDisplay}</div>
+      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
       <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
       <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
       <div><span class="muted">Stop</span><br>${snap.stopLoss == null && p.stopLoss == null ? "—" : priceDisplay(snap.stopLoss ?? p.stopLoss)}</div>
       <div><span class="muted">Objectif</span><br>${snap.takeProfit == null && p.takeProfit == null ? "—" : priceDisplay(snap.takeProfit ?? p.takeProfit)}</div>
-      <div><span class="muted">Ratio</span><br>${ratioValue == null ? "—" : num(ratioValue, 2)}</div>
+      <div><span class="muted">Ratio</span><br>${snap.ratio == null ? "—" : num(snap.ratio, 2)}</div>
     </div>
 
     <div class="muted" style="margin:14px 0 6px">Etat live</div>
     <div class="trade-plan-grid compact">
       <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">P/L live</span><br>${safeText(tradePnlText(meta))}</div>
+      <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
       <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
       <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
       <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
       <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
       <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-      <div><span class="muted">Investi</span><br>${investedValue == null ? "—" : money(investedValue * fxRateUsdToEur(), "EUR")}</div>
+      <div><span class="muted">Investi</span><br>${exec.invested == null ? "—" : money(exec.invested * fxRateUsdToEur(), "EUR")}</div>
     </div>
 
     <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
@@ -2274,7 +2298,6 @@ function renderPositionRow(position) {
 function renderHistoryRow(item) {
     const p = normalizePositionRecord(item);
     const snap = p.analysisSnapshot || {};
-    const scoreValue = displayScoreValue(p);
     return `
       <div class="trade-row history simple-history-row">
         <div>
@@ -2286,8 +2309,8 @@ function renderHistoryRow(item) {
         <div>${priceDisplay(p.entryPrice)}</div>
         <div>${priceDisplay(p.exitPrice)}</div>
         <div class="${(p.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((p.pnl || 0) * fxRateUsdToEur(), "EUR")} · ${pct(p.pnlPct)}</div>
-        <div>${safeText(scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`)}</div>
-        <div>${safeText(historyCloseLabel(p))}</div>
+        <div>${safeText(snap.score == null ? "—" : `${num(snap.score, 0)}/100`)}</div>
+        <div>${safeText(p.closeType || p.sourceUsed || "training")}</div>
       </div>`;
   }
 
@@ -2330,40 +2353,86 @@ function renderHistoryRow(item) {
     return "en attente";
   }
 
-  function displayScoreValue(position){
-    const snap = position?.analysisSnapshot || {};
-    const raw = Number(snap?.score ?? position?.score);
-    if (!Number.isFinite(raw) || raw <= 0) return null;
-    return raw;
+  function tradeLiveIntervalMs(position) {
+    const symbol = String(position?.symbol || "").toUpperCase();
+    if (!symbol) return 120000;
+    if (["BTC", "ETH", "SOL", "BNB", "XRP", "DOGE", "ADA", "AVAX", "LINK", "SUI", "NEAR", "TON", "APT"].includes(symbol)) return 30000;
+    return 120000;
   }
 
-  function displayRatioValue(position){
-    const snap = position?.analysisSnapshot || {};
-    const explicit = Number(snap?.ratio ?? position?.rrRatio);
-    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+  async function refreshOpenTradesLive(force = false) {
+    if (state.tradeLive?.running) return;
+    if (state.route !== "portfolio" || state.trades.mode !== "training") return;
+    const positions = Array.isArray(state.trades?.positions) ? state.trades.positions : [];
+    if (!positions.length) return;
 
-    const entry = Number(position?.execution?.entryPrice ?? snap?.entry ?? position?.entryPrice);
-    const stop = Number(snap?.stopLoss ?? position?.stopLoss);
-    const target = Number(snap?.takeProfit ?? position?.takeProfit);
-    if (!Number.isFinite(entry) || !Number.isFinite(stop) || !Number.isFinite(target)) return null;
-    const risk = Math.abs(entry - stop);
-    const reward = Math.abs(target - entry);
-    if (!(risk > 0) || !(reward > 0)) return null;
-    return reward / risk;
-  }
+    const now = Date.now();
+    const targets = positions.filter((p) => {
+      const key = String(p?.symbol || "").toUpperCase();
+      const last = Number(state.tradeLive.bySymbol?.[key] || 0);
+      return force || (now - last) >= tradeLiveIntervalMs(p);
+    });
 
-  function displayInvestedValue(position){
-    const exec = position?.execution || {};
-    const direct = Number(exec?.invested ?? position?.invested);
-    if (Number.isFinite(direct) && direct > 0) return direct;
-    const entry = Number(exec?.entryPrice ?? position?.analysisSnapshot?.entry ?? position?.entryPrice);
-    const qty = Number(exec?.quantity ?? position?.quantity);
-    if (Number.isFinite(entry) && entry > 0 && Number.isFinite(qty) && qty > 0) return entry * qty;
-    return null;
-  }
+    if (!targets.length) return;
+    state.tradeLive.running = true;
 
-  function historyCloseLabel(position){
-    return position?.closeType || position?.sourceUsed || position?.analysisSnapshot?.sourceUsed || "training";
+    try {
+      const results = await Promise.all(targets.map(async (position) => {
+        const symbol = String(position?.symbol || "").toUpperCase();
+        try {
+          const detail = await api(`/api/opportunity-detail/${encodeURIComponent(symbol)}`, 8000);
+          const price = Number(detail?.data?.price);
+          return {
+            symbol,
+            ok: Number.isFinite(price),
+            price: Number.isFinite(price) ? price : null,
+            sourceUsed: detail?.data?.sourceUsed || null
+          };
+        } catch (e) {
+          return { symbol, ok: false, price: null, sourceUsed: null };
+        }
+      }));
+
+      let changed = false;
+      state.trades.positions = state.trades.positions.map((raw) => {
+        const p = normalizePositionRecord(raw);
+        const symbol = String(p?.symbol || "").toUpperCase();
+        const hit = results.find((x) => x.symbol === symbol);
+        if (!hit) return p;
+        state.tradeLive.bySymbol[symbol] = now;
+        if (!hit.ok || hit.price == null) return p;
+
+        const exec = p.execution || {};
+        const entryPrice = Number(exec.entryPrice ?? p.entryPrice ?? p.analysisSnapshot?.entry);
+        const quantity = Number(exec.quantity ?? p.quantity);
+        const pnl = (Number.isFinite(entryPrice) && Number.isFinite(quantity) && quantity > 0)
+          ? ((p.side === "short" ? (entryPrice - hit.price) : (hit.price - entryPrice)) * quantity)
+          : null;
+        const invested = Number.isFinite(entryPrice) && Number.isFinite(quantity) && quantity > 0 ? entryPrice * quantity : null;
+        const pnlPct = (pnl != null && invested && invested > 0) ? (pnl / invested) * 100 : null;
+
+        changed = true
+        return normalizePositionRecord({
+          ...p,
+          sourceUsed: p.sourceUsed || hit.sourceUsed || null,
+          live: {
+            ...(p.live || {}),
+            updatedAt: new Date(now).toISOString(),
+            price: hit.price,
+            pnl,
+            pnlPct
+          }
+        });
+      });
+
+      if (changed || results.length) {
+        persistTradesLocalCache();
+        render();
+      }
+    } finally {
+      state.tradeLive.lastRunAt = now;
+      state.tradeLive.running = false;
+    }
   }
 
   
@@ -2476,6 +2545,7 @@ function openPositionsRiskView() {
 
   function renderPortfolio() {
     restoreTradesFromBackupIfEmpty();
+    refreshOpenTradesLive().catch(() => {});
     const stats = trainingStats();
     const positions = state.trades.positions;
     const history = state.trades.history;
@@ -2487,7 +2557,7 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker.</div>
+          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${
             state.trades.remoteStatus === "connected"
@@ -2586,7 +2656,7 @@ function openPositionsRiskView() {
             ${history.length ? `
               <div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Resultat</div><div>Entree</div><div>Sortie</div><div>P/L</div><div>Source / cloture</div>
+                  <div>Actif</div><div>Sens</div><div>Resultat</div><div>Entree</div><div>Sortie</div><div>P/L</div><div>Cloture</div>
                 </div>
                 ${history.map(renderHistoryRow).join("")}
               </div>
@@ -2786,7 +2856,10 @@ function openPositionsRiskView() {
     await loadDashboard();
     render();
     setInterval(() => {
-      if (["dashboard", "opportunities", "asset-detail", "settings"].includes(state.route)) {
+      if (["dashboard", "opportunities", "asset-detail", "settings", "portfolio"].includes(state.route)) {
+        if (state.route === "portfolio") {
+          refreshOpenTradesLive().catch(() => {});
+        }
         render();
       }
     }, 30000);
