@@ -1757,10 +1757,11 @@ function dashboardTopPick(opps) {
                   </div>
                 </div>
                 <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
+                <div class="news-summary">${safeText(cleanNewsSummary(item))}</div>
                 <div class="news-bottom">
                   <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
                   <div class="legend">
-                    <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Lire</a>
+                    <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Ouvrir la source</a>
                     <button class="btn" data-route="news">Voir tout</button>
                   </div>
                 </div>
@@ -1783,6 +1784,33 @@ function dashboardTopPick(opps) {
     };
   }
 
+  function cleanNewsSummary(item) {
+    const raw = String(item?.summary || "").trim();
+    if (!raw) return "Pas de resume.";
+    let text = raw
+      .replace(/https?:\/\/\S+/gi, " ")
+      .replace(/www\.\S+/gi, " ")
+      .replace(/target=_blank/gi, " ")
+      .replace(/font color=.*?>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!text) text = "Pas de resume.";
+    if (text.length > 220) text = `${text.slice(0, 217).trim()}...`;
+    return text;
+  }
+
+  function newsSourceLabel(item) {
+    const src = String(item?.source || "").trim();
+    if (src) return src;
+    try {
+      const url = new URL(String(item?.link || ""));
+      return url.hostname.replace(/^www\./, "");
+    } catch {
+      return "Source";
+    }
+  }
+
   function renderNewsList(items, limit = 8) {
     const rows = (items || []).slice(0, limit);
     if (!rows.length) return `<div class="empty-state">Aucune news exploitable pour le moment.</div>`;
@@ -1791,17 +1819,21 @@ function dashboardTopPick(opps) {
         ${rows.map((item) => `
           <div class="news-row">
             <div class="news-top">
-              <div class="trade-symbol">${safeText(item.source || "Source")}</div>
+              <div class="trade-symbol">${safeText(newsSourceLabel(item))}</div>
               <div class="legend">
                 ${badge(item.topic || "marche")}
                 ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
               </div>
             </div>
             <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
-            <div class="trade-sub">${safeText(item.summary || "Pas de resume")}</div>
+            <div class="news-summary">${safeText(cleanNewsSummary(item))}</div>
+            <div class="news-meta">
+              <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")}</div>
+              <div class="muted">${safeNewsDate(item.publishedAt)}</div>
+            </div>
             <div class="news-bottom">
-              <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
-              <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Lire</a>
+              <div class="muted">${safeText(item.category || "actualite marche")}</div>
+              <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Ouvrir la source</a>
             </div>
           </div>
         `).join("")}
@@ -1829,7 +1861,7 @@ function dashboardTopPick(opps) {
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
           <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
-          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Source : ${safeText(state.news.source)}` : ""}</div>
+          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
         <div class="grid trades-stats">

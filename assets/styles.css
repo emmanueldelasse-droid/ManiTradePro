@@ -506,3 +506,27 @@ html.theme-light-root :root{
 @media (max-width: 900px){
   .news-summary-grid{grid-template-columns:1fr}
 }
+
+
+.news-summary{
+  margin:8px 0 10px;
+  color:var(--text-secondary);
+  line-height:1.45;
+}
+.news-meta{
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:10px;
+  flex-wrap:wrap;
+}
+.news-row .trade-symbol{
+  font-weight:700;
+}
+.news-row{
+  padding:16px;
+}
+.news-title{
+  font-size:1rem;
+  line-height:1.35;
+}
