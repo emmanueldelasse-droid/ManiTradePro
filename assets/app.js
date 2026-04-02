@@ -57,6 +57,14 @@
       trending: [],
       portfolio: null
     },
+    news: {
+      items: [],
+      overview: null,
+      status: "idle",
+      source: null,
+      asOf: null,
+      message: null
+    },
     trades: {
       mode: "training",
       positions: [],
@@ -1147,14 +1155,23 @@ function currentTradePlan() {
 
   async function loadDashboard() {
     try {
-      const [fg, trending, portfolio] = await Promise.all([
+      const [fg, trending, portfolio, news] = await Promise.all([
         api("/api/fear-greed").catch(() => null),
         api("/api/trending").catch(() => null),
-        api("/api/portfolio/summary").catch(() => null)
+        api("/api/portfolio/summary").catch(() => null),
+        api("/api/news").catch(() => null)
       ]);
       state.dashboard.fearGreed = fg?.data || null;
       state.dashboard.trending = trending?.data || [];
       state.dashboard.portfolio = portfolio?.data || null;
+      state.news = {
+        items: Array.isArray(news?.data?.items) ? news.data.items : [],
+        overview: news?.data?.overview || null,
+        status: news?.status || "idle",
+        source: news?.source || null,
+        asOf: news?.asOf || null,
+        message: news?.message || null
+      };
       state.error = null;
     } catch (e) {
       state.error = e.message || "Chargement impossible";
@@ -1692,6 +1709,66 @@ function dashboardTopPick(opps) {
 }
 
 
+
+  function safeNewsDate(value) {
+    if (!value) return "—";
+    const d = new Date(value);
+    const t = d.getTime();
+    if (!Number.isFinite(t)) return "—";
+    return d.toLocaleString("fr-FR");
+  }
+
+  function newsToneBadgeClass(tone) {
+    const t = String(tone || "").toLowerCase();
+    if (t.includes("hauss")) return "positive";
+    if (t.includes("baiss")) return "negative";
+    return "neutral";
+  }
+
+  function renderNewsIaBlock() {
+    const items = Array.isArray(state.news?.items) ? state.news.items.slice(0, 6) : [];
+    const overview = state.news?.overview || {};
+    return `
+      <div class="card" style="margin-top:18px">
+        <div class="section-title"><span>News + IA</span><span>${items.length}</span></div>
+
+        <div class="grid trades-stats" style="margin-bottom:14px">
+          <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
+          <div class="stat-card"><div class="stat-label">Themes</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,2).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Source</div><div class="stat-value" style="font-size:1rem">${safeText(state.news?.source || "—")}</div></div>
+        </div>
+
+        <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
+          <div class="muted" style="margin-bottom:6px">Lecture IA</div>
+          <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
+        </div>
+
+        ${items.length ? `
+          <div class="news-list">
+            ${items.map((item) => `
+              <div class="news-row">
+                <div class="news-top">
+                  <div class="trade-symbol">${safeText(item.source || "Source")}</div>
+                  <div class="legend">
+                    ${badge(item.topic || "marche")}
+                    ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
+                  </div>
+                </div>
+                <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
+                <div class="trade-sub">${safeText(item.summary || "Pas de resume")} </div>
+                <div class="news-bottom">
+                  <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
+                  <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Lire</a>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        ` : `<div class="empty-state">Aucune news exploitable pour le moment.</div>`}
+      </div>
+    `;
+  }
+
 function renderDashboard() {
     const stats = trainingStats();
     const summary = dashboardSignalSummary(state.opportunities);
@@ -1782,6 +1859,7 @@ function renderDashboard() {
           <div class="section-title"><span>Meilleures opportunites</span><span>${topRows.length}</span></div>
           ${topRows.length ? `<div class="opp-list">${topRows.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite disponible.</div>`}
         </div>
+        ${renderNewsIaBlock()}
         ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
       </div>`;
   }

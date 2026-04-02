@@ -489,3 +489,13 @@ html.theme-light-root :root{
   background:var(--bg-card) !important;
   color:var(--text-primary) !important;
 }
+
+
+.news-list{display:flex;flex-direction:column;gap:12px}
+.news-row{border:1px solid var(--border-subtle);border-radius:12px;padding:14px;background:var(--bg-card-hover)}
+.news-top,.news-bottom{display:flex;justify-content:space-between;gap:12px;align-items:center}
+.news-title{font-weight:700;margin:8px 0}
+.news-bottom .btn{padding:8px 12px}
+@media (max-width: 900px){
+  .news-top,.news-bottom{flex-direction:column;align-items:flex-start}
+}
