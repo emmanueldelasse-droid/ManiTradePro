@@ -1410,17 +1410,23 @@ function createRecommendedTrade() {
 function closeTrainingTrade(id, livePrice = null) {
     const idx = state.trades.positions.findIndex((p) => p.id === id);
     if (idx === -1) return;
-    const position = state.trades.positions[idx];
-    const exitPrice = livePrice ?? position.entryPrice;
+    const position = normalizePositionRecord(state.trades.positions[idx]);
+    const exitPrice = Number.isFinite(Number(livePrice)) ? Number(livePrice) : Number(position?.live?.price ?? position?.entryPrice);
     const { pnl, pnlPct } = getOpenPnl(position, exitPrice);
-    const closed = {
+    const closedAt = nowIso();
+    const closed = normalizePositionRecord({
       ...position,
       exitPrice,
-      closedAt: nowIso(),
+      closedAt,
       pnl,
       pnlPct,
-      closeType: "Cloture manuelle"
-    };
+      closeType: "Cloture manuelle",
+      closedExecution: {
+        exitPrice,
+        closedAt,
+        closeType: "Cloture manuelle"
+      }
+    });
     state.trades.positions.splice(idx, 1);
     state.trades.history.unshift(closed);
     persistTradesState();
@@ -2220,7 +2226,7 @@ function tradeStatusMeta(position) {
 function partialClosePosition(positionId, percent = 50) {
   const idx = state.trades.positions.findIndex((p) => p.id === positionId);
   if (idx === -1) return;
-  const position = state.trades.positions[idx];
+  const position = normalizePositionRecord(state.trades.positions[idx]);
   const meta = tradeStatusMeta(position);
   const livePrice = meta.livePrice ?? position.entryPrice;
   const ratio = Math.max(0.1, Math.min(1, percent / 100));
@@ -2232,29 +2238,51 @@ function partialClosePosition(positionId, percent = 50) {
     ? (livePrice - position.entryPrice) * closeQty
     : (position.entryPrice - livePrice) * closeQty;
   const pnlPct = position.entryPrice ? ((pnl / (position.entryPrice * closeQty)) * 100) : null;
+  const closedAt = new Date().toISOString();
 
-  state.trades.history.unshift({
+  state.trades.history.unshift(normalizePositionRecord({
     id: `${position.id}:partial:${Date.now()}`,
     symbol: position.symbol,
+    name: position.name,
     side: position.side,
     quantity: closeQty,
     entryPrice: position.entryPrice,
+    invested: Number.isFinite(Number(position.entryPrice)) ? position.entryPrice * closeQty : null,
     exitPrice: livePrice,
     pnl,
     pnlPct,
-    closedAt: new Date().toISOString(),
+    closedAt,
     sourceUsed: position.sourceUsed || "training",
-    closeType: "Cloture partielle 50%"
-  });
+    closeType: `Cloture partielle ${percent}%`,
+    analysisSnapshot: position.analysisSnapshot,
+    execution: {
+      openedAt: position.execution?.openedAt || position.openedAt || null,
+      entryPrice: position.entryPrice,
+      quantity: closeQty,
+      invested: Number.isFinite(Number(position.entryPrice)) ? position.entryPrice * closeQty : null
+    },
+    closedExecution: {
+      exitPrice: livePrice,
+      closedAt,
+      closeType: `Cloture partielle ${percent}%`
+    }
+  }));
 
   if (remainingQty <= 0.0000001) {
     state.trades.positions.splice(idx, 1);
   } else {
-    state.trades.positions[idx] = {
+    state.trades.positions[idx] = normalizePositionRecord({
       ...position,
       quantity: remainingQty,
-      partialClosedAt: new Date().toISOString()
-    };
+      invested: Number.isFinite(Number(position.entryPrice)) ? position.entryPrice * remainingQty : null,
+      execution: {
+        ...(position.execution || {}),
+        entryPrice: position.entryPrice,
+        quantity: remainingQty,
+        invested: Number.isFinite(Number(position.entryPrice)) ? position.entryPrice * remainingQty : null
+      },
+      partialClosedAt: closedAt
+    });
   }
 
   state.error = null;
@@ -2265,27 +2293,42 @@ function partialClosePosition(positionId, percent = 50) {
 function closeTradePosition(positionId) {
   const idx = state.trades.positions.findIndex((p) => p.id === positionId);
   if (idx === -1) return;
-  const position = state.trades.positions[idx];
+  const position = normalizePositionRecord(state.trades.positions[idx]);
   const meta = tradeStatusMeta(position);
   const livePrice = meta.livePrice ?? position.entryPrice;
   const pnl = position.side === "long"
     ? (livePrice - position.entryPrice) * position.quantity
     : (position.entryPrice - livePrice) * position.quantity;
   const pnlPct = position.entryPrice ? ((pnl / (position.entryPrice * position.quantity)) * 100) : null;
+  const closedAt = new Date().toISOString();
 
-  state.trades.history.unshift({
+  state.trades.history.unshift(normalizePositionRecord({
     id: `${position.id}:full:${Date.now()}`,
     symbol: position.symbol,
+    name: position.name,
     side: position.side,
     quantity: position.quantity,
     entryPrice: position.entryPrice,
+    invested: Number.isFinite(Number(position.entryPrice)) ? position.entryPrice * position.quantity : null,
     exitPrice: livePrice,
     pnl,
     pnlPct,
-    closedAt: new Date().toISOString(),
+    closedAt,
     sourceUsed: position.sourceUsed || "training",
-    closeType: "Complete"
-  });
+    closeType: "Cloture manuelle",
+    analysisSnapshot: position.analysisSnapshot,
+    execution: {
+      openedAt: position.execution?.openedAt || position.openedAt || null,
+      entryPrice: position.entryPrice,
+      quantity: position.quantity,
+      invested: Number.isFinite(Number(position.entryPrice)) ? position.entryPrice * position.quantity : null
+    },
+    closedExecution: {
+      exitPrice: livePrice,
+      closedAt,
+      closeType: "Cloture manuelle"
+    }
+  }));
 
   state.trades.positions.splice(idx, 1);
   state.error = null;
@@ -2383,22 +2426,49 @@ function renderPositionRow(position) {
   </div>`;
 }
 
+function displayHistoryEntryPrice(position) {
+    const p = normalizePositionRecord(position);
+    const value = Number(p?.execution?.entryPrice ?? p?.analysisSnapshot?.entry ?? p?.entryPrice);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function displayHistoryExitPrice(position) {
+    const p = normalizePositionRecord(position);
+    const value = Number(p?.closedExecution?.exitPrice ?? p?.exitPrice ?? p?.live?.price);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  function displayHistoryClosedAt(position) {
+    const p = normalizePositionRecord(position);
+    return p?.closedExecution?.closedAt || p?.closedAt || null;
+  }
+
+  function displayHistorySourceOrClosure(position){
+    const p = normalizePositionRecord(position);
+    return p?.closedExecution?.closeType || p?.closeType || p?.sourceUsed || p?.analysisSnapshot?.sourceUsed || "training";
+  }
+
 function renderHistoryRow(item) {
     const p = normalizePositionRecord(item);
-    const snap = p.analysisSnapshot || {};
+    const scoreValue = displayScoreValue(p);
+    const entryPrice = displayHistoryEntryPrice(p);
+    const exitPrice = displayHistoryExitPrice(p);
+    const closedAt = displayHistoryClosedAt(p);
+    const pnl = Number(p?.pnl || 0);
+    const pnlPctValue = Number.isFinite(Number(p?.pnlPct)) ? Number(p.pnlPct) : null;
     return `
       <div class="trade-row history simple-history-row">
         <div>
           <div class="trade-symbol">${safeText(p.symbol)}</div>
-          <div class="trade-sub">${p.closedAt ? new Date(p.closedAt).toLocaleString("fr-FR") : "date indisponible"}</div>
+          <div class="trade-sub">${closedAt ? new Date(closedAt).toLocaleString("fr-FR") : "date indisponible"}</div>
         </div>
         <div>${badge(simpleSideLabel(p.side), p.side)}</div>
-        <div>${badge(historyResultLabel(p), (Number(p.pnl || 0) >= 0 ? "positive" : "negative"))}</div>
-        <div>${priceDisplay(p.entryPrice)}</div>
-        <div>${priceDisplay(p.exitPrice)}</div>
-        <div class="${(p.pnl || 0) >= 0 ? 'positive' : 'negative'}">${money((p.pnl || 0) * fxRateUsdToEur(), "EUR")} · ${pct(p.pnlPct)}</div>
-        <div>${safeText(displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`)}</div>
-        <div>${safeText(historyCloseLabel(p))}</div>
+        <div>${badge(historyResultLabel(p), (pnl >= 0 ? "positive" : "negative"))}</div>
+        <div>${entryPrice == null ? "—" : priceDisplay(entryPrice)}</div>
+        <div>${exitPrice == null ? "—" : priceDisplay(exitPrice)}</div>
+        <div class="${pnl >= 0 ? 'positive' : 'negative'}">${money(pnl * fxRateUsdToEur(), "EUR")} · ${pnlPctValue == null ? "—" : pct(pnlPctValue)}</div>
+        <div>${safeText(scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`)}</div>
+        <div>${safeText(displayHistorySourceOrClosure(p))}</div>
       </div>`;
   }
 
@@ -2473,7 +2543,7 @@ function renderHistoryRow(item) {
   }
 
   function historyCloseLabel(position){
-    return position?.closeType || position?.sourceUsed || position?.analysisSnapshot?.sourceUsed || "training";
+    return displayHistorySourceOrClosure(position);
   }
 
   function tradeLiveIntervalMs(position) {
@@ -2583,32 +2653,78 @@ function createAnalysisSnapshotFromOpportunity(detail){
 
 function normalizePositionRecord(position){
   if (!position || typeof position !== "object") return position;
+
   const legacy = position.analysisSnapshot || null;
+
+  const entryPriceRaw = Number(
+    position?.execution?.entryPrice ??
+    position?.entryPrice ??
+    position?.analysisSnapshot?.entry
+  );
+  const quantityRaw = Number(position?.execution?.quantity ?? position?.quantity);
+  const investedRaw = Number(position?.execution?.invested ?? position?.invested);
+  const exitPriceRaw = Number(position?.exitPrice ?? position?.closedExecution?.exitPrice);
+  const sourceUsed = position?.sourceUsed || position?.source || position?.analysisSnapshot?.sourceUsed || null;
+
   const snapshot = legacy || {
     symbol: position.symbol || null,
     name: position.name || position.symbol || null,
     score: Number.isFinite(Number(position.score)) ? Number(position.score) : null,
-    decision: position.analysisSnapshot?.decision || position.tradeDecision || null,
+    decision: position.tradeDecision || null,
     trendLabel: position.trendLabel || detectedTrendLabel(position.direction || "neutral"),
     direction: position.direction || null,
-    entry: Number.isFinite(Number(position.entryPrice)) ? Number(position.entryPrice) : null,
+    entry: Number.isFinite(entryPriceRaw) ? entryPriceRaw : null,
     stopLoss: Number.isFinite(Number(position.stopLoss)) ? Number(position.stopLoss) : null,
     takeProfit: Number.isFinite(Number(position.takeProfit)) ? Number(position.takeProfit) : null,
-    ratio: Number.isFinite(Number(position.rrRatio)) ? Number(position.rrRatio) : null,
-    horizon: position.analysisSnapshot?.horizon || position.horizon || null,
-    reason: position.analysisSnapshot?.reason || position.tradeReason || null,
+    ratio: Number.isFinite(Number(position.rrRatio ?? position.rr)) ? Number(position.rrRatio ?? position.rr) : null,
+    horizon: position.horizon || null,
+    reason: position.tradeReason || null,
     scoreBreakdown: position.scoreBreakdown || null,
-    sourceUsed: position.source || null,
+    sourceUsed,
     analysisTimestamp: position.openedAt || Date.now()
   };
+
+  const execution = position.execution || {
+    openedAt: position.openedAt || Date.now(),
+    entryPrice: Number.isFinite(entryPriceRaw) ? entryPriceRaw : null,
+    quantity: Number.isFinite(quantityRaw) ? quantityRaw : null,
+    invested: Number.isFinite(investedRaw) ? investedRaw : (
+      Number.isFinite(entryPriceRaw) && Number.isFinite(quantityRaw) ? entryPriceRaw * quantityRaw : null
+    )
+  };
+
+  const closedExecution = position.closedExecution || {
+    exitPrice: Number.isFinite(exitPriceRaw) ? exitPriceRaw : null,
+    closedAt: position.closedAt || null,
+    closeType: position.closeType || null
+  };
+
+  const pnlRaw = Number(position?.pnl);
+  const pnlPctRaw = Number(position?.pnlPct);
+
   return {
     ...position,
-    analysisSnapshot: snapshot,
-    execution: position.execution || {
-      openedAt: position.openedAt || Date.now(),
-      entryPrice: Number.isFinite(Number(position.entryPrice)) ? Number(position.entryPrice) : null,
-      quantity: Number.isFinite(Number(position.quantity)) ? Number(position.quantity) : null,
-      invested: Number.isFinite(Number(position.invested)) ? Number(position.invested) : null,
+    analysisSnapshot: {
+      ...snapshot,
+      entry: Number.isFinite(Number(snapshot.entry)) ? Number(snapshot.entry) : (Number.isFinite(entryPriceRaw) ? entryPriceRaw : null),
+      stopLoss: Number.isFinite(Number(snapshot.stopLoss)) ? Number(snapshot.stopLoss) : null,
+      takeProfit: Number.isFinite(Number(snapshot.takeProfit)) ? Number(snapshot.takeProfit) : null,
+      ratio: Number.isFinite(Number(snapshot.ratio)) ? Number(snapshot.ratio) : null,
+      sourceUsed: snapshot.sourceUsed || sourceUsed || null
+    },
+    execution: {
+      ...execution,
+      entryPrice: Number.isFinite(Number(execution.entryPrice)) ? Number(execution.entryPrice) : (Number.isFinite(entryPriceRaw) ? entryPriceRaw : null),
+      quantity: Number.isFinite(Number(execution.quantity)) ? Number(execution.quantity) : (Number.isFinite(quantityRaw) ? quantityRaw : null),
+      invested: Number.isFinite(Number(execution.invested)) ? Number(execution.invested) : (
+        Number.isFinite(entryPriceRaw) && Number.isFinite(quantityRaw) ? entryPriceRaw * quantityRaw : null
+      )
+    },
+    closedExecution: {
+      ...closedExecution,
+      exitPrice: Number.isFinite(Number(closedExecution.exitPrice)) ? Number(closedExecution.exitPrice) : (Number.isFinite(exitPriceRaw) ? exitPriceRaw : null),
+      closedAt: closedExecution.closedAt || position.closedAt || null,
+      closeType: closedExecution.closeType || position.closeType || null
     },
     live: position.live || {
       updatedAt: Date.now(),
@@ -2616,13 +2732,22 @@ function normalizePositionRecord(position){
       pnl: null,
       pnlPct: null,
     },
-    tradeDecision: snapshot.decision || position.analysisSnapshot?.decision || position.tradeDecision || null,
-    tradeReason: snapshot.reason || position.analysisSnapshot?.reason || position.tradeReason || null,
+    tradeDecision: snapshot.decision || position.tradeDecision || null,
+    tradeReason: snapshot.reason || position.tradeReason || null,
     trendLabel: snapshot.trendLabel || position.trendLabel || null,
-    horizon: snapshot.horizon || position.analysisSnapshot?.horizon || position.horizon || null,
-    stopLoss: Number.isFinite(Number(snapshot.stopLoss)) ? Number(snapshot.stopLoss) : position.stopLoss,
-    takeProfit: Number.isFinite(Number(snapshot.takeProfit)) ? Number(snapshot.takeProfit) : position.takeProfit,
-    score: Number.isFinite(Number(snapshot.score)) ? Number(snapshot.score) : position.score,
+    horizon: snapshot.horizon || position.horizon || null,
+    stopLoss: Number.isFinite(Number(snapshot.stopLoss)) ? Number(snapshot.stopLoss) : null,
+    takeProfit: Number.isFinite(Number(snapshot.takeProfit)) ? Number(snapshot.takeProfit) : null,
+    score: Number.isFinite(Number(snapshot.score)) ? Number(snapshot.score) : null,
+    entryPrice: Number.isFinite(entryPriceRaw) ? entryPriceRaw : null,
+    quantity: Number.isFinite(quantityRaw) ? quantityRaw : null,
+    invested: Number.isFinite(investedRaw) ? investedRaw : (
+      Number.isFinite(entryPriceRaw) && Number.isFinite(quantityRaw) ? entryPriceRaw * quantityRaw : null
+    ),
+    exitPrice: Number.isFinite(exitPriceRaw) ? exitPriceRaw : null,
+    pnl: Number.isFinite(pnlRaw) ? pnlRaw : null,
+    pnlPct: Number.isFinite(pnlPctRaw) ? pnlPctRaw : null,
+    sourceUsed
   };
 }
 
@@ -2648,6 +2773,16 @@ function restoreTradesFromBackupIfEmpty() {
 }
 
 
+function normalizeTradesHistoryState() {
+  if (!state?.trades) return;
+  if (Array.isArray(state.trades.positions)) {
+    state.trades.positions = state.trades.positions.map(normalizePositionRecord);
+  }
+  if (Array.isArray(state.trades.history)) {
+    state.trades.history = state.trades.history.map(normalizePositionRecord);
+  }
+}
+
 function openPositionsRiskView() {
     const positions = Array.isArray(state.trades?.positions) ? state.trades.positions : [];
     return positions.map((p) => {
@@ -2668,6 +2803,7 @@ function openPositionsRiskView() {
 
   function renderPortfolio() {
     restoreTradesFromBackupIfEmpty();
+    normalizeTradesHistoryState();
     refreshOpenTradesLive().catch(() => {});
     const stats = trainingStats();
     const positions = state.trades.positions;
