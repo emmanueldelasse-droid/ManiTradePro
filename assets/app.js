@@ -1736,8 +1736,8 @@ function dashboardTopPick(opps) {
   function renderNewsAiDetailGrid() {
     const hasAi = state.news?.ai && (
       state.news.ai.thesis ||
-      state.news.ai.risks ||
-      state.news.ai.opportunities ||
+      state.news.ai.bullDrivers ||
+      state.news.ai.riskDrivers ||
       state.news.ai.actionableTakeaway
     );
 
@@ -1750,15 +1750,15 @@ function dashboardTopPick(opps) {
           <div>${safeText(newsAiText("thesis"))}</div>
         </div>
         <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">Risques dominants</div>
-          <div>${safeText(newsAiText("risks"))}</div>
+          <div class="muted" style="margin-bottom:6px">Ce qui soutient le marche</div>
+          <div>${safeText(newsAiText("bullDrivers", "Aucun moteur haussier clair ne ressort."))}</div>
         </div>
         <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">Ce qui ressort positivement</div>
-          <div>${safeText(newsAiText("opportunities"))}</div>
+          <div class="muted" style="margin-bottom:6px">Ce qui pese sur le marche</div>
+          <div>${safeText(newsAiText("riskDrivers", "Aucun facteur de risque dominant n'apparait."))}</div>
         </div>
         <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">A surveiller maintenant</div>
+          <div class="muted" style="margin-bottom:6px">Ce qu'il faut surveiller maintenant</div>
           <div>${safeText(newsAiText("actionableTakeaway"))}</div>
         </div>
       </div>
@@ -1901,7 +1901,7 @@ function renderNewsIaBlock() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
-          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
+          <div class="screen-subtitle">Lecture contextuelle du marche, synthese IA des articles francais et anglais, themes dominants et actifs a surveiller.</div>
           <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
