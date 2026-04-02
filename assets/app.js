@@ -1168,6 +1168,7 @@ function currentTradePlan() {
       state.news = {
         items: Array.isArray(news?.data?.items) ? news.data.items : [],
         overview: news?.data?.overview || null,
+        ai: news?.data?.ai || null,
         status: news?.status || "idle",
         source: news?.source || null,
         asOf: news?.asOf || null,
@@ -1726,7 +1727,45 @@ function dashboardTopPick(opps) {
     return "neutral";
   }
 
-  function renderNewsIaBlock() {
+  
+  function newsAiText(key, fallback = "—") {
+    const value = String(state.news?.ai?.[key] || "").trim();
+    return value || fallback;
+  }
+
+  function renderNewsAiDetailGrid() {
+    const hasAi = state.news?.ai && (
+      state.news.ai.thesis ||
+      state.news.ai.risks ||
+      state.news.ai.opportunities ||
+      state.news.ai.actionableTakeaway
+    );
+
+    if (!hasAi) return "";
+
+    return `
+      <div class="news-summary-grid" style="margin-top:12px">
+        <div class="news-summary-box">
+          <div class="muted" style="margin-bottom:6px">Lecture centrale</div>
+          <div>${safeText(newsAiText("thesis"))}</div>
+        </div>
+        <div class="news-summary-box">
+          <div class="muted" style="margin-bottom:6px">Risques dominants</div>
+          <div>${safeText(newsAiText("risks"))}</div>
+        </div>
+        <div class="news-summary-box">
+          <div class="muted" style="margin-bottom:6px">Ce qui ressort positivement</div>
+          <div>${safeText(newsAiText("opportunities"))}</div>
+        </div>
+        <div class="news-summary-box">
+          <div class="muted" style="margin-bottom:6px">A surveiller maintenant</div>
+          <div>${safeText(newsAiText("actionableTakeaway"))}</div>
+        </div>
+      </div>
+    `;
+  }
+
+function renderNewsIaBlock() {
     const items = Array.isArray(state.news?.items) ? state.news.items.slice(0, 3) : [];
     const overview = state.news?.overview || {};
     return `
@@ -1744,6 +1783,8 @@ function dashboardTopPick(opps) {
           <div class="muted" style="margin-bottom:6px">Lecture IA</div>
           <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
         </div>
+
+        ${renderNewsAiDetailGrid()}
 
         ${items.length ? `
           <div class="news-list">
@@ -1880,9 +1921,10 @@ function dashboardTopPick(opps) {
             </div>
             <div class="news-summary-box">
               <div class="muted" style="margin-bottom:6px">Focus utile</div>
-              <div>${safeText((overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment.")}</div>
+              <div>${safeText(newsAiText("actionableTakeaway", (overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment."))}</div>
             </div>
           </div>
+          ${renderNewsAiDetailGrid()}
         </div>
 
         ${renderNewsPageSection("A la une marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
