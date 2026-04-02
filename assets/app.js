@@ -26,6 +26,7 @@
     showSourceBadges: true,
     showScoreBreakdown: true,
     compactCards: false,
+    lightTheme: false,
     displayCurrency: "EUR_PLUS_USD",
     showAlgoJournal: true,
     supabaseEnabled: false,
@@ -3083,6 +3084,14 @@ function openPositionsRiskView() {
 
             <label class="setting-row">
               <div>
+                <div class="setting-title">Activer le theme clair</div>
+                <div class="setting-desc">Passe l'app sur un rendu clair, plus doux en journee.</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="lightTheme" ${state.settings.lightTheme ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row">
+              <div>
                 <div class="setting-title">Afficher le journal moteur</div>
                 <div class="setting-desc">Montre les dernieres decisions du moteur dans l'accueil et Mes trades.</div>
               </div>
@@ -3143,7 +3152,7 @@ function openPositionsRiskView() {
 
   function render() {
     app.innerHTML = `
-      <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""}">
+      <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${state.settings.lightTheme ? "theme-light" : ""}">
         ${renderSidebar()}
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
