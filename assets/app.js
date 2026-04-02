@@ -1202,6 +1202,7 @@ function currentTradePlan() {
       const rows = Array.isArray(result?.data) ? result.data : [];
       if (rows.length) {
         setOpportunities(rows);
+        rows.forEach((row) => updateJournalMoteurFromOpportunity(normalizeOpportunity(row)));
         state.opportunitiesLastGoodAt = Date.now();
       }
       markScheduledFetch("opportunities");
@@ -1251,6 +1252,7 @@ function currentTradePlan() {
       });
 
       state.detail = merged;
+      updateJournalMoteurFromOpportunity(merged);
       saveDetailCache(cleanSymbol, merged);
       state.error = null;
 
@@ -1779,6 +1781,7 @@ function renderDashboard() {
           <div class="section-title"><span>Meilleures opportunites</span><span>${topRows.length}</span></div>
           ${topRows.length ? `<div class="opp-list">${topRows.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite disponible.</div>`}
         </div>
+        ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
       </div>`;
   }
 
@@ -2524,6 +2527,90 @@ function renderHistoryRow(item) {
     return out;
   }
 
+  function moteurDecisionLabel(row) {
+    const raw = String(row?.decision || row?.analysisLabel || "").toLowerCase();
+    if (raw.includes("propose") || raw.includes("conseille")) return "Trade propose";
+    if (raw.includes("possible")) return "Trade possible";
+    if (raw.includes("surveiller")) return "A surveiller";
+    if (raw.includes("eviter")) return "A eviter";
+    if (raw.includes("aucun") || raw.includes("pas de trade")) return "Pas de trade";
+    return row?.decision || "Decision inconnue";
+  }
+
+  function journalMoteurRows(limit = 10) {
+    const rows = Array.isArray(state.algoJournal) ? state.algoJournal.slice() : [];
+    return rows
+      .map((row, index) => ({
+        ...row,
+        _symbol: String(row?.symbol || "").toUpperCase(),
+        _decision: moteurDecisionLabel(row),
+        _score: Number.isFinite(Number(row?.score)) ? Number(row.score) : null,
+        _time: row?.updatedAt || row?.createdAt || row?.timestamp || null,
+        _idx: index
+      }))
+      .filter((row) => row._symbol)
+      .sort((a, b) => {
+        const ta = a._time ? new Date(a._time).getTime() : 0;
+        const tb = b._time ? new Date(b._time).getTime() : 0;
+        return tb - ta;
+      })
+      .slice(0, limit);
+  }
+
+  function updateJournalMoteurFromOpportunity(item) {
+    if (!item || !item.symbol) return;
+    const symbol = String(item.symbol || "").toUpperCase();
+    const rows = Array.isArray(state.algoJournal) ? state.algoJournal.slice() : [];
+    const next = {
+      id: `journal:${symbol}`,
+      symbol,
+      name: item.name || symbol,
+      score: Number.isFinite(Number(item.score)) ? Number(item.score) : null,
+      decision: item.decision || item.analysisLabel || null,
+      confidence: item.confidence || null,
+      confidenceLabel: item.confidenceLabel || null,
+      trendLabel: item.trendLabel || null,
+      reasonShort: item.reasonShort || null,
+      sourceUsed: item.sourceUsed || null,
+      updatedAt: new Date().toISOString()
+    };
+    const idx = rows.findIndex((row) => String(row?.symbol || "").toUpperCase() === symbol);
+    if (idx >= 0) rows[idx] = { ...rows[idx], ...next };
+    else rows.unshift(next);
+    state.algoJournal = rows.slice(0, 200);
+    persistTradesState();
+  }
+
+  function renderJournalMoteurCard() {
+    const rows = journalMoteurRows(8);
+    return `
+      <div class="card" style="margin-top:18px">
+        <div class="section-title"><span>Journal moteur</span><span>${rows.length}</span></div>
+        ${rows.length ? `
+          <div class="trade-table simplified-history">
+            <div class="trade-row trade-head">
+              <div>Actif</div><div>Decision</div><div>Score</div><div>Confiance</div><div>Tendance</div><div>Source</div><div>Maj</div>
+            </div>
+            ${rows.map((row) => `
+              <div class="trade-row history simple-history-row">
+                <div>
+                  <div class="trade-symbol">${safeText(row._symbol)}</div>
+                  <div class="trade-sub">${safeText(row.name || row._symbol)}</div>
+                </div>
+                <div>${badge(row._decision, row._decision === "Trade propose" ? "positive" : row._decision === "Pas de trade" ? "negative" : "neutral")}</div>
+                <div>${row._score == null ? "—" : `${num(row._score, 0)}/100`}</div>
+                <div>${safeText(row.confidenceLabel || row.confidence || "—")}</div>
+                <div>${safeText(row.trendLabel || "—")}</div>
+                <div>${safeText(row.sourceUsed || "—")}</div>
+                <div>${row._time ? new Date(row._time).toLocaleString("fr-FR") : "—"}</div>
+              </div>
+            `).join("")}
+          </div>
+        ` : `<div class="empty-state">Le journal moteur se remplira au fur et a mesure des analyses.</div>`}
+      </div>
+    `;
+  }
+
   function groupedHistoryInsights() {
     const history = Array.isArray(state.trades?.history) ? state.trades.history : [];
     const bySymbol = {};
@@ -2947,6 +3034,7 @@ function openPositionsRiskView() {
               </div>
             ` : `<div class="empty-state">Aucun trade cloture pour le moment.</div>`}
           </div>
+          ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
         `}
       </div>`;
   }
@@ -2991,6 +3079,14 @@ function openPositionsRiskView() {
                 <div class="setting-desc">Resserre un peu les cartes opportunites.</div>
               </div>
               <input type="checkbox" data-setting-toggle="compactCards" ${state.settings.compactCards ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Afficher le journal moteur</div>
+                <div class="setting-desc">Montre les dernieres decisions du moteur dans l'accueil et Mes trades.</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="showAlgoJournal" ${state.settings.showAlgoJournal ? "checked" : ""}>
             </label>
 
             <label class="setting-row">
