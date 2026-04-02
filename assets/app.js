@@ -2688,7 +2688,13 @@ function displayHistoryEntryPrice(position) {
 
   function displayHistorySourceOrClosure(position){
     const p = normalizePositionRecord(position);
-    return p?.closedExecution?.closeType || p?.closeType || p?.sourceUsed || p?.analysisSnapshot?.sourceUsed || "training";
+    const raw = p?.closedExecution?.closeType || p?.closeType || p?.sourceUsed || p?.analysisSnapshot?.sourceUsed || "training";
+    const text = String(raw || "").trim().toLowerCase();
+    if (!text || text === "training") return "cloture legacy";
+    if (text === "manual" || text === "manuel" || text === "manual_close") return "cloture manuelle";
+    if (text === "stop" || text === "stoploss" || text === "stop_loss") return "stop touche";
+    if (text === "target" || text === "takeprofit" || text === "take_profit") return "objectif touche";
+    return raw;
   }
 
 function renderHistoryRow(item) {
@@ -2703,7 +2709,7 @@ function renderHistoryRow(item) {
       <div class="trade-row history simple-history-row">
         <div>
           <div class="trade-symbol">${safeText(p.symbol)}</div>
-          <div class="trade-sub">${closedAt ? new Date(closedAt).toLocaleString("fr-FR") : "date indisponible"}</div>
+          <div class="trade-sub">${validTradeDate(closedAt) ? new Date(closedAt).toLocaleString("fr-FR") : "date indisponible"}</div>
         </div>
         <div>${badge(simpleSideLabel(p.side), p.side)}</div>
         <div>${badge(historyResultLabel(p), (pnl >= 0 ? "positive" : "negative"))}</div>
@@ -3091,13 +3097,81 @@ function restoreTradesFromBackupIfEmpty() {
 }
 
 
+function validTradeDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function historyHasMeaningfulClosure(position) {
+  const p = normalizePositionRecord(position);
+  const closeType = String(p?.closedExecution?.closeType || p?.closeType || "").toLowerCase();
+  return !!(
+    validTradeDate(p?.closedExecution?.closedAt || p?.closedAt) ||
+    (Number.isFinite(Number(p?.closedExecution?.exitPrice ?? p?.exitPrice)) && Number(p?.closedExecution?.exitPrice ?? p?.exitPrice) > 0) ||
+    (Number.isFinite(Number(p?.pnl)) && Math.abs(Number(p?.pnl)) > 0.000001) ||
+    (closeType && closeType !== "training")
+  );
+}
+
+function isLegacyClosedTrade(position) {
+  const p = normalizePositionRecord(position);
+  const closeType = String(p?.closedExecution?.closeType || p?.closeType || p?.sourceUsed || "").toLowerCase();
+  const closedAt = validTradeDate(p?.closedExecution?.closedAt || p?.closedAt);
+  const exitPrice = Number(p?.closedExecution?.exitPrice ?? p?.exitPrice);
+  const pnl = Number(p?.pnl || 0);
+  const pnlPct = Number(p?.pnlPct || 0);
+  const entryPrice = Number(p?.execution?.entryPrice ?? p?.entryPrice);
+  const hasAnyClose = historyHasMeaningfulClosure(p);
+
+  if (hasAnyClose) return false;
+  return !!(
+    p?.symbol &&
+    Number.isFinite(entryPrice) && entryPrice > 0 &&
+    (!closedAt) &&
+    (!Number.isFinite(exitPrice) || exitPrice <= 0) &&
+    Math.abs(pnl) < 0.000001 &&
+    Math.abs(pnlPct) < 0.000001 &&
+    (!closeType || closeType === "training")
+  );
+}
+
+function historyDedupKey(position) {
+  const p = normalizePositionRecord(position);
+  const symbol = String(p?.symbol || "").toUpperCase();
+  const closedAt = validTradeDate(p?.closedExecution?.closedAt || p?.closedAt) || "no-date";
+  const entry = Number.isFinite(Number(p?.execution?.entryPrice ?? p?.entryPrice)) ? Number(p?.execution?.entryPrice ?? p?.entryPrice).toFixed(6) : "no-entry";
+  const exit = Number.isFinite(Number(p?.closedExecution?.exitPrice ?? p?.exitPrice)) ? Number(p?.closedExecution?.exitPrice ?? p?.exitPrice).toFixed(6) : "no-exit";
+  const qty = Number.isFinite(Number(p?.execution?.quantity ?? p?.quantity)) ? Number(p?.execution?.quantity ?? p?.quantity).toFixed(6) : "no-qty";
+  return [symbol, closedAt, entry, exit, qty].join("|");
+}
+
 function normalizeTradesHistoryState() {
   if (!state?.trades) return;
+  state.trades.historyHiddenCount = 0;
+
   if (Array.isArray(state.trades.positions)) {
-    state.trades.positions = state.trades.positions.map(normalizePositionRecord);
+    state.trades.positions = state.trades.positions
+      .map(normalizePositionRecord)
+      .filter((p) => !!String(p?.symbol || "").trim());
   }
+
   if (Array.isArray(state.trades.history)) {
-    state.trades.history = state.trades.history.map(normalizePositionRecord);
+    const normalized = state.trades.history
+      .map(normalizePositionRecord)
+      .filter((p) => !!String(p?.symbol || "").trim());
+
+    const hidden = normalized.filter(isLegacyClosedTrade);
+    state.trades.historyHiddenCount = hidden.length;
+
+    const clean = normalized.filter((p) => !isLegacyClosedTrade(p));
+    const seen = new Set();
+    state.trades.history = clean.filter((p) => {
+      const key = historyDedupKey(p);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
   }
 }
 
@@ -3143,6 +3217,7 @@ function openPositionsRiskView() {
                 ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
                 : "local uniquement"
           }</div>
+          ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
         </div>
 
         <div class="controls">
@@ -3236,6 +3311,7 @@ function openPositionsRiskView() {
 
           <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Trades clotures</span><span>${history.length}</span></div>
+            <div class="muted" style="margin-bottom:12px">Les lignes legacy sans vraie date de cloture, sans prix de sortie valide et sans fermeture exploitable sont maintenant masquees.</div>
             ${history.length ? `
               <div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
