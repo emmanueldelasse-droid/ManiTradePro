@@ -3150,6 +3150,11 @@ function openPositionsRiskView() {
     }
   }
 
+  function applyThemeMode() {
+    document.documentElement.classList.toggle("theme-light-root", !!state.settings.lightTheme);
+    document.body.classList.toggle("theme-light-root", !!state.settings.lightTheme);
+  }
+
   function render() {
     app.innerHTML = `
       <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${state.settings.lightTheme ? "theme-light" : ""}">
@@ -3158,6 +3163,7 @@ function openPositionsRiskView() {
         ${renderBottomNav()}
       </div>
     `;
+    applyThemeMode();
     bindEvents();
   }
 
