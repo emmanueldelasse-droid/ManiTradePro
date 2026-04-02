@@ -1767,7 +1767,7 @@ function renderDashboard() {
                   <div class="algo-row full">
                     <div>
                       <div class="trade-symbol">${safeText(row.symbol)}</div>
-                      <div class="trade-sub">${new Date(row.createdAt).toLocaleString("fr-FR")}</div>
+                      <div class="trade-sub">${safeJournalDate(row.createdAt || row.updatedAt || row.timestamp)}</div>
                     </div>
                     <div>${badge(row.decision || "—", decisionBadgeClass(row.decision || ""))}</div>
                     <div class="muted">${safeText(row.aiSummary || row.reason || "—")}</div>
@@ -2538,6 +2538,14 @@ function renderHistoryRow(item) {
     return row?.decision || "Decision inconnue";
   }
 
+  function safeJournalDate(value) {
+    if (!value) return "—";
+    const date = new Date(value);
+    const time = date.getTime();
+    if (!Number.isFinite(time)) return "—";
+    return date.toLocaleString("fr-FR");
+  }
+
   function journalMoteurRows(limit = 10) {
     const rows = Array.isArray(state.algoJournal) ? state.algoJournal.slice() : [];
     return rows
@@ -2603,7 +2611,7 @@ function renderHistoryRow(item) {
                 <div>${safeText(row.confidenceLabel || row.confidence || "—")}</div>
                 <div>${safeText(row.trendLabel || "—")}</div>
                 <div>${safeText(row.sourceUsed || "—")}</div>
-                <div>${row._time ? new Date(row._time).toLocaleString("fr-FR") : "—"}</div>
+                <div>${safeJournalDate(row._time)}</div>
               </div>
             `).join("")}
           </div>
