@@ -499,3 +499,10 @@ html.theme-light-root :root{
 @media (max-width: 900px){
   .news-top,.news-bottom{flex-direction:column;align-items:flex-start}
 }
+
+
+.news-summary-grid{display:grid;grid-template-columns:1.3fr .9fr;gap:14px}
+.news-summary-box{padding:14px;border-radius:12px;border:1px solid var(--border-subtle);background:var(--bg-card-hover)}
+@media (max-width: 900px){
+  .news-summary-grid{grid-template-columns:1fr}
+}

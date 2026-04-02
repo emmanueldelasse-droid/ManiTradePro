@@ -91,6 +91,7 @@
   const navItems = [
     ["dashboard", "Accueil", "⌂"],
     ["opportunities", "Opportunites", "◎"],
+    ["news", "News", "◌"],
     ["portfolio", "Mes trades", "◫"],
     ["settings", "Reglages", "◦"]
   ];
@@ -1726,7 +1727,7 @@ function dashboardTopPick(opps) {
   }
 
   function renderNewsIaBlock() {
-    const items = Array.isArray(state.news?.items) ? state.news.items.slice(0, 6) : [];
+    const items = Array.isArray(state.news?.items) ? state.news.items.slice(0, 3) : [];
     const overview = state.news?.overview || {};
     return `
       <div class="card" style="margin-top:18px">
@@ -1736,7 +1737,7 @@ function dashboardTopPick(opps) {
           <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
           <div class="stat-card"><div class="stat-label">Themes</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,2).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
-          <div class="stat-card"><div class="stat-label">Source</div><div class="stat-value" style="font-size:1rem">${safeText(state.news?.source || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Maj</div><div class="stat-value" style="font-size:1rem">${safeNewsDate(state.news?.asOf)}</div></div>
         </div>
 
         <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
@@ -1756,15 +1757,106 @@ function dashboardTopPick(opps) {
                   </div>
                 </div>
                 <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
-                <div class="trade-sub">${safeText(item.summary || "Pas de resume")} </div>
                 <div class="news-bottom">
                   <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
-                  <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Lire</a>
+                  <div class="legend">
+                    <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Lire</a>
+                    <button class="btn" data-route="news">Voir tout</button>
+                  </div>
                 </div>
               </div>
             `).join("")}
           </div>
         ` : `<div class="empty-state">Aucune news exploitable pour le moment.</div>`}
+      </div>
+    `;
+  }
+
+
+  function groupedNewsItems() {
+    const items = Array.isArray(state.news?.items) ? state.news.items : [];
+    return {
+      macro: items.filter((x) => x.topic === "macro"),
+      crypto: items.filter((x) => x.topic === "crypto"),
+      tech: items.filter((x) => x.topic === "tech"),
+      market: items.filter((x) => x.topic === "marche" || !x.topic)
+    };
+  }
+
+  function renderNewsList(items, limit = 8) {
+    const rows = (items || []).slice(0, limit);
+    if (!rows.length) return `<div class="empty-state">Aucune news exploitable pour le moment.</div>`;
+    return `
+      <div class="news-list">
+        ${rows.map((item) => `
+          <div class="news-row">
+            <div class="news-top">
+              <div class="trade-symbol">${safeText(item.source || "Source")}</div>
+              <div class="legend">
+                ${badge(item.topic || "marche")}
+                ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
+              </div>
+            </div>
+            <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
+            <div class="trade-sub">${safeText(item.summary || "Pas de resume")}</div>
+            <div class="news-bottom">
+              <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
+              <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Lire</a>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderNewsPageSection(title, subtitle, items, limit = 6) {
+    return `
+      <div class="card" style="margin-top:18px">
+        <div class="section-title"><span>${title}</span><span>${items.length}</span></div>
+        <div class="muted" style="margin-bottom:12px">${subtitle}</div>
+        ${renderNewsList(items, limit)}
+      </div>
+    `;
+  }
+
+  function renderNews() {
+    const overview = state.news?.overview || {};
+    const groups = groupedNewsItems();
+    const allItems = Array.isArray(state.news?.items) ? state.news.items : [];
+
+    return `
+      <div class="screen">
+        <div class="screen-header">
+          <div class="screen-title">News + IA</div>
+          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
+          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Source : ${safeText(state.news.source)}` : ""}</div>
+        </div>
+
+        <div class="grid trades-stats">
+          <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
+          <div class="stat-card"><div class="stat-label">Themes dominants</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,3).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,4).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Articles</div><div class="stat-value">${allItems.length}</div></div>
+        </div>
+
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Synthese IA</span><span>priorite</span></div>
+          <div class="news-summary-grid">
+            <div class="news-summary-box">
+              <div class="muted" style="margin-bottom:6px">Lecture IA</div>
+              <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
+            </div>
+            <div class="news-summary-box">
+              <div class="muted" style="margin-bottom:6px">Focus utile</div>
+              <div>${safeText((overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment.")}</div>
+            </div>
+          </div>
+        </div>
+
+        ${renderNewsPageSection("A la une marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
+        ${renderNewsPageSection("Macro / banques centrales", "Ce qui peut impacter les taux, les indices et le risque global.", groups.macro, 6)}
+        ${renderNewsPageSection("Crypto", "Flux crypto utiles pour BTC, ETH et le sentiment speculatif.", groups.crypto, 6)}
+        ${renderNewsPageSection("Tech / actions", "News societes et themes croissance / IA / Nasdaq.", groups.tech, 6)}
       </div>
     `;
   }
@@ -3229,6 +3321,7 @@ function openPositionsRiskView() {
     switch (state.route) {
       case "dashboard": return renderDashboard();
       case "opportunities": return renderOpportunities();
+      case "news": return renderNews();
       case "asset-detail": return renderDetail();
       case "portfolio": return renderPortfolio();
       case "settings": return renderSettings();
@@ -3349,7 +3442,7 @@ function openPositionsRiskView() {
     await loadDashboard();
     render();
     setInterval(() => {
-      if (["dashboard", "opportunities", "asset-detail", "settings", "portfolio"].includes(state.route)) {
+      if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio"].includes(state.route)) {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
         }
