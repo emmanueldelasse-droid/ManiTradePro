@@ -1934,8 +1934,8 @@ function renderDashboard() {
           <div class="stat-card"><div class="stat-label">Neutre</div><div class="stat-value">${summary.neutral}</div></div>
         </div>
 
-        <div class="dashboard-grid">
-          <div class="card">
+        <div class="dashboard-grid polished-home-grid">
+          <div class="card compact-card">
             <div class="section-title"><span>Meilleure opportunite du moment</span><span>${topPick ? topPick.symbol : "—"}</span></div>
             ${topPick ? `
               <div class="top-pick-box">
@@ -1960,7 +1960,7 @@ function renderDashboard() {
             ` : `<div class="empty-state">Aucune opportunite assez lisible pour le moment.</div>`}
           </div>
 
-          <div class="card">
+          <div class="card compact-card">
             <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
             ${recentAlgo.length ? `
               <div class="algo-feed">
@@ -1979,7 +1979,7 @@ function renderDashboard() {
           </div>
         </div>
 
-        <div class="card" style="margin-top:18px">
+        <div class="card compact-card" style="margin-top:18px">
           <div class="section-title"><span>Meilleures opportunites</span><span>${topRows.length}</span></div>
           ${topRows.length ? `<div class="opp-list">${topRows.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite disponible.</div>`}
         </div>
@@ -2616,14 +2616,14 @@ function renderPositionRow(position) {
   const live = p.live || {};
   const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
   const currentPrice = Number(meta.livePrice);
+  const stopValue = Number(snap.stopLoss ?? p.stopLoss);
+  const targetValue = Number(snap.takeProfit ?? p.takeProfit);
   const invested = displayInvestedValue(p);
   const pnlValue = p.live?.pnl != null ? money(p.live.pnl * fxRateUsdToEur(), "EUR") : "—";
   const pnlPctValue = p.live?.pnlPct != null ? pct(p.live.pnlPct) : "—";
-  const stopValue = Number(snap.stopLoss ?? p.stopLoss);
-  const targetValue = Number(snap.takeProfit ?? p.takeProfit);
 
-  return `<div class="trade-row trade-card-row clean-trade-card">
-    <div class="clean-trade-head">
+  return `<div class="trade-row trade-card-row compact-trade-card">
+    <div class="compact-trade-top">
       <div>
         <div class="trade-symbol">${safeText(p.symbol)}</div>
         <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
@@ -2635,46 +2635,24 @@ function renderPositionRow(position) {
       </div>
     </div>
 
-    <div class="clean-trade-summary">${safeText(actionTradeSummary(meta))}</div>
+    <div class="compact-trade-summary">${safeText(actionTradeSummary(meta))}</div>
 
-    <div class="clean-trade-grid">
-      <div class="clean-trade-panel">
-        <div class="clean-panel-title">Position</div>
-        <div class="clean-panel-grid">
-          <div><span class="muted">Entree</span><br>${Number.isFinite(entryPrice) ? priceDisplay(entryPrice) : "—"}</div>
-          <div><span class="muted">Prix actuel</span><br>${Number.isFinite(currentPrice) ? priceDisplay(currentPrice) : "—"}</div>
-          <div><span class="muted">Investi</span><br>${invested == null ? "—" : money(invested * fxRateUsdToEur(), "EUR")}</div>
-          <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-          <div><span class="muted">P/L</span><br>${pnlValue}</div>
-          <div><span class="muted">P/L %</span><br>${pnlPctValue}</div>
-        </div>
-      </div>
-
-      <div class="clean-trade-panel">
-        <div class="clean-panel-title">Risque</div>
-        <div class="clean-panel-grid">
-          <div><span class="muted">Stop</span><br>${stopValue > 0 ? priceDisplay(stopValue) : "—"}</div>
-          <div><span class="muted">Objectif</span><br>${targetValue > 0 ? priceDisplay(targetValue) : "—"}</div>
-          <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-          <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
-          <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
-          <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
-        </div>
-      </div>
-
-      <div class="clean-trade-panel">
-        <div class="clean-panel-title">Lecture</div>
-        <div class="clean-panel-grid">
-          <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
-          <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
-          <div><span class="muted">Score</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
-          <div><span class="muted">Maj live</span><br>${live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—"}</div>
-        </div>
-        <div class="clean-why-line"><span class="muted">Pourquoi :</span> ${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
-      </div>
+    <div class="compact-kpis">
+      <div class="compact-kpi"><span class="muted">Entree</span><strong>${Number.isFinite(entryPrice) ? priceDisplay(entryPrice) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Actuel</span><strong>${Number.isFinite(currentPrice) ? priceDisplay(currentPrice) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Investi</span><strong>${invested == null ? "—" : money(invested * fxRateUsdToEur(), "EUR")}</strong></div>
+      <div class="compact-kpi"><span class="muted">P/L</span><strong>${pnlValue} · ${pnlPctValue}</strong></div>
+      <div class="compact-kpi"><span class="muted">Stop</span><strong>${stopValue > 0 ? priceDisplay(stopValue) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Objectif</span><strong>${targetValue > 0 ? priceDisplay(targetValue) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Avant stop</span><strong>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</strong></div>
+      <div class="compact-kpi"><span class="muted">Avant objectif</span><strong>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</strong></div>
+      <div class="compact-kpi"><span class="muted">Source</span><strong>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</strong></div>
+      <div class="compact-kpi"><span class="muted">Maj</span><strong>${live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—"}</strong></div>
     </div>
 
-    <div class="trade-actions split clean-actions">
+    <div class="compact-why"><span class="muted">Pourquoi :</span> ${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
+
+    <div class="trade-actions split compact-actions">
       <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
       <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
     </div>
@@ -3215,7 +3193,6 @@ function openPositionsRiskView() {
     const algoCounts = (typeof algoDecisionCounts === "function") ? algoDecisionCounts() : { total: 0, conseille: 0, possible: 0, surveiller: 0, eviter: 0, aucun: 0, manuel: 0 };
     const insights = (typeof groupedHistoryInsights === "function") ? groupedHistoryInsights() : { best: [], worst: [] };
     const riskRows = (typeof openPositionsRiskView === "function") ? openPositionsRiskView() : [];
-    const nearStopCount = riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length;
 
     return `
       <div class="screen">
@@ -3230,6 +3207,7 @@ function openPositionsRiskView() {
                 ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
                 : "local uniquement"
           }</div>
+          ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
         </div>
 
         <div class="controls">
@@ -3239,7 +3217,7 @@ function openPositionsRiskView() {
         </div>
 
         ${state.trades.mode === "real" ? `
-          <div class="empty-state">Le portefeuille reel n'est pas encore branche.</div>
+          <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette partie restera vide tant qu'aucune source reelle n'est connectee.</div>
         ` : `
           <div class="portfolio-hero-grid">
             <div class="stat-card hero"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
@@ -3257,21 +3235,21 @@ function openPositionsRiskView() {
             <div class="stat-card mini"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
           </div>
 
-          <div class="card compact-card" style="margin-top:18px">
+          <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Lecture rapide</span><span>${positions.length}</span></div>
             <div class="portfolio-overview-text">
               ${positions.length
-                ? `${positions.length} trade${positions.length > 1 ? "s sont" : " est"} ouvert${positions.length > 1 ? "s" : ""}. ${nearStopCount} position${nearStopCount > 1 ? "s sont" : " est"} proche${nearStopCount > 1 ? "s" : ""} du stop.`
+                ? `${positions.length} trade${positions.length > 1 ? "s sont" : " est"} ouvert${positions.length > 1 ? "s" : ""}. ${riskRows.length ? `${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length} position${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s sont" : " est"} proche${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s" : ""} du stop.` : ""}`
                 : "Aucun trade ouvert pour le moment."}
             </div>
           </div>
 
           <div class="portfolio-mid-grid">
-            <div class="card compact-card">
+            <div class="card compact-card" style="margin-top:18px">
               <div class="section-title"><span>Positions a surveiller</span><span>${riskRows.length}</span></div>
               ${riskRows.length ? `
-                <div class="risk-list compact">
-                  ${riskRows.slice(0, 6).map((row) => `
+                <div class="risk-list">
+                  ${riskRows.slice(0, 8).map((row) => `
                     <div class="risk-row">
                       <div>
                         <div class="trade-symbol">${safeText(row.symbol)}</div>
@@ -3282,18 +3260,18 @@ function openPositionsRiskView() {
                     </div>
                   `).join("")}
                 </div>
-              ` : `<div class="empty-state">Aucune position ouverte.</div>`}
+              ` : `<div class="empty-state">Aucune position ouverte pour le moment.</div>`}
             </div>
 
-            <div class="card compact-card">
+            <div class="card compact-card" style="margin-top:18px">
               <div class="section-title"><span>Bilan rapide</span><span>historique</span></div>
-              <div class="perf-columns compact">
+              <div class="perf-columns">
                 <div>
                   <div class="muted" style="margin-bottom:8px">Actifs qui ont le mieux marche</div>
                   ${insights.best.length ? insights.best.map((row) => `
                     <div class="mini-perf-row">
                       <span>${safeText(row.symbol)}</span>
-                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")}</span>
+                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
                     </div>
                   `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
                 </div>
@@ -3302,7 +3280,7 @@ function openPositionsRiskView() {
                   ${insights.worst.length ? insights.worst.map((row) => `
                     <div class="mini-perf-row">
                       <span>${safeText(row.symbol)}</span>
-                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")}</span>
+                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
                     </div>
                   `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
                 </div>
@@ -3310,18 +3288,18 @@ function openPositionsRiskView() {
             </div>
           </div>
 
-          <div class="card compact-card" style="margin-top:18px">
+          <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Trades ouverts</span><span>${positions.length}</span></div>
             ${positions.length ? `
               <div class="trade-table simplified-open-trades">
                 ${positions.map(renderPositionRow).join("")}
               </div>
-            ` : `<div class="empty-state">Aucun trade ouvert.</div>`}
+            ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
           </div>
 
-          <div class="card compact-card" style="margin-top:18px">
+          <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Trades clotures</span><span>${history.length}</span></div>
-            <div class="muted" style="margin-bottom:12px">Les lignes legacy invalides sont masquees.</div>
+            <div class="muted" style="margin-bottom:12px">Les lignes legacy sans vraie date de cloture, sans prix de sortie valide et sans fermeture exploitable sont maintenant masquees.</div>
             ${history.length ? `
               <div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
