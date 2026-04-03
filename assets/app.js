@@ -1746,7 +1746,7 @@ function dashboardTopPick(opps) {
     return `
       <div class="news-summary-grid" style="margin-top:12px">
         <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">Lecture centrale</div>
+          <div class="muted" style="margin-bottom:6px">Lecture centrale IA</div>
           <div>${safeText(newsAiText("thesis"))}</div>
         </div>
         <div class="news-summary-box">
@@ -1780,7 +1780,7 @@ function renderNewsIaBlock() {
         </div>
 
         <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
-          <div class="muted" style="margin-bottom:6px">Lecture IA</div>
+          <div class="muted" style="margin-bottom:6px">Synthese courte</div>
           <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
         </div>
 
@@ -1902,7 +1902,7 @@ function renderNewsIaBlock() {
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
           <div class="screen-subtitle">Lecture contextuelle du marche, synthese IA des articles francais et anglais, themes dominants et actifs a surveiller.</div>
-          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
+          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,5).join(" · "))}` : ""}</div>
         </div>
 
         <div class="grid trades-stats">
@@ -1916,11 +1916,11 @@ function renderNewsIaBlock() {
           <div class="section-title"><span>Synthese IA</span><span>priorite</span></div>
           <div class="news-summary-grid">
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">Lecture IA</div>
+              <div class="muted" style="margin-bottom:6px">Synthese courte</div>
               <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
             </div>
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">Focus utile</div>
+              <div class="muted" style="margin-bottom:6px">A surveiller maintenant</div>
               <div>${safeText(newsAiText("actionableTakeaway", (overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment."))}</div>
             </div>
           </div>
