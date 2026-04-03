@@ -535,3 +535,35 @@ html.theme-light-root :root{
 .simple-history-row .trade-sub{
   text-transform:none;
 }
+
+
+.portfolio-hero-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.portfolio-mini-grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}
+.portfolio-mid-grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px;margin-top:18px}
+.stat-card.hero{padding:16px 18px}
+.stat-card.mini{padding:14px 16px}
+.compact-card{padding:16px}
+.clean-trade-card{padding:18px;background:rgba(255,255,255,.018)}
+.clean-trade-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.clean-trade-summary{font-weight:700;margin-top:4px}
+.clean-trade-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.clean-trade-panel{border:1px solid var(--border-subtle);border-radius:16px;padding:14px;background:rgba(255,255,255,.015)}
+.clean-panel-title{font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:10px;font-weight:700}
+.clean-panel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px}
+.clean-why-line{margin-top:12px;padding-top:12px;border-top:1px solid var(--border-subtle);line-height:1.45}
+.clean-actions{margin-top:14px}
+.risk-list.compact{display:flex;flex-direction:column;gap:10px}
+.perf-columns.compact{gap:12px}
+
+@media (max-width: 1100px){
+  .portfolio-mini-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .clean-trade-grid{grid-template-columns:1fr}
+}
+@media (max-width: 900px){
+  .portfolio-hero-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .portfolio-mid-grid{grid-template-columns:1fr}
+}
+@media (max-width: 640px){
+  .portfolio-hero-grid,.portfolio-mini-grid{grid-template-columns:1fr 1fr}
+  .clean-panel-grid{grid-template-columns:1fr 1fr}
+}

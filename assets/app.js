@@ -1168,7 +1168,6 @@ function currentTradePlan() {
       state.news = {
         items: Array.isArray(news?.data?.items) ? news.data.items : [],
         overview: news?.data?.overview || null,
-        ai: news?.data?.ai || null,
         status: news?.status || "idle",
         source: news?.source || null,
         asOf: news?.asOf || null,
@@ -1727,45 +1726,7 @@ function dashboardTopPick(opps) {
     return "neutral";
   }
 
-  
-  function newsAiText(key, fallback = "—") {
-    const value = String(state.news?.ai?.[key] || "").trim();
-    return value || fallback;
-  }
-
-  function renderNewsAiDetailGrid() {
-    const hasAi = state.news?.ai && (
-      state.news.ai.thesis ||
-      state.news.ai.bullDrivers ||
-      state.news.ai.riskDrivers ||
-      state.news.ai.actionableTakeaway
-    );
-
-    if (!hasAi) return "";
-
-    return `
-      <div class="news-summary-grid" style="margin-top:12px">
-        <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">Lecture centrale IA</div>
-          <div>${safeText(newsAiText("thesis"))}</div>
-        </div>
-        <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">Ce qui soutient le marche</div>
-          <div>${safeText(newsAiText("bullDrivers", "Aucun moteur haussier clair ne ressort."))}</div>
-        </div>
-        <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">Ce qui pese sur le marche</div>
-          <div>${safeText(newsAiText("riskDrivers", "Aucun facteur de risque dominant n'apparait."))}</div>
-        </div>
-        <div class="news-summary-box">
-          <div class="muted" style="margin-bottom:6px">Ce qu'il faut surveiller maintenant</div>
-          <div>${safeText(newsAiText("actionableTakeaway"))}</div>
-        </div>
-      </div>
-    `;
-  }
-
-function renderNewsIaBlock() {
+  function renderNewsIaBlock() {
     const items = Array.isArray(state.news?.items) ? state.news.items.slice(0, 3) : [];
     const overview = state.news?.overview || {};
     return `
@@ -1780,11 +1741,9 @@ function renderNewsIaBlock() {
         </div>
 
         <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
-          <div class="muted" style="margin-bottom:6px">Synthese courte</div>
+          <div class="muted" style="margin-bottom:6px">Lecture IA</div>
           <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
         </div>
-
-        ${renderNewsAiDetailGrid()}
 
         ${items.length ? `
           <div class="news-list">
@@ -1901,7 +1860,7 @@ function renderNewsIaBlock() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
-          <div class="screen-subtitle">Le contexte marche du moment.</div>
+          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
           <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
@@ -1916,15 +1875,14 @@ function renderNewsIaBlock() {
           <div class="section-title"><span>Synthese IA</span><span>priorite</span></div>
           <div class="news-summary-grid">
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">Synthese courte</div>
+              <div class="muted" style="margin-bottom:6px">Lecture IA</div>
               <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
             </div>
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">A surveiller maintenant</div>
-              <div>${safeText(newsAiText("actionableTakeaway", (overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment."))}</div>
+              <div class="muted" style="margin-bottom:6px">Focus utile</div>
+              <div>${safeText((overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment.")}</div>
             </div>
           </div>
-          ${renderNewsAiDetailGrid()}
         </div>
 
         ${renderNewsPageSection("A la une marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
@@ -1940,7 +1898,7 @@ function renderDashboard() {
     const summary = dashboardSignalSummary(state.opportunities);
     const topPick = dashboardTopPick(state.opportunities);
     const topRows = state.opportunities.slice(0, 5);
-    const recentAlgo = journalMoteurRows(3);
+    const recentAlgo = state.algoJournal.slice(0, 3);
 
     return `
       <div class="screen">
@@ -2656,68 +2614,69 @@ function renderPositionRow(position) {
   const snap = p.analysisSnapshot || {};
   const exec = p.execution || {};
   const live = p.live || {};
-  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
-  const entryValue = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const currentPrice = Number(meta.livePrice);
+  const invested = displayInvestedValue(p);
+  const pnlValue = p.live?.pnl != null ? money(p.live.pnl * fxRateUsdToEur(), "EUR") : "—";
+  const pnlPctValue = p.live?.pnlPct != null ? pct(p.live.pnlPct) : "—";
   const stopValue = Number(snap.stopLoss ?? p.stopLoss);
   const targetValue = Number(snap.takeProfit ?? p.takeProfit);
-  const scoreValue = displayScoreValue(p);
-  const ratioValue = displayRatioValue(p);
 
-  return `<div class="trade-row trade-card-row simple-trade-card" style="padding:16px;border-radius:16px">
-    <div class="trade-card-top" style="align-items:flex-start;gap:12px;flex-wrap:wrap">
+  return `<div class="trade-row trade-card-row clean-trade-card">
+    <div class="clean-trade-head">
       <div>
         <div class="trade-symbol">${safeText(p.symbol)}</div>
-        <div class="trade-sub" style="margin-top:4px">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
+        <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
       </div>
-      <div class="trade-card-badges" style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <div class="trade-card-badges">
         ${badge(simpleSideLabel(p.side), p.side)}
-        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
+        ${badge(snap.trendLabel || p.trendLabel || "tendance neutre", "neutral")}
         ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
 
-    <div class="trade-summary-line" style="margin-top:10px">${safeText(actionTradeSummary(meta))}</div>
+    <div class="clean-trade-summary">${safeText(actionTradeSummary(meta))}</div>
 
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px">
-      <div class="card" style="padding:12px;background:var(--bg-elevated)">
-        <div class="muted" style="margin-bottom:8px">Plan d'ouverture</div>
-        <div class="trade-plan-grid compact" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-          <div><span class="muted">Score</span><br>${scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`}</div>
-          <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
-          <div><span class="muted">Entree</span><br>${Number.isFinite(entryValue) ? priceDisplay(entryValue) : "—"}</div>
-          <div><span class="muted">Ratio</span><br>${ratioValue == null ? "—" : num(ratioValue, 2)}</div>
+    <div class="clean-trade-grid">
+      <div class="clean-trade-panel">
+        <div class="clean-panel-title">Position</div>
+        <div class="clean-panel-grid">
+          <div><span class="muted">Entree</span><br>${Number.isFinite(entryPrice) ? priceDisplay(entryPrice) : "—"}</div>
+          <div><span class="muted">Prix actuel</span><br>${Number.isFinite(currentPrice) ? priceDisplay(currentPrice) : "—"}</div>
+          <div><span class="muted">Investi</span><br>${invested == null ? "—" : money(invested * fxRateUsdToEur(), "EUR")}</div>
+          <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
+          <div><span class="muted">P/L</span><br>${pnlValue}</div>
+          <div><span class="muted">P/L %</span><br>${pnlPctValue}</div>
+        </div>
+      </div>
+
+      <div class="clean-trade-panel">
+        <div class="clean-panel-title">Risque</div>
+        <div class="clean-panel-grid">
           <div><span class="muted">Stop</span><br>${stopValue > 0 ? priceDisplay(stopValue) : "—"}</div>
           <div><span class="muted">Objectif</span><br>${targetValue > 0 ? priceDisplay(targetValue) : "—"}</div>
-        </div>
-      </div>
-
-      <div class="card" style="padding:12px;background:var(--bg-elevated)">
-        <div class="muted" style="margin-bottom:8px">Etat live</div>
-        <div class="trade-plan-grid compact" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-          <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-          <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
           <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
           <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
-          <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
-          <div><span class="muted">Source</span><br>${safeText(p.sourceUsed || "—")}</div>
+          <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
+          <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
         </div>
       </div>
 
-      <div class="card" style="padding:12px;background:var(--bg-elevated)">
-        <div class="muted" style="margin-bottom:8px">Position et statut</div>
-        <div class="trade-plan-grid compact" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-          <div><span class="muted">Quantite</span><br>${safeText(p.quantity ?? "—")}</div>
-          <div><span class="muted">Investi</span><br>${money((p.invested || 0) * fxRateUsdToEur(), "EUR")}</div>
+      <div class="clean-trade-panel">
+        <div class="clean-panel-title">Lecture</div>
+        <div class="clean-panel-grid">
           <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
-          <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
+          <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
+          <div><span class="muted">Score</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
+          <div><span class="muted">Maj live</span><br>${live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—"}</div>
         </div>
-        <div style="margin-top:10px"><span class="muted">Pourquoi :</span> ${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
+        <div class="clean-why-line"><span class="muted">Pourquoi :</span> ${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
       </div>
     </div>
 
-    <div class="trade-card-actions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn btn-secondary" style="flex:1 1 180px" data-action="trade-close-half" data-id="${safeText(p.id)}">Cloturer 50%</button>
-      <button class="btn btn-danger" style="flex:1 1 180px" data-action="trade-close" data-id="${safeText(p.id)}">Cloturer</button>
+    <div class="trade-actions split clean-actions">
+      <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
+      <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
     </div>
   </div>`;
 }
@@ -2809,44 +2768,22 @@ function renderHistoryRow(item) {
 
   function journalMoteurRows(limit = 10) {
     const rows = Array.isArray(state.algoJournal) ? state.algoJournal.slice() : [];
-    const normalized = rows
-      .map((row, index) => {
-        const symbol = String(row?.symbol || "").toUpperCase();
-        const name = String(row?.name || "").trim();
-        const hasGoodName = !!name && name.toUpperCase() !== symbol;
-        const hasSource = !!row?.sourceUsed;
-        const hasTrend = !!row?.trendLabel;
-        const hasConfidence = !!(row?.confidenceLabel || row?.confidence);
-        const quality = (hasGoodName ? 2 : 0) + (hasSource ? 2 : 0) + (hasTrend ? 1 : 0) + (hasConfidence ? 1 : 0);
-
-        return {
-          ...row,
-          _symbol: symbol,
-          _decision: moteurDecisionLabel(row),
-          _score: Number.isFinite(Number(row?.score)) ? Number(row.score) : null,
-          _time: row?.updatedAt || row?.createdAt || row?.timestamp || null,
-          _quality: quality,
-          _completeEnough: quality >= 3,
-          _idx: index
-        };
-      })
-      .filter((row) => row._symbol && row._completeEnough)
+    return rows
+      .map((row, index) => ({
+        ...row,
+        _symbol: String(row?.symbol || "").toUpperCase(),
+        _decision: moteurDecisionLabel(row),
+        _score: Number.isFinite(Number(row?.score)) ? Number(row.score) : null,
+        _time: row?.updatedAt || row?.createdAt || row?.timestamp || null,
+        _idx: index
+      }))
+      .filter((row) => row._symbol)
       .sort((a, b) => {
-        if ((b._quality || 0) !== (a._quality || 0)) return (b._quality || 0) - (a._quality || 0);
         const ta = a._time ? new Date(a._time).getTime() : 0;
         const tb = b._time ? new Date(b._time).getTime() : 0;
         return tb - ta;
-      });
-
-    const deduped = [];
-    const seen = new Set();
-    for (const row of normalized) {
-      if (seen.has(row._symbol)) continue;
-      seen.add(row._symbol);
-      deduped.push(row);
-      if (deduped.length >= limit) break;
-    }
-    return deduped;
+      })
+      .slice(0, limit);
   }
 
   function updateJournalMoteurFromOpportunity(item) {
@@ -3278,6 +3215,7 @@ function openPositionsRiskView() {
     const algoCounts = (typeof algoDecisionCounts === "function") ? algoDecisionCounts() : { total: 0, conseille: 0, possible: 0, surveiller: 0, eviter: 0, aucun: 0, manuel: 0 };
     const insights = (typeof groupedHistoryInsights === "function") ? groupedHistoryInsights() : { best: [], worst: [] };
     const riskRows = (typeof openPositionsRiskView === "function") ? openPositionsRiskView() : [];
+    const nearStopCount = riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length;
 
     return `
       <div class="screen">
@@ -3292,7 +3230,6 @@ function openPositionsRiskView() {
                 ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
                 : "local uniquement"
           }</div>
-          ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
         </div>
 
         <div class="controls">
@@ -3302,41 +3239,39 @@ function openPositionsRiskView() {
         </div>
 
         ${state.trades.mode === "real" ? `
-          <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette partie restera vide tant qu'aucune source reelle n'est connectee.</div>
+          <div class="empty-state">Le portefeuille reel n'est pas encore branche.</div>
         ` : `
-          <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Capital de depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
+          <div class="portfolio-hero-grid">
+            <div class="stat-card hero"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
           </div>
 
-          <div class="grid trades-stats" style="margin-top:14px">
-            <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades proposes</div><div class="stat-value">${algoCounts.conseille}</div></div>
-            <div class="stat-card"><div class="stat-label">Possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
-            <div class="stat-card"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
-            <div class="stat-card"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
+          <div class="portfolio-mini-grid" style="margin-top:14px">
+            <div class="stat-card mini"><div class="stat-label">Capital depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
+            <div class="stat-card mini"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
+            <div class="stat-card mini"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
           </div>
 
-          <div class="card" style="margin-top:18px">
+          <div class="card compact-card" style="margin-top:18px">
             <div class="section-title"><span>Lecture rapide</span><span>${positions.length}</span></div>
             <div class="portfolio-overview-text">
               ${positions.length
-                ? `${positions.length} trade${positions.length > 1 ? "s sont" : " est"} ouvert${positions.length > 1 ? "s" : ""}. ${riskRows.length ? `${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length} position${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s sont" : " est"} proche${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s" : ""} du stop.` : ""}`
+                ? `${positions.length} trade${positions.length > 1 ? "s sont" : " est"} ouvert${positions.length > 1 ? "s" : ""}. ${nearStopCount} position${nearStopCount > 1 ? "s sont" : " est"} proche${nearStopCount > 1 ? "s" : ""} du stop.`
                 : "Aucun trade ouvert pour le moment."}
             </div>
           </div>
 
-          <div class="risk-layout">
-            <div class="card" style="margin-top:18px">
+          <div class="portfolio-mid-grid">
+            <div class="card compact-card">
               <div class="section-title"><span>Positions a surveiller</span><span>${riskRows.length}</span></div>
               ${riskRows.length ? `
-                <div class="risk-list">
-                  ${riskRows.slice(0, 8).map((row) => `
+                <div class="risk-list compact">
+                  ${riskRows.slice(0, 6).map((row) => `
                     <div class="risk-row">
                       <div>
                         <div class="trade-symbol">${safeText(row.symbol)}</div>
@@ -3347,18 +3282,18 @@ function openPositionsRiskView() {
                     </div>
                   `).join("")}
                 </div>
-              ` : `<div class="empty-state">Aucune position ouverte pour le moment.</div>`}
+              ` : `<div class="empty-state">Aucune position ouverte.</div>`}
             </div>
 
-            <div class="card" style="margin-top:18px">
+            <div class="card compact-card">
               <div class="section-title"><span>Bilan rapide</span><span>historique</span></div>
-              <div class="perf-columns">
+              <div class="perf-columns compact">
                 <div>
                   <div class="muted" style="margin-bottom:8px">Actifs qui ont le mieux marche</div>
                   ${insights.best.length ? insights.best.map((row) => `
                     <div class="mini-perf-row">
                       <span>${safeText(row.symbol)}</span>
-                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
+                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")}</span>
                     </div>
                   `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
                 </div>
@@ -3367,7 +3302,7 @@ function openPositionsRiskView() {
                   ${insights.worst.length ? insights.worst.map((row) => `
                     <div class="mini-perf-row">
                       <span>${safeText(row.symbol)}</span>
-                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
+                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")}</span>
                     </div>
                   `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
                 </div>
@@ -3375,18 +3310,18 @@ function openPositionsRiskView() {
             </div>
           </div>
 
-          <div class="card" style="margin-top:18px">
+          <div class="card compact-card" style="margin-top:18px">
             <div class="section-title"><span>Trades ouverts</span><span>${positions.length}</span></div>
             ${positions.length ? `
               <div class="trade-table simplified-open-trades">
                 ${positions.map(renderPositionRow).join("")}
               </div>
-            ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
+            ` : `<div class="empty-state">Aucun trade ouvert.</div>`}
           </div>
 
-          <div class="card" style="margin-top:18px">
+          <div class="card compact-card" style="margin-top:18px">
             <div class="section-title"><span>Trades clotures</span><span>${history.length}</span></div>
-            <div class="muted" style="margin-bottom:12px">Les lignes legacy sans vraie date de cloture, sans prix de sortie valide et sans fermeture exploitable sont maintenant masquees.</div>
+            <div class="muted" style="margin-bottom:12px">Les lignes legacy invalides sont masquees.</div>
             ${history.length ? `
               <div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
