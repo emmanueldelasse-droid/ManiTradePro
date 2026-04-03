@@ -1902,7 +1902,7 @@ function renderNewsIaBlock() {
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
           <div class="screen-subtitle">Lecture contextuelle du marche, synthese IA des articles francais et anglais, themes dominants et actifs a surveiller.</div>
-          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,5).join(" · "))}` : ""}</div>
+          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
         <div class="grid trades-stats">
@@ -1940,7 +1940,7 @@ function renderDashboard() {
     const summary = dashboardSignalSummary(state.opportunities);
     const topPick = dashboardTopPick(state.opportunities);
     const topRows = state.opportunities.slice(0, 5);
-    const recentAlgo = state.algoJournal.slice(0, 3);
+    const recentAlgo = journalMoteurRows(3);
 
     return `
       <div class="screen">
@@ -2657,56 +2657,70 @@ function renderPositionRow(position) {
   const exec = p.execution || {};
   const live = p.live || {};
   const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
+  const entryValue = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const stopValue = Number(snap.stopLoss ?? p.stopLoss);
+  const targetValue = Number(snap.takeProfit ?? p.takeProfit);
+  const scoreValue = displayScoreValue(p);
+  const ratioValue = displayRatioValue(p);
 
-  return `<div class="trade-row trade-card-row simple-trade-card">
-    <div class="trade-card-top">
+  return `<div class="trade-row trade-card-row simple-trade-card" style="padding:16px;border-radius:16px">
+    <div class="trade-card-top" style="align-items:flex-start;gap:12px;flex-wrap:wrap">
       <div>
         <div class="trade-symbol">${safeText(p.symbol)}</div>
-        <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
+        <div class="trade-sub" style="margin-top:4px">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
       </div>
-      <div class="trade-card-badges">
+      <div class="trade-card-badges" style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
         ${badge(simpleSideLabel(p.side), p.side)}
         ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
         ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
 
-    <div class="trade-summary-line">${safeText(actionTradeSummary(meta))}</div>
+    <div class="trade-summary-line" style="margin-top:10px">${safeText(actionTradeSummary(meta))}</div>
 
-    <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Score d'entree</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
-      <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
-      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
-      <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
-      <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
-      <div><span class="muted">Stop</span><br>${(Number(snap.stopLoss ?? p.stopLoss) > 0) ? priceDisplay(snap.stopLoss ?? p.stopLoss) : "—"}</div>
-      <div><span class="muted">Objectif</span><br>${(Number(snap.takeProfit ?? p.takeProfit) > 0) ? priceDisplay(snap.takeProfit ?? p.takeProfit) : "—"}</div>
-      <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px">
+      <div class="card" style="padding:12px;background:var(--bg-elevated)">
+        <div class="muted" style="margin-bottom:8px">Plan d'ouverture</div>
+        <div class="trade-plan-grid compact" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div><span class="muted">Score</span><br>${scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`}</div>
+          <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
+          <div><span class="muted">Entree</span><br>${Number.isFinite(entryValue) ? priceDisplay(entryValue) : "—"}</div>
+          <div><span class="muted">Ratio</span><br>${ratioValue == null ? "—" : num(ratioValue, 2)}</div>
+          <div><span class="muted">Stop</span><br>${stopValue > 0 ? priceDisplay(stopValue) : "—"}</div>
+          <div><span class="muted">Objectif</span><br>${targetValue > 0 ? priceDisplay(targetValue) : "—"}</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:12px;background:var(--bg-elevated)">
+        <div class="muted" style="margin-bottom:8px">Etat live</div>
+        <div class="trade-plan-grid compact" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
+          <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
+          <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
+          <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
+          <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
+          <div><span class="muted">Source</span><br>${safeText(p.sourceUsed || "—")}</div>
+        </div>
+      </div>
+
+      <div class="card" style="padding:12px;background:var(--bg-elevated)">
+        <div class="muted" style="margin-bottom:8px">Position et statut</div>
+        <div class="trade-plan-grid compact" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div><span class="muted">Quantite</span><br>${safeText(p.quantity ?? "—")}</div>
+          <div><span class="muted">Investi</span><br>${money((p.invested || 0) * fxRateUsdToEur(), "EUR")}</div>
+          <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
+          <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
+        </div>
+        <div style="margin-top:10px">
+          <div class="muted">Pourquoi</div>
+          <div style="margin-top:4px">${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
+        </div>
+      </div>
     </div>
 
-    <div class="muted" style="margin:14px 0 6px">Etat live</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
-      <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
-      <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
-      <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-      <div><span class="muted">Investi</span><br>${displayInvestedValue(p) == null ? "—" : money(displayInvestedValue(p) * fxRateUsdToEur(), "EUR")}</div>
-    </div>
-
-    <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
-      <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
-      <div style="grid-column: span 2"><span class="muted">Pourquoi</span><br>${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
-    </div>
-
-    <div class="trade-actions split">
-      <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
-      <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
+    <div class="trade-card-actions" style="margin-top:14px">
+      <button class="btn btn-secondary" data-action="trade-close-half" data-id="${safeText(p.id)}">Cloturer 50%</button>
+      <button class="btn btn-danger" data-action="trade-close" data-id="${safeText(p.id)}">Cloturer</button>
     </div>
   </div>`;
 }
@@ -2798,22 +2812,33 @@ function renderHistoryRow(item) {
 
   function journalMoteurRows(limit = 10) {
     const rows = Array.isArray(state.algoJournal) ? state.algoJournal.slice() : [];
-    return rows
+    const normalized = rows
       .map((row, index) => ({
         ...row,
         _symbol: String(row?.symbol || "").toUpperCase(),
         _decision: moteurDecisionLabel(row),
         _score: Number.isFinite(Number(row?.score)) ? Number(row.score) : null,
         _time: row?.updatedAt || row?.createdAt || row?.timestamp || null,
+        _quality: [row?.sourceUsed, row?.trendLabel, row?.confidenceLabel || row?.confidence].filter(Boolean).length,
         _idx: index
       }))
       .filter((row) => row._symbol)
       .sort((a, b) => {
         const ta = a._time ? new Date(a._time).getTime() : 0;
         const tb = b._time ? new Date(b._time).getTime() : 0;
-        return tb - ta;
-      })
-      .slice(0, limit);
+        if (tb !== ta) return tb - ta;
+        return (b._quality || 0) - (a._quality || 0);
+      });
+
+    const deduped = [];
+    const seen = new Set();
+    for (const row of normalized) {
+      if (seen.has(row._symbol)) continue;
+      seen.add(row._symbol);
+      deduped.push(row);
+      if (deduped.length >= limit) break;
+    }
+    return deduped;
   }
 
   function updateJournalMoteurFromOpportunity(item) {
