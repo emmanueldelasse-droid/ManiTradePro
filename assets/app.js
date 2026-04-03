@@ -1901,7 +1901,7 @@ function renderNewsIaBlock() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
-          <div class="screen-subtitle">Lecture contextuelle du marche, synthese IA des articles francais et anglais, themes dominants et actifs a surveiller.</div>
+          <div class="screen-subtitle">Le contexte marche du moment.</div>
           <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
@@ -2711,16 +2711,13 @@ function renderPositionRow(position) {
           <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
           <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
         </div>
-        <div style="margin-top:10px">
-          <div class="muted">Pourquoi</div>
-          <div style="margin-top:4px">${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
-        </div>
+        <div style="margin-top:10px"><span class="muted">Pourquoi :</span> ${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
       </div>
     </div>
 
-    <div class="trade-card-actions" style="margin-top:14px">
-      <button class="btn btn-secondary" data-action="trade-close-half" data-id="${safeText(p.id)}">Cloturer 50%</button>
-      <button class="btn btn-danger" data-action="trade-close" data-id="${safeText(p.id)}">Cloturer</button>
+    <div class="trade-card-actions" style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-secondary" style="flex:1 1 180px" data-action="trade-close-half" data-id="${safeText(p.id)}">Cloturer 50%</button>
+      <button class="btn btn-danger" style="flex:1 1 180px" data-action="trade-close" data-id="${safeText(p.id)}">Cloturer</button>
     </div>
   </div>`;
 }
@@ -2813,21 +2810,32 @@ function renderHistoryRow(item) {
   function journalMoteurRows(limit = 10) {
     const rows = Array.isArray(state.algoJournal) ? state.algoJournal.slice() : [];
     const normalized = rows
-      .map((row, index) => ({
-        ...row,
-        _symbol: String(row?.symbol || "").toUpperCase(),
-        _decision: moteurDecisionLabel(row),
-        _score: Number.isFinite(Number(row?.score)) ? Number(row.score) : null,
-        _time: row?.updatedAt || row?.createdAt || row?.timestamp || null,
-        _quality: [row?.sourceUsed, row?.trendLabel, row?.confidenceLabel || row?.confidence].filter(Boolean).length,
-        _idx: index
-      }))
-      .filter((row) => row._symbol)
+      .map((row, index) => {
+        const symbol = String(row?.symbol || "").toUpperCase();
+        const name = String(row?.name || "").trim();
+        const hasGoodName = !!name && name.toUpperCase() !== symbol;
+        const hasSource = !!row?.sourceUsed;
+        const hasTrend = !!row?.trendLabel;
+        const hasConfidence = !!(row?.confidenceLabel || row?.confidence);
+        const quality = (hasGoodName ? 2 : 0) + (hasSource ? 2 : 0) + (hasTrend ? 1 : 0) + (hasConfidence ? 1 : 0);
+
+        return {
+          ...row,
+          _symbol: symbol,
+          _decision: moteurDecisionLabel(row),
+          _score: Number.isFinite(Number(row?.score)) ? Number(row.score) : null,
+          _time: row?.updatedAt || row?.createdAt || row?.timestamp || null,
+          _quality: quality,
+          _completeEnough: quality >= 3,
+          _idx: index
+        };
+      })
+      .filter((row) => row._symbol && row._completeEnough)
       .sort((a, b) => {
+        if ((b._quality || 0) !== (a._quality || 0)) return (b._quality || 0) - (a._quality || 0);
         const ta = a._time ? new Date(a._time).getTime() : 0;
         const tb = b._time ? new Date(b._time).getTime() : 0;
-        if (tb !== ta) return tb - ta;
-        return (b._quality || 0) - (a._quality || 0);
+        return tb - ta;
       });
 
     const deduped = [];
@@ -3275,7 +3283,7 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts. Le mode entrainement suit maintenant un vrai capital fictif.</div>
+          <div class="screen-subtitle">Suivi simple des positions ouvertes, des trades clotures et du risque en cours.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${
             state.trades.remoteStatus === "connected"
