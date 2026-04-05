@@ -6,9 +6,14 @@
     settings: "mtp_settings_v1",
     algoJournal: "mtp_algo_journal_v1",
     budgetTracker: "mtp_budget_tracker_v1",
-    detailCache: "mtp_detail_cache_v1",
-    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1",
+    detailCache: "mtp_detail_cache_v2",
+    opportunitiesSnapshot: "mtp_opportunities_snapshot_v2",
     trainingCapital: "mtp_training_capital_v1"
+  };
+
+  const LEGACY_STORAGE_KEYS = {
+    detailCache: "mtp_detail_cache_v1",
+    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1"
   };
 
   const TRADE_STORAGE = {
@@ -115,6 +120,11 @@
 
   function removeJson(key) {
     try { localStorage.removeItem(key); } catch {}
+  }
+
+  function clearLegacyOpportunityCaches() {
+    removeJson(LEGACY_STORAGE_KEYS.detailCache);
+    removeJson(LEGACY_STORAGE_KEYS.opportunitiesSnapshot);
   }
 
   function readJsonFromKeys(keys, fallback) {
@@ -1100,19 +1110,30 @@ function currentTradePlan() {
   }
 
   function mergeOpportunityWithStored(current, stored) {
-    if (!stored) return current;
+    if (!stored) return normalizeOpportunity(current);
     return normalizeOpportunity({
-      ...current,
       ...stored,
-      price: stored.price ?? current.price,
-      change24hPct: stored.change24hPct ?? current.change24hPct,
-      score: stored.score ?? current.score,
-      decision: stored.decision || current.decision || null,
-      trendLabel: stored.trendLabel || current.trendLabel || null,
-      reasonShort: stored.reasonShort || current.reasonShort || null,
-      plan: stored.plan || current.plan || null,
-      status: stored.status || current.status || null,
-      freshness: stored.freshness || current.freshness || "unknown"
+      ...current,
+      price: current?.price ?? stored?.price ?? null,
+      change24hPct: current?.change24hPct ?? stored?.change24hPct ?? null,
+      score: current?.score ?? stored?.score ?? null,
+      scoreStatus: current?.scoreStatus || stored?.scoreStatus || null,
+      direction: current?.direction || stored?.direction || "neutral",
+      analysisLabel: current?.analysisLabel || stored?.analysisLabel || null,
+      confidence: current?.confidence || stored?.confidence || "low",
+      confidenceLabel: current?.confidenceLabel || stored?.confidenceLabel || null,
+      breakdown: current?.breakdown || stored?.breakdown || null,
+      reasonShort: current?.reasonShort || stored?.reasonShort || null,
+      decision: current?.decision || stored?.decision || null,
+      trendLabel: current?.trendLabel || stored?.trendLabel || null,
+      plan: current?.plan || stored?.plan || null,
+      sourceUsed: current?.sourceUsed || stored?.sourceUsed || null,
+      freshness: current?.freshness || stored?.freshness || "unknown",
+      status: current?.status || stored?.status || null,
+      candles: Array.isArray(current?.candles) && current.candles.length
+        ? current.candles
+        : (Array.isArray(stored?.candles) ? stored.candles : []),
+      error: current?.error || (current?.status === "unavailable" ? stored?.error : null)
     });
   }
 
@@ -1575,6 +1596,12 @@ function closeTrainingTrade(id, livePrice = null) {
   }
 
   
+function comparableOpportunityScore(item) {
+  const score = Number(item?.score);
+  if (!Number.isFinite(score)) return -1;
+  return String(item?.direction || "neutral") === "short" ? (100 - score) : score;
+}
+
 function groupedOpportunities(rows) {
   const items = Array.isArray(rows) ? rows.slice() : [];
   const buckets = { proposed: [], watch: [], noTrade: [] };
@@ -1590,7 +1617,8 @@ function groupedOpportunities(rows) {
   });
 
   const sorter = (a, b) => {
-    if ((b._score ?? -1) !== (a._score ?? -1)) return (b._score ?? -1) - (a._score ?? -1);
+    const diff = comparableOpportunityScore(b) - comparableOpportunityScore(a);
+    if (diff !== 0) return diff;
     return String(a.symbol || "").localeCompare(String(b.symbol || ""));
   };
 
@@ -3586,6 +3614,7 @@ function openPositionsRiskView() {
   }
 
   async function boot() {
+    clearLegacyOpportunityCaches();
     await loadTradesState();
     if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
       state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);

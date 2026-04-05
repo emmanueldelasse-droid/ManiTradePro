@@ -6,9 +6,14 @@
     settings: "mtp_settings_v1",
     algoJournal: "mtp_algo_journal_v1",
     budgetTracker: "mtp_budget_tracker_v1",
-    detailCache: "mtp_detail_cache_v1",
-    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1",
+    detailCache: "mtp_detail_cache_v2",
+    opportunitiesSnapshot: "mtp_opportunities_snapshot_v2",
     trainingCapital: "mtp_training_capital_v1"
+  };
+
+  const LEGACY_STORAGE_KEYS = {
+    detailCache: "mtp_detail_cache_v1",
+    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1"
   };
 
   const TRADE_STORAGE = {
@@ -115,6 +120,11 @@
 
   function removeJson(key) {
     try { localStorage.removeItem(key); } catch {}
+  }
+
+  function clearLegacyOpportunityCaches() {
+    removeJson(LEGACY_STORAGE_KEYS.detailCache);
+    removeJson(LEGACY_STORAGE_KEYS.opportunitiesSnapshot);
   }
 
   function readJsonFromKeys(keys, fallback) {
@@ -495,26 +505,83 @@
     }
   }
 
+  function mergeById(localRows = [], remoteRows = []) {
+    const map = new Map();
+
+    for (const row of Array.isArray(localRows) ? localRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+      map.set(String(normalized.id), normalized);
+    }
+
+    for (const row of Array.isArray(remoteRows) ? remoteRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+
+      const key = String(normalized.id);
+      const existing = map.get(key);
+
+      if (!existing) {
+        map.set(key, normalized);
+        continue;
+      }
+
+      map.set(key, {
+        ...existing,
+        ...normalized,
+        analysisSnapshot: normalized.analysisSnapshot || existing.analysisSnapshot || null,
+        execution: normalized.execution || existing.execution || null,
+        live: normalized.live || existing.live || null,
+        closedExecution: normalized.closedExecution || existing.closedExecution || null
+      });
+    }
+
+    return [...map.values()];
+  }
+
   async function loadTradesState() {
-    const loadedRemote = await loadTradesFromWorker();
     const rawPositions = readJsonFromKeys(TRADE_STORAGE.positions, []);
     const rawHistory = readJsonFromKeys(TRADE_STORAGE.history, []);
     const rawAlgo = readJsonFromKeys(TRADE_STORAGE.algoJournal, []);
 
-    if (!loadedRemote) {
-      state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
-      state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
-    }
-    state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
+    const localPositions = Array.isArray(rawPositions)
+      ? rawPositions.map(normalizePositionRecord).filter((x) => x && x.id)
+      : [];
 
-    // Warm the current versioned keys too, so older/newer builds keep seeing the same trades.
+    const localHistory = Array.isArray(rawHistory)
+      ? rawHistory.map((x) => normalizePositionRecord(x)).filter((x) => x && x.id)
+      : [];
+
+    const localAlgo = Array.isArray(rawAlgo) ? rawAlgo : [];
+
+    const loadedRemote = await loadTradesFromWorker();
+
+    const remotePositions = Array.isArray(state.trades.positions)
+      ? state.trades.positions.map(normalizePositionRecord).filter((x) => x && x.id)
+      : [];
+
+    const remoteHistory = Array.isArray(state.trades.history)
+      ? state.trades.history.map((x) => normalizePositionRecord(x)).filter((x) => x && x.id)
+      : [];
+
+    state.trades.positions = mergeById(localPositions, loadedRemote ? remotePositions : []);
+    state.trades.history = mergeById(localHistory, loadedRemote ? remoteHistory : []);
+    state.algoJournal = localAlgo;
+
     writeJsonToKeys(TRADE_STORAGE.positions, state.trades.positions);
     writeJsonToKeys(TRADE_STORAGE.history, state.trades.history);
     writeJsonToKeys(TRADE_STORAGE.algoJournal, state.algoJournal);
+
     writeJson(TRADE_STORAGE.positionsBackup, state.trades.positions);
     writeJson(TRADE_STORAGE.historyBackup, state.trades.history);
     writeJson(TRADE_STORAGE.algoJournalBackup, state.algoJournal);
-    saveTradesMeta({ migratedAt: Date.now() });
+
+    saveTradesMeta({
+      migratedAt: Date.now(),
+      positionsCount: state.trades.positions.length,
+      historyCount: state.trades.history.length,
+      algoCount: state.algoJournal.length
+    });
   }
 
   function persistTradesState() {
@@ -1043,19 +1110,30 @@ function currentTradePlan() {
   }
 
   function mergeOpportunityWithStored(current, stored) {
-    if (!stored) return current;
+    if (!stored) return normalizeOpportunity(current);
     return normalizeOpportunity({
-      ...current,
       ...stored,
-      price: stored.price ?? current.price,
-      change24hPct: stored.change24hPct ?? current.change24hPct,
-      score: stored.score ?? current.score,
-      decision: stored.decision || current.decision || null,
-      trendLabel: stored.trendLabel || current.trendLabel || null,
-      reasonShort: stored.reasonShort || current.reasonShort || null,
-      plan: stored.plan || current.plan || null,
-      status: stored.status || current.status || null,
-      freshness: stored.freshness || current.freshness || "unknown"
+      ...current,
+      price: current?.price ?? stored?.price ?? null,
+      change24hPct: current?.change24hPct ?? stored?.change24hPct ?? null,
+      score: current?.score ?? stored?.score ?? null,
+      scoreStatus: current?.scoreStatus || stored?.scoreStatus || null,
+      direction: current?.direction || stored?.direction || "neutral",
+      analysisLabel: current?.analysisLabel || stored?.analysisLabel || null,
+      confidence: current?.confidence || stored?.confidence || "low",
+      confidenceLabel: current?.confidenceLabel || stored?.confidenceLabel || null,
+      breakdown: current?.breakdown || stored?.breakdown || null,
+      reasonShort: current?.reasonShort || stored?.reasonShort || null,
+      decision: current?.decision || stored?.decision || null,
+      trendLabel: current?.trendLabel || stored?.trendLabel || null,
+      plan: current?.plan || stored?.plan || null,
+      sourceUsed: current?.sourceUsed || stored?.sourceUsed || null,
+      freshness: current?.freshness || stored?.freshness || "unknown",
+      status: current?.status || stored?.status || null,
+      candles: Array.isArray(current?.candles) && current.candles.length
+        ? current.candles
+        : (Array.isArray(stored?.candles) ? stored.candles : []),
+      error: current?.error || (current?.status === "unavailable" ? stored?.error : null)
     });
   }
 
@@ -1518,6 +1596,12 @@ function closeTrainingTrade(id, livePrice = null) {
   }
 
   
+function comparableOpportunityScore(item) {
+  const score = Number(item?.score);
+  if (!Number.isFinite(score)) return -1;
+  return String(item?.direction || "neutral") === "short" ? (100 - score) : score;
+}
+
 function groupedOpportunities(rows) {
   const items = Array.isArray(rows) ? rows.slice() : [];
   const buckets = { proposed: [], watch: [], noTrade: [] };
@@ -1533,7 +1617,8 @@ function groupedOpportunities(rows) {
   });
 
   const sorter = (a, b) => {
-    if ((b._score ?? -1) !== (a._score ?? -1)) return (b._score ?? -1) - (a._score ?? -1);
+    const diff = comparableOpportunityScore(b) - comparableOpportunityScore(a);
+    if (diff !== 0) return diff;
     return String(a.symbol || "").localeCompare(String(b.symbol || ""));
   };
 
@@ -1934,8 +2019,8 @@ function renderDashboard() {
           <div class="stat-card"><div class="stat-label">Neutre</div><div class="stat-value">${summary.neutral}</div></div>
         </div>
 
-        <div class="dashboard-grid">
-          <div class="card">
+        <div class="dashboard-grid polished-home-grid">
+          <div class="card compact-card">
             <div class="section-title"><span>Meilleure opportunite du moment</span><span>${topPick ? topPick.symbol : "—"}</span></div>
             ${topPick ? `
               <div class="top-pick-box">
@@ -1960,7 +2045,7 @@ function renderDashboard() {
             ` : `<div class="empty-state">Aucune opportunite assez lisible pour le moment.</div>`}
           </div>
 
-          <div class="card">
+          <div class="card compact-card">
             <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
             ${recentAlgo.length ? `
               <div class="algo-feed">
@@ -1979,7 +2064,7 @@ function renderDashboard() {
           </div>
         </div>
 
-        <div class="card" style="margin-top:18px">
+        <div class="card compact-card" style="margin-top:18px">
           <div class="section-title"><span>Meilleures opportunites</span><span>${topRows.length}</span></div>
           ${topRows.length ? `<div class="opp-list">${topRows.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite disponible.</div>`}
         </div>
@@ -2614,55 +2699,45 @@ function renderPositionRow(position) {
   const snap = p.analysisSnapshot || {};
   const exec = p.execution || {};
   const live = p.live || {};
-  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
+  const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const currentPrice = Number(meta.livePrice);
+  const stopValue = Number(snap.stopLoss ?? p.stopLoss);
+  const targetValue = Number(snap.takeProfit ?? p.takeProfit);
+  const invested = displayInvestedValue(p);
+  const pnlValue = p.live?.pnl != null ? money(p.live.pnl * fxRateUsdToEur(), "EUR") : "—";
+  const pnlPctValue = p.live?.pnlPct != null ? pct(p.live.pnlPct) : "—";
 
-  return `<div class="trade-row trade-card-row simple-trade-card">
-    <div class="trade-card-top">
+  return `<div class="trade-row trade-card-row compact-trade-card">
+    <div class="compact-trade-top">
       <div>
         <div class="trade-symbol">${safeText(p.symbol)}</div>
         <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
       </div>
       <div class="trade-card-badges">
         ${badge(simpleSideLabel(p.side), p.side)}
-        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
+        ${badge(snap.trendLabel || p.trendLabel || "tendance neutre", "neutral")}
         ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
 
-    <div class="trade-summary-line">${safeText(actionTradeSummary(meta))}</div>
+    <div class="compact-trade-summary">${safeText(actionTradeSummary(meta))}</div>
 
-    <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Score d'entree</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
-      <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
-      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
-      <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
-      <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
-      <div><span class="muted">Stop</span><br>${(Number(snap.stopLoss ?? p.stopLoss) > 0) ? priceDisplay(snap.stopLoss ?? p.stopLoss) : "—"}</div>
-      <div><span class="muted">Objectif</span><br>${(Number(snap.takeProfit ?? p.takeProfit) > 0) ? priceDisplay(snap.takeProfit ?? p.takeProfit) : "—"}</div>
-      <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
+    <div class="compact-kpis">
+      <div class="compact-kpi"><span class="muted">Entree</span><strong>${Number.isFinite(entryPrice) ? priceDisplay(entryPrice) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Actuel</span><strong>${Number.isFinite(currentPrice) ? priceDisplay(currentPrice) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Investi</span><strong>${invested == null ? "—" : money(invested * fxRateUsdToEur(), "EUR")}</strong></div>
+      <div class="compact-kpi"><span class="muted">P/L</span><strong>${pnlValue} · ${pnlPctValue}</strong></div>
+      <div class="compact-kpi"><span class="muted">Stop</span><strong>${stopValue > 0 ? priceDisplay(stopValue) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Objectif</span><strong>${targetValue > 0 ? priceDisplay(targetValue) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Avant stop</span><strong>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</strong></div>
+      <div class="compact-kpi"><span class="muted">Avant objectif</span><strong>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</strong></div>
+      <div class="compact-kpi"><span class="muted">Source</span><strong>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</strong></div>
+      <div class="compact-kpi"><span class="muted">Maj</span><strong>${live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—"}</strong></div>
     </div>
 
-    <div class="muted" style="margin:14px 0 6px">Etat live</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
-      <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
-      <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
-      <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-      <div><span class="muted">Investi</span><br>${displayInvestedValue(p) == null ? "—" : money(displayInvestedValue(p) * fxRateUsdToEur(), "EUR")}</div>
-    </div>
+    <div class="compact-why"><span class="muted">Pourquoi :</span> ${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
 
-    <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
-      <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
-      <div style="grid-column: span 2"><span class="muted">Pourquoi</span><br>${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
-    </div>
-
-    <div class="trade-actions split">
+    <div class="trade-actions split compact-actions">
       <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
       <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
     </div>
@@ -3208,7 +3283,7 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts. Le mode entrainement suit maintenant un vrai capital fictif.</div>
+          <div class="screen-subtitle">Suivi simple des positions ouvertes, des trades clotures et du risque en cours.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${
             state.trades.remoteStatus === "connected"
@@ -3229,22 +3304,20 @@ function openPositionsRiskView() {
         ${state.trades.mode === "real" ? `
           <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette partie restera vide tant qu'aucune source reelle n'est connectee.</div>
         ` : `
-          <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Capital de depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
+          <div class="portfolio-hero-grid">
+            <div class="stat-card hero"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
           </div>
 
-          <div class="grid trades-stats" style="margin-top:14px">
-            <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades proposes</div><div class="stat-value">${algoCounts.conseille}</div></div>
-            <div class="stat-card"><div class="stat-label">Possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
-            <div class="stat-card"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
-            <div class="stat-card"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
+          <div class="portfolio-mini-grid" style="margin-top:14px">
+            <div class="stat-card mini"><div class="stat-label">Capital depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
+            <div class="stat-card mini"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
+            <div class="stat-card mini"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
           </div>
 
           <div class="card" style="margin-top:18px">
@@ -3256,8 +3329,8 @@ function openPositionsRiskView() {
             </div>
           </div>
 
-          <div class="risk-layout">
-            <div class="card" style="margin-top:18px">
+          <div class="portfolio-mid-grid">
+            <div class="card compact-card" style="margin-top:18px">
               <div class="section-title"><span>Positions a surveiller</span><span>${riskRows.length}</span></div>
               ${riskRows.length ? `
                 <div class="risk-list">
@@ -3275,7 +3348,7 @@ function openPositionsRiskView() {
               ` : `<div class="empty-state">Aucune position ouverte pour le moment.</div>`}
             </div>
 
-            <div class="card" style="margin-top:18px">
+            <div class="card compact-card" style="margin-top:18px">
               <div class="section-title"><span>Bilan rapide</span><span>historique</span></div>
               <div class="perf-columns">
                 <div>
@@ -3498,7 +3571,7 @@ function openPositionsRiskView() {
     });
 
     app.querySelectorAll("[data-close-trade]").forEach(el => {
-      el.addEventListener("click", () => closeTrainingTrade(el.getAttribute("data-close-trade")));
+      el.addEventListener("click", () => closeTradePosition(el.getAttribute("data-close-trade")));
     });
 
     app.querySelectorAll("[data-close-half]").forEach(el => {
@@ -3541,6 +3614,7 @@ function openPositionsRiskView() {
   }
 
   async function boot() {
+    clearLegacyOpportunityCaches();
     await loadTradesState();
     if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
       state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);
