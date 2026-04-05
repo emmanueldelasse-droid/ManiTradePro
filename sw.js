@@ -1,4 +1,4 @@
-const CACHE_VERSION = "manitradepro-v5.5";
+const CACHE_VERSION = "manitradepro-v5.4";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -6,8 +6,8 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./assets/app.js?v=20260405-fullpush1",
-  "./assets/styles.css?v=20260405-fullpush1"
+  "./assets/app.js?v=5.4",
+  "./assets/styles.css?v=5.4"
 ];
 
 function isHttpRequest(url) {
