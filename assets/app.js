@@ -6,8 +6,8 @@
     settings: "mtp_settings_v1",
     algoJournal: "mtp_algo_journal_v1",
     budgetTracker: "mtp_budget_tracker_v1",
-    detailCache: "mtp_detail_cache_v2",
-    opportunitiesSnapshot: "mtp_opportunities_snapshot_v2",
+    detailCache: "mtp_detail_cache_v1",
+    opportunitiesSnapshot: "mtp_opportunities_snapshot_v1",
     trainingCapital: "mtp_training_capital_v1"
   };
 
@@ -88,15 +88,6 @@
   };
 
   const app = document.getElementById("app");
-  clearObsoleteOpportunityCaches();
-
-  function clearObsoleteOpportunityCaches() {
-    try {
-      localStorage.removeItem("mtp_detail_cache_v1");
-      localStorage.removeItem("mtp_opportunities_snapshot_v1");
-    } catch {}
-  }
-
   const navItems = [
     ["dashboard", "Accueil", "⌂"],
     ["opportunities", "Opportunites", "◎"],
@@ -513,6 +504,9 @@
     if (!loadedRemote) {
       state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
       state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
+    } else {
+      state.trades.positions = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
+      state.trades.history = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : [];
     }
     state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
 
@@ -523,7 +517,7 @@
     writeJson(TRADE_STORAGE.positionsBackup, state.trades.positions);
     writeJson(TRADE_STORAGE.historyBackup, state.trades.history);
     writeJson(TRADE_STORAGE.algoJournalBackup, state.algoJournal);
-    saveTradesMeta({ migratedAt: Date.now() });
+    saveTradesMeta({ migratedAt: Date.now(), remoteLoaded: loadedRemote });
   }
 
   function persistTradesState() {
@@ -1052,19 +1046,7 @@ function currentTradePlan() {
   }
 
   function mergeOpportunityWithStored(current, stored) {
-    if (!stored) return normalizeOpportunity(current);
-
-    const currentAvailable = !!current && current.status !== "unavailable" && current.scoreStatus !== "unavailable";
-    const storedAvailable = !!stored && stored.status !== "unavailable" && stored.scoreStatus !== "unavailable";
-
-    if (currentAvailable && !storedAvailable) {
-      return normalizeOpportunity({
-        ...stored,
-        ...current,
-        candles: Array.isArray(current?.candles) && current.candles.length ? current.candles : (Array.isArray(stored?.candles) ? stored.candles : [])
-      });
-    }
-
+    if (!stored) return current;
     return normalizeOpportunity({
       ...current,
       ...stored,
@@ -3025,60 +3007,92 @@ function normalizePositionRecord(position){
     return num != null && num > 0 ? num : null;
   };
 
-  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? position?.analysisSnapshot?.entry);
-  const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
-  const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
+  const legacySnapshot = position?.analysisSnapshot || position?.analysis_snapshot || {};
+  const execution = position?.execution || {};
+  const closedExecution = position?.closedExecution || position?.closed_execution || {};
+  const live = position?.live || {};
+  const normalizedSide = (() => {
+    const raw = String(
+      legacySnapshot?.direction ||
+      position?.direction ||
+      position?.side ||
+      ""
+    ).toLowerCase();
+    return raw === "long" || raw === "short" ? raw : null;
+  })();
+
+  const entryPriceRaw = positiveOrNull(
+    execution?.entryPrice ?? execution?.entry_price ?? position?.entryPrice ?? position?.entry_price ?? legacySnapshot?.entry
+  );
+  const quantityRaw = positiveOrNull(execution?.quantity ?? position?.quantity);
+  const investedRaw = positiveOrNull(execution?.invested ?? position?.invested)
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(position?.analysisSnapshot?.stopLoss ?? position?.stopLoss);
-  const takeProfitRaw = positiveOrNull(position?.analysisSnapshot?.takeProfit ?? position?.takeProfit);
-  const ratioRaw = positiveOrNull(position?.analysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
-  const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice);
-  const livePriceRaw = positiveOrNull(position?.live?.price);
-  const pnlRaw = safeNumber(position?.pnl);
-  const pnlPctRaw = safeNumber(position?.pnlPct);
-  const sourceUsed = position?.sourceUsed || position?.source || position?.analysisSnapshot?.sourceUsed || null;
+  const stopLossRaw = positiveOrNull(
+    legacySnapshot?.stopLoss ?? legacySnapshot?.stop_loss ?? position?.stopLoss ?? position?.stop_loss
+  );
+  const takeProfitRaw = positiveOrNull(
+    legacySnapshot?.takeProfit ?? legacySnapshot?.take_profit ?? position?.takeProfit ?? position?.take_profit
+  );
+  const ratioRaw = positiveOrNull(
+    legacySnapshot?.ratio ?? position?.rrRatio ?? position?.rr_ratio ?? position?.rr
+  );
+  const exitPriceRaw = positiveOrNull(
+    closedExecution?.exitPrice ?? closedExecution?.exit_price ?? position?.exitPrice ?? position?.exit_price
+  );
+  const livePriceRaw = positiveOrNull(live?.price);
+  const pnlRaw = safeNumber(position?.pnl ?? live?.pnl);
+  const pnlPctRaw = safeNumber(position?.pnlPct ?? position?.pnl_pct ?? live?.pnlPct ?? live?.pnl_pct);
+  const openedAt = execution?.openedAt || execution?.opened_at || position?.openedAt || position?.opened_at || null;
+  const updatedAt = live?.updatedAt || live?.updated_at || position?.updatedAt || position?.updated_at || null;
+  const closedAt = closedExecution?.closedAt || closedExecution?.closed_at || position?.closedAt || position?.closed_at || null;
+  const sourceUsed = position?.sourceUsed || position?.source_used || position?.source || legacySnapshot?.sourceUsed || legacySnapshot?.source_used || null;
 
   const snapshot = {
     symbol: position.symbol || null,
-    name: position.name || position.symbol || null,
-    score: positiveOrNull(position?.analysisSnapshot?.score ?? position?.score),
-    decision: position?.analysisSnapshot?.decision || position?.tradeDecision || null,
-    trendLabel: position?.analysisSnapshot?.trendLabel || position?.trendLabel || detectedTrendLabel(position?.direction || "neutral"),
-    direction: position?.analysisSnapshot?.direction || position?.direction || null,
+    name: position.name || legacySnapshot?.name || position.symbol || null,
+    score: positiveOrNull(legacySnapshot?.score ?? position?.score),
+    decision: legacySnapshot?.decision || position?.decision || position?.tradeDecision || position?.trade_decision || null,
+    trendLabel: legacySnapshot?.trendLabel || legacySnapshot?.trend_label || position?.trendLabel || position?.trend_label || detectedTrendLabel(normalizedSide || "neutral"),
+    direction: legacySnapshot?.direction || position?.direction || normalizedSide,
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     ratio: ratioRaw,
-    horizon: position?.analysisSnapshot?.horizon || position?.horizon || null,
-    reason: position?.analysisSnapshot?.reason || position?.tradeReason || null,
-    scoreBreakdown: position?.analysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
+    horizon: legacySnapshot?.horizon || position?.horizon || null,
+    reason: legacySnapshot?.reason || position?.tradeReason || position?.trade_reason || null,
+    scoreBreakdown: legacySnapshot?.scoreBreakdown || legacySnapshot?.score_breakdown || position?.scoreBreakdown || position?.score_breakdown || null,
     sourceUsed,
-    analysisTimestamp: position?.analysisSnapshot?.analysisTimestamp || position?.openedAt || Date.now()
+    analysisTimestamp: legacySnapshot?.analysisTimestamp || legacySnapshot?.analysis_timestamp || openedAt || updatedAt || Date.now()
   };
 
   return {
     ...position,
+    side: normalizedSide,
+    direction: snapshot.direction || normalizedSide,
     analysisSnapshot: snapshot,
     execution: {
-      ...(position.execution || {}),
-      openedAt: position?.execution?.openedAt || position?.openedAt || null,
+      ...(execution || {}),
+      openedAt,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
       invested: investedRaw
     },
     live: {
-      ...(position.live || {}),
-      updatedAt: position?.live?.updatedAt || Date.now(),
+      ...(live || {}),
+      updatedAt: updatedAt || Date.now(),
       price: livePriceRaw,
-      pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : null,
-      pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : null
+      pnl: live?.pnl != null ? safeNumber(live.pnl) : pnlRaw,
+      pnlPct: live?.pnlPct != null ? safeNumber(live.pnlPct) : pnlPctRaw
     },
     closedExecution: {
-      ...(position.closedExecution || {}),
+      ...(closedExecution || {}),
       exitPrice: exitPriceRaw,
-      closedAt: position?.closedExecution?.closedAt || position?.closedAt || null,
-      closeType: position?.closedExecution?.closeType || position?.closeType || null
+      closedAt,
+      closeType: closedExecution?.closeType || closedExecution?.close_type || position?.closeType || position?.close_type || null
     },
+    openedAt,
+    updatedAt,
+    closedAt,
     tradeDecision: snapshot.decision,
     tradeReason: snapshot.reason,
     trendLabel: snapshot.trendLabel,
@@ -3102,6 +3116,8 @@ function normalizeOpenPositionsState(){
 }
 
 function restoreTradesFromBackupIfEmpty() {
+  if (state?.trades?.remoteStatus === "connected") return;
+
   const backupPositions = readJson(TRADE_STORAGE.positionsBackup, []);
   const backupHistory = readJson(TRADE_STORAGE.historyBackup, []);
   const backupAlgo = readJson(TRADE_STORAGE.algoJournalBackup, []);

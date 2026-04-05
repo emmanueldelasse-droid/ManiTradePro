@@ -6,8 +6,8 @@ const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./assets/app.js?v=5.4",
-  "./assets/styles.css?v=5.4"
+  "./assets/app.js",
+  "./assets/styles.css"
 ];
 
 function isHttpRequest(url) {
