@@ -71,7 +71,8 @@
       history: [],
       remoteStatus: "local_only",
       remoteError: null,
-      lastRemoteSyncAt: null
+      lastRemoteSyncAt: null,
+      remoteWriteDisabled: false
     },
     tradeLive: {
       lastRunAt: 0,
@@ -189,6 +190,58 @@
     return res.text();
   }
 
+
+
+  function isTradesSchemaMismatchError(message) {
+    const msg = String(message || "").toLowerCase();
+    return msg.includes("pgrst204") || (msg.includes("could not find") && msg.includes("column"));
+  }
+
+  function mergeDefinedRow(base, overlay) {
+    const out = { ...(base || {}) };
+    const source = overlay || {};
+    for (const [key, value] of Object.entries(source)) {
+      if (value !== undefined && value !== null && value !== "") out[key] = value;
+    }
+    return out;
+  }
+
+  function mergeTradeCollections(remoteRows = [], localRows = [], prefer = "local") {
+    const map = new Map();
+
+    for (const row of Array.isArray(remoteRows) ? remoteRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+      map.set(String(normalized.id), normalized);
+    }
+
+    for (const row of Array.isArray(localRows) ? localRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+      const key = String(normalized.id);
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, normalized);
+        continue;
+      }
+
+      const preferred = prefer === "remote" ? existing : normalized;
+      const secondary = prefer === "remote" ? normalized : existing;
+      const merged = mergeDefinedRow(preferred, secondary);
+
+      merged.analysisSnapshot = mergeDefinedRow(existing.analysisSnapshot || {}, normalized.analysisSnapshot || {});
+      merged.execution = mergeDefinedRow(existing.execution || {}, normalized.execution || {});
+      merged.live = mergeDefinedRow(existing.live || {}, normalized.live || {});
+      merged.closedExecution = mergeDefinedRow(existing.closedExecution || {}, normalized.closedExecution || {});
+      merged.side = merged.side || merged.direction || null;
+      merged.direction = merged.direction || merged.side || null;
+
+      map.set(key, normalizePositionRecord(merged));
+    }
+
+    return [...map.values()];
+  }
+
   async function loadTradesFromWorker() {
     try {
       const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.state);
@@ -208,6 +261,7 @@
   }
 
   async function syncTradesToSupabase() {
+    if (state.trades.remoteWriteDisabled) return false;
     try {
       const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.sync, {
         method: "POST",
@@ -219,10 +273,20 @@
       state.trades.remoteStatus = payload?.data?.configured ? "connected" : "fallback_local";
       state.trades.remoteError = payload?.data?.configured ? null : (payload?.message || "worker_not_configured");
       state.trades.lastRemoteSyncAt = Date.now();
+      state.trades.remoteWriteDisabled = false;
+      saveTradesMeta({ remoteWriteDisabled: false });
       return !!payload?.data?.configured;
     } catch (err) {
+      const message = err?.message || "worker_trades_sync_failed";
+      if (isTradesSchemaMismatchError(message)) {
+        state.trades.remoteStatus = "connected";
+        state.trades.remoteError = "ecriture_distante_desactivee_schema";
+        state.trades.remoteWriteDisabled = true;
+        saveTradesMeta({ remoteWriteDisabled: true, remoteWriteReason: message });
+        return false;
+      }
       state.trades.remoteStatus = "fallback_local";
-      state.trades.remoteError = err?.message || "worker_trades_sync_failed";
+      state.trades.remoteError = message;
       return false;
     }
   }
@@ -495,29 +559,83 @@
     }
   }
 
+  function mergeById(localRows = [], remoteRows = []) {
+    const map = new Map();
+
+    for (const row of Array.isArray(localRows) ? localRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+      map.set(String(normalized.id), normalized);
+    }
+
+    for (const row of Array.isArray(remoteRows) ? remoteRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+
+      const key = String(normalized.id);
+      const existing = map.get(key);
+
+      if (!existing) {
+        map.set(key, normalized);
+        continue;
+      }
+
+      map.set(key, {
+        ...existing,
+        ...normalized,
+        analysisSnapshot: normalized.analysisSnapshot || existing.analysisSnapshot || null,
+        execution: normalized.execution || existing.execution || null,
+        live: normalized.live || existing.live || null,
+        closedExecution: normalized.closedExecution || existing.closedExecution || null
+      });
+    }
+
+    return [...map.values()];
+  }
+
   async function loadTradesState() {
-    const loadedRemote = await loadTradesFromWorker();
     const rawPositions = readJsonFromKeys(TRADE_STORAGE.positions, []);
     const rawHistory = readJsonFromKeys(TRADE_STORAGE.history, []);
     const rawAlgo = readJsonFromKeys(TRADE_STORAGE.algoJournal, []);
 
-    if (!loadedRemote) {
-      state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
-      state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
-    } else {
-      state.trades.positions = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
-      state.trades.history = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : [];
-    }
-    state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
+    const localPositions = Array.isArray(rawPositions)
+      ? rawPositions.map(normalizePositionRecord).filter((x) => x && x.id)
+      : [];
 
-    // Warm the current versioned keys too, so older/newer builds keep seeing the same trades.
+    const localHistory = Array.isArray(rawHistory)
+      ? rawHistory.map((x) => normalizePositionRecord(x)).filter((x) => x && x.id)
+      : [];
+
+    const localAlgo = Array.isArray(rawAlgo) ? rawAlgo : [];
+
+    const loadedRemote = await loadTradesFromWorker();
+
+    const remotePositions = Array.isArray(state.trades.positions)
+      ? state.trades.positions.map(normalizePositionRecord).filter((x) => x && x.id)
+      : [];
+
+    const remoteHistory = Array.isArray(state.trades.history)
+      ? state.trades.history.map((x) => normalizePositionRecord(x)).filter((x) => x && x.id)
+      : [];
+
+    state.trades.positions = mergeById(localPositions, loadedRemote ? remotePositions : []);
+    state.trades.history = mergeById(localHistory, loadedRemote ? remoteHistory : []);
+    state.algoJournal = localAlgo;
+
     writeJsonToKeys(TRADE_STORAGE.positions, state.trades.positions);
     writeJsonToKeys(TRADE_STORAGE.history, state.trades.history);
     writeJsonToKeys(TRADE_STORAGE.algoJournal, state.algoJournal);
+
     writeJson(TRADE_STORAGE.positionsBackup, state.trades.positions);
     writeJson(TRADE_STORAGE.historyBackup, state.trades.history);
     writeJson(TRADE_STORAGE.algoJournalBackup, state.algoJournal);
-    saveTradesMeta({ migratedAt: Date.now(), remoteLoaded: loadedRemote });
+
+    saveTradesMeta({
+      migratedAt: Date.now(),
+      positionsCount: state.trades.positions.length,
+      historyCount: state.trades.history.length,
+      algoCount: state.algoJournal.length
+    });
   }
 
   function persistTradesState() {
@@ -1937,8 +2055,8 @@ function renderDashboard() {
           <div class="stat-card"><div class="stat-label">Neutre</div><div class="stat-value">${summary.neutral}</div></div>
         </div>
 
-        <div class="dashboard-grid">
-          <div class="card">
+        <div class="dashboard-grid polished-home-grid">
+          <div class="card compact-card">
             <div class="section-title"><span>Meilleure opportunite du moment</span><span>${topPick ? topPick.symbol : "—"}</span></div>
             ${topPick ? `
               <div class="top-pick-box">
@@ -1963,7 +2081,7 @@ function renderDashboard() {
             ` : `<div class="empty-state">Aucune opportunite assez lisible pour le moment.</div>`}
           </div>
 
-          <div class="card">
+          <div class="card compact-card">
             <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
             ${recentAlgo.length ? `
               <div class="algo-feed">
@@ -1982,7 +2100,7 @@ function renderDashboard() {
           </div>
         </div>
 
-        <div class="card" style="margin-top:18px">
+        <div class="card compact-card" style="margin-top:18px">
           <div class="section-title"><span>Meilleures opportunites</span><span>${topRows.length}</span></div>
           ${topRows.length ? `<div class="opp-list">${topRows.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite disponible.</div>`}
         </div>
@@ -2617,55 +2735,45 @@ function renderPositionRow(position) {
   const snap = p.analysisSnapshot || {};
   const exec = p.execution || {};
   const live = p.live || {};
-  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
+  const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const currentPrice = Number(meta.livePrice);
+  const stopValue = Number(snap.stopLoss ?? p.stopLoss);
+  const targetValue = Number(snap.takeProfit ?? p.takeProfit);
+  const invested = displayInvestedValue(p);
+  const pnlValue = p.live?.pnl != null ? money(p.live.pnl * fxRateUsdToEur(), "EUR") : "—";
+  const pnlPctValue = p.live?.pnlPct != null ? pct(p.live.pnlPct) : "—";
 
-  return `<div class="trade-row trade-card-row simple-trade-card">
-    <div class="trade-card-top">
+  return `<div class="trade-row trade-card-row compact-trade-card">
+    <div class="compact-trade-top">
       <div>
         <div class="trade-symbol">${safeText(p.symbol)}</div>
         <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
       </div>
       <div class="trade-card-badges">
         ${badge(simpleSideLabel(p.side), p.side)}
-        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
+        ${badge(snap.trendLabel || p.trendLabel || "tendance neutre", "neutral")}
         ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
 
-    <div class="trade-summary-line">${safeText(actionTradeSummary(meta))}</div>
+    <div class="compact-trade-summary">${safeText(actionTradeSummary(meta))}</div>
 
-    <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Score d'entree</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
-      <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
-      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
-      <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
-      <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
-      <div><span class="muted">Stop</span><br>${(Number(snap.stopLoss ?? p.stopLoss) > 0) ? priceDisplay(snap.stopLoss ?? p.stopLoss) : "—"}</div>
-      <div><span class="muted">Objectif</span><br>${(Number(snap.takeProfit ?? p.takeProfit) > 0) ? priceDisplay(snap.takeProfit ?? p.takeProfit) : "—"}</div>
-      <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
+    <div class="compact-kpis">
+      <div class="compact-kpi"><span class="muted">Entree</span><strong>${Number.isFinite(entryPrice) ? priceDisplay(entryPrice) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Actuel</span><strong>${Number.isFinite(currentPrice) ? priceDisplay(currentPrice) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Investi</span><strong>${invested == null ? "—" : money(invested * fxRateUsdToEur(), "EUR")}</strong></div>
+      <div class="compact-kpi"><span class="muted">P/L</span><strong>${pnlValue} · ${pnlPctValue}</strong></div>
+      <div class="compact-kpi"><span class="muted">Stop</span><strong>${stopValue > 0 ? priceDisplay(stopValue) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Objectif</span><strong>${targetValue > 0 ? priceDisplay(targetValue) : "—"}</strong></div>
+      <div class="compact-kpi"><span class="muted">Avant stop</span><strong>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</strong></div>
+      <div class="compact-kpi"><span class="muted">Avant objectif</span><strong>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</strong></div>
+      <div class="compact-kpi"><span class="muted">Source</span><strong>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</strong></div>
+      <div class="compact-kpi"><span class="muted">Maj</span><strong>${live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—"}</strong></div>
     </div>
 
-    <div class="muted" style="margin:14px 0 6px">Etat live</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
-      <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
-      <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
-      <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-      <div><span class="muted">Investi</span><br>${displayInvestedValue(p) == null ? "—" : money(displayInvestedValue(p) * fxRateUsdToEur(), "EUR")}</div>
-    </div>
+    <div class="compact-why"><span class="muted">Pourquoi :</span> ${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
 
-    <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
-      <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
-      <div style="grid-column: span 2"><span class="muted">Pourquoi</span><br>${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
-    </div>
-
-    <div class="trade-actions split">
+    <div class="trade-actions split compact-actions">
       <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
       <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
     </div>
@@ -3007,96 +3115,74 @@ function normalizePositionRecord(position){
     return num != null && num > 0 ? num : null;
   };
 
-  const legacySnapshot = position?.analysisSnapshot || position?.analysis_snapshot || {};
-  const execution = position?.execution || {};
-  const closedExecution = position?.closedExecution || position?.closed_execution || {};
-  const live = position?.live || {};
-  const normalizedSide = (() => {
-    const raw = String(
-      legacySnapshot?.direction ||
-      position?.direction ||
-      position?.side ||
-      ""
-    ).toLowerCase();
-    return raw === "long" || raw === "short" ? raw : null;
-  })();
-
-  const entryPriceRaw = positiveOrNull(
-    execution?.entryPrice ?? execution?.entry_price ?? position?.entryPrice ?? position?.entry_price ?? legacySnapshot?.entry
-  );
-  const quantityRaw = positiveOrNull(execution?.quantity ?? position?.quantity);
-  const investedRaw = positiveOrNull(execution?.invested ?? position?.invested)
+  const resolvedSide = position?.side || position?.direction || position?.analysis_snapshot?.direction || position?.analysisSnapshot?.direction || null;
+  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? position?.entry_price ?? position?.analysis_snapshot?.entry ?? position?.analysisSnapshot?.entry);
+  const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
+  const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(
-    legacySnapshot?.stopLoss ?? legacySnapshot?.stop_loss ?? position?.stopLoss ?? position?.stop_loss
-  );
-  const takeProfitRaw = positiveOrNull(
-    legacySnapshot?.takeProfit ?? legacySnapshot?.take_profit ?? position?.takeProfit ?? position?.take_profit
-  );
-  const ratioRaw = positiveOrNull(
-    legacySnapshot?.ratio ?? position?.rrRatio ?? position?.rr_ratio ?? position?.rr
-  );
-  const exitPriceRaw = positiveOrNull(
-    closedExecution?.exitPrice ?? closedExecution?.exit_price ?? position?.exitPrice ?? position?.exit_price
-  );
-  const livePriceRaw = positiveOrNull(live?.price);
-  const pnlRaw = safeNumber(position?.pnl ?? live?.pnl);
-  const pnlPctRaw = safeNumber(position?.pnlPct ?? position?.pnl_pct ?? live?.pnlPct ?? live?.pnl_pct);
-  const openedAt = execution?.openedAt || execution?.opened_at || position?.openedAt || position?.opened_at || null;
-  const updatedAt = live?.updatedAt || live?.updated_at || position?.updatedAt || position?.updated_at || null;
-  const closedAt = closedExecution?.closedAt || closedExecution?.closed_at || position?.closedAt || position?.closed_at || null;
-  const sourceUsed = position?.sourceUsed || position?.source_used || position?.source || legacySnapshot?.sourceUsed || legacySnapshot?.source_used || null;
+  const stopLossRaw = positiveOrNull(position?.analysis_snapshot?.stopLoss ?? position?.analysisSnapshot?.stopLoss ?? position?.stopLoss ?? position?.stop_loss);
+  const takeProfitRaw = positiveOrNull(position?.analysis_snapshot?.takeProfit ?? position?.analysisSnapshot?.takeProfit ?? position?.takeProfit ?? position?.take_profit);
+  const ratioRaw = positiveOrNull(position?.analysis_snapshot?.ratio ?? position?.analysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr_ratio ?? position?.rr);
+  const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice ?? position?.exit_price);
+  const livePriceRaw = positiveOrNull(position?.live?.price);
+  const pnlRaw = safeNumber(position?.pnl);
+  const pnlPctRaw = safeNumber(position?.pnlPct ?? position?.pnl_pct);
+  const sourceUsed = position?.sourceUsed || position?.source_used || position?.source || position?.analysis_snapshot?.sourceUsed || position?.analysisSnapshot?.sourceUsed || null;
+  const resolvedDecision = position?.analysis_snapshot?.decision || position?.analysisSnapshot?.decision || position?.tradeDecision || position?.trade_decision || position?.decision || null;
+  const resolvedReason = position?.analysis_snapshot?.reason || position?.analysisSnapshot?.reason || position?.tradeReason || position?.trade_reason || position?.reason || null;
+  const resolvedTrend = position?.analysis_snapshot?.trendLabel || position?.analysisSnapshot?.trendLabel || position?.trendLabel || position?.trend_label || detectedTrendLabel(resolvedSide || "neutral");
+  const resolvedHorizon = position?.analysis_snapshot?.horizon || position?.analysisSnapshot?.horizon || position?.horizon || null;
 
   const snapshot = {
     symbol: position.symbol || null,
-    name: position.name || legacySnapshot?.name || position.symbol || null,
-    score: positiveOrNull(legacySnapshot?.score ?? position?.score),
-    decision: legacySnapshot?.decision || position?.decision || position?.tradeDecision || position?.trade_decision || null,
-    trendLabel: legacySnapshot?.trendLabel || legacySnapshot?.trend_label || position?.trendLabel || position?.trend_label || detectedTrendLabel(normalizedSide || "neutral"),
-    direction: legacySnapshot?.direction || position?.direction || normalizedSide,
+    name: position.name || position.symbol || null,
+    score: positiveOrNull(position?.analysis_snapshot?.score ?? position?.analysisSnapshot?.score ?? position?.score ?? position?.algoScore),
+    decision: resolvedDecision,
+    trendLabel: resolvedTrend,
+    direction: position?.analysis_snapshot?.direction || position?.analysisSnapshot?.direction || position?.direction || position?.side || null,
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     ratio: ratioRaw,
-    horizon: legacySnapshot?.horizon || position?.horizon || null,
-    reason: legacySnapshot?.reason || position?.tradeReason || position?.trade_reason || null,
-    scoreBreakdown: legacySnapshot?.scoreBreakdown || legacySnapshot?.score_breakdown || position?.scoreBreakdown || position?.score_breakdown || null,
+    horizon: resolvedHorizon,
+    reason: resolvedReason,
+    scoreBreakdown: position?.analysis_snapshot?.scoreBreakdown || position?.analysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
     sourceUsed,
-    analysisTimestamp: legacySnapshot?.analysisTimestamp || legacySnapshot?.analysis_timestamp || openedAt || updatedAt || Date.now()
+    analysisTimestamp: position?.analysis_snapshot?.analysisTimestamp || position?.analysisSnapshot?.analysisTimestamp || position?.openedAt || position?.opened_at || Date.now()
   };
 
   return {
     ...position,
-    side: normalizedSide,
-    direction: snapshot.direction || normalizedSide,
+    side: resolvedSide || null,
+    direction: position?.direction || resolvedSide || null,
     analysisSnapshot: snapshot,
     execution: {
-      ...(execution || {}),
-      openedAt,
+      ...(position.execution || {}),
+      openedAt: position?.execution?.openedAt || position?.openedAt || position?.opened_at || null,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
       invested: investedRaw
     },
     live: {
-      ...(live || {}),
-      updatedAt: updatedAt || Date.now(),
+      ...(position.live || {}),
+      updatedAt: position?.live?.updatedAt || position?.updatedAt || position?.updated_at || Date.now(),
       price: livePriceRaw,
-      pnl: live?.pnl != null ? safeNumber(live.pnl) : pnlRaw,
-      pnlPct: live?.pnlPct != null ? safeNumber(live.pnlPct) : pnlPctRaw
+      pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : pnlRaw,
+      pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : pnlPctRaw
     },
     closedExecution: {
-      ...(closedExecution || {}),
+      ...(position.closedExecution || {}),
       exitPrice: exitPriceRaw,
-      closedAt,
-      closeType: closedExecution?.closeType || closedExecution?.close_type || position?.closeType || position?.close_type || null
+      closedAt: position?.closedExecution?.closedAt || position?.closedAt || position?.closed_at || null,
+      closeType: position?.closedExecution?.closeType || position?.closeType || position?.close_type || null
     },
-    openedAt,
-    updatedAt,
-    closedAt,
-    tradeDecision: snapshot.decision,
-    tradeReason: snapshot.reason,
-    trendLabel: snapshot.trendLabel,
-    horizon: snapshot.horizon,
+    openedAt: position?.openedAt || position?.opened_at || null,
+    closedAt: position?.closedAt || position?.closed_at || null,
+    updatedAt: position?.updatedAt || position?.updated_at || null,
+    tradeDecision: resolvedDecision,
+    tradeReason: resolvedReason,
+    trendLabel: resolvedTrend,
+    horizon: resolvedHorizon,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     score: snapshot.score,
@@ -3116,8 +3202,6 @@ function normalizeOpenPositionsState(){
 }
 
 function restoreTradesFromBackupIfEmpty() {
-  if (state?.trades?.remoteStatus === "connected") return;
-
   const backupPositions = readJson(TRADE_STORAGE.positionsBackup, []);
   const backupHistory = readJson(TRADE_STORAGE.historyBackup, []);
   const backupAlgo = readJson(TRADE_STORAGE.algoJournalBackup, []);
@@ -3245,11 +3329,11 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts. Le mode entrainement suit maintenant un vrai capital fictif.</div>
+          <div class="screen-subtitle">Suivi simple des positions ouvertes, des trades clotures et du risque en cours.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${
             state.trades.remoteStatus === "connected"
-              ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
+              ? `${state.trades.remoteWriteDisabled ? "connecte · ecriture locale" : "connecte"}${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
               : state.trades.remoteStatus === "fallback_local"
                 ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
                 : "local uniquement"
@@ -3266,22 +3350,20 @@ function openPositionsRiskView() {
         ${state.trades.mode === "real" ? `
           <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette partie restera vide tant qu'aucune source reelle n'est connectee.</div>
         ` : `
-          <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Capital de depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
+          <div class="portfolio-hero-grid">
+            <div class="stat-card hero"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
+            <div class="stat-card hero"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
           </div>
 
-          <div class="grid trades-stats" style="margin-top:14px">
-            <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades proposes</div><div class="stat-value">${algoCounts.conseille}</div></div>
-            <div class="stat-card"><div class="stat-label">Possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
-            <div class="stat-card"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
-            <div class="stat-card"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
+          <div class="portfolio-mini-grid" style="margin-top:14px">
+            <div class="stat-card mini"><div class="stat-label">Capital depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
+            <div class="stat-card mini"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
+            <div class="stat-card mini"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
+            <div class="stat-card mini"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
           </div>
 
           <div class="card" style="margin-top:18px">
@@ -3293,8 +3375,8 @@ function openPositionsRiskView() {
             </div>
           </div>
 
-          <div class="risk-layout">
-            <div class="card" style="margin-top:18px">
+          <div class="portfolio-mid-grid">
+            <div class="card compact-card" style="margin-top:18px">
               <div class="section-title"><span>Positions a surveiller</span><span>${riskRows.length}</span></div>
               ${riskRows.length ? `
                 <div class="risk-list">
@@ -3312,7 +3394,7 @@ function openPositionsRiskView() {
               ` : `<div class="empty-state">Aucune position ouverte pour le moment.</div>`}
             </div>
 
-            <div class="card" style="margin-top:18px">
+            <div class="card compact-card" style="margin-top:18px">
               <div class="section-title"><span>Bilan rapide</span><span>historique</span></div>
               <div class="perf-columns">
                 <div>
@@ -3449,7 +3531,7 @@ function openPositionsRiskView() {
                 <div class="setting-title">Etat distant</div>
                 <div class="setting-desc">${
                   state.trades.remoteStatus === "connected"
-                    ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
+                    ? `${state.trades.remoteWriteDisabled ? "connecte · ecriture locale" : "connecte"}${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
                     : state.trades.remoteStatus === "fallback_local"
                       ? `fallback local · ${safeText(state.trades.remoteError || "worker / supabase indisponible")}`
                       : "local uniquement"
@@ -3535,7 +3617,7 @@ function openPositionsRiskView() {
     });
 
     app.querySelectorAll("[data-close-trade]").forEach(el => {
-      el.addEventListener("click", () => closeTrainingTrade(el.getAttribute("data-close-trade")));
+      el.addEventListener("click", () => closeTradePosition(el.getAttribute("data-close-trade")));
     });
 
     app.querySelectorAll("[data-close-half]").forEach(el => {

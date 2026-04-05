@@ -71,7 +71,8 @@
       history: [],
       remoteStatus: "local_only",
       remoteError: null,
-      lastRemoteSyncAt: null
+      lastRemoteSyncAt: null,
+      remoteWriteDisabled: false
     },
     tradeLive: {
       lastRunAt: 0,
@@ -189,6 +190,58 @@
     return res.text();
   }
 
+
+
+  function isTradesSchemaMismatchError(message) {
+    const msg = String(message || "").toLowerCase();
+    return msg.includes("pgrst204") || (msg.includes("could not find") && msg.includes("column"));
+  }
+
+  function mergeDefinedRow(base, overlay) {
+    const out = { ...(base || {}) };
+    const source = overlay || {};
+    for (const [key, value] of Object.entries(source)) {
+      if (value !== undefined && value !== null && value !== "") out[key] = value;
+    }
+    return out;
+  }
+
+  function mergeTradeCollections(remoteRows = [], localRows = [], prefer = "local") {
+    const map = new Map();
+
+    for (const row of Array.isArray(remoteRows) ? remoteRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+      map.set(String(normalized.id), normalized);
+    }
+
+    for (const row of Array.isArray(localRows) ? localRows : []) {
+      const normalized = normalizePositionRecord(row);
+      if (!normalized?.id) continue;
+      const key = String(normalized.id);
+      const existing = map.get(key);
+      if (!existing) {
+        map.set(key, normalized);
+        continue;
+      }
+
+      const preferred = prefer === "remote" ? existing : normalized;
+      const secondary = prefer === "remote" ? normalized : existing;
+      const merged = mergeDefinedRow(preferred, secondary);
+
+      merged.analysisSnapshot = mergeDefinedRow(existing.analysisSnapshot || {}, normalized.analysisSnapshot || {});
+      merged.execution = mergeDefinedRow(existing.execution || {}, normalized.execution || {});
+      merged.live = mergeDefinedRow(existing.live || {}, normalized.live || {});
+      merged.closedExecution = mergeDefinedRow(existing.closedExecution || {}, normalized.closedExecution || {});
+      merged.side = merged.side || merged.direction || null;
+      merged.direction = merged.direction || merged.side || null;
+
+      map.set(key, normalizePositionRecord(merged));
+    }
+
+    return [...map.values()];
+  }
+
   async function loadTradesFromWorker() {
     try {
       const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.state);
@@ -208,6 +261,7 @@
   }
 
   async function syncTradesToSupabase() {
+    if (state.trades.remoteWriteDisabled) return false;
     try {
       const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.sync, {
         method: "POST",
@@ -219,10 +273,20 @@
       state.trades.remoteStatus = payload?.data?.configured ? "connected" : "fallback_local";
       state.trades.remoteError = payload?.data?.configured ? null : (payload?.message || "worker_not_configured");
       state.trades.lastRemoteSyncAt = Date.now();
+      state.trades.remoteWriteDisabled = false;
+      saveTradesMeta({ remoteWriteDisabled: false });
       return !!payload?.data?.configured;
     } catch (err) {
+      const message = err?.message || "worker_trades_sync_failed";
+      if (isTradesSchemaMismatchError(message)) {
+        state.trades.remoteStatus = "connected";
+        state.trades.remoteError = "ecriture_distante_desactivee_schema";
+        state.trades.remoteWriteDisabled = true;
+        saveTradesMeta({ remoteWriteDisabled: true, remoteWriteReason: message });
+        return false;
+      }
       state.trades.remoteStatus = "fallback_local";
-      state.trades.remoteError = err?.message || "worker_trades_sync_failed";
+      state.trades.remoteError = message;
       return false;
     }
   }
@@ -501,23 +565,27 @@
     const rawHistory = readJsonFromKeys(TRADE_STORAGE.history, []);
     const rawAlgo = readJsonFromKeys(TRADE_STORAGE.algoJournal, []);
 
+    const localPositions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord).filter((x) => x && x.id) : [];
+    const localHistory = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)).filter((x) => x && x.id) : [];
+
     if (!loadedRemote) {
-      state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
-      state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
+      state.trades.positions = localPositions;
+      state.trades.history = localHistory;
     } else {
-      state.trades.positions = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
-      state.trades.history = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : [];
+      const remotePositions = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord).filter((x) => x && x.id) : [];
+      const remoteHistory = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)).filter((x) => x && x.id) : [];
+      state.trades.positions = mergeTradeCollections(remotePositions, localPositions, "local");
+      state.trades.history = mergeTradeCollections(remoteHistory, localHistory, "remote");
     }
     state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
 
-    // Warm the current versioned keys too, so older/newer builds keep seeing the same trades.
     writeJsonToKeys(TRADE_STORAGE.positions, state.trades.positions);
     writeJsonToKeys(TRADE_STORAGE.history, state.trades.history);
     writeJsonToKeys(TRADE_STORAGE.algoJournal, state.algoJournal);
     writeJson(TRADE_STORAGE.positionsBackup, state.trades.positions);
     writeJson(TRADE_STORAGE.historyBackup, state.trades.history);
     writeJson(TRADE_STORAGE.algoJournalBackup, state.algoJournal);
-    saveTradesMeta({ migratedAt: Date.now(), remoteLoaded: loadedRemote });
+    saveTradesMeta({ migratedAt: Date.now() });
   }
 
   function persistTradesState() {
@@ -3007,96 +3075,74 @@ function normalizePositionRecord(position){
     return num != null && num > 0 ? num : null;
   };
 
-  const legacySnapshot = position?.analysisSnapshot || position?.analysis_snapshot || {};
-  const execution = position?.execution || {};
-  const closedExecution = position?.closedExecution || position?.closed_execution || {};
-  const live = position?.live || {};
-  const normalizedSide = (() => {
-    const raw = String(
-      legacySnapshot?.direction ||
-      position?.direction ||
-      position?.side ||
-      ""
-    ).toLowerCase();
-    return raw === "long" || raw === "short" ? raw : null;
-  })();
-
-  const entryPriceRaw = positiveOrNull(
-    execution?.entryPrice ?? execution?.entry_price ?? position?.entryPrice ?? position?.entry_price ?? legacySnapshot?.entry
-  );
-  const quantityRaw = positiveOrNull(execution?.quantity ?? position?.quantity);
-  const investedRaw = positiveOrNull(execution?.invested ?? position?.invested)
+  const resolvedSide = position?.side || position?.direction || position?.analysis_snapshot?.direction || position?.analysisSnapshot?.direction || null;
+  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? position?.entry_price ?? position?.analysis_snapshot?.entry ?? position?.analysisSnapshot?.entry);
+  const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
+  const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(
-    legacySnapshot?.stopLoss ?? legacySnapshot?.stop_loss ?? position?.stopLoss ?? position?.stop_loss
-  );
-  const takeProfitRaw = positiveOrNull(
-    legacySnapshot?.takeProfit ?? legacySnapshot?.take_profit ?? position?.takeProfit ?? position?.take_profit
-  );
-  const ratioRaw = positiveOrNull(
-    legacySnapshot?.ratio ?? position?.rrRatio ?? position?.rr_ratio ?? position?.rr
-  );
-  const exitPriceRaw = positiveOrNull(
-    closedExecution?.exitPrice ?? closedExecution?.exit_price ?? position?.exitPrice ?? position?.exit_price
-  );
-  const livePriceRaw = positiveOrNull(live?.price);
-  const pnlRaw = safeNumber(position?.pnl ?? live?.pnl);
-  const pnlPctRaw = safeNumber(position?.pnlPct ?? position?.pnl_pct ?? live?.pnlPct ?? live?.pnl_pct);
-  const openedAt = execution?.openedAt || execution?.opened_at || position?.openedAt || position?.opened_at || null;
-  const updatedAt = live?.updatedAt || live?.updated_at || position?.updatedAt || position?.updated_at || null;
-  const closedAt = closedExecution?.closedAt || closedExecution?.closed_at || position?.closedAt || position?.closed_at || null;
-  const sourceUsed = position?.sourceUsed || position?.source_used || position?.source || legacySnapshot?.sourceUsed || legacySnapshot?.source_used || null;
+  const stopLossRaw = positiveOrNull(position?.analysis_snapshot?.stopLoss ?? position?.analysisSnapshot?.stopLoss ?? position?.stopLoss ?? position?.stop_loss);
+  const takeProfitRaw = positiveOrNull(position?.analysis_snapshot?.takeProfit ?? position?.analysisSnapshot?.takeProfit ?? position?.takeProfit ?? position?.take_profit);
+  const ratioRaw = positiveOrNull(position?.analysis_snapshot?.ratio ?? position?.analysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr_ratio ?? position?.rr);
+  const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice ?? position?.exit_price);
+  const livePriceRaw = positiveOrNull(position?.live?.price);
+  const pnlRaw = safeNumber(position?.pnl);
+  const pnlPctRaw = safeNumber(position?.pnlPct ?? position?.pnl_pct);
+  const sourceUsed = position?.sourceUsed || position?.source_used || position?.source || position?.analysis_snapshot?.sourceUsed || position?.analysisSnapshot?.sourceUsed || null;
+  const resolvedDecision = position?.analysis_snapshot?.decision || position?.analysisSnapshot?.decision || position?.tradeDecision || position?.trade_decision || position?.decision || null;
+  const resolvedReason = position?.analysis_snapshot?.reason || position?.analysisSnapshot?.reason || position?.tradeReason || position?.trade_reason || position?.reason || null;
+  const resolvedTrend = position?.analysis_snapshot?.trendLabel || position?.analysisSnapshot?.trendLabel || position?.trendLabel || position?.trend_label || detectedTrendLabel(resolvedSide || "neutral");
+  const resolvedHorizon = position?.analysis_snapshot?.horizon || position?.analysisSnapshot?.horizon || position?.horizon || null;
 
   const snapshot = {
     symbol: position.symbol || null,
-    name: position.name || legacySnapshot?.name || position.symbol || null,
-    score: positiveOrNull(legacySnapshot?.score ?? position?.score),
-    decision: legacySnapshot?.decision || position?.decision || position?.tradeDecision || position?.trade_decision || null,
-    trendLabel: legacySnapshot?.trendLabel || legacySnapshot?.trend_label || position?.trendLabel || position?.trend_label || detectedTrendLabel(normalizedSide || "neutral"),
-    direction: legacySnapshot?.direction || position?.direction || normalizedSide,
+    name: position.name || position.symbol || null,
+    score: positiveOrNull(position?.analysis_snapshot?.score ?? position?.analysisSnapshot?.score ?? position?.score ?? position?.algoScore),
+    decision: resolvedDecision,
+    trendLabel: resolvedTrend,
+    direction: position?.analysis_snapshot?.direction || position?.analysisSnapshot?.direction || position?.direction || position?.side || null,
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     ratio: ratioRaw,
-    horizon: legacySnapshot?.horizon || position?.horizon || null,
-    reason: legacySnapshot?.reason || position?.tradeReason || position?.trade_reason || null,
-    scoreBreakdown: legacySnapshot?.scoreBreakdown || legacySnapshot?.score_breakdown || position?.scoreBreakdown || position?.score_breakdown || null,
+    horizon: resolvedHorizon,
+    reason: resolvedReason,
+    scoreBreakdown: position?.analysis_snapshot?.scoreBreakdown || position?.analysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
     sourceUsed,
-    analysisTimestamp: legacySnapshot?.analysisTimestamp || legacySnapshot?.analysis_timestamp || openedAt || updatedAt || Date.now()
+    analysisTimestamp: position?.analysis_snapshot?.analysisTimestamp || position?.analysisSnapshot?.analysisTimestamp || position?.openedAt || position?.opened_at || Date.now()
   };
 
   return {
     ...position,
-    side: normalizedSide,
-    direction: snapshot.direction || normalizedSide,
+    side: resolvedSide || null,
+    direction: position?.direction || resolvedSide || null,
     analysisSnapshot: snapshot,
     execution: {
-      ...(execution || {}),
-      openedAt,
+      ...(position.execution || {}),
+      openedAt: position?.execution?.openedAt || position?.openedAt || position?.opened_at || null,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
       invested: investedRaw
     },
     live: {
-      ...(live || {}),
-      updatedAt: updatedAt || Date.now(),
+      ...(position.live || {}),
+      updatedAt: position?.live?.updatedAt || position?.updatedAt || position?.updated_at || Date.now(),
       price: livePriceRaw,
-      pnl: live?.pnl != null ? safeNumber(live.pnl) : pnlRaw,
-      pnlPct: live?.pnlPct != null ? safeNumber(live.pnlPct) : pnlPctRaw
+      pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : pnlRaw,
+      pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : pnlPctRaw
     },
     closedExecution: {
-      ...(closedExecution || {}),
+      ...(position.closedExecution || {}),
       exitPrice: exitPriceRaw,
-      closedAt,
-      closeType: closedExecution?.closeType || closedExecution?.close_type || position?.closeType || position?.close_type || null
+      closedAt: position?.closedExecution?.closedAt || position?.closedAt || position?.closed_at || null,
+      closeType: position?.closedExecution?.closeType || position?.closeType || position?.close_type || null
     },
-    openedAt,
-    updatedAt,
-    closedAt,
-    tradeDecision: snapshot.decision,
-    tradeReason: snapshot.reason,
-    trendLabel: snapshot.trendLabel,
-    horizon: snapshot.horizon,
+    openedAt: position?.openedAt || position?.opened_at || null,
+    closedAt: position?.closedAt || position?.closed_at || null,
+    updatedAt: position?.updatedAt || position?.updated_at || null,
+    tradeDecision: resolvedDecision,
+    tradeReason: resolvedReason,
+    trendLabel: resolvedTrend,
+    horizon: resolvedHorizon,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     score: snapshot.score,
@@ -3116,8 +3162,6 @@ function normalizeOpenPositionsState(){
 }
 
 function restoreTradesFromBackupIfEmpty() {
-  if (state?.trades?.remoteStatus === "connected") return;
-
   const backupPositions = readJson(TRADE_STORAGE.positionsBackup, []);
   const backupHistory = readJson(TRADE_STORAGE.historyBackup, []);
   const backupAlgo = readJson(TRADE_STORAGE.algoJournalBackup, []);
@@ -3249,7 +3293,7 @@ function openPositionsRiskView() {
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${
             state.trades.remoteStatus === "connected"
-              ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
+              ? `${state.trades.remoteWriteDisabled ? "connecte · ecriture locale" : "connecte"}${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
               : state.trades.remoteStatus === "fallback_local"
                 ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
                 : "local uniquement"
@@ -3449,7 +3493,7 @@ function openPositionsRiskView() {
                 <div class="setting-title">Etat distant</div>
                 <div class="setting-desc">${
                   state.trades.remoteStatus === "connected"
-                    ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
+                    ? `${state.trades.remoteWriteDisabled ? "connecte · ecriture locale" : "connecte"}${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
                     : state.trades.remoteStatus === "fallback_local"
                       ? `fallback local · ${safeText(state.trades.remoteError || "worker / supabase indisponible")}`
                       : "local uniquement"
