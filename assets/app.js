@@ -1445,7 +1445,6 @@ function closeTrainingTrade(id, livePrice = null) {
     const closedAt = nowIso();
     const closed = normalizePositionRecord({
       ...position,
-      status: "closed",
       exitPrice,
       closedAt,
       pnl,
@@ -2916,15 +2915,18 @@ function renderHistoryRow(item) {
         const symbol = String(position?.symbol || "").toUpperCase();
         try {
           const detail = await api(`/api/opportunity-detail/${encodeURIComponent(symbol)}`, 8000);
-          const price = Number(detail?.data?.price);
+          const detailData = detail?.data || null;
+          const price = Number(detailData?.price);
           return {
             symbol,
             ok: Number.isFinite(price),
             price: Number.isFinite(price) ? price : null,
-            sourceUsed: detail?.data?.sourceUsed || null
+            sourceUsed: detailData?.sourceUsed || null,
+            detail: detailData,
+            plan: detailData?.plan || null
           };
         } catch (e) {
-          return { symbol, ok: false, price: null, sourceUsed: null };
+          return { symbol, ok: false, price: null, sourceUsed: null, detail: null, plan: null };
         }
       }));
 
@@ -2945,11 +2947,23 @@ function renderHistoryRow(item) {
           : null;
         const invested = Number.isFinite(entryPrice) && Number.isFinite(quantity) && quantity > 0 ? entryPrice * quantity : null;
         const pnlPct = (pnl != null && invested && invested > 0) ? (pnl / invested) * 100 : null;
+        const detailSnapshot = hit.detail ? createAnalysisSnapshotFromOpportunity(hit.detail) : null;
 
         changed = true
         return normalizePositionRecord({
           ...p,
-          sourceUsed: p.sourceUsed || hit.sourceUsed || null,
+          sourceUsed: p.sourceUsed || hit.sourceUsed || hit.detail?.sourceUsed || null,
+          tradeDecision: p.tradeDecision || hit.plan?.decision || hit.detail?.decision || null,
+          tradeReason: p.tradeReason || hit.plan?.reason || hit.detail?.reasonShort || null,
+          trendLabel: p.trendLabel || hit.plan?.trendLabel || hit.detail?.trendLabel || null,
+          horizon: p.horizon || hit.plan?.horizon || hit.detail?.horizon || null,
+          stopLoss: p.stopLoss ?? hit.plan?.stopLoss ?? null,
+          takeProfit: p.takeProfit ?? hit.plan?.takeProfit ?? null,
+          rr: p.rr ?? hit.plan?.rr ?? null,
+          analysisSnapshot: {
+            ...(p.analysisSnapshot || {}),
+            ...(detailSnapshot || {})
+          },
           live: {
             ...(p.live || {}),
             updatedAt: new Date(now).toISOString(),
@@ -3004,60 +3018,83 @@ function normalizePositionRecord(position){
     const num = safeNumber(value);
     return num != null && num > 0 ? num : null;
   };
+  const firstValue = (...values) => values.find((value) => value != null);
 
-  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? position?.analysisSnapshot?.entry);
-  const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
-  const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
+  const analysisSnapshotRaw = position?.analysisSnapshot || position?.analysis_snapshot || null;
+  const executionRaw = position?.execution || null;
+  const liveRaw = position?.live || null;
+  const closedExecutionRaw = position?.closedExecution || position?.closed_execution || null;
+
+  const entryPriceRaw = positiveOrNull(
+    firstValue(
+      executionRaw?.entryPrice,
+      executionRaw?.entry_price,
+      position?.entryPrice,
+      position?.entry_price,
+      analysisSnapshotRaw?.entry
+    )
+  );
+  const quantityRaw = positiveOrNull(firstValue(executionRaw?.quantity, position?.quantity));
+  const investedRaw = positiveOrNull(firstValue(executionRaw?.invested, position?.invested))
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(position?.analysisSnapshot?.stopLoss ?? position?.stopLoss);
-  const takeProfitRaw = positiveOrNull(position?.analysisSnapshot?.takeProfit ?? position?.takeProfit);
-  const ratioRaw = positiveOrNull(position?.analysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
-  const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice);
-  const livePriceRaw = positiveOrNull(position?.live?.price);
-  const pnlRaw = safeNumber(position?.pnl);
-  const pnlPctRaw = safeNumber(position?.pnlPct);
-  const sourceUsed = position?.sourceUsed || position?.source || position?.analysisSnapshot?.sourceUsed || null;
+  const stopLossRaw = positiveOrNull(firstValue(analysisSnapshotRaw?.stopLoss, position?.stopLoss, position?.stop_loss));
+  const takeProfitRaw = positiveOrNull(firstValue(analysisSnapshotRaw?.takeProfit, position?.takeProfit, position?.take_profit));
+  const ratioRaw = positiveOrNull(firstValue(analysisSnapshotRaw?.ratio, position?.rrRatio, position?.rr_ratio, position?.rr));
+  const exitPriceRaw = positiveOrNull(firstValue(closedExecutionRaw?.exitPrice, closedExecutionRaw?.exit_price, position?.exitPrice, position?.exit_price));
+  const livePriceRaw = positiveOrNull(firstValue(liveRaw?.price, position?.livePrice));
+  const pnlRaw = safeNumber(firstValue(position?.pnl, position?.live?.pnl));
+  const pnlPctRaw = safeNumber(firstValue(position?.pnlPct, position?.pnl_pct, position?.live?.pnlPct, position?.live?.pnl_pct));
+  const sourceUsed = firstValue(position?.sourceUsed, position?.source_used, position?.source, analysisSnapshotRaw?.sourceUsed, analysisSnapshotRaw?.source_used, null);
 
   const snapshot = {
     symbol: position.symbol || null,
     name: position.name || position.symbol || null,
-    score: positiveOrNull(position?.analysisSnapshot?.score ?? position?.score),
-    decision: position?.analysisSnapshot?.decision || position?.tradeDecision || null,
-    trendLabel: position?.analysisSnapshot?.trendLabel || position?.trendLabel || detectedTrendLabel(position?.direction || "neutral"),
-    direction: position?.analysisSnapshot?.direction || position?.direction || null,
+    score: positiveOrNull(firstValue(analysisSnapshotRaw?.score, position?.score)),
+    decision: firstValue(analysisSnapshotRaw?.decision, position?.tradeDecision, position?.trade_decision, position?.decision, null),
+    trendLabel: firstValue(analysisSnapshotRaw?.trendLabel, analysisSnapshotRaw?.trend_label, position?.trendLabel, position?.trend_label, detectedTrendLabel(position?.direction || "neutral")),
+    direction: firstValue(analysisSnapshotRaw?.direction, position?.direction, null),
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     ratio: ratioRaw,
-    horizon: position?.analysisSnapshot?.horizon || position?.horizon || null,
-    reason: position?.analysisSnapshot?.reason || position?.tradeReason || null,
-    scoreBreakdown: position?.analysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
+    horizon: firstValue(analysisSnapshotRaw?.horizon, position?.horizon, null),
+    reason: firstValue(analysisSnapshotRaw?.reason, position?.tradeReason, position?.trade_reason, null),
+    scoreBreakdown: firstValue(analysisSnapshotRaw?.scoreBreakdown, analysisSnapshotRaw?.score_breakdown, position?.scoreBreakdown, position?.score_breakdown, null),
     sourceUsed,
-    analysisTimestamp: position?.analysisSnapshot?.analysisTimestamp || position?.openedAt || Date.now()
+    analysisTimestamp: firstValue(
+      analysisSnapshotRaw?.analysisTimestamp,
+      analysisSnapshotRaw?.analysis_timestamp,
+      executionRaw?.openedAt,
+      position?.openedAt,
+      position?.opened_at,
+      position?.updatedAt,
+      position?.updated_at,
+      new Date().toISOString()
+    )
   };
 
   return {
     ...position,
     analysisSnapshot: snapshot,
     execution: {
-      ...(position.execution || {}),
-      openedAt: position?.execution?.openedAt || position?.openedAt || null,
+      ...(executionRaw || {}),
+      openedAt: firstValue(executionRaw?.openedAt, executionRaw?.opened_at, position?.openedAt, position?.opened_at, null),
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
       invested: investedRaw
     },
     live: {
-      ...(position.live || {}),
-      updatedAt: position?.live?.updatedAt || Date.now(),
+      ...(liveRaw || {}),
+      updatedAt: firstValue(liveRaw?.updatedAt, liveRaw?.updated_at, position?.updatedAt, position?.updated_at, null),
       price: livePriceRaw,
-      pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : null,
-      pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : null
+      pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : pnlRaw,
+      pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : pnlPctRaw
     },
     closedExecution: {
-      ...(position.closedExecution || {}),
+      ...(closedExecutionRaw || {}),
       exitPrice: exitPriceRaw,
-      closedAt: position?.closedExecution?.closedAt || position?.closedAt || null,
-      closeType: position?.closedExecution?.closeType || position?.closeType || null
+      closedAt: firstValue(closedExecutionRaw?.closedAt, closedExecutionRaw?.closed_at, position?.closedAt, position?.closed_at, null),
+      closeType: firstValue(closedExecutionRaw?.closeType, closedExecutionRaw?.close_type, position?.closeType, position?.close_type, null)
     },
     tradeDecision: snapshot.decision,
     tradeReason: snapshot.reason,
@@ -3178,9 +3215,10 @@ function normalizeTradesHistoryState() {
 
 function openPositionsRiskView() {
     const positions = Array.isArray(state.trades?.positions) ? state.trades.positions : [];
-    return positions.map((p) => {
+    return positions.map((raw) => {
+      const p = normalizePositionRecord(raw);
       const liveMatch = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === p.symbol) : null;
-      const livePrice = liveMatch?.price ?? p.entryPrice ?? null;
+      const livePrice = p?.live?.price ?? liveMatch?.price ?? p.entryPrice ?? null;
       const distanceToStop = (p.stopLoss == null || livePrice == null)
         ? null
         : (p.side === "long"
