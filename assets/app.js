@@ -676,16 +676,6 @@
     return new Date().toISOString();
   }
 
-  function normalizeTradeTimestamp(value, fallback = null) {
-    if (value == null || value === "") return fallback;
-    if (typeof value === "string" && /^\d{10,17}$/.test(value.trim())) {
-      const fromNumberString = new Date(Number(value.trim()));
-      return Number.isFinite(fromNumberString.getTime()) ? fromNumberString.toISOString() : fallback;
-    }
-    const date = new Date(value);
-    return Number.isFinite(date.getTime()) ? date.toISOString() : fallback;
-  }
-
   function uid(prefix = "id") {
     return `${prefix}_${Math.random().toString(36).slice(2, 10)}_${Date.now().toString(36)}`;
   }
@@ -1455,6 +1445,7 @@ function closeTrainingTrade(id, livePrice = null) {
     const closedAt = nowIso();
     const closed = normalizePositionRecord({
       ...position,
+      status: "closed",
       exitPrice,
       closedAt,
       pnl,
@@ -2998,7 +2989,7 @@ function createAnalysisSnapshotFromOpportunity(detail){
     reason: plan?.reason || detail.reason || detail.summary || null,
     scoreBreakdown: detail.scoreBreakdown || null,
     sourceUsed: detail.source || detail.sourceUsed || null,
-    analysisTimestamp: nowIso()
+    analysisTimestamp: Date.now()
   };
 }
 
@@ -3026,9 +3017,6 @@ function normalizePositionRecord(position){
   const pnlRaw = safeNumber(position?.pnl);
   const pnlPctRaw = safeNumber(position?.pnlPct);
   const sourceUsed = position?.sourceUsed || position?.source || position?.analysisSnapshot?.sourceUsed || null;
-  const openedAtIso = normalizeTradeTimestamp(position?.openedAt ?? position?.execution?.openedAt, null);
-  const closedAtIso = normalizeTradeTimestamp(position?.closedAt ?? position?.closedExecution?.closedAt, null);
-  const updatedAtIso = normalizeTradeTimestamp(position?.updatedAt ?? position?.live?.updatedAt ?? position?.closedExecution?.closedAt, null);
 
   const snapshot = {
     symbol: position.symbol || null,
@@ -3045,7 +3033,7 @@ function normalizePositionRecord(position){
     reason: position?.analysisSnapshot?.reason || position?.tradeReason || null,
     scoreBreakdown: position?.analysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
     sourceUsed,
-    analysisTimestamp: normalizeTradeTimestamp(position?.analysisSnapshot?.analysisTimestamp, openedAtIso || nowIso())
+    analysisTimestamp: position?.analysisSnapshot?.analysisTimestamp || position?.openedAt || Date.now()
   };
 
   return {
@@ -3053,14 +3041,14 @@ function normalizePositionRecord(position){
     analysisSnapshot: snapshot,
     execution: {
       ...(position.execution || {}),
-      openedAt: normalizeTradeTimestamp(position?.execution?.openedAt ?? position?.openedAt, null),
+      openedAt: position?.execution?.openedAt || position?.openedAt || null,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
       invested: investedRaw
     },
     live: {
       ...(position.live || {}),
-      updatedAt: normalizeTradeTimestamp(position?.live?.updatedAt, updatedAtIso || nowIso()),
+      updatedAt: position?.live?.updatedAt || Date.now(),
       price: livePriceRaw,
       pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : null,
       pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : null
@@ -3068,12 +3056,9 @@ function normalizePositionRecord(position){
     closedExecution: {
       ...(position.closedExecution || {}),
       exitPrice: exitPriceRaw,
-      closedAt: normalizeTradeTimestamp(position?.closedExecution?.closedAt ?? position?.closedAt, null),
+      closedAt: position?.closedExecution?.closedAt || position?.closedAt || null,
       closeType: position?.closedExecution?.closeType || position?.closeType || null
     },
-    openedAt: openedAtIso,
-    closedAt: closedAtIso,
-    updatedAt: updatedAtIso,
     tradeDecision: snapshot.decision,
     tradeReason: snapshot.reason,
     trendLabel: snapshot.trendLabel,
