@@ -2647,8 +2647,8 @@ function renderPositionRow(position) {
     <div class="trade-plan-grid compact">
       <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
       <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
+      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(Math.abs(meta.stopDistancePct), 2)}%`}</div>
+      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(Math.abs(meta.targetDistancePct), 2)}%`}</div>
       <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
       <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
       <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
@@ -2952,14 +2952,15 @@ function renderHistoryRow(item) {
         changed = true
         return normalizePositionRecord({
           ...p,
-          sourceUsed: p.sourceUsed || hit.sourceUsed || hit.detail?.sourceUsed || null,
-          tradeDecision: p.tradeDecision || hit.plan?.decision || hit.detail?.decision || null,
-          tradeReason: p.tradeReason || hit.plan?.reason || hit.detail?.reasonShort || null,
-          trendLabel: p.trendLabel || hit.plan?.trendLabel || hit.detail?.trendLabel || null,
-          horizon: p.horizon || hit.plan?.horizon || hit.detail?.horizon || null,
-          stopLoss: p.stopLoss ?? hit.plan?.stopLoss ?? null,
-          takeProfit: p.takeProfit ?? hit.plan?.takeProfit ?? null,
-          rr: p.rr ?? hit.plan?.rr ?? null,
+          side: hit.plan?.side || hit.detail?.direction || p.side || p.direction || null,
+          sourceUsed: hit.detail?.sourceUsed || hit.sourceUsed || p.sourceUsed || null,
+          tradeDecision: hit.plan?.decision || hit.detail?.decision || p.tradeDecision || null,
+          tradeReason: hit.plan?.reason || hit.detail?.reasonShort || p.tradeReason || null,
+          trendLabel: hit.plan?.trendLabel || hit.detail?.trendLabel || p.trendLabel || null,
+          horizon: hit.plan?.horizon || hit.detail?.horizon || p.horizon || null,
+          stopLoss: hit.plan?.stopLoss ?? p.stopLoss ?? null,
+          takeProfit: hit.plan?.takeProfit ?? p.takeProfit ?? null,
+          rr: hit.plan?.rr ?? p.rr ?? null,
           analysisSnapshot: {
             ...(p.analysisSnapshot || {}),
             ...(detailSnapshot || {})
@@ -3024,6 +3025,13 @@ function normalizePositionRecord(position){
   const executionRaw = position?.execution || null;
   const liveRaw = position?.live || null;
   const closedExecutionRaw = position?.closedExecution || position?.closed_execution || null;
+  const normalizedSide = firstValue(
+    position?.side,
+    analysisSnapshotRaw?.side,
+    analysisSnapshotRaw?.direction,
+    position?.direction,
+    null
+  );
 
   const entryPriceRaw = positiveOrNull(
     firstValue(
@@ -3051,8 +3059,14 @@ function normalizePositionRecord(position){
     name: position.name || position.symbol || null,
     score: positiveOrNull(firstValue(analysisSnapshotRaw?.score, position?.score)),
     decision: firstValue(analysisSnapshotRaw?.decision, position?.tradeDecision, position?.trade_decision, position?.decision, null),
-    trendLabel: firstValue(analysisSnapshotRaw?.trendLabel, analysisSnapshotRaw?.trend_label, position?.trendLabel, position?.trend_label, detectedTrendLabel(position?.direction || "neutral")),
-    direction: firstValue(analysisSnapshotRaw?.direction, position?.direction, null),
+    trendLabel: firstValue(
+      analysisSnapshotRaw?.trendLabel,
+      analysisSnapshotRaw?.trend_label,
+      position?.trendLabel,
+      position?.trend_label,
+      detectedTrendLabel(normalizedSide || "neutral")
+    ),
+    direction: firstValue(analysisSnapshotRaw?.direction, normalizedSide, position?.direction, null),
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
@@ -3075,6 +3089,7 @@ function normalizePositionRecord(position){
 
   return {
     ...position,
+    side: normalizedSide,
     analysisSnapshot: snapshot,
     execution: {
       ...(executionRaw || {}),
@@ -3307,7 +3322,7 @@ function openPositionsRiskView() {
                         <div class="trade-sub">${safeText(row.tradeDecision || "trade ouvert")}</div>
                       </div>
                       <div>${badge(simpleSideLabel(row.side), row.side)}</div>
-                      <div>${row.distanceToStop == null ? "stop indisponible" : `${num(row.distanceToStop, 2)}% avant stop`}</div>
+                      <div>${row.distanceToStop == null ? "stop indisponible" : `${num(Math.abs(row.distanceToStop), 2)}% avant stop`}</div>
                     </div>
                   `).join("")}
                 </div>
