@@ -1011,28 +1011,6 @@ function currentTradePlan() {
   return state.detail?.plan || null;
 }
 
-function setupStatusBadgeClass(status) {
-  const v = String(status || "").toLowerCase();
-  if (v.includes("confirme") || v.includes("propre")) return "positive";
-  if (v.includes("surveiller") || v.includes("trop tard")) return "warning";
-  if (v.includes("risque") || v.includes("non exploitable")) return "negative";
-  return "";
-}
-function setupStatusLabel(status) {
-  return String(status || "Statut inconnu");
-}
-function confirmationLabelText(plan) {
-  const count = Number(plan?.confirmationCount ?? 0);
-  const label = String(plan?.confirmationLabel || "").trim();
-  if (!count) return "0 confirmation";
-  return `${count} confirmation${count > 1 ? "s" : ""}${label ? ` · ${label}` : ""}`;
-}
-function planBlockersText(plan, fallback = "Aucun blocage majeur.") {
-  const rows = Array.isArray(plan?.blockers) ? plan.blockers.filter(Boolean) : [];
-  if (rows.length) return rows.join(" · ");
-  return fallback;
-}
-
   function normalizeOpportunity(item) {
     return {
       symbol: item?.symbol || "",
@@ -1055,6 +1033,7 @@ function planBlockersText(plan, fallback = "Aucun blocage majeur.") {
       trendLabel: item?.trendLabel || null,
       plan: item?.plan || null,
       candles: Array.isArray(item?.candles) ? item.candles : [],
+      candleCount: Array.isArray(item?.candles) ? item.candles.length : (typeof item?.candleCount === "number" ? item.candleCount : 0),
       error: compactError(item?.error || item?.reasonShort || null)
     };
   }
@@ -1168,7 +1147,7 @@ function planBlockersText(plan, fallback = "Aucun blocage majeur.") {
         reason: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
         invalidation: localPlan?.refusalReason || "Attendre un signal plus propre.",
         summary: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
-        warning: "Pont Analyse externe indisponible."
+        warning: "Analyse externe indisponible."
       };
     } finally {
       state.loadingAiReview = false;
@@ -1642,10 +1621,6 @@ function applyFilter() {
     const decisionLabel = rowDecisionLabel(item);
     const trendLabel = rowTrendLabel(item);
     const note = item?.reasonShort || item?.error || null;
-    const plan = rowTradePlan(item);
-    const setupStatus = plan?.setupStatus || item?.setupStatus || null;
-    const confirmationText = confirmationLabelText(plan);
-    const blockerText = Array.isArray(plan?.blockers) && plan.blockers.length ? plan.blockers[0] : "";
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}">
@@ -1655,7 +1630,6 @@ function applyFilter() {
           <div class="asset-text">
             <div class="asset-symbol">${safeText(item.symbol)}</div>
             <div class="asset-name">${safeText(item.name || "Nom indisponible")}</div>
-            ${setupStatus ? `<div class="muted opp-note">${safeText(setupStatus)}</div>` : ""}
           </div>
         </div>
         <div class="score-box">
@@ -1663,21 +1637,16 @@ function applyFilter() {
           <div class="score-meta">
             ${badge(decisionLabel, decisionLabel)}
             ${badge(trendLabel, item.direction || "")}
-            ${setupStatus ? badge(setupStatusLabel(setupStatus), setupStatusBadgeClass(setupStatus)) : ""}
           </div>
         </div>
         <div class="price-col">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
           ${note ? `<div class="muted opp-note">${safeText(note)}</div>` : ""}
-          ${plan?.tradeNow === true ? `<div class="muted opp-note">Actionnable maintenant</div>` : ""}
         </div>
         <div class="meta-col">
           ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
           ${badge(`fiabilite ${safeText(item.confidenceLabel || simpleConfidenceLabel(item.confidence || "low"))}`)}
-          ${plan?.setupType ? badge(safeText(plan.setupType)) : ""}
-          ${plan?.confirmationCount != null ? badge(safeText(confirmationText)) : ""}
-          ${blockerText ? badge(`blocage ${safeText(blockerText)}`) : ""}
           ${state.settings.showSourceBadges ? badge(item.sourceUsed || "source?") : ""}
           ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(item.freshness || "unknown"), item.freshness || "") : ""}
         </div>
@@ -2134,6 +2103,15 @@ function simpleReliabilityLabel(score) {
   return "faible";
 }
 
+function simpleRiskQualityLabel(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value)) return "indisponible";
+  if (value >= 80) return "faible";
+  if (value >= 60) return "correct";
+  if (value >= 40) return "acceptable";
+  return "eleve";
+}
+
 function simpleTrendWord(label) {
   const text = String(label || "").toLowerCase();
   if (text.includes("haussi")) return "hausse";
@@ -2157,8 +2135,6 @@ function simpleContextSentence(plan) {
 
 
 function simpleBlockerText(plan) {
-  const blockers = Array.isArray(plan?.blockers) ? plan.blockers.filter(Boolean) : [];
-  if (blockers.length) return blockers.join(" · ");
   const score = Number(plan?.finalScore ?? 0);
   const trend = simpleTrendWord(plan?.trendLabel || "");
   if (String(plan?.decision || "") === "Trade propose") return "Rien de bloquant pour le moment.";
@@ -2168,9 +2144,9 @@ function simpleBlockerText(plan) {
 }
 
 function actionNowLabel(plan) {
-  if (plan?.tradeNow === true) return "Ouvrir le trade";
   const decision = String(plan?.decision || "");
-  if (decision === "A surveiller" && String(plan?.waitFor || "").includes("meilleur")) return "Attendre un meilleur point d'entree";
+  if (decision === "Trade propose") return "Ouvrir le trade";
+  if (decision === "A surveiller" && String(plan?.waitFor || "").includes("meilleur point d'entree")) return "Attendre un meilleur point d'entree";
   if (decision === "A surveiller") return "Surveiller";
   return "Ne rien faire";
 }
@@ -2307,12 +2283,7 @@ function renderDetail() {
                       <div class="section-title"><span>Decision automatique</span><span>${safeText(plan?.decision || "—")}</span></div>
                       <div class="kv plan-grid">
                         <div class="muted">Decision simple</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
-                        <div class="muted">Statut setup</div><div>${plan?.setupStatus ? `${safeText(plan.setupStatus)}${plan?.tradeNow ? " · exploitable maintenant" : ""}` : "—"}</div>
-                        <div class="muted">Type de setup</div><div>${safeText(plan?.setupType || "—")}</div>
                         <div class="muted">Tendance</div><div>${safeText(plan?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</div>
-                        <div class="muted">Confirmations</div><div>${safeText(confirmationLabelText(plan))}</div>
-                        <div class="muted">Qualite entree</div><div>${plan?.entryQuality != null ? `${num(plan.entryQuality, 0)}/100` : "—"}</div>
-                        <div class="muted">Qualite risque</div><div>${plan?.riskQuality != null ? `${num(plan.riskQuality, 0)}/100` : "—"}</div>
                         <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
                         <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
                         <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
@@ -2340,27 +2311,27 @@ function renderDetail() {
               </div>
 
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Validation IA externe</span><span>${state.loadingAiReview ? "analyse..." : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local")}</span></div>
+                <div class="section-title"><span>Lecture complementaire</span><span>${state.loadingAiReview ? "analyse..." : (state.aiReview?.externalAiUsed ? "Claude" : "lecture locale")}</span></div>
                 ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
                   <div class="ai-review-box">
                     <div class="legend">
                       ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}
                       ${badge(`prudence ${state.aiReview.prudence || "—"}`)}
-                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : "fallback local")}
+                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : "lecture locale")}
                     </div>
                     <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
                     <div class="kv" style="margin-top:12px">
                       <div class="muted">Pourquoi</div><div>${safeText(state.aiReview.reason || "—")}</div>
-                      <div class="muted">Ce qui bloque</div><div>${safeText(state.aiReview.invalidation || "—")}</div>
+                      <div class="muted">Blocages</div><div>${safeText(state.aiReview.invalidation || "Aucun blocage complementaire.")}</div>
                       <div class="muted">Source</div><div>${safeText(state.aiReview.provider || "—")}</div>
                     </div>
-                    ${state.aiReview.warning ? `<div class="muted" style="margin-top:10px">${safeText(state.aiReview.warning)}</div>` : ""}
+                    ${state.aiReview.warning ? `<div class="muted" style="margin-top:10px">Lecture complementaire locale : ${safeText(state.aiReview.warning)}</div>` : ""}
                   </div>
                 ` : `<div class="empty-state">Aucune validation IA disponible pour le moment.</div>`}
               </div>
 
               <div class="card">
-                <div class="section-title"><span>Evolution recente</span><span>${d.candleCount || 0} bougies</span></div>
+                <div class="section-title"><span>Evolution recente</span><span>${Array.isArray(d.candles) && d.candles.length ? `${d.candles.length} bougies` : "historique recent"}</span></div>
                 ${renderChart(d.candles)}
               </div>
             </div>
@@ -2372,10 +2343,8 @@ function renderDetail() {
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
                     <div class="conclusion-line">Fiabilite du trade : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore))}</strong></div>
-                    <div class="conclusion-line">Statut setup : <strong>${safeText(currentTradePlan()?.setupStatus || "—")}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(currentTradePlan()?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</strong></div>
                     <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
-                    <div class="conclusion-line">Confirmations : <strong>${safeText(confirmationLabelText(currentTradePlan()))}</strong></div>
                     <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
                     <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
                   </div>
@@ -2388,12 +2357,8 @@ function renderDetail() {
                   <div>${safeText(simpleDecisionSentence(currentTradePlan()))}</div>
                 </div>
                 <div class="conclusion-text">
-                  <div class="muted">Ce qui bloque</div>
-                  <div>${safeText(simpleBlockerText(currentTradePlan()))}</div>
-                </div>
-                <div class="conclusion-text">
-                  <div class="muted">Blocages detailles</div>
-                  <div>${safeText(planBlockersText(currentTradePlan(), "Aucun blocage majeur."))}</div>
+                  <div class="muted">Blocages</div>
+                  <div>${safeText(planBlockersText(currentTradePlan(), simpleBlockerText(currentTradePlan())))}</div>
                 </div>
                 <div class="conclusion-text">
                   <div class="muted">Ce qu'il faut attendre</div>
@@ -2405,7 +2370,7 @@ function renderDetail() {
                     <div class="break-item"><div class="break-name">Tendance</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.trend))}</div></div>
                     <div class="break-item"><div class="break-name">Elan</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.momentum))}</div></div>
                     <div class="break-item"><div class="break-name">Entree</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.entryQuality))}</div></div>
-                    <div class="break-item"><div class="break-name">Risque</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.risk))}</div></div>
+                    <div class="break-item"><div class="break-name">Risque</div><div class="break-value">${safeText(simpleRiskQualityLabel(d.breakdown?.risk))}</div></div>
                     <div class="break-item"><div class="break-name">Activite</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.participation))}</div></div>
                   </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
                 }
