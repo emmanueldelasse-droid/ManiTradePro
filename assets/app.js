@@ -84,7 +84,8 @@
     detailCache: readJson(STORAGE_KEYS.detailCache, {}),
     opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, []),
     trainingCapital: loadTrainingCapital(),
-    nonCryptoHydration: {}
+    nonCryptoHydration: {},
+    pendingTradeConfirm: null
   };
 
   const app = document.getElementById("app");
@@ -1301,6 +1302,140 @@ function currentTradePlan() {
     return { pnl, pnlPct };
   }
 
+
+function buildTradeOpenConfirmation(payload) {
+  const d = payload?.detail || null;
+  const plan = payload?.plan || null;
+  if (!d || !plan) return null;
+  const quantity = Number(plan.quantity || 0);
+  const investedUsd = Number(plan.investedUsd || 0);
+  return {
+    mode: payload.mode || "training",
+    symbol: d.symbol,
+    name: d.name,
+    side: plan.side,
+    entry: plan.entry,
+    stopLoss: plan.stopLoss,
+    takeProfit: plan.takeProfit,
+    rr: plan.rr,
+    horizon: plan.horizon,
+    quantity,
+    investedUsd,
+    title: "Confirmer l'ouverture du trade",
+    message: "Verifier le plan avant de creer le trade d'entrainement.",
+    payload
+  };
+}
+
+function openTradeConfirmation(payload) {
+  const confirmData = buildTradeOpenConfirmation(payload);
+  if (!confirmData) {
+    state.error = "Impossible de preparer la confirmation du trade.";
+    render();
+    return;
+  }
+  state.pendingTradeConfirm = confirmData;
+  state.error = null;
+  render();
+}
+
+function closeTradeConfirmation() {
+  state.pendingTradeConfirm = null;
+  render();
+}
+
+function executeConfirmedTradeOpen() {
+  const confirm = state.pendingTradeConfirm;
+  const payload = confirm?.payload || null;
+  if (!payload) {
+    state.pendingTradeConfirm = null;
+    render();
+    return;
+  }
+
+  const d = payload.detail;
+  const plan = payload.plan;
+  const position = {
+    id: uid("pos"),
+    symbol: d.symbol,
+    name: d.name,
+    assetClass: d.assetClass,
+    side: plan.side,
+    quantity: plan.quantity,
+    entryPrice: plan.entry,
+    invested: plan.investedUsd,
+    openedAt: nowIso(),
+    sourceUsed: d.sourceUsed || null,
+    stopLoss: plan.stopLoss ?? null,
+    takeProfit: plan.takeProfit ?? null,
+    tradeDecision: plan.decision,
+    tradeReason: plan.reason,
+    rr: plan.rr ?? null,
+    horizon: plan.horizon ?? null,
+    confidence: plan.confidence || null,
+    algoScore: d.score ?? null,
+    execution: {
+      openedAt: nowIso(),
+      entryPrice: plan.entry,
+      quantity: plan.quantity,
+      invested: plan.investedUsd
+    }
+  };
+
+  state.trades.positions.unshift(position);
+  state.algoJournal.unshift({
+    id: uid("algo"),
+    symbol: d.symbol,
+    createdAt: nowIso(),
+    mode: payload.journalMode || "conseille",
+    score: d.score ?? null,
+    decision: plan.decision,
+    side: plan.side,
+    entry: plan.entry,
+    stopLoss: plan.stopLoss ?? null,
+    takeProfit: plan.takeProfit ?? null,
+    rr: plan.rr ?? null,
+    confidence: plan.confidence,
+    reason: plan.reason,
+    horizon: plan.horizon ?? null,
+    aiSummary: payload.aiSummary || state.aiReview?.summary || plan.aiSummary || plan.reason || "",
+    safety: payload.safety || state.aiReview?.prudence || plan.safety || "moyenne",
+    aiProvider: payload.aiProvider || state.aiReview?.provider || "local_plan"
+  });
+
+  state.pendingTradeConfirm = null;
+  state.error = null;
+  persistTradesState();
+  render();
+}
+
+function renderTradeConfirmationModal() {
+  const confirm = state.pendingTradeConfirm;
+  if (!confirm) return "";
+  return `
+    <div data-trade-confirm-overlay style="position:fixed;inset:0;background:rgba(5,8,15,.72);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999;">
+      <div class="card" style="width:min(520px,100%);padding:18px 18px 16px;border:1px solid var(--border-medium);box-shadow:0 20px 60px rgba(0,0,0,.35);">
+        <div class="section-title" style="margin-bottom:10px;">${safeText(confirm.title || "Confirmer le trade")}</div>
+        <div class="muted" style="margin-bottom:14px;">${safeText(confirm.message || "")}</div>
+        <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;">
+          <div class="stat-card"><div class="stat-label">Actif</div><div class="stat-value small">${safeText(confirm.symbol || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Sens</div><div class="stat-value small">${safeText(simpleSideLabel(confirm.side || ""))}</div></div>
+          <div class="stat-card"><div class="stat-label">Entree</div><div class="stat-value small">${priceDisplay(confirm.entry)}</div></div>
+          <div class="stat-card"><div class="stat-label">Quantite</div><div class="stat-value small">${confirm.quantity != null ? safeText(String(confirm.quantity)) : "—"}</div></div>
+          <div class="stat-card"><div class="stat-label">Stop</div><div class="stat-value small">${priceDisplay(confirm.stopLoss)}</div></div>
+          <div class="stat-card"><div class="stat-label">Objectif</div><div class="stat-value small">${priceDisplay(confirm.takeProfit)}</div></div>
+          <div class="stat-card"><div class="stat-label">Ratio</div><div class="stat-value small">${confirm.rr != null ? safeText(String(confirm.rr)) : "—"}</div></div>
+          <div class="stat-card"><div class="stat-label">Investi</div><div class="stat-value small">${priceDisplay(confirm.investedUsd)}</div></div>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+          <button class="btn" data-cancel-trade-confirm>Annuler</button>
+          <button class="btn primary" data-confirm-trade-open>Confirmer</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function addTrainingTradeFromDetail(side) {
   const d = state.detail;
   if (!d || d.price == null) {
@@ -1315,51 +1450,28 @@ function addTrainingTradeFromDetail(side) {
     render();
     return;
   }
-  const position = {
-    id: uid("pos"),
-    symbol: d.symbol,
-    name: d.name,
-    assetClass: d.assetClass,
-    side,
-    quantity,
-    entryPrice: d.price,
-    invested: investedUsd,
-    openedAt: nowIso(),
-    sourceUsed: d.sourceUsed || null,
-    stopLoss: null,
-    takeProfit: null,
-    tradeDecision: "manuel",
-    tradeReason: "Trade cree manuellement depuis la fiche actif.",
-    rr: null,
-    horizon: null,
-    execution: {
-      openedAt: nowIso(),
-      entryPrice: d.price,
-      quantity,
-      invested: investedUsd
-    }
-  };
-  state.trades.positions.unshift(position);
-  state.algoJournal.unshift({
-    id: uid("algo"),
-    symbol: d.symbol,
-    createdAt: nowIso(),
-    mode: "manuel",
-    score: d.score ?? null,
-    decision: "manuel",
-    side,
-    entry: d.price,
-    stopLoss: null,
-    takeProfit: null,
-    rr: null,
-    confidence: simpleConfidenceLabel(d.confidence || "low"),
-    reason: "Trade manuel depuis la fiche actif.",
+
+  openTradeConfirmation({
+    mode: "training",
+    journalMode: "manuel",
     aiSummary: "Decision manuelle hors moteur prudent.",
-    safety: "non evalue"
+    safety: "non evalue",
+    aiProvider: "manual",
+    detail: d,
+    plan: {
+      side,
+      entry: d.price,
+      stopLoss: null,
+      takeProfit: null,
+      rr: null,
+      horizon: null,
+      quantity,
+      investedUsd,
+      decision: "manuel",
+      reason: "Trade cree manuellement depuis la fiche actif.",
+      confidence: simpleConfidenceLabel(d.confidence || "low")
+    }
   });
-  persistTradesState();
-  state.error = `Trade d'entrainement ajoute : ${d.symbol} (${simpleSideLabel(side)})`;
-  render();
 }
 
 function createRecommendedTrade() {
@@ -1377,55 +1489,20 @@ function createRecommendedTrade() {
     render();
     return;
   }
-  const position = {
-    id: uid("pos"),
-    symbol: d.symbol,
-    name: d.name,
-    assetClass: d.assetClass,
-    side: plan.side,
-    quantity,
-    entryPrice: plan.entry,
-    invested: investedUsd,
-    openedAt: nowIso(),
-    sourceUsed: d.sourceUsed || null,
-    stopLoss: plan.stopLoss,
-    takeProfit: plan.takeProfit,
-    tradeDecision: plan.decision,
-    tradeReason: plan.reason,
-    rr: plan.rr,
-    horizon: plan.horizon,
-    confidence: plan.confidence,
-    algoScore: d.score ?? null,
-    execution: {
-      openedAt: nowIso(),
-      entryPrice: plan.entry,
-      quantity,
-      invested: investedUsd
-    }
-  };
-  state.trades.positions.unshift(position);
-  state.algoJournal.unshift({
-    id: uid("algo"),
-    symbol: d.symbol,
-    createdAt: nowIso(),
-    mode: "conseille",
-    score: d.score ?? null,
-    decision: plan.decision,
-    side: plan.side,
-    entry: plan.entry,
-    stopLoss: plan.stopLoss,
-    takeProfit: plan.takeProfit,
-    rr: plan.rr,
-    confidence: plan.confidence,
-    reason: plan.reason,
-    horizon: plan.horizon,
+
+  openTradeConfirmation({
+    mode: "training",
+    journalMode: "conseille",
     aiSummary: state.aiReview?.summary || plan.aiSummary,
     safety: state.aiReview?.prudence || plan.safety,
-    aiProvider: state.aiReview?.provider || "local_plan"
+    aiProvider: state.aiReview?.provider || "local_plan",
+    detail: d,
+    plan: {
+      ...plan,
+      quantity,
+      investedUsd
+    }
   });
-  persistTradesState();
-  state.error = `Trade propose cree : ${d.symbol} (${simpleSideLabel(plan.side)})`;
-  render();
 }
 
 function closeTrainingTrade(id, livePrice = null) {
@@ -2647,8 +2724,8 @@ function renderPositionRow(position) {
     <div class="trade-plan-grid compact">
       <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
       <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(Math.abs(meta.stopDistancePct), 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(Math.abs(meta.targetDistancePct), 2)}%`}</div>
+      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
+      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
       <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
       <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
       <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
@@ -2915,18 +2992,15 @@ function renderHistoryRow(item) {
         const symbol = String(position?.symbol || "").toUpperCase();
         try {
           const detail = await api(`/api/opportunity-detail/${encodeURIComponent(symbol)}`, 8000);
-          const detailData = detail?.data || null;
-          const price = Number(detailData?.price);
+          const price = Number(detail?.data?.price);
           return {
             symbol,
             ok: Number.isFinite(price),
             price: Number.isFinite(price) ? price : null,
-            sourceUsed: detailData?.sourceUsed || null,
-            detail: detailData,
-            plan: detailData?.plan || null
+            sourceUsed: detail?.data?.sourceUsed || null
           };
         } catch (e) {
-          return { symbol, ok: false, price: null, sourceUsed: null, detail: null, plan: null };
+          return { symbol, ok: false, price: null, sourceUsed: null };
         }
       }));
 
@@ -2947,24 +3021,11 @@ function renderHistoryRow(item) {
           : null;
         const invested = Number.isFinite(entryPrice) && Number.isFinite(quantity) && quantity > 0 ? entryPrice * quantity : null;
         const pnlPct = (pnl != null && invested && invested > 0) ? (pnl / invested) * 100 : null;
-        const detailSnapshot = hit.detail ? createAnalysisSnapshotFromOpportunity(hit.detail) : null;
 
         changed = true
         return normalizePositionRecord({
           ...p,
-          side: hit.plan?.side || hit.detail?.direction || p.side || p.direction || null,
-          sourceUsed: hit.detail?.sourceUsed || hit.sourceUsed || p.sourceUsed || null,
-          tradeDecision: hit.plan?.decision || hit.detail?.decision || p.tradeDecision || null,
-          tradeReason: hit.plan?.reason || hit.detail?.reasonShort || p.tradeReason || null,
-          trendLabel: hit.plan?.trendLabel || hit.detail?.trendLabel || p.trendLabel || null,
-          horizon: hit.plan?.horizon || hit.detail?.horizon || p.horizon || null,
-          stopLoss: hit.plan?.stopLoss ?? p.stopLoss ?? null,
-          takeProfit: hit.plan?.takeProfit ?? p.takeProfit ?? null,
-          rr: hit.plan?.rr ?? p.rr ?? null,
-          analysisSnapshot: {
-            ...(p.analysisSnapshot || {}),
-            ...(detailSnapshot || {})
-          },
+          sourceUsed: p.sourceUsed || hit.sourceUsed || null,
           live: {
             ...(p.live || {}),
             updatedAt: new Date(now).toISOString(),
@@ -3019,97 +3080,60 @@ function normalizePositionRecord(position){
     const num = safeNumber(value);
     return num != null && num > 0 ? num : null;
   };
-  const firstValue = (...values) => values.find((value) => value != null);
 
-  const analysisSnapshotRaw = position?.analysisSnapshot || position?.analysis_snapshot || null;
-  const executionRaw = position?.execution || null;
-  const liveRaw = position?.live || null;
-  const closedExecutionRaw = position?.closedExecution || position?.closed_execution || null;
-  const normalizedSide = firstValue(
-    position?.side,
-    analysisSnapshotRaw?.side,
-    analysisSnapshotRaw?.direction,
-    position?.direction,
-    null
-  );
-
-  const entryPriceRaw = positiveOrNull(
-    firstValue(
-      executionRaw?.entryPrice,
-      executionRaw?.entry_price,
-      position?.entryPrice,
-      position?.entry_price,
-      analysisSnapshotRaw?.entry
-    )
-  );
-  const quantityRaw = positiveOrNull(firstValue(executionRaw?.quantity, position?.quantity));
-  const investedRaw = positiveOrNull(firstValue(executionRaw?.invested, position?.invested))
+  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? position?.analysisSnapshot?.entry);
+  const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
+  const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(firstValue(analysisSnapshotRaw?.stopLoss, position?.stopLoss, position?.stop_loss));
-  const takeProfitRaw = positiveOrNull(firstValue(analysisSnapshotRaw?.takeProfit, position?.takeProfit, position?.take_profit));
-  const ratioRaw = positiveOrNull(firstValue(analysisSnapshotRaw?.ratio, position?.rrRatio, position?.rr_ratio, position?.rr));
-  const exitPriceRaw = positiveOrNull(firstValue(closedExecutionRaw?.exitPrice, closedExecutionRaw?.exit_price, position?.exitPrice, position?.exit_price));
-  const livePriceRaw = positiveOrNull(firstValue(liveRaw?.price, position?.livePrice));
-  const pnlRaw = safeNumber(firstValue(position?.pnl, position?.live?.pnl));
-  const pnlPctRaw = safeNumber(firstValue(position?.pnlPct, position?.pnl_pct, position?.live?.pnlPct, position?.live?.pnl_pct));
-  const sourceUsed = firstValue(position?.sourceUsed, position?.source_used, position?.source, analysisSnapshotRaw?.sourceUsed, analysisSnapshotRaw?.source_used, null);
+  const stopLossRaw = positiveOrNull(position?.analysisSnapshot?.stopLoss ?? position?.stopLoss);
+  const takeProfitRaw = positiveOrNull(position?.analysisSnapshot?.takeProfit ?? position?.takeProfit);
+  const ratioRaw = positiveOrNull(position?.analysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
+  const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice);
+  const livePriceRaw = positiveOrNull(position?.live?.price);
+  const pnlRaw = safeNumber(position?.pnl);
+  const pnlPctRaw = safeNumber(position?.pnlPct);
+  const sourceUsed = position?.sourceUsed || position?.source || position?.analysisSnapshot?.sourceUsed || null;
 
   const snapshot = {
     symbol: position.symbol || null,
     name: position.name || position.symbol || null,
-    score: positiveOrNull(firstValue(analysisSnapshotRaw?.score, position?.score)),
-    decision: firstValue(analysisSnapshotRaw?.decision, position?.tradeDecision, position?.trade_decision, position?.decision, null),
-    trendLabel: firstValue(
-      analysisSnapshotRaw?.trendLabel,
-      analysisSnapshotRaw?.trend_label,
-      position?.trendLabel,
-      position?.trend_label,
-      detectedTrendLabel(normalizedSide || "neutral")
-    ),
-    direction: firstValue(analysisSnapshotRaw?.direction, normalizedSide, position?.direction, null),
+    score: positiveOrNull(position?.analysisSnapshot?.score ?? position?.score),
+    decision: position?.analysisSnapshot?.decision || position?.tradeDecision || null,
+    trendLabel: position?.analysisSnapshot?.trendLabel || position?.trendLabel || detectedTrendLabel(position?.direction || "neutral"),
+    direction: position?.analysisSnapshot?.direction || position?.direction || null,
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     ratio: ratioRaw,
-    horizon: firstValue(analysisSnapshotRaw?.horizon, position?.horizon, null),
-    reason: firstValue(analysisSnapshotRaw?.reason, position?.tradeReason, position?.trade_reason, null),
-    scoreBreakdown: firstValue(analysisSnapshotRaw?.scoreBreakdown, analysisSnapshotRaw?.score_breakdown, position?.scoreBreakdown, position?.score_breakdown, null),
+    horizon: position?.analysisSnapshot?.horizon || position?.horizon || null,
+    reason: position?.analysisSnapshot?.reason || position?.tradeReason || null,
+    scoreBreakdown: position?.analysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
     sourceUsed,
-    analysisTimestamp: firstValue(
-      analysisSnapshotRaw?.analysisTimestamp,
-      analysisSnapshotRaw?.analysis_timestamp,
-      executionRaw?.openedAt,
-      position?.openedAt,
-      position?.opened_at,
-      position?.updatedAt,
-      position?.updated_at,
-      new Date().toISOString()
-    )
+    analysisTimestamp: position?.analysisSnapshot?.analysisTimestamp || position?.openedAt || Date.now()
   };
 
   return {
     ...position,
-    side: normalizedSide,
     analysisSnapshot: snapshot,
     execution: {
-      ...(executionRaw || {}),
-      openedAt: firstValue(executionRaw?.openedAt, executionRaw?.opened_at, position?.openedAt, position?.opened_at, null),
+      ...(position.execution || {}),
+      openedAt: position?.execution?.openedAt || position?.openedAt || null,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
       invested: investedRaw
     },
     live: {
-      ...(liveRaw || {}),
-      updatedAt: firstValue(liveRaw?.updatedAt, liveRaw?.updated_at, position?.updatedAt, position?.updated_at, null),
+      ...(position.live || {}),
+      updatedAt: position?.live?.updatedAt || Date.now(),
       price: livePriceRaw,
-      pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : pnlRaw,
-      pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : pnlPctRaw
+      pnl: position?.live?.pnl != null ? safeNumber(position.live.pnl) : null,
+      pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : null
     },
     closedExecution: {
-      ...(closedExecutionRaw || {}),
+      ...(position.closedExecution || {}),
       exitPrice: exitPriceRaw,
-      closedAt: firstValue(closedExecutionRaw?.closedAt, closedExecutionRaw?.closed_at, position?.closedAt, position?.closed_at, null),
-      closeType: firstValue(closedExecutionRaw?.closeType, closedExecutionRaw?.close_type, position?.closeType, position?.close_type, null)
+      closedAt: position?.closedExecution?.closedAt || position?.closedAt || null,
+      closeType: position?.closedExecution?.closeType || position?.closeType || null
     },
     tradeDecision: snapshot.decision,
     tradeReason: snapshot.reason,
@@ -3230,10 +3254,9 @@ function normalizeTradesHistoryState() {
 
 function openPositionsRiskView() {
     const positions = Array.isArray(state.trades?.positions) ? state.trades.positions : [];
-    return positions.map((raw) => {
-      const p = normalizePositionRecord(raw);
+    return positions.map((p) => {
       const liveMatch = Array.isArray(state.opportunities) ? state.opportunities.find((o) => o.symbol === p.symbol) : null;
-      const livePrice = p?.live?.price ?? liveMatch?.price ?? p.entryPrice ?? null;
+      const livePrice = liveMatch?.price ?? p.entryPrice ?? null;
       const distanceToStop = (p.stopLoss == null || livePrice == null)
         ? null
         : (p.side === "long"
@@ -3322,7 +3345,7 @@ function openPositionsRiskView() {
                         <div class="trade-sub">${safeText(row.tradeDecision || "trade ouvert")}</div>
                       </div>
                       <div>${badge(simpleSideLabel(row.side), row.side)}</div>
-                      <div>${row.distanceToStop == null ? "stop indisponible" : `${num(Math.abs(row.distanceToStop), 2)}% avant stop`}</div>
+                      <div>${row.distanceToStop == null ? "stop indisponible" : `${num(row.distanceToStop, 2)}% avant stop`}</div>
                     </div>
                   `).join("")}
                 </div>
@@ -3503,6 +3526,7 @@ function openPositionsRiskView() {
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
       </div>
+      ${renderTradeConfirmationModal()}
     `;
     applyThemeMode();
     bindEvents();
@@ -3553,6 +3577,20 @@ function openPositionsRiskView() {
 
     app.querySelectorAll("[data-close-trade]").forEach(el => {
       el.addEventListener("click", () => closeTrainingTrade(el.getAttribute("data-close-trade")));
+    });
+
+    app.querySelectorAll("[data-cancel-trade-confirm]").forEach(el => {
+      el.addEventListener("click", () => closeTradeConfirmation());
+    });
+
+    app.querySelectorAll("[data-confirm-trade-open]").forEach(el => {
+      el.addEventListener("click", () => executeConfirmedTradeOpen());
+    });
+
+    app.querySelectorAll("[data-trade-confirm-overlay]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        if (ev.target === el) closeTradeConfirmation();
+      });
     });
 
     app.querySelectorAll("[data-close-half]").forEach(el => {
