@@ -2143,6 +2143,12 @@ function simpleBlockerText(plan) {
   return "Le marche reste trop flou pour proposer un trade.";
 }
 
+function planBlockersText(plan, fallback = "Aucun blocage majeur.") {
+  const rows = Array.isArray(plan?.blockers) ? plan.blockers.filter(Boolean) : [];
+  if (rows.length) return rows.join(" · ");
+  return fallback;
+}
+
 function actionNowLabel(plan) {
   const decision = String(plan?.decision || "");
   if (decision === "Trade propose") return "Ouvrir le trade";
