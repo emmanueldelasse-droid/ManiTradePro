@@ -1154,6 +1154,49 @@ function currentTradePlan() {
     }
   }
 
+  function normalizeNewsState(payload) {
+    const safe = payload && typeof payload === "object" ? payload : {};
+    const data = safe.data && typeof safe.data === "object" ? safe.data : {};
+    const overview = data.overview && typeof data.overview === "object" ? data.overview : {};
+    const ai = data.ai && typeof data.ai === "object" ? data.ai : {};
+    return {
+      items: Array.isArray(data.items) ? data.items : [],
+      overview: {
+        marketTone: overview.marketTone || "mitige",
+        summary: overview.summary || "",
+        keyThemes: Array.isArray(overview.keyThemes) ? overview.keyThemes : [],
+        watchAssets: Array.isArray(overview.watchAssets) ? overview.watchAssets : [],
+        sources: Array.isArray(overview.sources) ? overview.sources : [],
+        topSignals: Array.isArray(overview.topSignals) ? overview.topSignals : [],
+        watchAssetsDetailed: Array.isArray(overview.watchAssetsDetailed) ? overview.watchAssetsDetailed : []
+      },
+      ai: {
+        thesis: ai.thesis || "",
+        bullDrivers: ai.bullDrivers || "",
+        riskDrivers: ai.riskDrivers || "",
+        actionableTakeaway: ai.actionableTakeaway || ""
+      },
+      status: safe.status || "idle",
+      source: safe.source || null,
+      asOf: safe.asOf || null,
+      freshness: safe.freshness || "unknown",
+      message: safe.message || null
+    };
+  }
+
+  async function loadNews(force = false) {
+    try {
+      if (!force && Array.isArray(state.news?.items) && state.news.items.length && state.news?.asOf) return;
+      const news = await api("/api/news").catch(() => null);
+      state.news = normalizeNewsState(news);
+      state.error = null;
+      render();
+    } catch (e) {
+      state.error = e.message || "Chargement news impossible";
+      render();
+    }
+  }
+
   async function loadDashboard() {
     try {
       const [fg, trending, portfolio, news] = await Promise.all([
@@ -1165,14 +1208,7 @@ function currentTradePlan() {
       state.dashboard.fearGreed = fg?.data || null;
       state.dashboard.trending = trending?.data || [];
       state.dashboard.portfolio = portfolio?.data || null;
-      state.news = {
-        items: Array.isArray(news?.data?.items) ? news.data.items : [],
-        overview: news?.data?.overview || null,
-        status: news?.status || "idle",
-        source: news?.source || null,
-        asOf: news?.asOf || null,
-        message: news?.message || null
-      };
+      state.news = normalizeNewsState(news);
       state.error = null;
     } catch (e) {
       state.error = e.message || "Chargement impossible";
@@ -1576,6 +1612,9 @@ function applyFilter() {
       state.aiReview = null;
       render();
       loadOpportunities(true);
+    } else if (route === "news") {
+      render();
+      loadNews(true);
     } else if (route === "asset-detail" && symbol) {
       state.aiReview = null;
       loadDetail(symbol);
@@ -1726,80 +1765,6 @@ function dashboardTopPick(opps) {
     return "neutral";
   }
 
-  function newsSignalBadgeClass(level) {
-    const v = String(level || "").toLowerCase();
-    if (v === "fort") return "positive";
-    if (v === "catalyseur") return "neutral";
-    if (v === "utile") return "warning";
-    return "";
-  }
-
-  function newsSignalLabel(level) {
-    const v = String(level || "").toLowerCase();
-    if (v === "fort") return "Signal fort";
-    if (v === "catalyseur") return "Catalyseur";
-    if (v === "utile") return "Utile";
-    if (v === "faible") return "Faible";
-    return "Signal";
-  }
-
-  function renderNewsSignalBadge(item) {
-    if (!item?.signalLevel) return "";
-    return badge(`${newsSignalLabel(item.signalLevel)}${typeof item.newsScore === "number" ? ` ${item.newsScore}/100` : ""}`, newsSignalBadgeClass(item.signalLevel));
-  }
-
-  function renderNewsReason(item) {
-    const reason = String(item?.signalReason || "").trim();
-    if (!reason) return "";
-    return `<div class="news-signal-reason">${safeText(reason)}</div>`;
-  }
-
-  function renderTopSignalsBlock() {
-    const rows = Array.isArray(state.news?.overview?.topSignals) ? state.news.overview.topSignals : [];
-    if (!rows.length) return `<div class="empty-state">Aucun signal news fort pour le moment.</div>`;
-    return `
-      <div class="news-list">
-        ${rows.map((row) => `
-          <div class="news-row news-row-compact">
-            <div class="news-top">
-              <div class="trade-symbol">${safeText(row.source || "Source")}</div>
-              <div class="legend">
-                ${renderNewsSignalBadge(row)}
-                ${badge(row.topic || "marche")}
-              </div>
-            </div>
-            <div class="news-title">${safeText(row.title || "Titre indisponible")}</div>
-            ${renderNewsReason(row)}
-            <div class="news-meta">
-              <div class="muted">${safeText((row.assets || []).join(" · ") || "Aucun actif cible")}</div>
-            </div>
-            <div class="news-bottom">
-              <div class="muted">${safeText(row.signalReason || "Signal detecte")}</div>
-              <a class="btn" href="${safeText(row.link)}" target="_blank" rel="noreferrer noopener">Ouvrir la source</a>
-            </div>
-          </div>
-        `).join("")}
-      </div>
-    `;
-  }
-
-  function renderWatchAssetsDetailed() {
-    const rows = Array.isArray(state.news?.overview?.watchAssetsDetailed) ? state.news.overview.watchAssetsDetailed : [];
-    if (!rows.length) return `<div class="empty-state">Aucun actif dominant ne ressort pour le moment.</div>`;
-    return `
-      <div class="grid trades-stats">
-        ${rows.map((row) => `
-          <div class="stat-card stat-card-left">
-            <div class="stat-label">${safeText(row.asset || "Actif")}</div>
-            <div class="stat-value" style="font-size:1rem">${typeof row.newsScore === "number" ? `${row.newsScore}/100` : "—"}</div>
-            <div class="muted" style="margin-top:6px">${safeText(newsSignalLabel(row.signalLevel || "faible"))} · ${safeText(row.tone || "mitige")}</div>
-            <div class="muted">${safeText(`${row.articleCount || 0} article(s) · ${(row.sources || []).slice(0,2).join(" · ") || "sources mixtes"}`)}</div>
-          </div>
-        `).join("")}
-      </div>
-    `;
-  }
-
   function renderNewsIaBlock() {
     const items = Array.isArray(state.news?.items) ? state.news.items.slice(0, 3) : [];
     const overview = state.news?.overview || {};
@@ -1810,19 +1775,13 @@ function dashboardTopPick(opps) {
         <div class="grid trades-stats" style="margin-bottom:14px">
           <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
           <div class="stat-card"><div class="stat-label">Themes</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,2).join(" · ") || "—")}</div></div>
-          <div class="stat-card"><div class="stat-label">Actifs</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Maj</div><div class="stat-value" style="font-size:1rem">${safeNewsDate(state.news?.asOf)}</div></div>
         </div>
 
-        <div class="news-summary-grid" style="margin-bottom:14px">
-          <div class="news-summary-box">
-            <div class="muted" style="margin-bottom:6px">Lecture IA</div>
-            <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
-          </div>
-          <div class="news-summary-box">
-            <div class="muted" style="margin-bottom:6px">Top signaux</div>
-            ${renderTopSignalsBlock()}
-          </div>
+        <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
+          <div class="muted" style="margin-bottom:6px">Lecture IA</div>
+          <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
         </div>
 
         ${items.length ? `
@@ -1832,13 +1791,11 @@ function dashboardTopPick(opps) {
                 <div class="news-top">
                   <div class="trade-symbol">${safeText(item.source || "Source")}</div>
                   <div class="legend">
-                    ${renderNewsSignalBadge(item)}
                     ${badge(item.topic || "marche")}
                     ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
                   </div>
                 </div>
                 <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
-                ${renderNewsReason(item)}
                 <div class="news-summary">${safeText(cleanNewsSummary(item))}</div>
                 <div class="news-bottom">
                   <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
@@ -1855,12 +1812,12 @@ function dashboardTopPick(opps) {
     `;
   }
 
+
   function groupedNewsItems() {
     const items = Array.isArray(state.news?.items) ? state.news.items : [];
     return {
       macro: items.filter((x) => x.topic === "macro"),
       crypto: items.filter((x) => x.topic === "crypto"),
-      enterprise: items.filter((x) => x.topic === "entreprise"),
       tech: items.filter((x) => x.topic === "tech"),
       market: items.filter((x) => x.topic === "marche" || !x.topic)
     };
@@ -1903,20 +1860,18 @@ function dashboardTopPick(opps) {
             <div class="news-top">
               <div class="trade-symbol">${safeText(newsSourceLabel(item))}</div>
               <div class="legend">
-                ${renderNewsSignalBadge(item)}
                 ${badge(item.topic || "marche")}
                 ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
               </div>
             </div>
             <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
-            ${renderNewsReason(item)}
             <div class="news-summary">${safeText(cleanNewsSummary(item))}</div>
             <div class="news-meta">
               <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")}</div>
               <div class="muted">${safeNewsDate(item.publishedAt)}</div>
             </div>
             <div class="news-bottom">
-              <div class="muted">${safeText(item.signalReason || item.category || "actualite marche")}</div>
+              <div class="muted">${safeText(item.category || "actualite marche")}</div>
               <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Ouvrir la source</a>
             </div>
           </div>
@@ -1944,7 +1899,7 @@ function dashboardTopPick(opps) {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
-          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et intensite des signaux news.</div>
+          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
           <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
@@ -1969,21 +1924,8 @@ function dashboardTopPick(opps) {
           </div>
         </div>
 
-        <div class="card" style="margin-top:18px">
-          <div class="section-title"><span>Top signaux news</span><span>${(overview.topSignals || []).length}</span></div>
-          <div class="muted" style="margin-bottom:12px">Les articles que le moteur news considere comme les plus structurants.</div>
-          ${renderTopSignalsBlock()}
-        </div>
-
-        <div class="card" style="margin-top:18px">
-          <div class="section-title"><span>Actifs a surveiller</span><span>${(overview.watchAssetsDetailed || []).length}</span></div>
-          <div class="muted" style="margin-bottom:12px">Lecture agregée par actif a partir des articles detectes.</div>
-          ${renderWatchAssetsDetailed()}
-        </div>
-
         ${renderNewsPageSection("A la une marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
         ${renderNewsPageSection("Macro / banques centrales", "Ce qui peut impacter les taux, les indices et le risque global.", groups.macro, 6)}
-        ${renderNewsPageSection("Entreprises / recommandations", "Resultats, guidance, objectifs de cours et catalyseurs societes.", groups.enterprise, 6)}
         ${renderNewsPageSection("Crypto", "Flux crypto utiles pour BTC, ETH et le sentiment speculatif.", groups.crypto, 6)}
         ${renderNewsPageSection("Tech / actions", "News societes et themes croissance / IA / Nasdaq.", groups.tech, 6)}
       </div>
@@ -3652,6 +3594,7 @@ function openPositionsRiskView() {
           refreshOpenTradesLive().catch(() => {});
         }
         render();
+  if (state.route === "news") loadNews(true);
       }
     }, 30000);
   }
