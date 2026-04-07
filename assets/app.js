@@ -84,8 +84,7 @@
     detailCache: readJson(STORAGE_KEYS.detailCache, {}),
     opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, []),
     trainingCapital: loadTrainingCapital(),
-    nonCryptoHydration: {},
-    pendingTradeConfirm: null
+    nonCryptoHydration: {}
   };
 
   const app = document.getElementById("app");
@@ -1302,140 +1301,6 @@ function currentTradePlan() {
     return { pnl, pnlPct };
   }
 
-
-function buildTradeOpenConfirmation(payload) {
-  const d = payload?.detail || null;
-  const plan = payload?.plan || null;
-  if (!d || !plan) return null;
-  const quantity = Number(plan.quantity || 0);
-  const investedUsd = Number(plan.investedUsd || 0);
-  return {
-    mode: payload.mode || "training",
-    symbol: d.symbol,
-    name: d.name,
-    side: plan.side,
-    entry: plan.entry,
-    stopLoss: plan.stopLoss,
-    takeProfit: plan.takeProfit,
-    rr: plan.rr,
-    horizon: plan.horizon,
-    quantity,
-    investedUsd,
-    title: "Confirmer l'ouverture du trade",
-    message: "Verifier le plan avant de creer le trade d'entrainement.",
-    payload
-  };
-}
-
-function openTradeConfirmation(payload) {
-  const confirmData = buildTradeOpenConfirmation(payload);
-  if (!confirmData) {
-    state.error = "Impossible de preparer la confirmation du trade.";
-    render();
-    return;
-  }
-  state.pendingTradeConfirm = confirmData;
-  state.error = null;
-  render();
-}
-
-function closeTradeConfirmation() {
-  state.pendingTradeConfirm = null;
-  render();
-}
-
-function executeConfirmedTradeOpen() {
-  const confirm = state.pendingTradeConfirm;
-  const payload = confirm?.payload || null;
-  if (!payload) {
-    state.pendingTradeConfirm = null;
-    render();
-    return;
-  }
-
-  const d = payload.detail;
-  const plan = payload.plan;
-  const position = {
-    id: uid("pos"),
-    symbol: d.symbol,
-    name: d.name,
-    assetClass: d.assetClass,
-    side: plan.side,
-    quantity: plan.quantity,
-    entryPrice: plan.entry,
-    invested: plan.investedUsd,
-    openedAt: nowIso(),
-    sourceUsed: d.sourceUsed || null,
-    stopLoss: plan.stopLoss ?? null,
-    takeProfit: plan.takeProfit ?? null,
-    tradeDecision: plan.decision,
-    tradeReason: plan.reason,
-    rr: plan.rr ?? null,
-    horizon: plan.horizon ?? null,
-    confidence: plan.confidence || null,
-    algoScore: d.score ?? null,
-    execution: {
-      openedAt: nowIso(),
-      entryPrice: plan.entry,
-      quantity: plan.quantity,
-      invested: plan.investedUsd
-    }
-  };
-
-  state.trades.positions.unshift(position);
-  state.algoJournal.unshift({
-    id: uid("algo"),
-    symbol: d.symbol,
-    createdAt: nowIso(),
-    mode: payload.journalMode || "conseille",
-    score: d.score ?? null,
-    decision: plan.decision,
-    side: plan.side,
-    entry: plan.entry,
-    stopLoss: plan.stopLoss ?? null,
-    takeProfit: plan.takeProfit ?? null,
-    rr: plan.rr ?? null,
-    confidence: plan.confidence,
-    reason: plan.reason,
-    horizon: plan.horizon ?? null,
-    aiSummary: payload.aiSummary || state.aiReview?.summary || plan.aiSummary || plan.reason || "",
-    safety: payload.safety || state.aiReview?.prudence || plan.safety || "moyenne",
-    aiProvider: payload.aiProvider || state.aiReview?.provider || "local_plan"
-  });
-
-  state.pendingTradeConfirm = null;
-  state.error = null;
-  persistTradesState();
-  render();
-}
-
-function renderTradeConfirmationModal() {
-  const confirm = state.pendingTradeConfirm;
-  if (!confirm) return "";
-  return `
-    <div data-trade-confirm-overlay style="position:fixed;inset:0;background:rgba(5,8,15,.72);display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999;">
-      <div class="card" style="width:min(520px,100%);padding:18px 18px 16px;border:1px solid var(--border-medium);box-shadow:0 20px 60px rgba(0,0,0,.35);">
-        <div class="section-title" style="margin-bottom:10px;">${safeText(confirm.title || "Confirmer le trade")}</div>
-        <div class="muted" style="margin-bottom:14px;">${safeText(confirm.message || "")}</div>
-        <div class="grid" style="grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px;">
-          <div class="stat-card"><div class="stat-label">Actif</div><div class="stat-value small">${safeText(confirm.symbol || "—")}</div></div>
-          <div class="stat-card"><div class="stat-label">Sens</div><div class="stat-value small">${safeText(simpleSideLabel(confirm.side || ""))}</div></div>
-          <div class="stat-card"><div class="stat-label">Entree</div><div class="stat-value small">${priceDisplay(confirm.entry)}</div></div>
-          <div class="stat-card"><div class="stat-label">Quantite</div><div class="stat-value small">${confirm.quantity != null ? safeText(String(confirm.quantity)) : "—"}</div></div>
-          <div class="stat-card"><div class="stat-label">Stop</div><div class="stat-value small">${priceDisplay(confirm.stopLoss)}</div></div>
-          <div class="stat-card"><div class="stat-label">Objectif</div><div class="stat-value small">${priceDisplay(confirm.takeProfit)}</div></div>
-          <div class="stat-card"><div class="stat-label">Ratio</div><div class="stat-value small">${confirm.rr != null ? safeText(String(confirm.rr)) : "—"}</div></div>
-          <div class="stat-card"><div class="stat-label">Investi</div><div class="stat-value small">${priceDisplay(confirm.investedUsd)}</div></div>
-        </div>
-        <div style="display:flex;gap:10px;justify-content:flex-end;">
-          <button class="btn" data-cancel-trade-confirm>Annuler</button>
-          <button class="btn primary" data-confirm-trade-open>Confirmer</button>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function addTrainingTradeFromDetail(side) {
   const d = state.detail;
   if (!d || d.price == null) {
@@ -1450,28 +1315,51 @@ function addTrainingTradeFromDetail(side) {
     render();
     return;
   }
-
-  openTradeConfirmation({
-    mode: "training",
-    journalMode: "manuel",
-    aiSummary: "Decision manuelle hors moteur prudent.",
-    safety: "non evalue",
-    aiProvider: "manual",
-    detail: d,
-    plan: {
-      side,
-      entry: d.price,
-      stopLoss: null,
-      takeProfit: null,
-      rr: null,
-      horizon: null,
+  const position = {
+    id: uid("pos"),
+    symbol: d.symbol,
+    name: d.name,
+    assetClass: d.assetClass,
+    side,
+    quantity,
+    entryPrice: d.price,
+    invested: investedUsd,
+    openedAt: nowIso(),
+    sourceUsed: d.sourceUsed || null,
+    stopLoss: null,
+    takeProfit: null,
+    tradeDecision: "manuel",
+    tradeReason: "Trade cree manuellement depuis la fiche actif.",
+    rr: null,
+    horizon: null,
+    execution: {
+      openedAt: nowIso(),
+      entryPrice: d.price,
       quantity,
-      investedUsd,
-      decision: "manuel",
-      reason: "Trade cree manuellement depuis la fiche actif.",
-      confidence: simpleConfidenceLabel(d.confidence || "low")
+      invested: investedUsd
     }
+  };
+  state.trades.positions.unshift(position);
+  state.algoJournal.unshift({
+    id: uid("algo"),
+    symbol: d.symbol,
+    createdAt: nowIso(),
+    mode: "manuel",
+    score: d.score ?? null,
+    decision: "manuel",
+    side,
+    entry: d.price,
+    stopLoss: null,
+    takeProfit: null,
+    rr: null,
+    confidence: simpleConfidenceLabel(d.confidence || "low"),
+    reason: "Trade manuel depuis la fiche actif.",
+    aiSummary: "Decision manuelle hors moteur prudent.",
+    safety: "non evalue"
   });
+  persistTradesState();
+  state.error = `Trade d'entrainement ajoute : ${d.symbol} (${simpleSideLabel(side)})`;
+  render();
 }
 
 function createRecommendedTrade() {
@@ -1489,20 +1377,55 @@ function createRecommendedTrade() {
     render();
     return;
   }
-
-  openTradeConfirmation({
-    mode: "training",
-    journalMode: "conseille",
+  const position = {
+    id: uid("pos"),
+    symbol: d.symbol,
+    name: d.name,
+    assetClass: d.assetClass,
+    side: plan.side,
+    quantity,
+    entryPrice: plan.entry,
+    invested: investedUsd,
+    openedAt: nowIso(),
+    sourceUsed: d.sourceUsed || null,
+    stopLoss: plan.stopLoss,
+    takeProfit: plan.takeProfit,
+    tradeDecision: plan.decision,
+    tradeReason: plan.reason,
+    rr: plan.rr,
+    horizon: plan.horizon,
+    confidence: plan.confidence,
+    algoScore: d.score ?? null,
+    execution: {
+      openedAt: nowIso(),
+      entryPrice: plan.entry,
+      quantity,
+      invested: investedUsd
+    }
+  };
+  state.trades.positions.unshift(position);
+  state.algoJournal.unshift({
+    id: uid("algo"),
+    symbol: d.symbol,
+    createdAt: nowIso(),
+    mode: "conseille",
+    score: d.score ?? null,
+    decision: plan.decision,
+    side: plan.side,
+    entry: plan.entry,
+    stopLoss: plan.stopLoss,
+    takeProfit: plan.takeProfit,
+    rr: plan.rr,
+    confidence: plan.confidence,
+    reason: plan.reason,
+    horizon: plan.horizon,
     aiSummary: state.aiReview?.summary || plan.aiSummary,
     safety: state.aiReview?.prudence || plan.safety,
-    aiProvider: state.aiReview?.provider || "local_plan",
-    detail: d,
-    plan: {
-      ...plan,
-      quantity,
-      investedUsd
-    }
+    aiProvider: state.aiReview?.provider || "local_plan"
   });
+  persistTradesState();
+  state.error = `Trade propose cree : ${d.symbol} (${simpleSideLabel(plan.side)})`;
+  render();
 }
 
 function closeTrainingTrade(id, livePrice = null) {
@@ -1803,6 +1726,80 @@ function dashboardTopPick(opps) {
     return "neutral";
   }
 
+  function newsSignalBadgeClass(level) {
+    const v = String(level || "").toLowerCase();
+    if (v === "fort") return "positive";
+    if (v === "catalyseur") return "neutral";
+    if (v === "utile") return "warning";
+    return "";
+  }
+
+  function newsSignalLabel(level) {
+    const v = String(level || "").toLowerCase();
+    if (v === "fort") return "Signal fort";
+    if (v === "catalyseur") return "Catalyseur";
+    if (v === "utile") return "Utile";
+    if (v === "faible") return "Faible";
+    return "Signal";
+  }
+
+  function renderNewsSignalBadge(item) {
+    if (!item?.signalLevel) return "";
+    return badge(`${newsSignalLabel(item.signalLevel)}${typeof item.newsScore === "number" ? ` ${item.newsScore}/100` : ""}`, newsSignalBadgeClass(item.signalLevel));
+  }
+
+  function renderNewsReason(item) {
+    const reason = String(item?.signalReason || "").trim();
+    if (!reason) return "";
+    return `<div class="news-signal-reason">${safeText(reason)}</div>`;
+  }
+
+  function renderTopSignalsBlock() {
+    const rows = Array.isArray(state.news?.overview?.topSignals) ? state.news.overview.topSignals : [];
+    if (!rows.length) return `<div class="empty-state">Aucun signal news fort pour le moment.</div>`;
+    return `
+      <div class="news-list">
+        ${rows.map((row) => `
+          <div class="news-row news-row-compact">
+            <div class="news-top">
+              <div class="trade-symbol">${safeText(row.source || "Source")}</div>
+              <div class="legend">
+                ${renderNewsSignalBadge(row)}
+                ${badge(row.topic || "marche")}
+              </div>
+            </div>
+            <div class="news-title">${safeText(row.title || "Titre indisponible")}</div>
+            ${renderNewsReason(row)}
+            <div class="news-meta">
+              <div class="muted">${safeText((row.assets || []).join(" · ") || "Aucun actif cible")}</div>
+            </div>
+            <div class="news-bottom">
+              <div class="muted">${safeText(row.signalReason || "Signal detecte")}</div>
+              <a class="btn" href="${safeText(row.link)}" target="_blank" rel="noreferrer noopener">Ouvrir la source</a>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderWatchAssetsDetailed() {
+    const rows = Array.isArray(state.news?.overview?.watchAssetsDetailed) ? state.news.overview.watchAssetsDetailed : [];
+    if (!rows.length) return `<div class="empty-state">Aucun actif dominant ne ressort pour le moment.</div>`;
+    return `
+      <div class="grid trades-stats">
+        ${rows.map((row) => `
+          <div class="stat-card stat-card-left">
+            <div class="stat-label">${safeText(row.asset || "Actif")}</div>
+            <div class="stat-value" style="font-size:1rem">${typeof row.newsScore === "number" ? `${row.newsScore}/100` : "—"}</div>
+            <div class="muted" style="margin-top:6px">${safeText(newsSignalLabel(row.signalLevel || "faible"))} · ${safeText(row.tone || "mitige")}</div>
+            <div class="muted">${safeText(`${row.articleCount || 0} article(s) · ${(row.sources || []).slice(0,2).join(" · ") || "sources mixtes"}`)}</div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
   function renderNewsIaBlock() {
     const items = Array.isArray(state.news?.items) ? state.news.items.slice(0, 3) : [];
     const overview = state.news?.overview || {};
@@ -1813,13 +1810,19 @@ function dashboardTopPick(opps) {
         <div class="grid trades-stats" style="margin-bottom:14px">
           <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
           <div class="stat-card"><div class="stat-label">Themes</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,2).join(" · ") || "—")}</div></div>
-          <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Actifs</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Maj</div><div class="stat-value" style="font-size:1rem">${safeNewsDate(state.news?.asOf)}</div></div>
         </div>
 
-        <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
-          <div class="muted" style="margin-bottom:6px">Lecture IA</div>
-          <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
+        <div class="news-summary-grid" style="margin-bottom:14px">
+          <div class="news-summary-box">
+            <div class="muted" style="margin-bottom:6px">Lecture IA</div>
+            <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
+          </div>
+          <div class="news-summary-box">
+            <div class="muted" style="margin-bottom:6px">Top signaux</div>
+            ${renderTopSignalsBlock()}
+          </div>
         </div>
 
         ${items.length ? `
@@ -1829,11 +1832,13 @@ function dashboardTopPick(opps) {
                 <div class="news-top">
                   <div class="trade-symbol">${safeText(item.source || "Source")}</div>
                   <div class="legend">
+                    ${renderNewsSignalBadge(item)}
                     ${badge(item.topic || "marche")}
                     ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
                   </div>
                 </div>
                 <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
+                ${renderNewsReason(item)}
                 <div class="news-summary">${safeText(cleanNewsSummary(item))}</div>
                 <div class="news-bottom">
                   <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
@@ -1850,12 +1855,12 @@ function dashboardTopPick(opps) {
     `;
   }
 
-
   function groupedNewsItems() {
     const items = Array.isArray(state.news?.items) ? state.news.items : [];
     return {
       macro: items.filter((x) => x.topic === "macro"),
       crypto: items.filter((x) => x.topic === "crypto"),
+      enterprise: items.filter((x) => x.topic === "entreprise"),
       tech: items.filter((x) => x.topic === "tech"),
       market: items.filter((x) => x.topic === "marche" || !x.topic)
     };
@@ -1898,18 +1903,20 @@ function dashboardTopPick(opps) {
             <div class="news-top">
               <div class="trade-symbol">${safeText(newsSourceLabel(item))}</div>
               <div class="legend">
+                ${renderNewsSignalBadge(item)}
                 ${badge(item.topic || "marche")}
                 ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
               </div>
             </div>
             <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
+            ${renderNewsReason(item)}
             <div class="news-summary">${safeText(cleanNewsSummary(item))}</div>
             <div class="news-meta">
               <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")}</div>
               <div class="muted">${safeNewsDate(item.publishedAt)}</div>
             </div>
             <div class="news-bottom">
-              <div class="muted">${safeText(item.category || "actualite marche")}</div>
+              <div class="muted">${safeText(item.signalReason || item.category || "actualite marche")}</div>
               <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Ouvrir la source</a>
             </div>
           </div>
@@ -1937,7 +1944,7 @@ function dashboardTopPick(opps) {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
-          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
+          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et intensite des signaux news.</div>
           <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
@@ -1962,8 +1969,21 @@ function dashboardTopPick(opps) {
           </div>
         </div>
 
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Top signaux news</span><span>${(overview.topSignals || []).length}</span></div>
+          <div class="muted" style="margin-bottom:12px">Les articles que le moteur news considere comme les plus structurants.</div>
+          ${renderTopSignalsBlock()}
+        </div>
+
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Actifs a surveiller</span><span>${(overview.watchAssetsDetailed || []).length}</span></div>
+          <div class="muted" style="margin-bottom:12px">Lecture agregée par actif a partir des articles detectes.</div>
+          ${renderWatchAssetsDetailed()}
+        </div>
+
         ${renderNewsPageSection("A la une marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
         ${renderNewsPageSection("Macro / banques centrales", "Ce qui peut impacter les taux, les indices et le risque global.", groups.macro, 6)}
+        ${renderNewsPageSection("Entreprises / recommandations", "Resultats, guidance, objectifs de cours et catalyseurs societes.", groups.enterprise, 6)}
         ${renderNewsPageSection("Crypto", "Flux crypto utiles pour BTC, ETH et le sentiment speculatif.", groups.crypto, 6)}
         ${renderNewsPageSection("Tech / actions", "News societes et themes croissance / IA / Nasdaq.", groups.tech, 6)}
       </div>
@@ -3526,7 +3546,6 @@ function openPositionsRiskView() {
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
       </div>
-      ${renderTradeConfirmationModal()}
     `;
     applyThemeMode();
     bindEvents();
@@ -3577,20 +3596,6 @@ function openPositionsRiskView() {
 
     app.querySelectorAll("[data-close-trade]").forEach(el => {
       el.addEventListener("click", () => closeTrainingTrade(el.getAttribute("data-close-trade")));
-    });
-
-    app.querySelectorAll("[data-cancel-trade-confirm]").forEach(el => {
-      el.addEventListener("click", () => closeTradeConfirmation());
-    });
-
-    app.querySelectorAll("[data-confirm-trade-open]").forEach(el => {
-      el.addEventListener("click", () => executeConfirmedTradeOpen());
-    });
-
-    app.querySelectorAll("[data-trade-confirm-overlay]").forEach(el => {
-      el.addEventListener("click", (ev) => {
-        if (ev.target === el) closeTradeConfirmation();
-      });
     });
 
     app.querySelectorAll("[data-close-half]").forEach(el => {
