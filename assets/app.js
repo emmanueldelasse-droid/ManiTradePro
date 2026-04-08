@@ -2179,6 +2179,15 @@ function simpleReliabilityLabel(score) {
   return "faible";
 }
 
+function simpleRiskQualityLabel(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value)) return "indisponible";
+  if (value >= 80) return "faible";
+  if (value >= 60) return "correct";
+  if (value >= 40) return "acceptable";
+  return "eleve";
+}
+
 function simpleTrendWord(label) {
   const text = String(label || "").toLowerCase();
   if (text.includes("haussi")) return "hausse";
