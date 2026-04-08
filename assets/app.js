@@ -84,7 +84,12 @@
     detailCache: readJson(STORAGE_KEYS.detailCache, {}),
     opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, []),
     trainingCapital: loadTrainingCapital(),
-    nonCryptoHydration: {}
+    nonCryptoHydration: {},
+    tradeConfirm: {
+      open: false,
+      mode: null,
+      side: null
+    }
   };
 
   const app = document.getElementById("app");
@@ -1011,6 +1016,15 @@ function currentTradePlan() {
   return state.detail?.plan || null;
 }
 
+function simpleRiskQualityLabel(score) {
+  const value = Number(score);
+  if (!Number.isFinite(value)) return "indisponible";
+  if (value >= 80) return "faible";
+  if (value >= 60) return "correct";
+  if (value >= 40) return "acceptable";
+  return "eleve";
+}
+
 function setupStatusBadgeClass(status) {
   const v = String(status || "").toLowerCase();
   if (v.includes("confirme") || v.includes("propre")) return "positive";
@@ -1037,7 +1051,7 @@ function mainBlockerText(plan) {
 }
 
 function priorityLevel(item) {
-  const plan = rowTradePlan(item);
+  const plan = rowTradePlan(item) || {};
   const score = Number(plan?.finalScore ?? item?.score ?? 0);
   const tradeNow = plan?.tradeNow === true;
   const confirmations = Number(plan?.confirmationCount ?? 0);
@@ -1055,13 +1069,82 @@ function opportunitiesQuickSummary(groups) {
   if (!leader) return "Aucun actif propre ne ressort pour le moment.";
   const leaderPlan = rowTradePlan(leader) || {};
   const leaderBlocker = mainBlockerText(leaderPlan);
-  const leadText = `Priorite du moment : ${leader.symbol}.`;
+  const names = proposed.slice(0, 3).map((x) => x.symbol).join(", ");
+  const leadText = proposed.length ? `Priorites du moment : ${names}.` : `Priorite du moment : ${leader.symbol}.`;
   const tradeText = proposed.length
     ? `${proposed.length} setup${proposed.length > 1 ? "s" : ""} actionnable${proposed.length > 1 ? "s" : ""}`
     : "aucun setup actionnable";
   const watchText = `${watch.length} actif${watch.length > 1 ? "s" : ""} a surveiller`;
-  const blockerText = leaderBlocker ? `Blocage principal hors priorite : ${leaderBlocker}.` : "Aucun blocage majeur sur la priorite principale.";
+  const blockerText = leaderBlocker ? `Blocage principal hors priorite : ${leaderBlocker}.` : "Aucun blocage majeur sur les priorites principales.";
   return `${leadText} ${tradeText}, ${watchText}. ${blockerText}`;
+}
+
+function relatedNewsForSymbol(symbol, name = "") {
+  const clean = String(symbol || "").toUpperCase();
+  const rawName = String(name || "").trim();
+  const words = rawName.split(/\s+/).filter((w) => w.length >= 4).slice(0, 2);
+  return (state.news?.items || []).filter((item) => {
+    const assets = Array.isArray(item?.assets) ? item.assets.map((x) => String(x || "").toUpperCase()) : [];
+    const hay = `${item?.title || ""} ${item?.summary || ""}`.toLowerCase();
+    if (assets.includes(clean)) return true;
+    if (clean && hay.includes(clean.toLowerCase())) return true;
+    return words.some((w) => hay.includes(w.toLowerCase()));
+  }).slice(0, 3);
+}
+
+function renderTradeConfirmModal() {
+  if (!state.tradeConfirm?.open) return "";
+  const d = state.detail;
+  const plan = currentTradePlan() || {};
+  const side = state.tradeConfirm?.side || plan?.side || null;
+  const entry = plan?.entry ?? d?.price ?? null;
+  const quantity = entry > 500 ? 1 : entry > 50 ? 2 : 10;
+  const invested = (Number(entry) || 0) * quantity;
+  const title = state.tradeConfirm?.mode === "recommended" ? "Confirmer le trade propose" : "Confirmer le trade manuel";
+  const reason = state.tradeConfirm?.mode === "recommended"
+    ? (plan?.reason || "Le moteur propose ce setup.")
+    : "Trade manuel d'entrainement depuis la fiche actif.";
+
+  return `
+    <div class="modal-backdrop" data-cancel-trade-confirm style="position:fixed;inset:0;background:rgba(3,8,20,.72);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px">
+      <div class="card" style="width:min(560px,100%);padding:18px 18px 16px;border:1px solid rgba(255,255,255,.12)" onclick="event.stopPropagation()">
+        <div class="section-title"><span>${safeText(title)}</span><span>${safeText(d?.symbol || "—")}</span></div>
+        <div class="kv" style="margin-top:10px">
+          <div class="muted">Actif</div><div>${safeText(d?.symbol || "—")} · ${safeText(d?.name || "")}</div>
+          <div class="muted">Sens</div><div>${safeText(simpleSideLabel(side || "long"))}</div>
+          <div class="muted">Entree</div><div>${entry != null ? priceDisplay(entry) : "—"}</div>
+          <div class="muted">Quantite</div><div>${quantity}</div>
+          <div class="muted">Investi</div><div>${entry != null ? priceDisplay(invested) : "—"}</div>
+          <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
+          <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
+          <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
+        </div>
+        <div class="plan-reason" style="margin-top:12px">${safeText(reason)}</div>
+        <div class="trade-actions" style="margin-top:14px">
+          <button class="btn" data-cancel-trade-confirm>Annuler</button>
+          <button class="btn trade-btn primary" data-confirm-open-trade>Confirmer le trade</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function openTradeConfirmModal(mode, side = null) {
+  state.tradeConfirm = { open: true, mode, side };
+  state.error = null;
+  render();
+}
+
+function closeTradeConfirmModal() {
+  state.tradeConfirm = { open: false, mode: null, side: null };
+  render();
+}
+
+function confirmTradeFromModal() {
+  const mode = state.tradeConfirm?.mode;
+  const side = state.tradeConfirm?.side || null;
+  state.tradeConfirm = { open: false, mode: null, side: null };
+  if (mode === "recommended") createRecommendedTrade();
+  else if (mode === "manual" && side) addTrainingTradeFromDetail(side);
 }
 
   function normalizeOpportunity(item) {
@@ -1415,7 +1498,7 @@ function addTrainingTradeFromDetail(side) {
     safety: "non evalue"
   });
   persistTradesState();
-  state.error = `Trade d'entrainement ajoute : ${d.symbol} (${simpleSideLabel(side)})`;
+  state.error = null;
   render();
 }
 
@@ -1481,7 +1564,7 @@ function createRecommendedTrade() {
     aiProvider: state.aiReview?.provider || "local_plan"
   });
   persistTradesState();
-  state.error = `Trade propose cree : ${d.symbol} (${simpleSideLabel(plan.side)})`;
+  state.error = null;
   render();
 }
 
@@ -1677,27 +1760,17 @@ function applyFilter() {
     const decisionLabel = rowDecisionLabel(item);
     const trendLabel = rowTrendLabel(item);
     const note = item?.reasonShort || item?.error || null;
-    const plan = rowTradePlan(item);
+    const plan = rowTradePlan(item) || {};
     const setupStatus = plan?.setupStatus || item?.setupStatus || null;
-    const confirmationText = confirmationLabelText(plan || item);
-    const blockerText = mainBlockerText(plan || item);
+    const confirmationText = confirmationLabelText(plan);
+    const blockerText = mainBlockerText(plan);
     const priority = priorityLevel(item);
     const actionText = plan?.tradeNow === true ? "actionnable maintenant" : (decisionLabel === "A surveiller" ? "surveillance active" : "");
     const riskText = plan?.riskQuality != null ? `risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}` : "";
-    const topMeta = [
-      badge(simpleAssetClassLabel(item.assetClass), item.assetClass),
-      badge(`fiabilite ${safeText(item.confidenceLabel || simpleConfidenceLabel(item.confidence || "low"))}`),
-      badge(safeText(priority))
-    ].join("");
-    const secondMeta = [
-      plan?.setupType ? badge(safeText(plan.setupType)) : "",
-      (plan?.confirmationCount != null || item?.confirmationCount != null) ? badge(safeText(confirmationText)) : "",
-      blockerText ? badge(`blocage ${safeText(blockerText)}`) : "",
-      riskText ? badge(riskText) : ""
-    ].join("");
+    const top1 = rank === 1 && decisionLabel === "Trade propose";
 
     return `
-      <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}">
+      <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
         <div class="opp-rank">#${rank}</div>
         <div class="asset-main">
           <div class="asset-icon">${safeText((item.symbol || "").slice(0, 4))}</div>
@@ -1705,6 +1778,7 @@ function applyFilter() {
             <div class="asset-symbol">${safeText(item.symbol)}</div>
             <div class="asset-name">${safeText(item.name || "Nom indisponible")}</div>
             ${setupStatus ? `<div class="muted opp-note">${safeText(setupStatus)}</div>` : ""}
+            ${top1 ? `<div class="muted opp-note">meilleure opportunite du moment</div>` : ""}
           </div>
         </div>
         <div class="score-box">
@@ -1723,13 +1797,18 @@ function applyFilter() {
           ${(state.settings.showSourceBadges && item.sourceUsed) ? `<div class="muted opp-note">${safeText(item.sourceUsed)} · ${safeText(simpleFreshnessLabel(item.freshness || "unknown"))}</div>` : ""}
         </div>
         <div class="meta-col">
-          ${topMeta}
-          ${secondMeta}
+          ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
+          ${badge(`fiabilite ${safeText(item.confidenceLabel || simpleConfidenceLabel(item.confidence || "low"))}`)}
+          ${badge(safeText(priority))}
+          ${plan?.setupType ? badge(safeText(plan.setupType)) : ""}
+          ${plan?.confirmationCount != null ? badge(safeText(confirmationText)) : ""}
+          ${blockerText ? badge(`blocage ${safeText(blockerText)}`) : ""}
+          ${riskText ? badge(riskText) : ""}
         </div>
       </div>`;
   }
 
-  function prudentShortlist(limit = 5) {
+function prudentShortlist(limit = 5) {
     return (state.opportunities || [])
       .filter(x => x && x.price != null)
       .map((item) => {
@@ -2179,15 +2258,6 @@ function simpleReliabilityLabel(score) {
   return "faible";
 }
 
-function simpleRiskQualityLabel(score) {
-  const value = Number(score);
-  if (!Number.isFinite(value)) return "indisponible";
-  if (value >= 80) return "faible";
-  if (value >= 60) return "correct";
-  if (value >= 40) return "acceptable";
-  return "eleve";
-}
-
 function simpleTrendWord(label) {
   const text = String(label || "").toLowerCase();
   if (text.includes("haussi")) return "hausse";
@@ -2325,7 +2395,7 @@ function renderDetail() {
         ${d ? `<div class="countdown-item">
                 <span class="countdown-dot"></span>
                 <span class="countdown-label">Bougies</span>
-                <strong>${isCryptoSymbol(d.symbol) ? "souple" : countdownOnlyLabel("candles_non_crypto", d.symbol)}</strong>
+                <strong>${isCryptoSymbol(d.symbol) ? "recentes" : countdownOnlyLabel("candles_non_crypto", d.symbol)}</strong>
               </div>
             </div>
           <div class="detail-layout">
@@ -2386,13 +2456,13 @@ function renderDetail() {
               </div>
 
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Validation IA externe</span><span>${state.loadingAiReview ? "analyse..." : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local")}</span></div>
+                <div class="section-title"><span>Lecture complementaire</span><span>${state.loadingAiReview ? "analyse..." : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local")}</span></div>
                 ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
                   <div class="ai-review-box">
                     <div class="legend">
                       ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}
                       ${badge(`prudence ${state.aiReview.prudence || "—"}`)}
-                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : "fallback local")}
+                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : "lecture locale")}
                     </div>
                     <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
                     <div class="kv" style="margin-top:12px">
@@ -2405,8 +2475,29 @@ function renderDetail() {
                 ` : `<div class="empty-state">Aucune validation IA disponible pour le moment.</div>`}
               </div>
 
+              <div class="card" style="margin-bottom:18px">
+                <div class="section-title"><span>News liees a l'actif</span><span>${relatedNewsForSymbol(d.symbol, d.name).length}</span></div>
+                ${relatedNewsForSymbol(d.symbol, d.name).length ? `
+                  <div class="news-list">
+                    ${relatedNewsForSymbol(d.symbol, d.name).map((item) => `
+                      <article class="news-card compact">
+                        <div class="news-source-row">
+                          <strong>${safeText(item.source || "source")}</strong>
+                          <span class="muted">${safeText(item.topic || "news")}</span>
+                        </div>
+                        <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
+                        <div class="muted">${safeText(item.summary || "Resume indisponible")}</div>
+                        <div class="trade-actions" style="margin-top:10px">
+                          ${item.link ? `<a class="btn" href="${safeText(item.link)}" target="_blank" rel="noopener noreferrer">Ouvrir la source</a>` : ""}
+                        </div>
+                      </article>
+                    `).join("")}
+                  </div>
+                ` : `<div class="empty-state">Aucune news directement reliee a cet actif pour le moment.</div>`}
+              </div>
+
               <div class="card">
-                <div class="section-title"><span>Evolution recente</span><span>${d.candleCount || 0} bougies</span></div>
+                <div class="section-title"><span>Evolution recente</span><span>${Array.isArray(d.candles) && d.candles.length ? `${d.candles.length} bougies` : "historique recent"}</span></div>
                 ${renderChart(d.candles)}
               </div>
             </div>
@@ -3534,6 +3625,7 @@ function openPositionsRiskView() {
         ${renderSidebar()}
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
+        ${renderTradeConfirmModal()}
       </div>
     `;
     applyThemeMode();
@@ -3572,14 +3664,28 @@ function openPositionsRiskView() {
     app.querySelectorAll("[data-add-trade]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        addTrainingTradeFromDetail(el.getAttribute("data-add-trade"));
+        openTradeConfirmModal("manual", el.getAttribute("data-add-trade"));
       });
     });
 
     app.querySelectorAll("[data-create-trade-plan]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        createRecommendedTrade();
+        openTradeConfirmModal("recommended");
+      });
+    });
+
+    app.querySelectorAll("[data-cancel-trade-confirm]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        closeTradeConfirmModal();
+      });
+    });
+
+    app.querySelectorAll("[data-confirm-open-trade]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        confirmTradeFromModal();
       });
     });
 
