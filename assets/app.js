@@ -1048,6 +1048,22 @@ function priorityLevel(item) {
   return "faible";
 }
 
+function opportunitiesQuickSummary(groups) {
+  const proposed = Array.isArray(groups?.proposed) ? groups.proposed : [];
+  const watch = Array.isArray(groups?.watch) ? groups.watch : [];
+  const leader = proposed[0] || watch[0] || null;
+  if (!leader) return "Aucun actif propre ne ressort pour le moment.";
+  const leaderPlan = rowTradePlan(leader) || {};
+  const leaderBlocker = mainBlockerText(leaderPlan);
+  const leadText = `Priorite du moment : ${leader.symbol}.`;
+  const tradeText = proposed.length
+    ? `${proposed.length} setup${proposed.length > 1 ? "s" : ""} actionnable${proposed.length > 1 ? "s" : ""}`
+    : "aucun setup actionnable";
+  const watchText = `${watch.length} actif${watch.length > 1 ? "s" : ""} a surveiller`;
+  const blockerText = leaderBlocker ? `Blocage principal hors priorite : ${leaderBlocker}.` : "Aucun blocage majeur sur la priorite principale.";
+  return `${leadText} ${tradeText}, ${watchText}. ${blockerText}`;
+}
+
   function normalizeOpportunity(item) {
     return {
       symbol: item?.symbol || "",
@@ -1667,6 +1683,18 @@ function applyFilter() {
     const blockerText = mainBlockerText(plan || item);
     const priority = priorityLevel(item);
     const actionText = plan?.tradeNow === true ? "actionnable maintenant" : (decisionLabel === "A surveiller" ? "surveillance active" : "");
+    const riskText = plan?.riskQuality != null ? `risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}` : "";
+    const topMeta = [
+      badge(simpleAssetClassLabel(item.assetClass), item.assetClass),
+      badge(`fiabilite ${safeText(item.confidenceLabel || simpleConfidenceLabel(item.confidence || "low"))}`),
+      badge(safeText(priority))
+    ].join("");
+    const secondMeta = [
+      plan?.setupType ? badge(safeText(plan.setupType)) : "",
+      (plan?.confirmationCount != null || item?.confirmationCount != null) ? badge(safeText(confirmationText)) : "",
+      blockerText ? badge(`blocage ${safeText(blockerText)}`) : "",
+      riskText ? badge(riskText) : ""
+    ].join("");
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}">
@@ -1692,16 +1720,11 @@ function applyFilter() {
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
           ${note ? `<div class="muted opp-note">${safeText(note)}</div>` : ""}
           ${actionText ? `<div class="muted opp-note">${safeText(actionText)}</div>` : ""}
+          ${(state.settings.showSourceBadges && item.sourceUsed) ? `<div class="muted opp-note">${safeText(item.sourceUsed)} · ${safeText(simpleFreshnessLabel(item.freshness || "unknown"))}</div>` : ""}
         </div>
         <div class="meta-col">
-          ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
-          ${badge(`fiabilite ${safeText(item.confidenceLabel || simpleConfidenceLabel(item.confidence || "low"))}`)}
-          ${badge(safeText(priority))}
-          ${plan?.setupType ? badge(safeText(plan.setupType)) : ""}
-          ${(plan?.confirmationCount != null || item?.confirmationCount != null) ? badge(safeText(confirmationText)) : ""}
-          ${blockerText ? badge(`blocage ${safeText(blockerText)}`) : ""}
-          ${state.settings.showSourceBadges ? badge(item.sourceUsed || "source?") : ""}
-          ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(item.freshness || "unknown"), item.freshness || "") : ""}
+          ${topMeta}
+          ${secondMeta}
         </div>
       </div>`;
   }
@@ -2103,7 +2126,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "Trades proposes",
-          "Actifs a regarder en premier.",
+          "Actifs a regarder en premier, sans blocage majeur.",
           groups.proposed,
           1,
           "Aucun trade propose pour le moment."
@@ -2111,7 +2134,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "A surveiller",
-          "Actifs a surveiller avant ouverture.",
+          "Actifs a surveiller avant ouverture, attente d'une meilleure confirmation.",
           groups.watch,
           groups.proposed.length + 1,
           "Aucun actif a surveiller pour le moment."
