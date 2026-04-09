@@ -2413,11 +2413,21 @@ function renderDashboard() {
   }
 
   
-function simpleReliabilityLabel(score) {
+function simpleReliabilityLabel(score, decision = "") {
+  const kind = String(decision || "");
   if (score == null) return "indisponible";
-  if (score >= 70) return "elevee";
-  if (score >= 55) return "moyenne";
-  return "faible";
+  if (kind === "Trade propose") {
+    if (score >= 78) return "elevee";
+    if (score >= 65) return "moyenne";
+    return "faible";
+  }
+  if (kind === "A surveiller") {
+    if (score >= 72) return "dossier interessant";
+    if (score >= 58) return "a surveiller";
+    return "encore fragile";
+  }
+  if (score >= 60) return "non actionnable";
+  return "fragile";
 }
 
 function simpleTrendWord(label) {
@@ -2444,10 +2454,15 @@ function simpleContextSentence(plan) {
 
 function simpleBlockerText(plan) {
   const score = Number(plan?.finalScore ?? 0);
+  const flags = Array.isArray(plan?.blockerFlags) ? plan.blockerFlags : [];
   const trend = simpleTrendWord(plan?.trendLabel || "");
   if (String(plan?.decision || "") === "Trade propose") return "Rien de bloquant pour le moment.";
+  if (flags.includes("risk_too_high")) return "Le plan existe, mais le risque reste trop eleve.";
+  if (flags.includes("entry_too_late")) return "Le setup existe, mais le timing n'est pas encore assez propre.";
+  if (flags.includes("trend_conflict")) return "Le contexte est trop contradictoire pour valider un trade.";
+  if (flags.includes("data_quality_low")) return "Les donnees sont trop fragiles pour juger le setup.";
   if (score < 40) return "Le signal est trop faible pour prendre position.";
-  if (trend === "hausse" || trend === "baisse") return "La tendance existe, mais l'entree n'est pas assez propre.";
+  if (trend === "hausse" || trend === "baisse") return "Le scenario existe, mais il vaut mieux attendre encore.";
   return "Le marche reste trop flou pour proposer un trade.";
 }
 
@@ -2670,7 +2685,7 @@ function renderDetail() {
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
-                    <div class="conclusion-line">Fiabilite du trade : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore))}</strong></div>
+                    <div class="conclusion-line">Fiabilite du trade : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore, currentTradePlan()?.decision))}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(currentTradePlan()?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</strong></div>
                     <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
                     <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
