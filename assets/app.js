@@ -1950,9 +1950,16 @@ function actionabilityScoreFrom(source) {
 
   function actionabilityLabel(score) {
     if (score == null) return "indisponible";
-    if (score >= 78) return "actionnable";
-    if (score >= 62) return "a surveiller";
+    if (score >= 80) return "actionnable";
+    if (score >= 65) return "a surveiller";
     return "non actionnable";
+  }
+
+  function actionabilityTone(score) {
+    if (score == null) return "watch";
+    if (score >= 80) return "proposed";
+    if (score >= 65) return "watch";
+    return "notrade";
   }
 
 function renderOppRow(item, rank) {
@@ -1970,7 +1977,7 @@ function renderOppRow(item, rank) {
     const top1 = rank === 1 && decisionLabel === "Trade propose";
     const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
     const dossierScore = dossierScoreFrom(plan) ?? dossierScoreFrom(item);
-    const scoreTone = opportunityDecisionTone({ ...item, exploitabilityScore: actionScore });
+    const scoreTone = actionabilityTone(actionScore);
     const statusReason = dominantStatusReason(item);
     const actionLine = actionScore != null ? `${actionScore}/100 · ${actionabilityLabel(actionScore)}` : "score actionnable indisponible";
     const dossierLine = dossierScore != null ? `dossier ${dossierScore}/100` : "";
@@ -2752,7 +2759,7 @@ function renderDetail() {
                     <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
                   </div>
                   <div class="conclusion-score">
-                    ${scoreRing(actionabilityScoreFrom(currentTradePlan() || d), currentTradePlan()?.decision === "Trade propose" ? "proposed" : currentTradePlan()?.decision === "A surveiller" ? "watch" : "notrade")}<div class="muted" style="text-align:center; margin-top:8px;">${safeText(`actionnable ${actionabilityScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div><div class="muted" style="text-align:center;">${safeText(`dossier ${dossierScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div>
+                    ${scoreRing(actionabilityScoreFrom(currentTradePlan() || d), actionabilityTone(actionabilityScoreFrom(currentTradePlan() || d)))}<div class="muted" style="text-align:center; margin-top:8px;">${safeText(`actionnable ${actionabilityScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div><div class="muted" style="text-align:center;">${safeText(`dossier ${dossierScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div>
                   </div>
                 </div>
                 <div class="conclusion-text">
