@@ -1852,17 +1852,19 @@ function applyFilter() {
     </div></nav>`;
   }
 
-  function renderOppRow(item, rank) {
+  
+function assetClassLabel(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return "actif";
+    if (raw === "stock" || raw === "action") return "action";
+    if (raw === "crypto") return "crypto";
+    if (raw === "etf") return "ETF";
+    if (raw === "forex") return "forex";
+    if (raw === "commodity" || raw === "matiere_premiere" || raw === "matière première") return "commodity";
+    return raw;
+  }
 
-    const assetClassLabel = (() => {
-      const raw = String(item?.assetClass || item?.type || "").trim().toLowerCase();
-      if (raw === "crypto") return "crypto";
-      if (raw === "stock" || raw === "action") return "action";
-      if (raw === "etf") return "ETF";
-      if (raw === "forex") return "forex";
-      if (raw === "commodity" || raw === "matiere_premiere" || raw === "matière première") return "commodity";
-      return raw || "actif";
-    })();
+function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
     const scoreValue = typeof item?.score === "number" ? item.score : null;
     const decisionLabel = rowDecisionLabel(item);
