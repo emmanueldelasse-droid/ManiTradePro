@@ -783,9 +783,9 @@
     if (tone === "blocked") return "#f5a623";
     if (tone === "notrade") return "var(--neutral)";
     if (score == null) return "var(--neutral)";
-    if (score >= 70) return "var(--profit)";
-    if (score >= 50) return "#f5a623";
-    return "var(--loss)";
+    if (score >= 80) return "var(--profit)";
+    if (score >= 65) return "#f5a623";
+    return "var(--neutral)";
   }
 
   function scoreRing(score, tone = "default") {
@@ -1073,6 +1073,15 @@ function rowIsUnavailable(item) {
 
 function rowIsUnavailable(item) {
   return !item || item.status === "unavailable" || item.scoreStatus === "unavailable";
+}
+
+
+function decisionBadgeTone(item) {
+  const decision = rowDecisionLabel(item);
+  if (decision === "Trade propose") return "proposed";
+  if (decision === "A surveiller") return "blocked";
+  if (decision === "Indisponible") return "notrade";
+  return "notrade";
 }
 
 function rowDecisionLabel(item) {
@@ -1976,9 +1985,9 @@ function actionabilityScoreFrom(source) {
   }
 
   function actionabilityTone(score) {
-    if (score == null) return "watch";
+    if (score == null) return "notrade";
     if (score >= 80) return "proposed";
-    if (score >= 65) return "watch";
+    if (score >= 65) return "blocked";
     return "notrade";
   }
 
@@ -2040,7 +2049,7 @@ function renderOppRow(item, rank) {
         <div class="score-box">
           ${scoreRing(actionScore, scoreTone)}
           <div class="score-meta">
-            ${badge(decisionLabel, decisionLabel)}
+            ${badge(decisionLabel, decisionBadgeTone(item))}
             ${badge(trendLabel, item.direction || "")}
           </div>
         </div>
