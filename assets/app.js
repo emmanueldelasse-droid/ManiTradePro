@@ -2384,13 +2384,30 @@ function dashboardPriorityTop(opps) {
     return actionabilityTone(actionScore);
   }
 
+
+function statusToneFromDecision(decision) {
+  if (decision === "Trade propose") return "proposed";
+  if (decision === "A surveiller") return "blocked";
+  return "notrade";
+}
+
+function statusBadge(decision) {
+  return badge(decision || "Pas de trade", statusToneFromDecision(decision));
+}
+
 function renderDashboard() {
     const opps = Array.isArray(state.opportunities) ? state.opportunities.slice() : [];
     const stats = trainingStats();
-    const summary = dashboardSignalSummary(state.opportunities);
-    const topPick = dashboardTopPick(state.opportunities);
-    const topRows = state.opportunities.slice(0, 5);
+    const summary = dashboardSignalSummary(opps);
+    const topPick = dashboardPriorityTop(opps);
+    const topRows = opps.slice(0, 5);
     const recentAlgo = state.algoJournal.slice(0, 3);
+    const topDecision = topPick ? rowDecisionLabel(topPick) : "Pas de trade";
+    const topTone = statusToneFromDecision(topDecision);
+    const topBadgeLabel = topDecision === "Trade propose" ? "actionnable" : (topDecision === "A surveiller" ? "a surveiller" : "pas de trade");
+    const topSubtitle = dashboardPrioritySubtitle(opps);
+    const heroText = summary.title + " · " + (summary.text || "");
+    const mobile = isPhoneLayout();
 
     return `
       <div class="screen">
@@ -2400,12 +2417,12 @@ function renderDashboard() {
         </div>
 
         <div class="card dashboard-hero-card" style="margin-bottom:18px">
-          <div class="dashboard-hero-top">
+          <div class="dashboard-hero-top" style="${mobile ? "display:block;" : ""}">
             <div>
               <div class="dashboard-hero-title">${stats.openCount} position${stats.openCount > 1 ? "s ouvertes" : " ouverte"}</div>
-              <div class="dashboard-hero-subtitle">${summary.title} · ${summary.text}</div>
+              <div class="dashboard-hero-subtitle">${safeText(heroText)}</div>
             </div>
-            <div class="legend">
+            <div class="legend" style="${mobile ? "margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;" : ""}">
               ${badge("Training")}
               ${badge(`${stats.closedCount} trade${stats.closedCount > 1 ? "s" : ""} cloture${stats.closedCount > 1 ? "s" : ""}`)}
               ${badge(`${money(stats.realized * fxRateUsdToEur(), "EUR")} realise`)}
@@ -2420,64 +2437,61 @@ function renderDashboard() {
         ` : ""}
 
         <div class="grid trades-stats" style="margin-bottom:18px">
-          <div class="stat-card"><div class="stat-label">Opportunites visibles</div><div class="stat-value">${state.opportunities.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Opportunites visibles</div><div class="stat-value">${opps.length}</div></div>
           <div class="stat-card"><div class="stat-label">Hausse</div><div class="stat-value">${summary.bullish}</div></div>
           <div class="stat-card"><div class="stat-label">Baisse</div><div class="stat-value">${summary.bearish}</div></div>
           <div class="stat-card"><div class="stat-label">Neutre</div><div class="stat-value">${summary.neutral}</div></div>
         </div>
 
-        <div class="dashboard-grid">
-          <div class="card">
-            <div class="section-title"><span>${safeText(dashboardPriorityTitle(opps))}</span><span>${topPick ? topPick.symbol : "—"}</span></div>
+        <div class="dashboard-grid" style="${mobile ? "display:block;" : ""}">
+          <div class="card" style="${mobile ? "margin-bottom:14px;" : ""}">
+            <div class="section-title"><span>Priorite du moment</span><span>${topPick ? safeText(topPick.symbol) : "—"}</span></div>
             ${topPick ? `
               <div class="top-pick-box">
                 <div>
                   <div class="trade-symbol">${safeText(topPick.symbol)}</div>
-                  <div class="trade-sub">${safeText(topPick.name || "Actif")}</div>
+                  <div class="trade-name">${safeText(topPick.name || "Nom indisponible")}</div>
+                  <div class="muted" style="margin-top:8px">${safeText(topSubtitle)}</div>
                 </div>
-                <div class="legend">
-                  ${badge(rowTradePlan(topPick)?.trendLabel || "analyse en cours")}
-                  ${badge(topPick.confidence || "fiabilite")}
+                <div class="legend" style="justify-content:flex-start;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                  ${badge(safeText(topBadgeLabel), topTone)}
+                  ${badge(safeText(rowTrendLabel(topPick)), topPick.direction || "")}
+                </div>
+                <div class="top-pick-metrics" style="margin-top:12px">
+                  <div><span>Prix</span><strong>${topPick.price != null ? priceDisplay(topPick.price) : "—"}</strong></div>
+                  <div><span>Variation 24h</span><strong class="${topPick.change24hPct > 0 ? "up" : topPick.change24hPct < 0 ? "down" : ""}">${pct(topPick.change24hPct)}</strong></div>
+                  <div><span>Score actionnable</span><strong style="color:${scoreColor(actionabilityScoreFrom(rowTradePlan(topPick)||topPick), actionabilityTone(actionabilityScoreFrom(rowTradePlan(topPick)||topPick)))}">${safeText((actionabilityScoreFrom(rowTradePlan(topPick)||topPick) ?? "—") + "/100")}</strong></div>
+                  <div><span>Source</span><strong>${safeText(topPick.sourceUsed || "—")}</strong></div>
+                </div>
+                <div style="margin-top:12px">
+                  <button class="btn" data-open-detail="${safeText(topPick.symbol)}">Ouvrir la fiche</button>
                 </div>
               </div>
-              <div class="kv" style="margin-top:14px">
-                <div class="muted">Prix</div><div>${priceDisplay(topPick.price)}</div>
-                <div class="muted">Variation 24h</div><div>${pct(topPick.change24hPct)}</div>
-                <div class="muted">Tendance</div><div>${safeText(rowTradePlan(topPick)?.trendLabel || "analyse en cours")}</div>
-                <div class="muted">Source</div><div>${safeText(topPick.sourceUsed || "—")}</div>
-              </div>
-              <div class="trade-actions" style="margin-top:14px">
-                <button class="btn trade-btn primary" data-open-symbol="${safeText(topPick.symbol)}">Ouvrir la fiche</button>
-              </div>
-            ` : `<div class="empty-state">Aucune opportunite assez lisible pour le moment.</div>`}
+            ` : `
+              <div class="empty-state">Aucune priorite exploitable pour le moment.</div>
+            `}
           </div>
 
           <div class="card">
             <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
-            ${recentAlgo.length ? `
-              <div class="algo-feed">
-                ${recentAlgo.map((row) => `
-                  <div class="algo-row full">
-                    <div>
-                      <div class="trade-symbol">${safeText(row.symbol)}</div>
-                      <div class="trade-sub">${safeJournalDate(row.createdAt || row.updatedAt || row.timestamp)}</div>
-                    </div>
-                    <div>${badge(row.decision || "—", decisionBadgeClass(row.decision || ""))}</div>
-                    <div class="muted">${safeText(row.aiSummary || row.reason || "—")}</div>
-                  </div>
-                `).join("")}
+            ${recentAlgo.length ? recentAlgo.map((item) => `
+              <div class="journal-card" style="margin-bottom:10px">
+                <div class="journal-head">
+                  <div class="trade-symbol">${safeText(item.symbol || "—")}</div>
+                  ${statusBadge(item.decision || "Pas de trade")}
+                </div>
+                <div class="muted">${safeText(formatAlgoDate(item.createdAt || item.at || item.timestamp || ""))}</div>
               </div>
-            ` : `<div class="empty-state">Aucune decision recente pour le moment.</div>`}
+            `).join("") : `<div class="empty-state">Aucune decision recente.</div>`}
           </div>
         </div>
 
         <div class="card" style="margin-top:18px">
-          <div class="section-title"><span>Meilleures opportunites</span><span>${topRows.length}</span></div>
-          ${topRows.length ? `<div class="opp-list">${topRows.map((item, idx) => renderOppRow(item, idx + 1)).join("")}</div>` : `<div class="empty-state">Aucune opportunite disponible.</div>`}
+          <div class="section-title"><span>Priorites classees</span><span>${topRows.length}</span></div>
+          ${topRows.length ? topRows.map((item, index) => renderOppRow(item, index + 1)).join("") : `<div class="empty-state">Aucune opportunite a afficher.</div>`}
         </div>
-        ${renderNewsIaBlock()}
-        ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
-      </div>`;
+      </div>
+    `;
   }
 
   function renderOpportunities() {
