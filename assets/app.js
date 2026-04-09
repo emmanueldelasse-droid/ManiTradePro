@@ -4239,3 +4239,4 @@ function openPositionsRiskView() {
 
   boot();
 })();
+ 
