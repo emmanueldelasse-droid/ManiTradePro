@@ -2704,6 +2704,71 @@ function aiDisplayState(plan) {
     };
   }
 
+
+function detailTileValue(kind, plan, detail) {
+    const score = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(detail) ?? null;
+    const context = Number(plan?.contextQuality ?? NaN);
+    const entry = Number(plan?.entryQuality ?? NaN);
+    const risk = Number(plan?.riskQuality ?? NaN);
+    const momentum = Number(plan?.momentumQuality ?? NaN);
+    const direction = String(plan?.trendLabel || detail?.trendLabel || detail?.direction || "").trim().toLowerCase();
+    const confirmationCount = Number(plan?.confirmationCount ?? detail?.confirmationCount ?? 0);
+
+    if (kind === "context") {
+      if (Number.isFinite(context)) {
+        if (context >= 75) return "solide";
+        if (context >= 60) return "correct";
+        if (context >= 45) return "fragile";
+        return "faible";
+      }
+      return score != null && score >= 65 ? "correct" : "fragile";
+    }
+
+    if (kind === "trend") {
+      if (direction.includes("hauss")) return "haussiere";
+      if (direction.includes("baiss")) return "baissiere";
+      return "neutre";
+    }
+
+    if (kind === "momentum") {
+      if (Number.isFinite(momentum)) {
+        if (momentum >= 75) return "fort";
+        if (momentum >= 60) return "correct";
+        if (momentum >= 45) return "moyen";
+        return "faible";
+      }
+      return confirmationCount >= 5 ? "correct" : "moyen";
+    }
+
+    if (kind === "entry") {
+      if (Number.isFinite(entry)) {
+        if (entry >= 78) return "propre";
+        if (entry >= 62) return "a surveiller";
+        return "faible";
+      }
+      return score != null && score >= 80 ? "propre" : (score != null && score >= 65 ? "a surveiller" : "faible");
+    }
+
+    if (kind === "risk") {
+      if (Number.isFinite(risk)) {
+        if (risk >= 72) return "faible";
+        if (risk >= 58) return "correct";
+        if (risk >= 45) return "a surveiller";
+        return "eleve";
+      }
+      return "a surveiller";
+    }
+
+    if (kind === "activity") {
+      if (confirmationCount >= 6) return "active";
+      if (confirmationCount >= 4) return "correcte";
+      if (confirmationCount >= 2) return "moyenne";
+      return "calme";
+    }
+
+    return "indisponible";
+  }
+
 function renderDetail() {
     const d = state.detail;
     return `
