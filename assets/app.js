@@ -2021,7 +2021,8 @@ function shortActionLabel(plan, item) {
 
 
 function isPhoneLayout() {
-
+    return typeof window !== "undefined" && window.innerWidth <= 560;
+  }
 
 function mobileCardBadges(item, plan) {
   const parts = [];
@@ -2032,9 +2033,6 @@ function mobileCardBadges(item, plan) {
   if (plan?.riskQuality != null) parts.push(badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)));
   return parts.join("");
 }
-
-    return typeof window !== "undefined" && window.innerWidth <= 560;
-  }
 
 function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
@@ -4250,4 +4248,3 @@ function openPositionsRiskView() {
 
   boot();
 })();
- 
