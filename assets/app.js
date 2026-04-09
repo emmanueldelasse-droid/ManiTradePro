@@ -2021,6 +2021,18 @@ function shortActionLabel(plan, item) {
 
 
 function isPhoneLayout() {
+
+
+function mobileCardBadges(item, plan) {
+  const parts = [];
+  parts.push(badge(assetClassLabel(item.assetClass), item.assetClass || ""));
+  parts.push(badge(fidelityLabel(item), fidelityClass(item)));
+  const confirmationText = confirmationLabelText(plan);
+  if (confirmationText) parts.push(badge(confirmationText, "neutral"));
+  if (plan?.riskQuality != null) parts.push(badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)));
+  return parts.join("");
+}
+
     return typeof window !== "undefined" && window.innerWidth <= 560;
   }
 
@@ -2040,6 +2052,7 @@ function renderOppRow(item, rank) {
     const mobile = isPhoneLayout();
     const riskBadge = plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "";
     const confirmationBadge = confirmationText ? badge(confirmationText, "neutral") : "";
+    const mobileBadges = mobileCardBadges(item, plan);
 
     if (mobile) {
       return `
@@ -2069,10 +2082,7 @@ function renderOppRow(item, rank) {
           </div>
 
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
-            ${badge(assetBadge, item.assetClass || "")}
-            ${badge(fidelityLabel(item), fidelityClass(item))}
-            ${confirmationBadge}
-            ${riskBadge}
+            ${mobileBadges}
           </div>
         </div>`;
     }
@@ -2314,7 +2324,7 @@ function dashboardTopPick(opps) {
     const allItems = Array.isArray(state.news?.items) ? state.news.items : [];
 
     return `
-      <div class="screen">
+      <div class="screen" style="${mobile ? `padding-top:max(18px, env(safe-area-inset-top));` : ``}">
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
           <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
