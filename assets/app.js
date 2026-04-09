@@ -2431,7 +2431,7 @@ function displayAlgoDate(value) {
 }
 
 function dashboardMetricLine(label, value, extraClass = "") {
-  return `<div class="top-pick-line"><span>${safeText(label)}</span><strong class="${safeText(extraClass)}">${safeText(value)}</strong></div>`;
+  return `<div class="top-pick-line"><span>${safeText(label)}</span><strong class="${safeText(extraClass)}">${value}</strong></div>`;
 }
 
 function renderDashboard() {
@@ -2501,7 +2501,7 @@ function renderDashboard() {
                   ${badge(safeText(rowTrendLabel(topPick)), topPick.direction || "")}
                 </div>
                 <div class="top-pick-metrics" style="margin-top:14px;display:grid;gap:10px;">
-                  ${dashboardMetricLine("Prix", topPick.price != null ? priceDisplay(topPick.price) : "—")}
+                  ${dashboardMetricLine("Prix", topPick.price != null ? `${priceDisplay(topPick.price)} <span class="muted">(${safeText(usdDisplay(topPick.price))})</span>` : "—")}
                   ${dashboardMetricLine("Variation 24h", pct(topPick.change24hPct), topChangeClass)}
                   ${dashboardMetricLine("Score actionnable", topActionScore != null ? `${topActionScore}/100` : "—", `score-${topActionTone}`)}
                   ${dashboardMetricLine("Source", topPick.sourceUsed || "—")}
