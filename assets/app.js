@@ -777,19 +777,23 @@
     return `<span class="badge ${cls}">${safeText(label)}</span>`;
   }
 
-  function scoreColor(score) {
+  function scoreColor(score, tone = "default") {
+    if (tone === "proposed") return "var(--profit)";
+    if (tone === "watch") return "var(--accent)";
+    if (tone === "blocked") return "#f5a623";
+    if (tone === "notrade") return "var(--neutral)";
     if (score == null) return "var(--neutral)";
     if (score >= 70) return "var(--profit)";
     if (score >= 50) return "#f5a623";
     return "var(--loss)";
   }
 
-  function scoreRing(score) {
+  function scoreRing(score, tone = "default") {
     const value = score == null ? 0 : Math.max(0, Math.min(100, score));
     const r = 20;
     const c = 2 * Math.PI * r;
     const dash = (value / 100) * c;
-    const color = scoreColor(score);
+    const color = scoreColor(score, tone);
     return `
       <div class="score-ring">
         <svg viewBox="0 0 48 48" aria-hidden="true">
@@ -1074,6 +1078,24 @@ function rowIsUnavailable(item) {
 function rowDecisionLabel(item) {
   if (rowIsUnavailable(item)) return "Indisponible";
   return item?.decision || "Pas de trade";
+}
+function opportunityDecisionTone(item) {
+  const decision = rowDecisionLabel(item);
+  const plan = rowTradePlan(item) || {};
+  const blockers = Array.isArray(plan?.blockers) ? plan.blockers.filter(Boolean) : [];
+  if (decision === "Trade propose") return "proposed";
+  if (decision === "A surveiller") return blockers.length ? "blocked" : "watch";
+  if (decision === "Indisponible") return "notrade";
+  return "notrade";
+}
+
+function dominantStatusReason(item) {
+  const decision = rowDecisionLabel(item);
+  const plan = rowTradePlan(item) || {};
+  const blocker = mainBlockerText(plan);
+  if (decision === "Trade propose") return "plan pret a ouvrir";
+  if (blocker) return blocker;
+  return plan?.waitFor || item?.reasonShort || "lecture supplementaire necessaire";
 }
 
 function rowTrendLabel(item) {
@@ -1844,6 +1866,8 @@ function applyFilter() {
     const actionText = plan?.tradeNow === true ? "actionnable maintenant" : (decisionLabel === "A surveiller" ? "surveillance active" : "");
     const riskText = plan?.riskQuality != null ? `risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}` : "";
     const top1 = rank === 1 && decisionLabel === "Trade propose";
+    const scoreTone = opportunityDecisionTone(item);
+    const statusReason = dominantStatusReason(item);
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
@@ -1853,33 +1877,31 @@ function applyFilter() {
           <div class="asset-text">
             <div class="asset-symbol">${safeText(item.symbol)}</div>
             <div class="asset-name">${safeText(item.name || "Nom indisponible")}</div>
-            ${setupStatus ? `<div class="muted opp-note">${safeText(setupStatus)}</div>` : ""}
             ${top1 ? `<div class="muted opp-note">meilleure opportunite du moment</div>` : ""}
           </div>
         </div>
         <div class="score-box">
-          ${scoreRing(scoreValue)}
+          ${scoreRing(scoreValue, scoreTone)}
           <div class="score-meta">
             ${badge(decisionLabel, decisionLabel)}
             ${badge(trendLabel, item.direction || "")}
-            ${setupStatus ? badge(setupStatusLabel(setupStatus), setupStatusBadgeClass(setupStatus)) : ""}
+            ${setupStatus && decisionLabel === "Trade propose" ? badge(setupStatusLabel(setupStatus), setupStatusBadgeClass(setupStatus)) : ""}
           </div>
         </div>
         <div class="price-col">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
-          ${note ? `<div class="muted opp-note">${safeText(note)}</div>` : ""}
+          <div class="muted opp-note" style="font-weight:700; color:${scoreColor(scoreValue, scoreTone)}">${safeText(statusReason)}</div>
           ${actionText ? `<div class="muted opp-note">${safeText(actionText)}</div>` : ""}
-          ${(state.settings.showSourceBadges && item.sourceUsed) ? `<div class="muted opp-note">${safeText(item.sourceUsed)} · ${safeText(simpleFreshnessLabel(item.freshness || "unknown"))}</div>` : ""}
+          ${note && note !== statusReason ? `<div class="muted opp-note">${safeText(note)}</div>` : ""}
         </div>
-        <div class="meta-col">
-          ${badge(simpleAssetClassLabel(item.assetClass), item.assetClass)}
-          ${badge(`fiabilite ${safeText(item.confidenceLabel || simpleConfidenceLabel(item.confidence || "low"))}`)}
-          ${badge(safeText(priority))}
-          ${plan?.setupType ? badge(safeText(plan.setupType)) : ""}
-          ${plan?.confirmationCount != null ? badge(safeText(confirmationText)) : ""}
-          ${blockerText ? badge(`blocage ${safeText(blockerText)}`) : ""}
-          ${riskText ? badge(riskText) : ""}
+        <div class="badges-col">
+          ${badge(assetClassLabel(item.assetClass), item.assetClass || "")}
+          ${badge(fidelityLabel(item), fidelityClass(item))}
+          ${badge(priority, priorityClass(priority))}
+          ${item.setupType ? badge(setupTypeLabel(item.setupType), item.setupType) : ""}
+          ${confirmationText ? badge(confirmationText, "neutral") : ""}
+          ${riskText ? badge(riskText, riskBadgeClass(plan)) : ""}
         </div>
       </div>`;
   }
@@ -2591,7 +2613,7 @@ function renderDetail() {
                     <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
                   </div>
                   <div class="conclusion-score">
-                    ${scoreRing(currentTradePlan()?.finalScore ?? d.score)}
+                    ${scoreRing(currentTradePlan()?.finalScore ?? d.score, currentTradePlan()?.decision === "Trade propose" ? "proposed" : currentTradePlan()?.decision === "A surveiller" ? "watch" : "notrade")}
                   </div>
                 </div>
                 <div class="conclusion-text">
