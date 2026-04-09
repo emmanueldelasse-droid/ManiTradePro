@@ -2395,16 +2395,26 @@ function statusBadge(decision) {
   return badge(decision || "Pas de trade", statusToneFromDecision(decision));
 }
 
+
+function dashboardTopStatusLabel(item) {
+  if (!item) return "pas de trade";
+  const decision = rowDecisionLabel(item);
+  if (decision === "Trade propose") return "actionnable";
+  if (decision === "A surveiller") return "a surveiller";
+  return "pas de trade";
+}
+
 function renderDashboard() {
     const opps = Array.isArray(state.opportunities) ? state.opportunities.slice() : [];
     const stats = trainingStats();
     const summary = dashboardSignalSummary(opps);
     const topPick = dashboardPriorityTop(opps);
-    const topRows = opps.slice(0, 5);
+    const grouped = groupedOpportunities(opps);
+    const topRows = [...grouped.proposed, ...grouped.watch, ...grouped.noTrade].slice(0, 5);
     const recentAlgo = state.algoJournal.slice(0, 3);
     const topDecision = topPick ? rowDecisionLabel(topPick) : "Pas de trade";
     const topTone = statusToneFromDecision(topDecision);
-    const topBadgeLabel = topDecision === "Trade propose" ? "actionnable" : (topDecision === "A surveiller" ? "a surveiller" : "pas de trade");
+    const topBadgeLabel = dashboardTopStatusLabel(topPick);
     const topSubtitle = dashboardPrioritySubtitle(opps);
     const heroText = summary.title + " · " + (summary.text || "");
     const mobile = isPhoneLayout();
@@ -2481,6 +2491,7 @@ function renderDashboard() {
                   ${statusBadge(item.decision || "Pas de trade")}
                 </div>
                 <div class="muted">${safeText(formatAlgoDate(item.createdAt || item.at || item.timestamp || ""))}</div>
+                ${item.reasonShort ? `<div class="muted" style="margin-top:8px">${safeText(item.reasonShort)}</div>` : ""}
               </div>
             `).join("") : `<div class="empty-state">Aucune decision recente.</div>`}
           </div>
