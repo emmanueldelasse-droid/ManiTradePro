@@ -1916,9 +1916,39 @@ function priorityClass(priority) {
     return "warning";
   }
 
+
+
+function actionabilityScoreFrom(source) {
+    const raw = Number(
+      source?.exploitabilityScore ??
+      source?.plan?.exploitabilityScore ??
+      source?.finalScore ??
+      source?.plan?.finalScore ??
+      source?.score ??
+      NaN
+    );
+    return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
+  }
+
+  function dossierScoreFrom(source) {
+    const raw = Number(
+      source?.finalScore ??
+      source?.plan?.finalScore ??
+      source?.score ??
+      NaN
+    );
+    return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
+  }
+
+  function actionabilityLabel(score) {
+    if (score == null) return "indisponible";
+    if (score >= 78) return "actionnable";
+    if (score >= 62) return "a surveiller";
+    return "non actionnable";
+  }
+
 function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
-    const scoreValue = typeof item?.score === "number" ? item.score : null;
     const decisionLabel = rowDecisionLabel(item);
     const trendLabel = rowTrendLabel(item);
     const note = item?.reasonShort || item?.error || null;
@@ -1930,8 +1960,12 @@ function renderOppRow(item, rank) {
     const actionText = plan?.tradeNow === true ? "actionnable maintenant" : (decisionLabel === "A surveiller" ? "surveillance active" : "");
     const riskText = plan?.riskQuality != null ? `risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}` : "";
     const top1 = rank === 1 && decisionLabel === "Trade propose";
-    const scoreTone = opportunityDecisionTone(item);
+    const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
+    const dossierScore = dossierScoreFrom(plan) ?? dossierScoreFrom(item);
+    const scoreTone = opportunityDecisionTone({ ...item, exploitabilityScore: actionScore });
     const statusReason = dominantStatusReason(item);
+    const actionLine = actionScore != null ? `${actionScore}/100 · ${actionabilityLabel(actionScore)}` : "score actionnable indisponible";
+    const dossierLine = dossierScore != null ? `dossier ${dossierScore}/100` : "";
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
@@ -1945,7 +1979,7 @@ function renderOppRow(item, rank) {
           </div>
         </div>
         <div class="score-box">
-          ${scoreRing(scoreValue, scoreTone)}
+          ${scoreRing(actionScore, scoreTone)}
           <div class="score-meta">
             ${badge(decisionLabel, decisionLabel)}
             ${badge(trendLabel, item.direction || "")}
@@ -1955,7 +1989,9 @@ function renderOppRow(item, rank) {
         <div class="price-col">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
-          <div class="muted opp-note" style="font-weight:700; color:${scoreColor(scoreValue, scoreTone)}">${safeText(statusReason)}</div>
+          <div class="muted opp-note" style="font-weight:700; color:${scoreColor(actionScore, scoreTone)}">${safeText(actionLine)}</div>
+          ${dossierLine ? `<div class="muted opp-note">${safeText(dossierLine)}</div>` : ""}
+          <div class="muted opp-note">${safeText(statusReason)}</div>
           ${actionText ? `<div class="muted opp-note">${safeText(actionText)}</div>` : ""}
           ${note && note !== statusReason ? `<div class="muted opp-note">${safeText(note)}</div>` : ""}
         </div>
@@ -2611,7 +2647,7 @@ function renderDetail() {
                         <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
                         <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
                         <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        <div class="muted">Niveau de fiabilite</div><div>${plan?.finalScore != null ? `${num(plan.finalScore, 0)}/100 · ${safeText(simpleReliabilityLabel(plan.finalScore))}` : "—"}</div>
+                        <div class="muted">Niveau actionnable</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div><div class="muted">Score dossier</div><div>${dossierScoreFrom(plan) != null ? `${num(dossierScoreFrom(plan), 0)}/100` : "—"}</div>
                         <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
                         <div class="muted">En clair</div><div>${safeText(simpleDecisionSentence(plan))}</div>
                         <div class="muted">Resume simple</div><div>${safeText(simpleContextSentence(plan))} ${safeText(plan?.aiSummary || "")}</div>
@@ -2685,14 +2721,14 @@ function renderDetail() {
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
-                    <div class="conclusion-line">Fiabilite du trade : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore, currentTradePlan()?.decision))}</strong></div>
+                    <div class="conclusion-line">Niveau actionnable : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore, currentTradePlan()?.decision))}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(currentTradePlan()?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</strong></div>
                     <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
                     <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
                     <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
                   </div>
                   <div class="conclusion-score">
-                    ${scoreRing(currentTradePlan()?.finalScore ?? d.score, currentTradePlan()?.decision === "Trade propose" ? "proposed" : currentTradePlan()?.decision === "A surveiller" ? "watch" : "notrade")}
+                    ${scoreRing(actionabilityScoreFrom(currentTradePlan() || d), currentTradePlan()?.decision === "Trade propose" ? "proposed" : currentTradePlan()?.decision === "A surveiller" ? "watch" : "notrade")}<div class="muted" style="text-align:center; margin-top:8px;">${safeText(`actionnable ${actionabilityScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div><div class="muted" style="text-align:center;">${safeText(`dossier ${dossierScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div>
                   </div>
                 </div>
                 <div class="conclusion-text">
