@@ -4086,7 +4086,7 @@ function openPositionsRiskView() {
   }
 
   
-const debugConsoleState = {
+const debugConsoleState = window.debugConsoleState = {
   logs: [],
   enabled: false
 };
@@ -4207,6 +4207,130 @@ function renderDebugConsolePanel() {
     </div>
   `;
 }
+
+function ensureStandaloneDebugConsoleButton() {
+  if (typeof document === "undefined") return;
+  if (document.getElementById("mtp-debug-button")) return;
+
+  const btn = document.createElement("button");
+  btn.id = "mtp-debug-button";
+  btn.textContent = "Debug";
+  btn.style.position = "fixed";
+  btn.style.right = "14px";
+  btn.style.bottom = "calc(84px + env(safe-area-inset-bottom))";
+  btn.style.zIndex = "2147483647";
+  btn.style.border = "none";
+  btn.style.borderRadius = "999px";
+  btn.style.padding = "10px 14px";
+  btn.style.background = "#111827";
+  btn.style.color = "#fff";
+  btn.style.fontSize = "12px";
+  btn.style.fontWeight = "700";
+  btn.style.boxShadow = "0 6px 20px rgba(0,0,0,.25)";
+  btn.style.display = (typeof window !== "undefined" && window.innerWidth <= 560) ? "block" : "none";
+
+  btn.addEventListener("click", () => {
+    try {
+      const existing = document.getElementById("mtp-debug-panel");
+      if (existing) {
+        existing.remove();
+        return;
+      }
+
+      const panel = document.createElement("div");
+      panel.id = "mtp-debug-panel";
+      panel.style.position = "fixed";
+      panel.style.inset = "0";
+      panel.style.zIndex = "2147483647";
+      panel.style.background = "rgba(0,0,0,.72)";
+      panel.style.display = "flex";
+      panel.style.alignItems = "flex-end";
+      panel.style.justifyContent = "center";
+      panel.style.padding = "18px";
+
+      const card = document.createElement("div");
+      card.style.width = "100%";
+      card.style.maxWidth = "760px";
+      card.style.maxHeight = "78vh";
+      card.style.background = "#0b1220";
+      card.style.color = "#fff";
+      card.style.borderRadius = "18px";
+      card.style.overflow = "hidden";
+      card.style.boxShadow = "0 18px 60px rgba(0,0,0,.45)";
+      card.addEventListener("click", (e) => e.stopPropagation());
+
+      const head = document.createElement("div");
+      head.style.display = "flex";
+      head.style.justifyContent = "space-between";
+      head.style.alignItems = "center";
+      head.style.padding = "14px 16px";
+      head.style.borderBottom = "1px solid rgba(255,255,255,.08)";
+
+      const title = document.createElement("div");
+      title.textContent = "Console debug iPhone";
+      title.style.fontSize = "14px";
+      title.style.fontWeight = "800";
+
+      const actions = document.createElement("div");
+      actions.style.display = "flex";
+      actions.style.gap = "8px";
+
+      const mkBtn = (label, onClick) => {
+        const b = document.createElement("button");
+        b.type = "button";
+        b.textContent = label;
+        b.className = "btn";
+        b.addEventListener("click", onClick);
+        return b;
+      };
+
+      const body = document.createElement("div");
+      body.style.padding = "12px 16px";
+      body.style.overflow = "auto";
+      body.style.maxHeight = "calc(78vh - 60px)";
+      body.style.fontSize = "12px";
+      body.style.lineHeight = "1.45";
+
+      const renderLogs = () => {
+        const logs = (window.debugConsoleState && Array.isArray(window.debugConsoleState.logs)) ? window.debugConsoleState.logs : [];
+        body.innerHTML = logs.length
+          ? logs.map((line) => `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08);white-space:pre-wrap;word-break:break-word;">${String(line).replace(/[&<>]/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>`).join("")
+          : '<div style="opacity:.7">Aucun log pour le moment.</div>';
+      };
+
+      actions.appendChild(mkBtn("Copier", () => {
+        const logs = (window.debugConsoleState && Array.isArray(window.debugConsoleState.logs)) ? window.debugConsoleState.logs.join("\n") : "";
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(logs).catch(() => {});
+        }
+      }));
+      actions.appendChild(mkBtn("Vider", () => {
+        if (window.debugConsoleState) window.debugConsoleState.logs = [];
+        renderLogs();
+      }));
+      actions.appendChild(mkBtn("Fermer", () => panel.remove()));
+
+      head.appendChild(title);
+      head.appendChild(actions);
+      card.appendChild(head);
+      card.appendChild(body);
+      panel.appendChild(card);
+      panel.addEventListener("click", () => panel.remove());
+      document.body.appendChild(panel);
+      renderLogs();
+    } catch (err) {
+      console.error("debug panel error", err);
+    }
+  });
+
+  document.body.appendChild(btn);
+
+  window.addEventListener("resize", () => {
+    btn.style.display = (window.innerWidth <= 560) ? "block" : "none";
+  });
+}
+
+
 
 function renderMain() {
     switch (state.route) {
@@ -4353,6 +4477,7 @@ function renderMain() {
           refreshOpenTradesLive().catch(() => {});
         }
         installDebugConsole();
+  ensureStandaloneDebugConsoleButton();
   render();
       }
     }, 30000);
