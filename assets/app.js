@@ -1982,25 +1982,49 @@ function actionabilityScoreFrom(source) {
     return "notrade";
   }
 
+
+function shortBlockerLabel(plan, item) {
+    const flags = Array.isArray(plan?.blockers) ? plan.blockers.filter(Boolean) : [];
+    const first = String(flags[0] || "").trim().toLowerCase();
+    const reason = String(plan?.refusalReason || item?.reasonShort || "").trim().toLowerCase();
+    const combined = `${first} ${reason}`.trim();
+
+    if (combined.includes("confirm")) return "confirmation insuffisante";
+    if (combined.includes("risque")) return "risque trop eleve";
+    if (combined.includes("timing")) return "timing encore tot";
+    if (combined.includes("volatil")) return "volatilite trop elevee";
+    if (combined.includes("contexte")) return "contexte trop fragile";
+    if (combined.includes("data") || combined.includes("donnee")) return "donnees trop fragiles";
+    if (combined.includes("ratio")) return "ratio insuffisant";
+    if (combined.includes("entree")) return "entree pas assez propre";
+    if (combined.includes("signal")) return "signal encore trop faible";
+    if (combined.includes("attendre")) return "attendre une confirmation";
+    if (plan?.tradeNow === true) return "actionnable maintenant";
+    return "surveillance active";
+  }
+
+function shortActionLabel(plan, item) {
+    const decision = rowDecisionLabel(item);
+    if (decision === "Trade propose" || plan?.tradeNow === true) return "actionnable maintenant";
+    if (decision === "A surveiller") return "attendre";
+    return "ne pas agir";
+  }
+
 function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
     const decisionLabel = rowDecisionLabel(item);
     const trendLabel = rowTrendLabel(item);
-    const note = item?.reasonShort || item?.error || null;
     const plan = rowTradePlan(item) || {};
-    const setupStatus = plan?.setupStatus || item?.setupStatus || null;
     const confirmationText = confirmationLabelText(plan);
-    const blockerText = mainBlockerText(plan);
     const priority = priorityLevel(item);
-    const actionText = plan?.tradeNow === true ? "actionnable maintenant" : (decisionLabel === "A surveiller" ? "surveillance active" : "");
-    const riskText = plan?.riskQuality != null ? `risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}` : "";
     const top1 = rank === 1 && decisionLabel === "Trade propose";
     const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
     const dossierScore = dossierScoreFrom(plan) ?? dossierScoreFrom(item);
     const scoreTone = actionabilityTone(actionScore);
-    const statusReason = dominantStatusReason(item);
     const actionLine = actionScore != null ? `${actionScore}/100 · ${actionabilityLabel(actionScore)}` : "score actionnable indisponible";
-    const dossierLine = dossierScore != null ? `dossier ${dossierScore}/100` : "";
+    const blockerLine = shortBlockerLabel(plan, item);
+    const nextActionLine = shortActionLabel(plan, item);
+    const assetBadge = assetClassLabel(item.assetClass);
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
@@ -2018,25 +2042,20 @@ function renderOppRow(item, rank) {
           <div class="score-meta">
             ${badge(decisionLabel, decisionLabel)}
             ${badge(trendLabel, item.direction || "")}
-            ${setupStatus && decisionLabel === "Trade propose" ? badge(setupStatusLabel(setupStatus), setupStatusBadgeClass(setupStatus)) : ""}
           </div>
         </div>
         <div class="price-col">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
           <div class="muted opp-note" style="font-weight:700; color:${scoreColor(actionScore, scoreTone)}">${safeText(actionLine)}</div>
-          ${dossierLine ? `<div class="muted opp-note">${safeText(dossierLine)}</div>` : ""}
-          <div class="muted opp-note">${safeText(statusReason)}</div>
-          ${actionText ? `<div class="muted opp-note">${safeText(actionText)}</div>` : ""}
-          ${note && note !== statusReason ? `<div class="muted opp-note">${safeText(note)}</div>` : ""}
+          <div class="muted opp-note">${safeText(blockerLine)}</div>
+          <div class="muted opp-note">${safeText(nextActionLine)}</div>
         </div>
         <div class="badges-col">
-          ${badge(assetClassLabel(item.assetClass), item.assetClass || "")}
+          ${badge(assetBadge, item.assetClass || "")}
           ${badge(fidelityLabel(item), fidelityClass(item))}
-          ${badge(priority, priorityClass(priority))}
-          ${item.setupType ? badge(setupTypeLabel(item.setupType), item.setupType) : ""}
           ${confirmationText ? badge(confirmationText, "neutral") : ""}
-          ${riskText ? badge(riskText, riskBadgeClass(plan)) : ""}
+          ${plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : ""}
         </div>
       </div>`;
   }
