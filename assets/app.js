@@ -2422,6 +2422,18 @@ function formatAlgoDate(value) {
   }
 }
 
+
+function displayAlgoDate(value) {
+  if (!value) return "";
+  const formatted = formatAlgoDate(value);
+  if (!formatted || formatted === "date indisponible") return "";
+  return formatted;
+}
+
+function dashboardMetricLine(label, value, extraClass = "") {
+  return `<div class="top-pick-line"><span>${safeText(label)}</span><strong class="${safeText(extraClass)}">${safeText(value)}</strong></div>`;
+}
+
 function renderDashboard() {
     const opps = Array.isArray(state.opportunities) ? state.opportunities.slice() : [];
     const stats = trainingStats();
@@ -2436,6 +2448,9 @@ function renderDashboard() {
     const topSubtitle = dashboardPrioritySubtitle(opps);
     const heroText = summary.title + " · " + (summary.text || "");
     const mobile = isPhoneLayout();
+    const topActionScore = topPick ? (actionabilityScoreFrom(rowTradePlan(topPick) || topPick)) : null;
+    const topActionTone = actionabilityTone(topActionScore);
+    const topChangeClass = topPick ? (topPick.change24hPct > 0 ? "up" : topPick.change24hPct < 0 ? "down" : "") : "";
 
     return `
       <div class="screen">
@@ -2485,13 +2500,13 @@ function renderDashboard() {
                   ${badge(safeText(topBadgeLabel), topTone)}
                   ${badge(safeText(rowTrendLabel(topPick)), topPick.direction || "")}
                 </div>
-                <div class="top-pick-metrics" style="margin-top:12px">
-                  <div><span>Prix</span><strong>${topPick.price != null ? priceDisplay(topPick.price) : "—"}</strong></div>
-                  <div><span>Variation 24h</span><strong class="${topPick.change24hPct > 0 ? "up" : topPick.change24hPct < 0 ? "down" : ""}">${pct(topPick.change24hPct)}</strong></div>
-                  <div><span>Score actionnable</span><strong style="color:${scoreColor(actionabilityScoreFrom(rowTradePlan(topPick)||topPick), actionabilityTone(actionabilityScoreFrom(rowTradePlan(topPick)||topPick)))}">${safeText((actionabilityScoreFrom(rowTradePlan(topPick)||topPick) ?? "—") + "/100")}</strong></div>
-                  <div><span>Source</span><strong>${safeText(topPick.sourceUsed || "—")}</strong></div>
+                <div class="top-pick-metrics" style="margin-top:14px;display:grid;gap:10px;">
+                  ${dashboardMetricLine("Prix", topPick.price != null ? priceDisplay(topPick.price) : "—")}
+                  ${dashboardMetricLine("Variation 24h", pct(topPick.change24hPct), topChangeClass)}
+                  ${dashboardMetricLine("Score actionnable", topActionScore != null ? `${topActionScore}/100` : "—", `score-${topActionTone}`)}
+                  ${dashboardMetricLine("Source", topPick.sourceUsed || "—")}
                 </div>
-                <div style="margin-top:12px">
+                <div style="margin-top:14px">
                   <button class="btn" data-open-detail="${safeText(topPick.symbol)}">Ouvrir la fiche</button>
                 </div>
               </div>
@@ -2502,16 +2517,21 @@ function renderDashboard() {
 
           <div class="card">
             <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
-            ${recentAlgo.length ? recentAlgo.map((item) => `
-              <div class="journal-card" style="margin-bottom:10px">
-                <div class="journal-head">
-                  <div class="trade-symbol">${safeText(item.symbol || "—")}</div>
-                  ${statusBadge(item.decision || "Pas de trade")}
+            ${recentAlgo.length ? recentAlgo.map((item) => {
+              const algoDecision = item.decision || "Pas de trade";
+              const algoReason = item.reasonShort || item.summary || "";
+              const algoDate = displayAlgoDate(item.createdAt || item.at || item.timestamp || "");
+              return `
+                <div class="journal-card" style="margin-bottom:10px">
+                  <div class="journal-head">
+                    <div class="trade-symbol">${safeText(item.symbol || "—")}</div>
+                    ${statusBadge(algoDecision)}
+                  </div>
+                  ${algoDate ? `<div class="muted">${safeText(algoDate)}</div>` : ""}
+                  ${algoReason ? `<div class="muted" style="margin-top:8px">${safeText(algoReason)}</div>` : ""}
                 </div>
-                <div class="muted">${safeText(formatAlgoDate(item.createdAt || item.at || item.timestamp || ""))}</div>
-                ${item.reasonShort ? `<div class="muted" style="margin-top:8px">${safeText(item.reasonShort)}</div>` : ""}
-              </div>
-            `).join("") : `<div class="empty-state">Aucune decision recente.</div>`}
+              `;
+            }).join("") : `<div class="empty-state">Aucune decision recente.</div>`}
           </div>
         </div>
 
