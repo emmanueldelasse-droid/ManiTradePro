@@ -2024,6 +2024,14 @@ function isPhoneLayout() {
     return typeof window !== "undefined" && window.innerWidth <= 560;
   }
 
+
+function secondaryPositiveTone(label) {
+  const v = String(label || "").toLowerCase();
+  if (v.includes("trade propose") || v.includes("actionnable")) return "proposed";
+  if (v.includes("a surveiller")) return "blocked";
+  return "neutral";
+}
+
 function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
     const decisionLabel = rowDecisionLabel(item);
@@ -2089,19 +2097,19 @@ function renderOppRow(item, rank) {
         </div>
         <div class="score-box">
           ${scoreRing(actionScore, scoreTone)}
-          <div class="score-meta">
+          <div class="score-meta" style="display:flex;flex-direction:column;gap:8px;">
             ${badge(decisionLabel, decisionBadgeTone(item))}
             ${badge(trendLabel, item.direction || "")}
           </div>
         </div>
-        <div class="price-col">
+        <div class="price-col" style="display:flex;flex-direction:column;gap:6px;">
           <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
           <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
           <div class="muted opp-note" style="font-weight:700; color:${scoreColor(actionScore, scoreTone)}">${safeText(actionLine)}</div>
           <div class="muted opp-note">${safeText(blockerLine)}</div>
           <div class="muted opp-note">${safeText(nextActionLine)}</div>
         </div>
-        <div class="badges-col">
+        <div class="badges-col" style="display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
           ${badge(assetBadge, item.assetClass || "")}
           ${badge(fidelityLabel(item), fidelityClass(item))}
           ${confirmationBadge}
@@ -2490,23 +2498,23 @@ function renderDashboard() {
           <div class="card" style="${mobile ? "margin-bottom:14px;" : ""}">
             <div class="section-title"><span>Priorite du moment</span><span>${topPick ? safeText(topPick.symbol) : "—"}</span></div>
             ${topPick ? `
-              <div class="top-pick-box">
+              <div class="top-pick-box" style="${mobile ? `` : `display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(170px,.8fr) minmax(240px,1fr) auto;gap:18px;align-items:start;`}">
                 <div>
                   <div class="trade-symbol">${safeText(topPick.symbol)}</div>
                   <div class="trade-name">${safeText(topPick.name || "Nom indisponible")}</div>
                   <div class="muted" style="margin-top:8px">${safeText(topSubtitle)}</div>
                 </div>
-                <div class="legend" style="justify-content:flex-start;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+                <div class="legend" style="${mobile ? `justify-content:flex-start;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;` : `display:flex;flex-direction:column;gap:8px;align-items:flex-start;`}">
                   ${badge(safeText(topBadgeLabel), topTone)}
                   ${badge(safeText(rowTrendLabel(topPick)), topPick.direction || "")}
                 </div>
-                <div class="top-pick-metrics" style="margin-top:14px;display:grid;gap:10px;">
+                <div class="top-pick-metrics" style="${mobile ? `margin-top:14px;display:grid;gap:10px;` : `display:grid;gap:10px;`}">
                   ${dashboardMetricLine("Prix", topPick.price != null ? priceDisplay(topPick.price) : "—")}
                   ${dashboardMetricLine("Variation 24h", pct(topPick.change24hPct), topChangeClass)}
                   ${dashboardMetricLine("Score actionnable", topActionScore != null ? `${topActionScore}/100` : "—", `score-${topActionTone}`)}
                   ${dashboardMetricLine("Source", topPick.sourceUsed || "—")}
                 </div>
-                <div style="margin-top:14px">
+                <div style="${mobile ? `margin-top:14px` : `display:flex;align-items:flex-start;justify-content:flex-end;`}">
                   <button class="btn" data-open-detail="${safeText(topPick.symbol)}">Ouvrir la fiche</button>
                 </div>
               </div>
