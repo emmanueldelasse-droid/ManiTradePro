@@ -1352,6 +1352,23 @@ function confirmTradeFromModal() {
 
   async function loadAiReview(detail, localPlan) {
     if (!detail) return null;
+    const aiMeta = aiDisplayState(localPlan || {});
+    if (aiMeta.title === "LECTURE MOTEUR SEULE") {
+      state.loadingAiReview = false;
+      state.aiReview = {
+        provider: aiMeta.source,
+        externalAiUsed: false,
+        decision: localPlan?.decision || "A surveiller",
+        prudence: localPlan?.safety || "moyenne",
+        reason: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
+        invalidation: localPlan?.refusalReason || localPlan?.reason || "Pas d'invalidation supplementaire.",
+        summary: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
+        warning: aiMeta.message
+      };
+      render();
+      return state.aiReview;
+    }
+
     state.loadingAiReview = true;
     state.aiReview = null;
     render();
@@ -1379,14 +1396,14 @@ function confirmTradeFromModal() {
       state.aiReview = review?.data || null;
     } catch (e) {
       state.aiReview = {
-        provider: "local_ui_fallback",
+        provider: "local_fallback",
         externalAiUsed: false,
         decision: localPlan?.decision || "Pas de trade conseille",
         prudence: localPlan?.safety || "moyenne",
         reason: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
         invalidation: localPlan?.refusalReason || "Attendre un signal plus propre.",
         summary: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
-        warning: "Pont Analyse externe indisponible."
+        warning: "IA externe indisponible, fallback local utilise."
       };
     } finally {
       state.loadingAiReview = false;
@@ -1565,6 +1582,7 @@ function addTrainingTradeFromDetail(side) {
     entryPrice: d.price,
     invested: investedUsd,
     openedAt: nowIso(),
+    status: "open",
     sourceUsed: d.sourceUsed || null,
     stopLoss: null,
     takeProfit: null,
@@ -1627,6 +1645,7 @@ function createRecommendedTrade() {
     entryPrice: plan.entry,
     invested: investedUsd,
     openedAt: nowIso(),
+    status: "open",
     sourceUsed: d.sourceUsed || null,
     stopLoss: plan.stopLoss,
     takeProfit: plan.takeProfit,
@@ -1695,7 +1714,8 @@ function closeTrainingTrade(id, livePrice = null) {
         exitPrice,
         closedAt,
         closeType: "Cloture manuelle"
-      }
+      },
+      status: "closed"
     });
     state.trades.positions.splice(idx, 1);
     state.trades.history.unshift(closed);
@@ -2637,27 +2657,31 @@ function aiDisplayState(plan) {
       return {
         title: "LECTURE MOTEUR SEULE",
         source: "moteur_local",
-        message: "Contexte IA non necessaire sur ce cas."
+        message: "Contexte IA non necessaire sur ce cas.",
+        externalAiUsed: false
       };
     }
     if (hasHttp || status.includes("network_error") || status.includes("invalid_json") || status.includes("missing_api_key")) {
       return {
         title: "FALLBACK LOCAL",
         source: "local_fallback",
-        message: "IA externe indisponible, fallback local utilise."
+        message: "IA externe indisponible, fallback local utilise.",
+        externalAiUsed: false
       };
     }
-    if (status) {
+    if (status && !status.startsWith("ai_not_needed")) {
       return {
         title: "LECTURE IA + MOTEUR",
         source: "ia_plus_moteur",
-        message: "Contexte IA pris en compte lorsque pertinent."
+        message: "Contexte IA pris en compte lorsque pertinent.",
+        externalAiUsed: true
       };
     }
     return {
       title: "LECTURE MOTEUR SEULE",
       source: "moteur_local",
-      message: "Lecture moteur seule."
+      message: "Lecture moteur seule.",
+      externalAiUsed: false
     };
   }
 
@@ -2732,13 +2756,13 @@ function renderDetail() {
               </div>
 
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Lecture complementaire</span><span>${state.loadingAiReview ? "analyse..." : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local")}</span></div>
+                <div class="section-title"><span>Lecture complementaire</span><span>${state.loadingAiReview ? "analyse..." : safeText((state.aiReview?.provider === "moteur_local") ? "lecture moteur seule" : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local"))}</span></div>
                 ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
                   <div class="ai-review-box">
                     <div class="legend">
                       ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}
                       ${badge(`prudence ${state.aiReview.prudence || "—"}`)}
-                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : "lecture locale")}
+                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : (state.aiReview?.provider === "moteur_local" ? "lecture moteur seule" : "lecture locale"))}
                     </div>
                     <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
                     <div class="kv" style="margin-top:12px">
@@ -3469,6 +3493,11 @@ function normalizePositionRecord(position){
   const pnlRaw = safeNumber(position?.pnl);
   const pnlPctRaw = safeNumber(position?.pnlPct);
   const sourceUsed = position?.sourceUsed || position?.source || position?.analysisSnapshot?.sourceUsed || null;
+  const inferredClosed = !!(
+    position?.closedExecution?.closedAt || position?.closedAt ||
+    position?.closedExecution?.exitPrice || position?.exitPrice
+  );
+  const normalizedStatus = position?.status || (inferredClosed ? "closed" : "open");
 
   const snapshot = {
     symbol: position.symbol || null,
@@ -3524,7 +3553,8 @@ function normalizePositionRecord(position){
     exitPrice: exitPriceRaw,
     pnl: pnlRaw,
     pnlPct: pnlPctRaw,
-    sourceUsed
+    sourceUsed,
+    status: normalizedStatus
   };
 }
 
