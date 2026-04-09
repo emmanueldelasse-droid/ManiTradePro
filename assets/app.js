@@ -2403,6 +2403,24 @@ function dashboardTopStatusLabel(item) {
   return "pas de trade";
 }
 
+
+function formatAlgoDate(value) {
+  if (!value) return "date indisponible";
+  try {
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return String(value);
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    const ss = String(d.getSeconds()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}:${ss}`;
+  } catch {
+    return String(value);
+  }
+}
+
 function renderDashboard() {
     const opps = Array.isArray(state.opportunities) ? state.opportunities.slice() : [];
     const stats = trainingStats();
@@ -4084,7 +4102,11 @@ function openPositionsRiskView() {
       </div>`;
   }
 
-  function renderMain() {
+  
+
+
+
+function renderMain() {
     switch (state.route) {
       case "dashboard": return renderDashboard();
       case "opportunities": return renderOpportunities();
