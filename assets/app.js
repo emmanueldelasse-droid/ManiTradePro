@@ -197,18 +197,29 @@
   async function loadTradesFromWorker() {
     try {
       const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.state);
-      const positions = Array.isArray(payload?.data?.positions) ? payload.data.positions : [];
-      const history = Array.isArray(payload?.data?.history) ? payload.data.history : [];
-      state.trades.positions = positions.map(normalizePositionRecord);
-      state.trades.history = history.map((x) => normalizePositionRecord(x));
-      state.trades.remoteStatus = payload?.data?.configured ? "connected" : "fallback_local";
-      state.trades.remoteError = payload?.data?.configured ? null : (payload?.message || "worker_not_configured");
+      const positions = Array.isArray(payload?.data?.positions) ? payload.data.positions.map(normalizePositionRecord) : [];
+      const history = Array.isArray(payload?.data?.history) ? payload.data.history.map((x) => normalizePositionRecord(x)) : [];
+      const configured = !!payload?.data?.configured;
+      state.trades.remoteStatus = configured ? "connected" : "fallback_local";
+      state.trades.remoteError = configured ? null : (payload?.message || "worker_not_configured");
       state.trades.lastRemoteSyncAt = Date.now();
-      return !!payload?.data?.configured;
+      return {
+        loaded: true,
+        configured,
+        positions,
+        history,
+        payload
+      };
     } catch (err) {
       state.trades.remoteStatus = "fallback_local";
       state.trades.remoteError = err?.message || "worker_trades_load_failed";
-      return false;
+      return {
+        loaded: false,
+        configured: false,
+        positions: [],
+        history: [],
+        payload: null
+      };
     }
   }
 
@@ -221,13 +232,27 @@
           history: Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : []
         })
       });
-      state.trades.remoteStatus = payload?.data?.configured ? "connected" : "fallback_local";
-      state.trades.remoteError = payload?.data?.configured ? null : (payload?.message || "worker_not_configured");
+      const configured = !!payload?.data?.configured;
+      state.trades.remoteStatus = configured ? "connected" : "fallback_local";
+      state.trades.remoteError = configured ? null : (payload?.message || "worker_not_configured");
       state.trades.lastRemoteSyncAt = Date.now();
-      return !!payload?.data?.configured;
+      saveTradesMeta({
+        positionsCount: Array.isArray(state.trades.positions) ? state.trades.positions.length : 0,
+        historyCount: Array.isArray(state.trades.history) ? state.trades.history.length : 0,
+        pendingRemoteSync: !configured,
+        lastSuccessfulRemoteSyncAt: configured ? Date.now() : (loadTradesMeta().lastSuccessfulRemoteSyncAt || null),
+        lastRemoteSyncAttemptAt: Date.now()
+      });
+      return configured;
     } catch (err) {
       state.trades.remoteStatus = "fallback_local";
       state.trades.remoteError = err?.message || "worker_trades_sync_failed";
+      saveTradesMeta({
+        positionsCount: Array.isArray(state.trades.positions) ? state.trades.positions.length : 0,
+        historyCount: Array.isArray(state.trades.history) ? state.trades.history.length : 0,
+        pendingRemoteSync: true,
+        lastRemoteSyncAttemptAt: Date.now()
+      });
       return false;
     }
   }
@@ -501,15 +526,37 @@
   }
 
   async function loadTradesState() {
-    const loadedRemote = await loadTradesFromWorker();
+    const remote = await loadTradesFromWorker();
     const rawPositions = readJsonFromKeys(TRADE_STORAGE.positions, []);
     const rawHistory = readJsonFromKeys(TRADE_STORAGE.history, []);
     const rawAlgo = readJsonFromKeys(TRADE_STORAGE.algoJournal, []);
+    const localPositions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
+    const localHistory = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
+    const meta = loadTradesMeta();
+    const localUpdatedAt = Number(meta?.localUpdatedAt || meta?.updatedAt || 0);
+    const lastSuccessfulRemoteSyncAt = Number(meta?.lastSuccessfulRemoteSyncAt || 0);
+    const hasLocalTrades = localPositions.length > 0 || localHistory.length > 0;
+    const preferLocal = hasLocalTrades && (
+      meta?.pendingRemoteSync === true ||
+      (localUpdatedAt > 0 && lastSuccessfulRemoteSyncAt > 0 && localUpdatedAt > lastSuccessfulRemoteSyncAt)
+    );
 
-    if (!loadedRemote) {
-      state.trades.positions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
-      state.trades.history = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
+    if (remote.loaded && remote.configured && !preferLocal) {
+      state.trades.positions = Array.isArray(remote.positions) ? remote.positions : [];
+      state.trades.history = Array.isArray(remote.history) ? remote.history : [];
+      saveTradesMeta({
+        migratedAt: Date.now(),
+        pendingRemoteSync: false,
+        lastSuccessfulRemoteSyncAt: Date.now(),
+        positionsCount: state.trades.positions.length,
+        historyCount: state.trades.history.length
+      });
+    } else {
+      state.trades.positions = localPositions;
+      state.trades.history = localHistory;
+      if (preferLocal && remote.configured) syncTradesToSupabase().catch(() => {});
     }
+
     state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
 
     // Warm the current versioned keys too, so older/newer builds keep seeing the same trades.
@@ -519,13 +566,18 @@
     writeJson(TRADE_STORAGE.positionsBackup, state.trades.positions);
     writeJson(TRADE_STORAGE.historyBackup, state.trades.history);
     writeJson(TRADE_STORAGE.algoJournalBackup, state.algoJournal);
-    saveTradesMeta({ migratedAt: Date.now() });
+    saveTradesMeta({
+      migratedAt: Date.now(),
+      positionsCount: Array.isArray(state.trades.positions) ? state.trades.positions.length : 0,
+      historyCount: Array.isArray(state.trades.history) ? state.trades.history.length : 0
+    });
   }
 
   function persistTradesState() {
     const positions = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
     const history = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : [];
     const algoJournal = Array.isArray(state.algoJournal) ? state.algoJournal : [];
+    const localUpdatedAt = Date.now();
 
     state.trades.positions = positions;
     state.trades.history = history;
@@ -541,7 +593,9 @@
     saveTradesMeta({
       positionsCount: positions.length,
       historyCount: history.length,
-      algoCount: algoJournal.length
+      algoCount: algoJournal.length,
+      localUpdatedAt,
+      pendingRemoteSync: true
     });
     syncTradesToSupabase().catch(() => {});
   }
@@ -558,7 +612,8 @@
     saveTradesMeta({
       positionsCount: positions.length,
       historyCount: history.length,
-      liveUpdatedAt: Date.now()
+      liveUpdatedAt: Date.now(),
+      localUpdatedAt: Date.now()
     });
   }
 
