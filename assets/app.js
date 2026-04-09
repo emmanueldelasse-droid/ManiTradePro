@@ -2024,16 +2024,6 @@ function isPhoneLayout() {
     return typeof window !== "undefined" && window.innerWidth <= 560;
   }
 
-function mobileCardBadges(item, plan) {
-  const parts = [];
-  parts.push(badge(assetClassLabel(item.assetClass), item.assetClass || ""));
-  parts.push(badge(fidelityLabel(item), fidelityClass(item)));
-  const confirmationText = confirmationLabelText(plan);
-  if (confirmationText) parts.push(badge(confirmationText, "neutral"));
-  if (plan?.riskQuality != null) parts.push(badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)));
-  return parts.join("");
-}
-
 function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
     const decisionLabel = rowDecisionLabel(item);
@@ -2050,7 +2040,6 @@ function renderOppRow(item, rank) {
     const mobile = isPhoneLayout();
     const riskBadge = plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "";
     const confirmationBadge = confirmationText ? badge(confirmationText, "neutral") : "";
-    const mobileBadges = mobileCardBadges(item, plan);
 
     if (mobile) {
       return `
@@ -2080,7 +2069,9 @@ function renderOppRow(item, rank) {
           </div>
 
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
-            ${mobileBadges}
+            ${badge(fidelityLabel(item), fidelityClass(item))}
+            ${confirmationBadge}
+            ${riskBadge}
           </div>
         </div>`;
     }
@@ -4248,4 +4239,3 @@ function openPositionsRiskView() {
 
   boot();
 })();
- 
