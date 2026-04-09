@@ -2019,21 +2019,63 @@ function shortActionLabel(plan, item) {
     return "ne pas agir";
   }
 
+
+function isPhoneLayout() {
+    return typeof window !== "undefined" && window.innerWidth <= 560;
+  }
+
 function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
     const decisionLabel = rowDecisionLabel(item);
     const trendLabel = rowTrendLabel(item);
     const plan = rowTradePlan(item) || {};
     const confirmationText = confirmationLabelText(plan);
-    const priority = priorityLevel(item);
     const top1 = rank === 1 && decisionLabel === "Trade propose";
     const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
-    const dossierScore = dossierScoreFrom(plan) ?? dossierScoreFrom(item);
     const scoreTone = actionabilityTone(actionScore);
     const actionLine = actionScore != null ? `${actionScore}/100 · ${actionabilityLabel(actionScore)}` : "score actionnable indisponible";
     const blockerLine = shortBlockerLabel(plan, item);
     const nextActionLine = shortActionLabel(plan, item);
     const assetBadge = assetClassLabel(item.assetClass);
+    const mobile = isPhoneLayout();
+    const riskBadge = plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "";
+    const confirmationBadge = confirmationText ? badge(confirmationText, "neutral") : "";
+
+    if (mobile) {
+      return `
+        <div class="opp-row mobile-card ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="display:block;padding:14px 14px 16px;border-radius:22px;${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
+          <div style="display:flex;gap:12px;align-items:flex-start;">
+            <div class="opp-rank" style="min-width:36px;">#${rank}</div>
+            <div class="asset-icon">${safeText((item.symbol || "").slice(0, 4))}</div>
+            <div style="min-width:0;flex:1;">
+              <div class="asset-symbol">${safeText(item.symbol)}</div>
+              <div class="asset-name">${safeText(item.name || "Nom indisponible")}</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:14px;align-items:center;margin-top:14px;">
+            <div style="flex:0 0 auto;">${scoreRing(actionScore, scoreTone)}</div>
+            <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:8px;">
+              <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                ${badge(decisionLabel, decisionBadgeTone(item))}
+                ${badge(trendLabel, item.direction || "")}
+              </div>
+              <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
+              <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
+              <div class="muted opp-note" style="font-weight:700; color:${scoreColor(actionScore, scoreTone)}">${safeText(actionLine)}</div>
+              <div class="muted opp-note">${safeText(blockerLine)}</div>
+              <div class="muted opp-note">${safeText(nextActionLine)}</div>
+            </div>
+          </div>
+
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
+            ${badge(assetBadge, item.assetClass || "")}
+            ${badge(fidelityLabel(item), fidelityClass(item))}
+            ${confirmationBadge}
+            ${riskBadge}
+          </div>
+        </div>`;
+    }
 
     return `
       <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
@@ -2063,8 +2105,8 @@ function renderOppRow(item, rank) {
         <div class="badges-col">
           ${badge(assetBadge, item.assetClass || "")}
           ${badge(fidelityLabel(item), fidelityClass(item))}
-          ${confirmationText ? badge(confirmationText, "neutral") : ""}
-          ${plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : ""}
+          ${confirmationBadge}
+          ${riskBadge}
         </div>
       </div>`;
   }
