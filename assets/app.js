@@ -2112,25 +2112,7 @@ function dashboardSignalSummary(opps) {
 }
 
 function dashboardTopPick(opps) {
-  const rows = Array.isArray(opps) ? opps.slice() : [];
-  const proposed = rows.filter((x) => rowDecisionLabel(x) === "Trade propose");
-  const watch = rows.filter((x) => rowDecisionLabel(x) === "A surveiller");
-
-  const scoreOf = (x) => Number(actionabilityScoreFrom(rowTradePlan(x) || x) ?? -1);
-  const dossierOf = (x) => Number(dossierScoreFrom(rowTradePlan(x) || x) ?? -1);
-
-  const sorter = (a, b) => {
-    const actionDelta = scoreOf(b) - scoreOf(a);
-    if (actionDelta) return actionDelta;
-    const dossierDelta = dossierOf(b) - dossierOf(a);
-    if (dossierDelta) return dossierDelta;
-    return String(a?.symbol || "").localeCompare(String(b?.symbol || ""));
-  };
-
-  proposed.sort(sorter);
-  watch.sort(sorter);
-
-  return proposed[0] || watch[0] || rows.sort(sorter)[0] || null;
+  return dashboardPriorityTop(opps);
 }
 
 
@@ -2317,6 +2299,40 @@ function dashboardTopPick(opps) {
     `;
   }
 
+
+function dashboardPriorityTop(opps) {
+    const rows = Array.isArray(opps) ? opps.slice() : [];
+    const grouped = groupedOpportunities(rows);
+    return grouped.proposed[0] || grouped.watch[0] || grouped.noTrade[0] || null;
+  }
+
+  function dashboardPriorityTitle(opps) {
+    const top = dashboardPriorityTop(opps);
+    const decision = top ? rowDecisionLabel(top) : "";
+    if (decision === "Trade propose") return "Priorite du moment";
+    return "Priorite du moment";
+  }
+
+  function dashboardPrioritySubtitle(opps) {
+    const top = dashboardPriorityTop(opps);
+    const decision = top ? rowDecisionLabel(top) : "";
+    if (decision === "Trade propose") return "Actif le plus propre a traiter maintenant.";
+    if (decision === "A surveiller") return "Actif le plus interessant a surveiller maintenant.";
+    return "Actif le plus pertinent du moment, sans signal tradable net.";
+  }
+
+  function dashboardPriorityBadgeLabel(item) {
+    if (!item) return "indisponible";
+    const actionScore = actionabilityScoreFrom(rowTradePlan(item) || item);
+    if (actionScore != null && actionScore >= 80) return "actionnable";
+    return "a surveiller";
+  }
+
+  function dashboardPriorityBadgeTone(item) {
+    const actionScore = actionabilityScoreFrom(rowTradePlan(item) || item);
+    return actionabilityTone(actionScore);
+  }
+
 function renderDashboard() {
     const stats = trainingStats();
     const summary = dashboardSignalSummary(state.opportunities);
@@ -2360,7 +2376,7 @@ function renderDashboard() {
 
         <div class="dashboard-grid">
           <div class="card">
-            <div class="section-title"><span>Meilleure opportunite du moment</span><span>${topPick ? topPick.symbol : "—"}</span></div>
+            <div class="section-title"><span>${safeText(dashboardPriorityTitle(opps))}</span><span>${topPick ? topPick.symbol : "—"}</span></div>
             ${topPick ? `
               <div class="top-pick-box">
                 <div>
