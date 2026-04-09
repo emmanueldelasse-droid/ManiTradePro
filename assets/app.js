@@ -1853,6 +1853,16 @@ function applyFilter() {
   }
 
   function renderOppRow(item, rank) {
+
+    const assetClassLabel = (() => {
+      const raw = String(item?.assetClass || item?.type || "").trim().toLowerCase();
+      if (raw === "crypto") return "crypto";
+      if (raw === "stock" || raw === "action") return "action";
+      if (raw === "etf") return "ETF";
+      if (raw === "forex") return "forex";
+      if (raw === "commodity" || raw === "matiere_premiere" || raw === "matière première") return "commodity";
+      return raw || "actif";
+    })();
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
     const scoreValue = typeof item?.score === "number" ? item.score : null;
     const decisionLabel = rowDecisionLabel(item);
