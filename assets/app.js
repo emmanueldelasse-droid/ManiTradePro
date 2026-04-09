@@ -2311,6 +2311,7 @@ function dashboardTopPick(opps) {
     const overview = state.news?.overview || {};
     const groups = groupedNewsItems();
     const allItems = Array.isArray(state.news?.items) ? state.news.items : [];
+    const mobile = isPhoneLayout();
 
     return `
       <div class="screen" style="${mobile ? `padding-top:max(18px, env(safe-area-inset-top));` : ``}">
