@@ -135,7 +135,9 @@
   }
 
   function saveTradesMeta(extra = {}) {
+    const current = readJson(TRADE_STORAGE.meta, {});
     writeJson(TRADE_STORAGE.meta, {
+      ...(current && typeof current === "object" ? current : {}),
       updatedAt: Date.now(),
       schema: "mestrades_v1",
       ...extra
@@ -536,9 +538,19 @@
     const localUpdatedAt = Number(meta?.localUpdatedAt || meta?.updatedAt || 0);
     const lastSuccessfulRemoteSyncAt = Number(meta?.lastSuccessfulRemoteSyncAt || 0);
     const hasLocalTrades = localPositions.length > 0 || localHistory.length > 0;
+
+    const remotePositionsCount = Array.isArray(remote.positions) ? remote.positions.length : 0;
+    const remoteHistoryCount = Array.isArray(remote.history) ? remote.history.length : 0;
+    const localPositionsCount = localPositions.length;
+    const localHistoryCount = localHistory.length;
+
+    const localHasMoreClosedHistory = localHistoryCount > remoteHistoryCount;
+    const localHasFewerOpenPositions = localPositionsCount < remotePositionsCount;
     const preferLocal = hasLocalTrades && (
       meta?.pendingRemoteSync === true ||
-      (localUpdatedAt > 0 && lastSuccessfulRemoteSyncAt > 0 && localUpdatedAt > lastSuccessfulRemoteSyncAt)
+      (localUpdatedAt > 0 && lastSuccessfulRemoteSyncAt > 0 && localUpdatedAt > lastSuccessfulRemoteSyncAt) ||
+      localHasMoreClosedHistory ||
+      localHasFewerOpenPositions
     );
 
     if (remote.loaded && remote.configured && !preferLocal) {
@@ -554,12 +566,19 @@
     } else {
       state.trades.positions = localPositions;
       state.trades.history = localHistory;
-      if (preferLocal && remote.configured) syncTradesToSupabase().catch(() => {});
+      saveTradesMeta({
+        migratedAt: Date.now(),
+        positionsCount: state.trades.positions.length,
+        historyCount: state.trades.history.length,
+        pendingRemoteSync: meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasFewerOpenPositions
+      });
+      if (remote.configured && (meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasFewerOpenPositions)) {
+        syncTradesToSupabase().catch(() => {});
+      }
     }
 
     state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
 
-    // Warm the current versioned keys too, so older/newer builds keep seeing the same trades.
     writeJsonToKeys(TRADE_STORAGE.positions, state.trades.positions);
     writeJsonToKeys(TRADE_STORAGE.history, state.trades.history);
     writeJsonToKeys(TRADE_STORAGE.algoJournal, state.algoJournal);
@@ -569,7 +588,8 @@
     saveTradesMeta({
       migratedAt: Date.now(),
       positionsCount: Array.isArray(state.trades.positions) ? state.trades.positions.length : 0,
-      historyCount: Array.isArray(state.trades.history) ? state.trades.history.length : 0
+      historyCount: Array.isArray(state.trades.history) ? state.trades.history.length : 0,
+      algoCount: Array.isArray(state.algoJournal) ? state.algoJournal.length : 0
     });
   }
 
@@ -613,7 +633,8 @@
       positionsCount: positions.length,
       historyCount: history.length,
       liveUpdatedAt: Date.now(),
-      localUpdatedAt: Date.now()
+      localUpdatedAt: Date.now(),
+      pendingRemoteSync: true
     });
   }
 
