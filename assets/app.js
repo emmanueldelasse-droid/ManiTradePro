@@ -2334,6 +2334,7 @@ function dashboardPriorityTop(opps) {
   }
 
 function renderDashboard() {
+    const opps = Array.isArray(state.opportunities) ? state.opportunities.slice() : [];
     const stats = trainingStats();
     const summary = dashboardSignalSummary(state.opportunities);
     const topPick = dashboardTopPick(state.opportunities);
