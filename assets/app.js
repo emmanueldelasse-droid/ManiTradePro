@@ -45,6 +45,7 @@
     loading: false,
     loadingDetail: false,
     loadingAiReview: false,
+    showDebugConsole: false,
     error: null,
     opportunitiesRequestId: 0,
     opportunitiesFetchedAt: 0,
@@ -4084,7 +4085,130 @@ function openPositionsRiskView() {
       </div>`;
   }
 
-  function renderMain() {
+  
+const debugConsoleState = {
+  logs: [],
+  enabled: false
+};
+
+function pushDebugLog(level, args) {
+  try {
+    const line = `[${new Date().toISOString()}] ${String(level || "log").toUpperCase()} ${args.map((x) => {
+      if (typeof x === "string") return x;
+      try { return JSON.stringify(x); } catch { return String(x); }
+    }).join(" ")}`;
+    debugConsoleState.logs.unshift(line);
+    if (debugConsoleState.logs.length > 150) debugConsoleState.logs = debugConsoleState.logs.slice(0, 150);
+  } catch {}
+}
+
+function installDebugConsole() {
+  if (debugConsoleState.enabled) return;
+  debugConsoleState.enabled = true;
+
+  const originalLog = console.log.bind(console);
+  const originalWarn = console.warn.bind(console);
+  const originalError = console.error.bind(console);
+
+  console.log = (...args) => {
+    pushDebugLog("log", args);
+    originalLog(...args);
+  };
+  console.warn = (...args) => {
+    pushDebugLog("warn", args);
+    originalWarn(...args);
+  };
+  console.error = (...args) => {
+    pushDebugLog("error", args);
+    originalError(...args);
+  };
+
+  window.addEventListener("error", (event) => {
+    pushDebugLog("error", [
+      event?.message || "window error",
+      event?.filename || "",
+      event?.lineno || "",
+      event?.colno || ""
+    ]);
+  });
+
+  window.addEventListener("unhandledrejection", (event) => {
+    const reason = event?.reason;
+    pushDebugLog("error", ["unhandledrejection", reason?.message || String(reason || "")]);
+  });
+}
+
+function renderDebugConsoleButton() {
+  if (!isPhoneLayout()) return "";
+  return `
+    <button
+      type="button"
+      data-open-debug-console="1"
+      style="
+        position:fixed;
+        right:14px;
+        bottom:calc(84px + env(safe-area-inset-bottom));
+        z-index:9999;
+        border:none;
+        border-radius:999px;
+        padding:10px 14px;
+        background:#111827;
+        color:#fff;
+        font-size:12px;
+        font-weight:700;
+        box-shadow:0 6px 20px rgba(0,0,0,.25);
+      "
+    >Debug</button>
+  `;
+}
+
+function renderDebugConsolePanel() {
+  if (!state.showDebugConsole) return "";
+  const content = debugConsoleState.logs.length
+    ? debugConsoleState.logs.map((line) => `<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.08);white-space:pre-wrap;word-break:break-word;">${safeText(line)}</div>`).join("")
+    : '<div class="muted">Aucun log pour le moment.</div>';
+  return `
+    <div
+      style="
+        position:fixed;
+        inset:0;
+        z-index:10000;
+        background:rgba(0,0,0,.72);
+        display:flex;
+        align-items:flex-end;
+        justify-content:center;
+        padding:18px;
+      "
+      data-close-debug-console="1"
+    >
+      <div
+        style="
+          width:100%;
+          max-width:760px;
+          max-height:78vh;
+          background:#0b1220;
+          color:#fff;
+          border-radius:18px;
+          overflow:hidden;
+          box-shadow:0 18px 60px rgba(0,0,0,.45);
+        "
+        onclick="event.stopPropagation()"
+      >
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.08);">
+          <div style="font-size:14px;font-weight:800;">Console debug iPhone</div>
+          <div style="display:flex;gap:8px;">
+            <button type="button" data-copy-debug-console="1" class="btn">Copier</button>
+            <button type="button" data-clear-debug-console="1" class="btn">Vider</button>
+            <button type="button" data-close-debug-console="1" class="btn">Fermer</button>
+          </div>
+        </div>
+        <div style="padding:12px 16px;overflow:auto;max-height:calc(78vh - 60px);font-size:12px;line-height:1.45;">${content}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMain() {
     switch (state.route) {
       case "dashboard": return renderDashboard();
       case "opportunities": return renderOpportunities();
@@ -4228,7 +4352,8 @@ function openPositionsRiskView() {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
         }
-        render();
+        installDebugConsole();
+  render();
       }
     }, 30000);
   }
@@ -4239,4 +4364,3 @@ function openPositionsRiskView() {
 
   boot();
 })();
- 
