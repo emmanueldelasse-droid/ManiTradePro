@@ -1864,6 +1864,58 @@ function assetClassLabel(value) {
     return raw;
   }
 
+
+
+function fidelityLabel(item) {
+    const plan = rowTradePlan(item) || {};
+    const raw = Number.isFinite(Number(plan?.confidence))
+      ? Number(plan.confidence)
+      : Number.isFinite(Number(item?.confidence))
+        ? Number(item.confidence)
+        : Number.isFinite(Number(item?.score))
+          ? Number(item.score)
+          : null;
+    if (raw == null) return "fiabilite inconnue";
+    if (raw >= 80) return "fiabilite elevee";
+    if (raw >= 65) return "fiabilite moyenne";
+    return "fiabilite faible";
+  }
+
+  function fidelityClass(item) {
+    const label = fidelityLabel(item);
+    if (label.includes("elevee")) return "positive";
+    if (label.includes("moyenne")) return "neutral";
+    return "warning";
+  }
+
+
+
+function priorityClass(priority) {
+    const raw = String(priority || "").trim().toLowerCase();
+    if (raw.includes("haute") || raw.includes("top")) return "positive";
+    if (raw.includes("utile") || raw.includes("moyenne")) return "neutral";
+    return "warning";
+  }
+
+  function setupTypeLabel(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw) return "setup";
+    if (raw === "breakout") return "breakout";
+    if (raw === "pullback") return "pullback";
+    if (raw === "trend_continuation") return "trend continuation";
+    if (raw === "reversal") return "reversal";
+    if (raw === "mean_reversion") return "mean reversion";
+    return raw.replaceAll("_", " ");
+  }
+
+  function riskBadgeClass(plan) {
+    const raw = Number(plan?.riskQuality);
+    if (!Number.isFinite(raw)) return "neutral";
+    if (raw >= 70) return "positive";
+    if (raw >= 55) return "neutral";
+    return "warning";
+  }
+
 function renderOppRow(item, rank) {
     const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
     const scoreValue = typeof item?.score === "number" ? item.score : null;
