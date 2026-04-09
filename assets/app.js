@@ -2058,9 +2058,22 @@ function dashboardSignalSummary(opps) {
 }
 
 function dashboardTopPick(opps) {
-  const rows = Array.isArray(opps) ? opps.filter((x) => typeof x?.score === "number") : [];
-  rows.sort((a, b) => Number(b.score || 0) - Number(a.score || 0));
-  return rows[0] || null;
+  const rows = Array.isArray(opps) ? opps.slice() : [];
+  const proposed = rows.filter((x) => rowDecisionLabel(x) === "Trade propose");
+  const watch = rows.filter((x) => rowDecisionLabel(x) === "A surveiller");
+
+  const scoreOf = (x) => Number(
+    rowTradePlan(x)?.exploitabilityScore ??
+    rowTradePlan(x)?.finalScore ??
+    x?.exploitabilityScore ??
+    x?.score ??
+    0
+  );
+
+  proposed.sort((a, b) => scoreOf(b) - scoreOf(a));
+  watch.sort((a, b) => scoreOf(b) - scoreOf(a));
+
+  return proposed[0] || watch[0] || rows[0] || null;
 }
 
 
@@ -2250,6 +2263,7 @@ function dashboardTopPick(opps) {
 function renderDashboard() {
     const stats = trainingStats();
     const summary = dashboardSignalSummary(state.opportunities);
+    const groups = groupedOpportunities(state.opportunities || []);
     const topPick = dashboardTopPick(state.opportunities);
     const topRows = state.opportunities.slice(0, 5);
     const recentAlgo = state.algoJournal.slice(0, 3);
@@ -2265,7 +2279,7 @@ function renderDashboard() {
           <div class="dashboard-hero-top">
             <div>
               <div class="dashboard-hero-title">${stats.openCount} position${stats.openCount > 1 ? "s ouvertes" : " ouverte"}</div>
-              <div class="dashboard-hero-subtitle">${summary.title} · ${summary.text}</div>
+              <div class="dashboard-hero-subtitle">${groups.proposed.length ? `${summary.title} · ${summary.text}` : groups.watch.length ? `Lecture prudente · Aucun trade propose net. ${groups.watch.length} actif${groups.watch.length > 1 ? "s" : ""} restent surtout a surveiller.` : `${summary.title} · ${summary.text}`}</div>
             </div>
             <div class="legend">
               ${badge("Training")}
@@ -2290,7 +2304,7 @@ function renderDashboard() {
 
         <div class="dashboard-grid">
           <div class="card">
-            <div class="section-title"><span>Meilleure opportunite du moment</span><span>${topPick ? topPick.symbol : "—"}</span></div>
+            <div class="section-title"><span>Priorite du moment</span><span>${topPick ? `${topPick.symbol} · ${rowDecisionLabel(topPick)}` : "—"}</span></div>
             ${topPick ? `
               <div class="top-pick-box">
                 <div>
@@ -2298,8 +2312,8 @@ function renderDashboard() {
                   <div class="trade-sub">${safeText(topPick.name || "Actif")}</div>
                 </div>
                 <div class="legend">
+                  ${badge(rowDecisionLabel(topPick), rowDecisionLabel(topPick))}
                   ${badge(rowTradePlan(topPick)?.trendLabel || "analyse en cours")}
-                  ${badge(topPick.confidence || "fiabilite")}
                 </div>
               </div>
               <div class="kv" style="margin-top:14px">
