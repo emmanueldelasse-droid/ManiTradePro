@@ -1150,13 +1150,15 @@ function mainBlockerText(plan) {
 
 function priorityLevel(item) {
   const plan = rowTradePlan(item) || {};
-  const score = Number(plan?.finalScore ?? item?.score ?? 0);
+  const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item) ?? 0;
+  const dossierScore = dossierScoreFrom(plan) ?? dossierScoreFrom(item) ?? 0;
   const tradeNow = plan?.tradeNow === true;
-  const confirmations = Number(plan?.confirmationCount ?? 0);
+  const confirmations = Number(plan?.confirmationCount ?? item?.confirmationCount ?? 0);
   const blockers = Array.isArray(plan?.blockers) ? plan.blockers.filter(Boolean).length : 0;
-  if (tradeNow && score >= 78 && confirmations >= 4 && blockers === 0) return "priorite haute";
-  if (tradeNow || score >= 65) return "priorite utile";
-  if (score >= 45) return "secondaire";
+
+  if (tradeNow && actionScore >= 78 && confirmations >= 4 && blockers === 0) return "priorite haute";
+  if (actionScore >= 68 || (tradeNow && dossierScore >= 70)) return "priorite utile";
+  if (actionScore >= 50 || dossierScore >= 65) return "secondaire";
   return "faible";
 }
 
@@ -1762,8 +1764,11 @@ function groupedOpportunities(rows) {
 
   items.forEach((item) => {
     const decision = rowDecisionLabel(item);
-    const score = typeof item?.score === "number" ? item.score : -1;
-    const enriched = { ...item, _score: score };
+    const enriched = {
+      ...item,
+      _actionScore: actionabilityScoreFrom(rowTradePlan(item) || item),
+      _dossierScore: dossierScoreFrom(rowTradePlan(item) || item)
+    };
 
     if (decision === "Trade propose") buckets.proposed.push(enriched);
     else if (decision === "A surveiller") buckets.watch.push(enriched);
@@ -1771,7 +1776,10 @@ function groupedOpportunities(rows) {
   });
 
   const sorter = (a, b) => {
-    if ((b._score ?? -1) !== (a._score ?? -1)) return (b._score ?? -1) - (a._score ?? -1);
+    const actionDelta = (Number(b._actionScore ?? -1) - Number(a._actionScore ?? -1));
+    if (actionDelta) return actionDelta;
+    const dossierDelta = (Number(b._dossierScore ?? -1) - Number(a._dossierScore ?? -1));
+    if (dossierDelta) return dossierDelta;
     return String(a.symbol || "").localeCompare(String(b.symbol || ""));
   };
 
@@ -2062,18 +2070,21 @@ function dashboardTopPick(opps) {
   const proposed = rows.filter((x) => rowDecisionLabel(x) === "Trade propose");
   const watch = rows.filter((x) => rowDecisionLabel(x) === "A surveiller");
 
-  const scoreOf = (x) => Number(
-    rowTradePlan(x)?.exploitabilityScore ??
-    rowTradePlan(x)?.finalScore ??
-    x?.exploitabilityScore ??
-    x?.score ??
-    0
-  );
+  const scoreOf = (x) => Number(actionabilityScoreFrom(rowTradePlan(x) || x) ?? -1);
+  const dossierOf = (x) => Number(dossierScoreFrom(rowTradePlan(x) || x) ?? -1);
 
-  proposed.sort((a, b) => scoreOf(b) - scoreOf(a));
-  watch.sort((a, b) => scoreOf(b) - scoreOf(a));
+  const sorter = (a, b) => {
+    const actionDelta = scoreOf(b) - scoreOf(a);
+    if (actionDelta) return actionDelta;
+    const dossierDelta = dossierOf(b) - dossierOf(a);
+    if (dossierDelta) return dossierDelta;
+    return String(a?.symbol || "").localeCompare(String(b?.symbol || ""));
+  };
 
-  return proposed[0] || watch[0] || rows[0] || null;
+  proposed.sort(sorter);
+  watch.sort(sorter);
+
+  return proposed[0] || watch[0] || rows.sort(sorter)[0] || null;
 }
 
 
@@ -2263,7 +2274,6 @@ function dashboardTopPick(opps) {
 function renderDashboard() {
     const stats = trainingStats();
     const summary = dashboardSignalSummary(state.opportunities);
-    const groups = groupedOpportunities(state.opportunities || []);
     const topPick = dashboardTopPick(state.opportunities);
     const topRows = state.opportunities.slice(0, 5);
     const recentAlgo = state.algoJournal.slice(0, 3);
@@ -2279,7 +2289,7 @@ function renderDashboard() {
           <div class="dashboard-hero-top">
             <div>
               <div class="dashboard-hero-title">${stats.openCount} position${stats.openCount > 1 ? "s ouvertes" : " ouverte"}</div>
-              <div class="dashboard-hero-subtitle">${groups.proposed.length ? `${summary.title} · ${summary.text}` : groups.watch.length ? `Lecture prudente · Aucun trade propose net. ${groups.watch.length} actif${groups.watch.length > 1 ? "s" : ""} restent surtout a surveiller.` : `${summary.title} · ${summary.text}`}</div>
+              <div class="dashboard-hero-subtitle">${summary.title} · ${summary.text}</div>
             </div>
             <div class="legend">
               ${badge("Training")}
@@ -2304,7 +2314,7 @@ function renderDashboard() {
 
         <div class="dashboard-grid">
           <div class="card">
-            <div class="section-title"><span>Priorite du moment</span><span>${topPick ? `${topPick.symbol} · ${rowDecisionLabel(topPick)}` : "—"}</span></div>
+            <div class="section-title"><span>Meilleure opportunite du moment</span><span>${topPick ? topPick.symbol : "—"}</span></div>
             ${topPick ? `
               <div class="top-pick-box">
                 <div>
@@ -2312,8 +2322,8 @@ function renderDashboard() {
                   <div class="trade-sub">${safeText(topPick.name || "Actif")}</div>
                 </div>
                 <div class="legend">
-                  ${badge(rowDecisionLabel(topPick), rowDecisionLabel(topPick))}
                   ${badge(rowTradePlan(topPick)?.trendLabel || "analyse en cours")}
+                  ${badge(topPick.confidence || "fiabilite")}
                 </div>
               </div>
               <div class="kv" style="margin-top:14px">
