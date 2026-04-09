@@ -4248,3 +4248,4 @@ function openPositionsRiskView() {
 
   boot();
 })();
+ 
