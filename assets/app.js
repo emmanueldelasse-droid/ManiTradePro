@@ -2629,6 +2629,38 @@ function officialPlanForDetail(detail) {
   return plan;
 }
 
+
+function aiDisplayState(plan) {
+    const status = String(plan?.aiContextStatus || "").trim().toLowerCase();
+    const hasHttp = /http_\d+/.test(status);
+    if (status.startsWith("ai_not_needed")) {
+      return {
+        title: "LECTURE MOTEUR SEULE",
+        source: "moteur_local",
+        message: "Contexte IA non necessaire sur ce cas."
+      };
+    }
+    if (hasHttp || status.includes("network_error") || status.includes("invalid_json") || status.includes("missing_api_key")) {
+      return {
+        title: "FALLBACK LOCAL",
+        source: "local_fallback",
+        message: "IA externe indisponible, fallback local utilise."
+      };
+    }
+    if (status) {
+      return {
+        title: "LECTURE IA + MOTEUR",
+        source: "ia_plus_moteur",
+        message: "Contexte IA pris en compte lorsque pertinent."
+      };
+    }
+    return {
+      title: "LECTURE MOTEUR SEULE",
+      source: "moteur_local",
+      message: "Lecture moteur seule."
+    };
+  }
+
 function renderDetail() {
     const d = state.detail;
     return `
