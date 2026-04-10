@@ -2032,22 +2032,69 @@ function secondaryPositiveTone(label) {
   return "neutral";
 }
 
+
+function getDecisionState(item) {
+  const decision = rowDecisionLabel(item);
+  if (decision === "Trade propose") return { key: "trade_propose", label: "Trade propose", tone: "proposed" };
+  if (decision === "A surveiller") return { key: "a_surveiller", label: "A surveiller", tone: "blocked" };
+  return { key: "pas_de_trade", label: decision || "Pas de trade", tone: "notrade" };
+}
+
+function getScoreState(item) {
+  const plan = rowTradePlan(item) || item || {};
+  const score = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
+  const tone = actionabilityTone(score);
+  const label = actionabilityLabel(score);
+  return { score, tone, label };
+}
+
+function getOpportunityCardViewModel(item) {
+  const plan = rowTradePlan(item) || {};
+  const decisionState = getDecisionState(item);
+  const scoreState = getScoreState(item);
+  const confirmationText = confirmationLabelText(plan);
+  return {
+    item,
+    plan,
+    decisionState,
+    scoreState,
+    decisionLabel: decisionState.label,
+    decisionTone: decisionState.tone,
+    trendLabel: rowTrendLabel(item),
+    assetBadge: assetClassLabel(item.assetClass),
+    blockerLine: shortBlockerLabel(plan, item),
+    nextActionLine: shortActionLabel(plan, item),
+    confirmationText,
+    riskBadge: plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "",
+    fidelityBadge: badge(fidelityLabel(item), fidelityClass(item)),
+    confirmationBadge: confirmationText ? badge(confirmationText, "neutral") : "",
+    priceHtml: item.price != null ? priceDisplay(item.price) : "Donnee indisponible",
+    changeClass: item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "",
+    changeText: pct(item.change24hPct),
+    scoreLine: scoreState.score != null ? `${scoreState.score}/100 · ${scoreState.label}` : "score actionnable indisponible"
+  };
+}
+
+function getDashboardTopViewModel(items) {
+  const opps = Array.isArray(items) ? items.slice() : [];
+  const topPick = dashboardPriorityTop(opps);
+  if (!topPick) return null;
+  const decisionState = getDecisionState(topPick);
+  const scoreState = getScoreState(topPick);
+  return {
+    item: topPick,
+    decisionState,
+    scoreState,
+    badgeLabel: decisionState.key === "trade_propose" ? "actionnable" : (decisionState.key === "a_surveiller" ? "a surveiller" : "pas de trade"),
+    subtitle: dashboardPrioritySubtitle(opps)
+  };
+}
+
 function renderOppRow(item, rank) {
-    const changeClass = item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "";
-    const decisionLabel = rowDecisionLabel(item);
-    const trendLabel = rowTrendLabel(item);
-    const plan = rowTradePlan(item) || {};
-    const confirmationText = confirmationLabelText(plan);
-    const top1 = rank === 1 && decisionLabel === "Trade propose";
-    const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
-    const scoreTone = actionabilityTone(actionScore);
-    const actionLine = actionScore != null ? `${actionScore}/100 · ${actionabilityLabel(actionScore)}` : "score actionnable indisponible";
-    const blockerLine = shortBlockerLabel(plan, item);
-    const nextActionLine = shortActionLabel(plan, item);
-    const assetBadge = assetClassLabel(item.assetClass);
+    const vm = getOpportunityCardViewModel(item);
+    const top1 = rank === 1 && vm.decisionState.key === "trade_propose";
     const mobile = isPhoneLayout();
-    const riskBadge = plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "";
-    const confirmationBadge = confirmationText ? badge(confirmationText, "neutral") : "";
+    const mobileBadges = [vm.fidelityBadge, vm.confirmationBadge, vm.riskBadge].filter(Boolean).join("");
 
     if (mobile) {
       return `
@@ -2060,26 +2107,22 @@ function renderOppRow(item, rank) {
               <div class="asset-name">${safeText(item.name || "Nom indisponible")}</div>
             </div>
           </div>
-
           <div style="display:flex;gap:14px;align-items:center;margin-top:14px;">
-            <div style="flex:0 0 auto;">${scoreRing(actionScore, scoreTone)}</div>
+            <div style="flex:0 0 auto;">${scoreRing(vm.scoreState.score, vm.scoreState.tone)}</div>
             <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:8px;">
               <div style="display:flex;flex-wrap:wrap;gap:8px;">
-                ${badge(decisionLabel, decisionBadgeTone(item))}
-                ${badge(trendLabel, item.direction || "")}
+                ${badge(vm.decisionLabel, vm.decisionTone)}
+                ${badge(vm.trendLabel, item.direction || "")}
               </div>
-              <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
-              <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
-              <div class="muted opp-note" style="font-weight:700; color:${scoreColor(actionScore, scoreTone)}">${safeText(actionLine)}</div>
-              <div class="muted opp-note">${safeText(blockerLine)}</div>
-              <div class="muted opp-note">${safeText(nextActionLine)}</div>
+              <div class="price">${vm.priceHtml}</div>
+              <div class="change ${vm.changeClass}">${vm.changeText}</div>
+              <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
+              <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
+              <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
             </div>
           </div>
-
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
-            ${badge(fidelityLabel(item), fidelityClass(item))}
-            ${confirmationBadge}
-            ${riskBadge}
+            ${mobileBadges}
           </div>
         </div>`;
     }
@@ -2092,28 +2135,27 @@ function renderOppRow(item, rank) {
           <div class="asset-text">
             <div class="asset-symbol">${safeText(item.symbol)}</div>
             <div class="asset-name">${safeText(item.name || "Nom indisponible")}</div>
-            ${top1 ? `<div class="muted opp-note">meilleure opportunite du moment</div>` : ""}
           </div>
         </div>
         <div class="score-box">
-          ${scoreRing(actionScore, scoreTone)}
+          ${scoreRing(vm.scoreState.score, vm.scoreState.tone)}
           <div class="score-meta" style="display:flex;flex-direction:column;gap:8px;">
-            ${badge(decisionLabel, decisionBadgeTone(item))}
-            ${badge(trendLabel, item.direction || "")}
+            ${badge(vm.decisionLabel, vm.decisionTone)}
+            ${badge(vm.trendLabel, item.direction || "")}
           </div>
         </div>
         <div class="price-col" style="display:flex;flex-direction:column;gap:6px;">
-          <div class="price">${item.price != null ? priceDisplay(item.price) : "Donnee indisponible"}</div>
-          <div class="change ${changeClass}">${pct(item.change24hPct)}</div>
-          <div class="muted opp-note" style="font-weight:700; color:${scoreColor(actionScore, scoreTone)}">${safeText(actionLine)}</div>
-          <div class="muted opp-note">${safeText(blockerLine)}</div>
-          <div class="muted opp-note">${safeText(nextActionLine)}</div>
+          <div class="price">${vm.priceHtml}</div>
+          <div class="change ${vm.changeClass}">${vm.changeText}</div>
+          <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
+          <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
+          <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
         </div>
         <div class="badges-col" style="display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
-          ${badge(assetBadge, item.assetClass || "")}
-          ${badge(fidelityLabel(item), fidelityClass(item))}
-          ${confirmationBadge}
-          ${riskBadge}
+          ${badge(vm.assetBadge, item.assetClass || "")}
+          ${vm.fidelityBadge}
+          ${vm.confirmationBadge}
+          ${vm.riskBadge}
         </div>
       </div>`;
   }
@@ -2446,19 +2488,11 @@ function renderDashboard() {
     const opps = Array.isArray(state.opportunities) ? state.opportunities.slice() : [];
     const stats = trainingStats();
     const summary = dashboardSignalSummary(opps);
-    const topPick = dashboardPriorityTop(opps);
     const grouped = groupedOpportunities(opps);
     const topRows = [...grouped.proposed, ...grouped.watch, ...grouped.noTrade].slice(0, 5);
     const recentAlgo = state.algoJournal.slice(0, 3);
-    const topDecision = topPick ? rowDecisionLabel(topPick) : "Pas de trade";
-    const topTone = statusToneFromDecision(topDecision);
-    const topBadgeLabel = dashboardTopStatusLabel(topPick);
-    const topSubtitle = dashboardPrioritySubtitle(opps);
-    const heroText = summary.title + " · " + (summary.text || "");
     const mobile = isPhoneLayout();
-    const topActionScore = topPick ? (actionabilityScoreFrom(rowTradePlan(topPick) || topPick)) : null;
-    const topActionTone = actionabilityTone(topActionScore);
-    const topChangeClass = topPick ? (topPick.change24hPct > 0 ? "up" : topPick.change24hPct < 0 ? "down" : "") : "";
+    const topVm = getDashboardTopViewModel(opps);
 
     return `
       <div class="screen">
@@ -2471,7 +2505,7 @@ function renderDashboard() {
           <div class="dashboard-hero-top" style="${mobile ? "display:block;" : ""}">
             <div>
               <div class="dashboard-hero-title">${stats.openCount} position${stats.openCount > 1 ? "s ouvertes" : " ouverte"}</div>
-              <div class="dashboard-hero-subtitle">${safeText(heroText)}</div>
+              <div class="dashboard-hero-subtitle">${safeText(summary.title + " · " + (summary.text || ""))}</div>
             </div>
             <div class="legend" style="${mobile ? "margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;" : ""}">
               ${badge("Training")}
@@ -2496,31 +2530,29 @@ function renderDashboard() {
 
         <div class="dashboard-grid" style="${mobile ? "display:block;" : ""}">
           <div class="card" style="${mobile ? "margin-bottom:14px;" : ""}">
-            <div class="section-title"><span>Priorite du moment</span><span>${topPick ? safeText(topPick.symbol) : "—"}</span></div>
-            ${topPick ? `
+            <div class="section-title"><span>Priorite du moment</span><span>${topVm ? safeText(topVm.item.symbol) : "—"}</span></div>
+            ${topVm ? `
               <div class="top-pick-box" style="${mobile ? `` : `display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(170px,.8fr) minmax(240px,1fr) auto;gap:18px;align-items:start;`}">
                 <div>
-                  <div class="trade-symbol">${safeText(topPick.symbol)}</div>
-                  <div class="trade-name">${safeText(topPick.name || "Nom indisponible")}</div>
-                  <div class="muted" style="margin-top:8px">${safeText(topSubtitle)}</div>
+                  <div class="trade-symbol">${safeText(topVm.item.symbol)}</div>
+                  <div class="trade-name">${safeText(topVm.item.name || "Nom indisponible")}</div>
+                  <div class="muted" style="margin-top:8px">${safeText(topVm.subtitle)}</div>
                 </div>
                 <div class="legend" style="${mobile ? `justify-content:flex-start;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;` : `display:flex;flex-direction:column;gap:8px;align-items:flex-start;`}">
-                  ${badge(safeText(topBadgeLabel), topTone)}
-                  ${badge(safeText(rowTrendLabel(topPick)), topPick.direction || "")}
+                  ${badge(safeText(topVm.badgeLabel), topVm.decisionState.tone)}
+                  ${badge(safeText(rowTrendLabel(topVm.item)), topVm.item.direction || "")}
                 </div>
                 <div class="top-pick-metrics" style="${mobile ? `margin-top:14px;display:grid;gap:10px;` : `display:grid;gap:10px;`}">
-                  ${dashboardMetricLine("Prix", topPick.price != null ? priceDisplay(topPick.price) : "—")}
-                  ${dashboardMetricLine("Variation 24h", pct(topPick.change24hPct), topChangeClass)}
-                  ${dashboardMetricLine("Score actionnable", topActionScore != null ? `${topActionScore}/100` : "—", `score-${topActionTone}`)}
-                  ${dashboardMetricLine("Source", topPick.sourceUsed || "—")}
+                  ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
+                  ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
+                  ${dashboardMetricLine("Score actionnable", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
+                  ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
                 </div>
                 <div style="${mobile ? `margin-top:14px` : `display:flex;align-items:flex-start;justify-content:flex-end;`}">
-                  <button class="btn" data-open-detail="${safeText(topPick.symbol)}">Ouvrir la fiche</button>
+                  <button class="btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche</button>
                 </div>
               </div>
-            ` : `
-              <div class="empty-state">Aucune priorite exploitable pour le moment.</div>
-            `}
+            ` : `<div class="empty-state">Aucune priorite exploitable pour le moment.</div>`}
           </div>
 
           <div class="card">
