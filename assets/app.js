@@ -2068,7 +2068,7 @@ function getOpportunityCardViewModel(item) {
     riskBadge: plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "",
     fidelityBadge: badge(fidelityLabel(item), fidelityClass(item)),
     confirmationBadge: confirmationText ? badge(confirmationText, "neutral") : "",
-    priceHtml: item.price != null ? priceDisplay(item.price) : "Donnee indisponible",
+    priceHtml: item.price != null ? renderPriceStack(item.price) : "Donnee indisponible",
     changeClass: item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "",
     changeText: pct(item.change24hPct),
     scoreLine: scoreState.score != null ? `${scoreState.score}/100 · ${scoreState.label}` : "score actionnable indisponible"
@@ -2088,6 +2088,29 @@ function getDashboardTopViewModel(items) {
     badgeLabel: decisionState.key === "trade_propose" ? "actionnable" : (decisionState.key === "a_surveiller" ? "a surveiller" : "pas de trade"),
     subtitle: dashboardPrioritySubtitle(opps)
   };
+}
+
+
+function displayPrimaryPrice(vUsd) {
+  if (vUsd == null || Number.isNaN(vUsd)) return "Donnee indisponible";
+  const eur = vUsd * fxRateUsdToEur();
+  const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
+  if (mode === "USD") return money(vUsd, "USD");
+  return money(eur, "EUR");
+}
+
+function displaySecondaryPrice(vUsd) {
+  if (vUsd == null || Number.isNaN(vUsd)) return "";
+  const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
+  if (mode === "EUR" || mode === "USD") return "";
+  return money(vUsd, "USD");
+}
+
+function renderPriceStack(vUsd) {
+  const primary = displayPrimaryPrice(vUsd);
+  const secondary = displaySecondaryPrice(vUsd);
+  if (!secondary) return `<div class="price">${primary}</div>`;
+  return `<div class="price-stack" style="display:flex;flex-direction:column;gap:2px;"><div class="price">${primary}</div><div class="muted" style="font-size:12px;">${secondary}</div></div>`;
 }
 
 function renderOppRow(item, rank) {
