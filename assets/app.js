@@ -828,9 +828,8 @@ function averageRange(candles, count = 14) {
 }
 
 function decisionBadgeClass(decision) {
-  if (decision === "Trade conseille") return "decision-strong";
-  if (decision === "Trade possible") return "decision-medium";
-  if (decision === "A surveiller") return "decision-watch";
+  if (decision === "Trade propose" || decision === "Trade conseille") return "decision-strong";
+  if (decision === "A surveiller" || decision === "Trade possible") return "decision-watch";
   if (decision === "A eviter") return "decision-avoid";
   return "decision-none";
 }
@@ -843,8 +842,8 @@ function detectedTrendLabel(direction) {
 }
 
 function decisionFromReliability(score) {
-  if (score >= 70) return "Trade propose";
-  if (score >= 55) return "A surveiller";
+  if (score >= 80) return "Trade propose";
+  if (score >= 65) return "A surveiller";
   return "Pas de trade";
 }
 
@@ -1115,8 +1114,11 @@ function rowTrendLabel(item) {
 async function hydrateNonCryptoRows(rows) { return; }
 
 function rowTradePlan(item) {
-  if (!item || !item.plan) return null;
-  return item.plan;
+  if (!item) return null;
+  if (item.plan) return item.plan;
+  const detail = detailEngineInputFor(item);
+  if (detail) return generateTradePlan(detail);
+  return lightweightTradePlan(item);
 }
 
 function currentTradePlan() {
@@ -1281,6 +1283,10 @@ function confirmTradeFromModal() {
       tradeNow: item?.tradeNow === true || item?.plan?.tradeNow === true,
       confirmationCount: typeof item?.confirmationCount === "number" ? item.confirmationCount : (typeof item?.plan?.confirmationCount === "number" ? item.plan.confirmationCount : null),
       blockers: Array.isArray(item?.blockers) ? item.blockers : (Array.isArray(item?.plan?.blockers) ? item.plan.blockers : []),
+      aiContextReview: item?.aiContextReview || null,
+      aiContextStatus: item?.aiContextStatus || item?.plan?.aiContextStatus || null,
+      aiModifier: typeof item?.aiModifier === "number" ? item.aiModifier : (typeof item?.plan?.aiModifier === "number" ? item.plan.aiModifier : 0),
+      aiInfluence: item?.aiInfluence || item?.plan?.aiInfluence || "aucune",
       candles: Array.isArray(item?.candles) ? item.candles : [],
       error: compactError(item?.error || item?.reasonShort || null)
     };
@@ -1303,6 +1309,10 @@ function confirmTradeFromModal() {
       trendLabel: stored.trendLabel || current.trendLabel || null,
       reasonShort: stored.reasonShort || current.reasonShort || null,
       plan: stored.plan || current.plan || null,
+      aiContextReview: stored.aiContextReview || current.aiContextReview || null,
+      aiContextStatus: stored.aiContextStatus || current.aiContextStatus || null,
+      aiModifier: typeof stored.aiModifier === "number" ? stored.aiModifier : (typeof current.aiModifier === "number" ? current.aiModifier : 0),
+      aiInfluence: stored.aiInfluence || current.aiInfluence || "aucune",
       status: stored.status || current.status || null,
       freshness: stored.freshness || current.freshness || "unknown"
     });
@@ -1361,63 +1371,69 @@ function confirmTradeFromModal() {
 
   async function loadAiReview(detail, localPlan) {
     if (!detail) return null;
-    const aiMeta = aiDisplayState(localPlan || {});
-    if (aiMeta.title === "LECTURE MOTEUR SEULE") {
-      state.loadingAiReview = false;
+
+    const aiMeta = aiDisplayState(localPlan || detail?.plan || {});
+    const review = detail?.aiContextReview || null;
+
+    state.loadingAiReview = false;
+
+    if (review) {
+      const supportMap = {
+        soutien_fort: "contexte favorable et coherent",
+        soutien_modere: "contexte plutot favorable",
+        neutre: "contexte neutre",
+        contradictoire: "contexte contradictoire",
+        fortement_contradictoire: "contexte fortement contradictoire",
+        insuffisant: "sources insuffisantes"
+      };
+      const toneMap = {
+        haussier: "haussier",
+        plutot_haussier: "plutot haussier",
+        neutre: "neutre",
+        plutot_baissier: "plutot baissier",
+        baissier: "baissier",
+        incertain: "incertain"
+      };
+      const contradiction = Number(review?.contradiction_level || 0);
+      const confidence = Number(review?.confidence || 0);
+      const sourceCount = Number(review?.source_count || 0);
+      const support = supportMap[String(review?.support_level || "")] || "contexte analyse";
+      const tone = toneMap[String(review?.tone || "")] || "incertain";
+      const summary = String(review?.summary_strict || "").trim() || (localPlan?.aiSummary || localPlan?.reason || "Lecture contextuelle disponible.");
+      const contradictionText = contradiction >= 3
+        ? "contradiction forte entre contexte et setup"
+        : contradiction === 2
+          ? "contradictions notables a surveiller"
+          : contradiction === 1
+            ? "quelques contradictions mineures"
+            : "pas de contradiction majeure detectee";
+
       state.aiReview = {
-        provider: aiMeta.source,
-        externalAiUsed: false,
-        decision: localPlan?.decision || "A surveiller",
-        prudence: localPlan?.safety || "moyenne",
-        reason: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
-        invalidation: localPlan?.refusalReason || localPlan?.reason || "Pas d'invalidation supplementaire.",
-        summary: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
-        warning: aiMeta.message
+        provider: "worker_context_review",
+        externalAiUsed: true,
+        decision: localPlan?.decision || detail?.decision || "A surveiller",
+        prudence: contradiction >= 3 ? "elevee" : confidence >= 0.7 ? "moyenne" : "moyenne",
+        reason: `${support} · tonalite ${tone} · ${sourceCount} source${sourceCount > 1 ? "s" : ""}.`,
+        invalidation: contradictionText,
+        summary,
+        warning: aiMeta.message || null
       };
       render();
       return state.aiReview;
     }
 
-    state.loadingAiReview = true;
-    state.aiReview = null;
+    state.aiReview = {
+      provider: aiMeta.source,
+      externalAiUsed: false,
+      decision: localPlan?.decision || detail?.decision || "A surveiller",
+      prudence: localPlan?.safety || "moyenne",
+      reason: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
+      invalidation: localPlan?.refusalReason || localPlan?.reason || "Pas d'invalidation supplementaire.",
+      summary: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
+      warning: aiMeta.message
+    };
     render();
-    try {
-      const payload = {
-        symbol: detail.symbol,
-        detail: {
-          symbol: detail.symbol,
-          name: detail.name,
-          assetClass: detail.assetClass,
-          price: detail.price,
-          change24hPct: detail.change24hPct,
-          score: detail.score,
-          scoreStatus: detail.scoreStatus,
-          direction: detail.direction,
-          analysisLabel: detail.analysisLabel,
-          confidence: detail.confidence,
-          breakdown: detail.breakdown || {},
-          sourceUsed: detail.sourceUsed,
-          freshness: detail.freshness
-        },
-        localPlan
-      };
-      const review = await apiPost("/api/ai/trade-review", payload);
-      state.aiReview = review?.data || null;
-    } catch (e) {
-      state.aiReview = {
-        provider: "local_fallback",
-        externalAiUsed: false,
-        decision: localPlan?.decision || "Pas de trade conseille",
-        prudence: localPlan?.safety || "moyenne",
-        reason: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
-        invalidation: localPlan?.refusalReason || "Attendre un signal plus propre.",
-        summary: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
-        warning: "IA externe indisponible, fallback local utilise."
-      };
-    } finally {
-      state.loadingAiReview = false;
-      render();
-    }
+    return state.aiReview;
   }
 
   async function loadDashboard() {
@@ -2195,10 +2211,10 @@ function prudentShortlist(limit = 5) {
         const plan = generateTradePlan(pseudoDetail);
         return { ...item, plan };
       })
-      .filter(x => x.plan && (x.plan.decision === "Trade conseille" || x.plan.decision === "Trade possible"))
+      .filter(x => x.plan && (x.plan.decision === "Trade propose" || x.plan.decision === "A surveiller"))
       .sort((a, b) => {
-        const aw = a.plan?.decision === "Trade conseille" ? 2 : 1;
-        const bw = b.plan?.decision === "Trade conseille" ? 2 : 1;
+        const aw = a.plan?.decision === "Trade propose" ? 2 : 1;
+        const bw = b.plan?.decision === "Trade propose" ? 2 : 1;
         if (bw !== aw) return bw - aw;
         return (b.score || 0) - (a.score || 0);
       })
