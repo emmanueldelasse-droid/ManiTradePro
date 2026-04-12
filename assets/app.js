@@ -1,5 +1,17 @@
 (() => {
-  const API_BASE = "https://manitradepro.emmanueldelasse.workers.dev";
+  function resolveApiBase() {
+    const configured = [
+      window.MTP_API_BASE,
+      document.querySelector('meta[name="mtp-api-base"]')?.getAttribute("content"),
+      localStorage.getItem("mtp_api_base_override"),
+      new URLSearchParams(window.location.search).get("apiBase")
+    ].find((value) => typeof value === "string" && value.trim());
+
+    if (configured) return String(configured).trim().replace(/\/$/, "");
+    return "https://manitradepro.emmanueldelasse.workers.dev";
+  }
+
+  const API_BASE = resolveApiBase();
   const STORAGE_KEYS = {
     trainingPositions: "mtp_training_positions_v1",
     trainingHistory: "mtp_training_history_v1",
@@ -179,6 +191,25 @@
     sync: "/api/trades/sync"
   };
 
+  async function parseWorkerResponse(res) {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) {
+      try { return await res.json(); } catch {}
+    }
+    const txt = await res.text().catch(() => "");
+    try { return JSON.parse(txt); } catch { return txt; }
+  }
+
+  function extractApiError(payload, fallback) {
+    if (payload && typeof payload === "object") {
+      if (typeof payload.message === "string" && payload.message.trim()) return payload.message.trim();
+      if (typeof payload.error === "string" && payload.error.trim()) return payload.error.trim();
+      if (typeof payload.statusText === "string" && payload.statusText.trim()) return payload.statusText.trim();
+    }
+    if (typeof payload === "string" && payload.trim()) return payload.trim();
+    return fallback;
+  }
+
   async function workerTradesRequest(path, options = {}) {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
@@ -187,13 +218,11 @@
         ...(options.headers || {})
       }
     });
+    const payload = await parseWorkerResponse(res);
     if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`worker_${res.status}:${txt || res.statusText}`);
+      throw new Error(`worker_${res.status}:${extractApiError(payload, res.statusText)}`);
     }
-    const ct = res.headers.get("content-type") || "";
-    if (ct.includes("application/json")) return res.json();
-    return res.text();
+    return payload;
   }
 
   async function loadTradesFromWorker() {
@@ -1353,8 +1382,8 @@ function confirmTradeFromModal() {
     }
     clearTimeout(timer);
     recordBudgetUsage(res.headers);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+    const data = await parseWorkerResponse(res);
+    if (!res.ok) throw new Error(extractApiError(data, `HTTP ${res.status}`));
     return data;
   }
 
@@ -1364,8 +1393,8 @@ function confirmTradeFromModal() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+    const data = await parseWorkerResponse(res);
+    if (!res.ok) throw new Error(extractApiError(data, `HTTP ${res.status}`));
     return data;
   }
 
@@ -3056,7 +3085,13 @@ function renderDetail() {
                     <div class="legend">
                       ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}
                       ${badge(`prudence ${state.aiReview.prudence || "—"}`)}
-                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : (state.aiReview?.provider === "moteur_local" ? "lecture moteur seule" : "lecture locale"))}
+                      ${badge(
+                        state.aiReview.provider === "worker_context_review"
+                          ? "contexte worker"
+                          : state.aiReview.externalAiUsed
+                            ? "IA externe"
+                            : (state.aiReview?.provider === "moteur_local" ? "lecture moteur seule" : "lecture locale")
+                      )}
                     </div>
                     <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
                     <div class="kv" style="margin-top:12px">
@@ -4343,7 +4378,10 @@ function renderMain() {
       applyFilter();
     }
     render();
-    await loadDashboard();
+    await Promise.allSettled([
+      loadDashboard(),
+      loadOpportunities(false)
+    ]);
     render();
     setInterval(() => {
       if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio"].includes(state.route)) {
