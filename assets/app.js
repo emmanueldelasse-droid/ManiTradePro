@@ -1256,7 +1256,7 @@ function renderTradeConfirmModal() {
           <div class="muted">Quantite</div><div>${quantity}</div>
           <div class="muted">Investi</div><div>${entry != null ? priceDisplay(invested) : "—"}</div>
           <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
-          <div class="muted">Cible</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
+          <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
           <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
         </div>
         <div class="plan-reason" style="margin-top:12px">${safeText(reason)}</div>
@@ -2267,10 +2267,10 @@ function dashboardSignalSummary(opps) {
 
   if (bullish >= 3 && bullish > bearish) {
     title = "Biais haussier";
-    text = "Les opportunites les plus propres restent orientees vers la hausse.";
+    text = "Les opportunites les plus fortes restent orientees vers la hausse.";
   } else if (bearish >= 3 && bearish > bullish) {
     title = "Biais baissier";
-    text = "Les signaux les plus propres restent plutot orientes vers la baisse.";
+    text = "Les signaux visibles restent plutot orientes vers la baisse.";
   } else if (tradables.length >= 5) {
     title = "Marche partage";
     text = "Le marche envoie des signaux melanges, sans domination nette.";
@@ -2293,20 +2293,6 @@ function dashboardTopPick(opps) {
     return d.toLocaleString("fr-FR");
   }
 
-  function displayNewsToneLabel(value) {
-    const tone = String(value || "").toLowerCase();
-    if (tone.includes("hauss")) return "haussier";
-    if (tone.includes("baiss")) return "baissier";
-    if (tone.includes("mitig")) return "mixte";
-    return value || "mixte";
-  }
-
-  function displayMarketToneLabel(value) {
-    const tone = String(value || "").toLowerCase();
-    if (tone.includes("mitig")) return "mixte";
-    return displayNewsToneLabel(value);
-  }
-
   function newsToneBadgeClass(tone) {
     const t = String(tone || "").toLowerCase();
     if (t.includes("hauss")) return "positive";
@@ -2322,14 +2308,14 @@ function dashboardTopPick(opps) {
         <div class="section-title"><span>News + IA</span><span>${items.length}</span></div>
 
         <div class="grid trades-stats" style="margin-bottom:14px">
-          <div class="stat-card"><div class="stat-label">Biais</div><div class="stat-value" style="font-size:1rem">${safeText(displayMarketToneLabel(overview.marketTone || "mitige"))}</div></div>
+          <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
           <div class="stat-card"><div class="stat-label">Themes</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,2).join(" · ") || "—")}</div></div>
-          <div class="stat-card"><div class="stat-label">Actifs a suivre</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Maj</div><div class="stat-value" style="font-size:1rem">${safeNewsDate(state.news?.asOf)}</div></div>
         </div>
 
         <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
-          <div class="muted" style="margin-bottom:6px">Lecture rapide</div>
+          <div class="muted" style="margin-bottom:6px">Lecture IA</div>
           <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
         </div>
 
@@ -2341,7 +2327,7 @@ function dashboardTopPick(opps) {
                   <div class="trade-symbol">${safeText(item.source || "Source")}</div>
                   <div class="legend">
                     ${badge(item.topic || "marche")}
-                    ${badge(displayNewsToneLabel(item.tone || "mitige"), newsToneBadgeClass(item.tone))}
+                    ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
                   </div>
                 </div>
                 <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
@@ -2356,7 +2342,7 @@ function dashboardTopPick(opps) {
               </div>
             `).join("")}
           </div>
-        ` : `<div class="empty-state">Aucun article vraiment utile pour le moment.</div>`}
+        ` : `<div class="empty-state">Aucune news exploitable pour le moment.</div>`}
       </div>
     `;
   }
@@ -2401,7 +2387,7 @@ function dashboardTopPick(opps) {
 
   function renderNewsList(items, limit = 8) {
     const rows = (items || []).slice(0, limit);
-    if (!rows.length) return `<div class="empty-state">Aucun article vraiment utile pour le moment.</div>`;
+    if (!rows.length) return `<div class="empty-state">Aucune news exploitable pour le moment.</div>`;
     return `
       <div class="news-list">
         ${rows.map((item) => `
@@ -2410,7 +2396,7 @@ function dashboardTopPick(opps) {
               <div class="trade-symbol">${safeText(newsSourceLabel(item))}</div>
               <div class="legend">
                 ${badge(item.topic || "marche")}
-                ${badge(displayNewsToneLabel(item.tone || "mitige"), newsToneBadgeClass(item.tone))}
+                ${badge(item.tone || "mitige", newsToneBadgeClass(item.tone))}
               </div>
             </div>
             <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
@@ -2449,33 +2435,33 @@ function dashboardTopPick(opps) {
       <div class="screen" style="${mobile ? `padding-top:max(18px, env(safe-area-inset-top));` : ``}">
         <div class="screen-header">
           <div class="screen-title">News + IA</div>
-          <div class="screen-subtitle">Lecture simple du marche, des themes dominants et des actifs a suivre.</div>
-          <div class="muted">${state.news?.asOf ? `Mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
+          <div class="screen-subtitle">Lecture contextuelle du marche, themes dominants, actifs a surveiller et articles utiles.</div>
+          <div class="muted">${state.news?.asOf ? `Derniere mise a jour : ${safeNewsDate(state.news.asOf)}` : "Pas encore de mise a jour news"}${state.news?.source ? ` · Panel : ${safeText(state.news.source)}` : ""}${(state.news?.overview?.sources || []).length ? ` · Sources visibles : ${safeText(state.news.overview.sources.slice(0,4).join(" · "))}` : ""}</div>
         </div>
 
         <div class="grid trades-stats">
-          <div class="stat-card"><div class="stat-label">Biais</div><div class="stat-value" style="font-size:1rem">${safeText(displayMarketToneLabel(overview.marketTone || "mitige"))}</div></div>
-          <div class="stat-card"><div class="stat-label">Themes</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,3).join(" · ") || "—")}</div></div>
-          <div class="stat-card"><div class="stat-label">Actifs a suivre</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,4).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
+          <div class="stat-card"><div class="stat-label">Themes dominants</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,3).join(" · ") || "—")}</div></div>
+          <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,4).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Articles</div><div class="stat-value">${allItems.length}</div></div>
         </div>
 
         <div class="card" style="margin-top:18px">
-          <div class="section-title"><span>Synthese</span><span>priorite</span></div>
+          <div class="section-title"><span>Synthese IA</span><span>priorite</span></div>
           <div class="news-summary-grid">
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">Lecture rapide</div>
+              <div class="muted" style="margin-bottom:6px">Lecture IA</div>
               <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
             </div>
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">Focus</div>
+              <div class="muted" style="margin-bottom:6px">Focus utile</div>
               <div>${safeText((overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment.")}</div>
             </div>
           </div>
         </div>
 
-        ${renderNewsPageSection("A la une marche", "Les infos de marche les plus utiles.", groups.market, 6)}
-        ${renderNewsPageSection("Macro / banques centrales", "Ce qui peut peser sur les indices et le risque global.", groups.macro, 6)}
+        ${renderNewsPageSection("A la une marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
+        ${renderNewsPageSection("Macro / banques centrales", "Ce qui peut impacter les taux, les indices et le risque global.", groups.macro, 6)}
         ${renderNewsPageSection("Crypto", "Flux crypto utiles pour BTC, ETH et le sentiment speculatif.", groups.crypto, 6)}
         ${renderNewsPageSection("Tech / actions", "News societes et themes croissance / IA / Nasdaq.", groups.tech, 6)}
       </div>
@@ -2580,7 +2566,7 @@ function renderDashboard() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
-          <div class="screen-subtitle">Vue rapide des actifs a regarder en premier.</div>
+          <div class="screen-subtitle">Vue rapide, lecture simple, priorites utiles.</div>
         </div>
 
         <div class="card dashboard-hero-card" style="margin-bottom:18px">
@@ -2638,7 +2624,7 @@ function renderDashboard() {
           </div>
 
           <div class="card">
-            <div class="section-title"><span>Dernieres lectures</span><span>${recentAlgo.length}</span></div>
+            <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
             ${recentAlgo.length ? recentAlgo.map((item) => {
               const algoDecision = item.decision || "Pas de trade";
               const algoReason = item.reasonShort || item.summary || "";
@@ -2658,7 +2644,7 @@ function renderDashboard() {
         </div>
 
         <div class="card" style="margin-top:18px">
-          <div class="section-title"><span>Classement utile</span><span>${topRows.length}</span></div>
+          <div class="section-title"><span>Priorites classees</span><span>${topRows.length}</span></div>
           ${topRows.length ? topRows.map((item, index) => renderOppRow(item, index + 1)).join("") : `<div class="empty-state">Aucune opportunite a afficher.</div>`}
         </div>
       </div>
@@ -2674,7 +2660,7 @@ function renderDashboard() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Opportunites</div>
-          <div class="screen-subtitle">Lecture claire des actifs a regarder en premier, a surveiller ou a laisser de cote.</div>
+          <div class="screen-subtitle">Lecture simple avec statut setup, confirmations, priorite reelle et blocage principal.</div>
         </div>
 
         <div class="opp-toolbar">
@@ -2726,7 +2712,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "Trades proposes",
-          "Actifs les plus propres a regarder tout de suite.",
+          "Actifs a regarder en premier, sans blocage majeur.",
           groups.proposed,
           1,
           "Aucun trade propose pour le moment."
@@ -2734,7 +2720,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "A surveiller",
-          "Actifs interessants, mais pas encore assez propres pour agir.",
+          "Actifs a surveiller avant ouverture, attente d'une meilleure confirmation.",
           groups.watch,
           groups.proposed.length + 1,
           "Aucun actif a surveiller pour le moment."
@@ -2742,7 +2728,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "Pas de trade",
-          "Actifs a laisser de cote pour l'instant.",
+          "Actifs non prioritaires ou encore trop faibles.",
           groups.noTrade,
           groups.proposed.length + groups.watch.length + 1,
           "Aucun actif dans cette section."
@@ -2785,8 +2771,8 @@ function simpleReliabilityLabel(score, decision = "") {
     if (score >= 58) return "a surveiller";
     return "encore fragile";
   }
-  if (score >= 60) return "a confirmer";
-  return "faible";
+  if (score >= 60) return "non actionnable";
+  return "fragile";
 }
 
 function simpleTrendWord(label) {
@@ -2799,15 +2785,15 @@ function simpleTrendWord(label) {
 function simpleDecisionSentence(plan) {
   const decision = String(plan?.decision || "").toLowerCase();
   if (decision.includes("trade propose")) return "Le trade semble assez propre pour etre envisage maintenant.";
-  if (decision.includes("surveiller")) return "Le dossier est interessant, mais il vaut mieux attendre encore.";
-  return "Le dossier n'est pas assez propre pour agir maintenant.";
+  if (decision.includes("surveiller")) return "Le scenario existe, mais il vaut mieux attendre encore.";
+  return "Le signal n'est pas assez propre pour prendre position maintenant.";
 }
 
 function simpleContextSentence(plan) {
   const trend = simpleTrendWord(plan?.trendLabel || "");
-  if (trend === "hausse") return "Le biais reste plutot haussier.";
-  if (trend === "baisse") return "Le biais reste plutot baissier.";
-  return "Le biais reste encore neutre.";
+  if (trend === "hausse") return "Le marche montre plutot une hausse.";
+  if (trend === "baisse") return "Le marche montre plutot une baisse.";
+  return "Le marche n'a pas de direction claire.";
 }
 
 
@@ -2817,20 +2803,20 @@ function simpleBlockerText(plan) {
   const trend = simpleTrendWord(plan?.trendLabel || "");
   if (String(plan?.decision || "") === "Trade propose") return "Rien de bloquant pour le moment.";
   if (flags.includes("risk_too_high")) return "Le plan existe, mais le risque reste trop eleve.";
-  if (flags.includes("entry_too_late")) return "Le setup existe, mais l'entree est encore trop tardive.";
+  if (flags.includes("entry_too_late")) return "Le setup existe, mais le timing n'est pas encore assez propre.";
   if (flags.includes("trend_conflict")) return "Le contexte est trop contradictoire pour valider un trade.";
   if (flags.includes("data_quality_low")) return "Les donnees sont trop fragiles pour juger le setup.";
-  if (score < 40) return "Le signal reste trop faible pour agir.";
-  if (trend === "hausse" || trend === "baisse") return "Le dossier existe, mais il vaut mieux attendre encore.";
-  return "Le marche reste trop flou pour proposer quelque chose de propre.";
+  if (score < 40) return "Le signal est trop faible pour prendre position.";
+  if (trend === "hausse" || trend === "baisse") return "Le scenario existe, mais il vaut mieux attendre encore.";
+  return "Le marche reste trop flou pour proposer un trade.";
 }
 
 function actionNowLabel(plan) {
   const decision = String(plan?.decision || "");
-  if (decision === "Trade propose") return "Agir maintenant";
+  if (decision === "Trade propose") return "Ouvrir le trade";
   if (decision === "A surveiller" && String(plan?.waitFor || "").includes("meilleur point d'entree")) return "Attendre un meilleur point d'entree";
-  if (decision === "A surveiller") return "Attendre";
-  return "Rester a l'ecart";
+  if (decision === "A surveiller") return "Surveiller";
+  return "Ne rien faire";
 }
 
 function simpleDecisionTitle(plan) {
@@ -2845,7 +2831,7 @@ function simpleTimingLabel(plan) {
   const timing = String(plan?.timing || "").toLowerCase();
   if (timing === "bon") return "bon";
   if (timing === "moyen" || timing === "correct") return "moyen";
-  if (timing === "mauvais" || timing === "faible") return "faible";
+  if (timing === "mauvais" || timing === "faible") return "mauvais";
   return "a confirmer";
 }
 
@@ -2937,7 +2923,7 @@ function aiDisplayState(plan) {
       return {
         title: "FALLBACK LOCAL",
         source: "local_fallback",
-        message: "IA externe indisponible, local utilise.",
+        message: "IA externe indisponible, fallback local utilise.",
         externalAiUsed: false
       };
     }
@@ -3063,22 +3049,22 @@ function renderDetail() {
                   const plan = currentTradePlan();
                   return `
                     <div class="plan-card">
-                      <div class="section-title"><span>Plan du moteur</span><span>${safeText(plan?.decision || "—")}</span></div>
+                      <div class="section-title"><span>Decision automatique</span><span>${safeText(plan?.decision || "—")}</span></div>
                       <div class="kv plan-grid">
-                        <div class="muted">Decision</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
+                        <div class="muted">Decision simple</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
                         <div class="muted">Tendance</div><div>${safeText(plan?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</div>
                         <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
                         <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
-                        <div class="muted">Cible</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
+                        <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
                         <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        <div class="muted">Score actionnable</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div><div class="muted">Score dossier</div><div>${dossierScoreFrom(plan) != null ? `${num(dossierScoreFrom(plan), 0)}/100` : "—"}</div>
+                        <div class="muted">Niveau actionnable</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div><div class="muted">Score dossier</div><div>${dossierScoreFrom(plan) != null ? `${num(dossierScoreFrom(plan), 0)}/100` : "—"}</div>
                         <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
-                        <div class="muted">Message</div><div>${safeText(simpleDecisionSentence(plan))}</div>
-                        <div class="muted">Resume</div><div>${safeText(simpleContextSentence(plan))} ${safeText(plan?.aiSummary || "")}</div>
+                        <div class="muted">En clair</div><div>${safeText(simpleDecisionSentence(plan))}</div>
+                        <div class="muted">Resume simple</div><div>${safeText(simpleContextSentence(plan))} ${safeText(plan?.aiSummary || "")}</div>
                       </div>
                       <div class="plan-reason">${safeText(plan?.reason || plan?.refusalReason || "Pas d'analyse disponible.")}</div>
                       <div class="plan-ai-summary">
-                        <div class="muted">Lecture courte</div>
+                        <div class="muted">Resume court</div>
                         <div>${safeText(plan?.aiSummary || "Pas d'avis complementaire.")}</div>
                       </div>
                       <div class="plan-context">
@@ -3093,7 +3079,7 @@ function renderDetail() {
               </div>
 
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Lecture contexte</span><span>${state.loadingAiReview ? "analyse..." : safeText((state.aiReview?.provider === "moteur_local") ? "moteur seul" : (state.aiReview?.externalAiUsed ? "Claude" : "local"))}</span></div>
+                <div class="section-title"><span>Lecture complementaire</span><span>${state.loadingAiReview ? "analyse..." : safeText((state.aiReview?.provider === "moteur_local") ? "lecture moteur seule" : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local"))}</span></div>
                 ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
                   <div class="ai-review-box">
                     <div class="legend">
@@ -3104,7 +3090,7 @@ function renderDetail() {
                           ? "contexte worker"
                           : state.aiReview.externalAiUsed
                             ? "IA externe"
-                            : (state.aiReview?.provider === "moteur_local" ? "moteur seul" : "lecture locale")
+                            : (state.aiReview?.provider === "moteur_local" ? "lecture moteur seule" : "lecture locale")
                       )}
                     </div>
                     <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
@@ -3115,7 +3101,7 @@ function renderDetail() {
                     </div>
                     ${state.aiReview.warning ? `<div class="muted" style="margin-top:10px">${safeText(state.aiReview.warning)}</div>` : ""}
                   </div>
-                ` : `<div class="empty-state">Pas de lecture complementaire disponible pour le moment.</div>`}
+                ` : `<div class="empty-state">Aucune validation IA disponible pour le moment.</div>`}
               </div>
 
               <div class="card" style="margin-bottom:18px">
@@ -3136,7 +3122,7 @@ function renderDetail() {
                       </article>
                     `).join("")}
                   </div>
-                ` : `<div class="empty-state">Pas de news directement utiles sur cet actif pour le moment.</div>`}
+                ` : `<div class="empty-state">Aucune news directement reliee a cet actif pour le moment.</div>`}
               </div>
 
               <div class="card">
@@ -3151,7 +3137,7 @@ function renderDetail() {
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
-                    <div class="conclusion-line">Score actionnable : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore, currentTradePlan()?.decision))}</strong></div>
+                    <div class="conclusion-line">Niveau actionnable : <strong>${safeText(simpleReliabilityLabel(currentTradePlan()?.finalScore, currentTradePlan()?.decision))}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(currentTradePlan()?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</strong></div>
                     <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
                     <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
@@ -3162,16 +3148,15 @@ function renderDetail() {
                   </div>
                 </div>
                 <div class="conclusion-text">
-                  <div class="conclusion-text">
-                  <div class="muted">Message</div>
+                  <div class="muted">Pourquoi</div>
                   <div>${safeText(simpleDecisionSentence(currentTradePlan()))}</div>
                 </div>
                 <div class="conclusion-text">
-                  <div class="muted">Blocage principal</div>
+                  <div class="muted">Ce qui bloque</div>
                   <div>${safeText(simpleBlockerText(currentTradePlan()))}</div>
                 </div>
                 <div class="conclusion-text">
-                  <div class="muted">A attendre</div>
+                  <div class="muted">Ce qu'il faut attendre</div>
                   <div>${safeText(simpleWaitForText(currentTradePlan()))}</div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
@@ -3182,12 +3167,12 @@ function renderDetail() {
                     <div class="break-item"><div class="break-name">Entree</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.entryQuality))}</div></div>
                     <div class="break-item"><div class="break-name">Risque</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.risk))}</div></div>
                     <div class="break-item"><div class="break-name">Activite</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.participation))}</div></div>
-                  </div>` : `<div class="muted">Le detail chiffre est masque dans les reglages.</div>`
+                  </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
                 }
               </div>
 
               <div class="card">
-                <div class="section-title"><span>Resume marche</span></div>
+                <div class="section-title"><span>Informations utiles</span></div>
                 <div class="kv">
                   <div class="muted">Source</div><div>${safeText(d.sourceUsed || "—")}</div>
                   <div class="muted">Mise a jour</div><div>${safeText(simpleFreshnessLabel(d.freshness || "unknown"))}</div>
@@ -3460,7 +3445,7 @@ function renderPositionRow(position) {
       <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
       <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
       <div><span class="muted">Stop</span><br>${(Number(snap.stopLoss ?? p.stopLoss) > 0) ? priceDisplay(snap.stopLoss ?? p.stopLoss) : "—"}</div>
-      <div><span class="muted">Cible</span><br>${(Number(snap.takeProfit ?? p.takeProfit) > 0) ? priceDisplay(snap.takeProfit ?? p.takeProfit) : "—"}</div>
+      <div><span class="muted">Objectif</span><br>${(Number(snap.takeProfit ?? p.takeProfit) > 0) ? priceDisplay(snap.takeProfit ?? p.takeProfit) : "—"}</div>
       <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
     </div>
 
@@ -4035,16 +4020,16 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Suivi simple des positions ouvertes, de l'historique et du capital d'entrainement.</div>
+          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts. Le mode entrainement suit maintenant un vrai capital fictif.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${
             state.trades.remoteStatus === "connected"
               ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
               : state.trades.remoteStatus === "fallback_local"
-                ? `local · ${safeText(state.trades.remoteError || "erreur distante")}`
+                ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
                 : "local uniquement"
           }</div>
-          ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Lignes anciennes masquees automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
+          ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
         </div>
 
         <div class="controls">
@@ -4133,12 +4118,12 @@ function openPositionsRiskView() {
               <div class="trade-table simplified-open-trades">
                 ${positions.map(renderPositionRow).join("")}
               </div>
-            ` : `<div class="empty-state">Aucun trade ouvert pour le moment.</div>`}
+            ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
           </div>
 
           <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Trades clotures</span><span>${history.length}</span></div>
-            <div class="muted" style="margin-bottom:12px">Les lignes anciennes incompletes restent masquees.</div>
+            <div class="muted" style="margin-bottom:12px">Les lignes legacy sans vraie date de cloture, sans prix de sortie valide et sans fermeture exploitable sont maintenant masquees.</div>
             ${history.length ? `
               <div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
@@ -4241,7 +4226,7 @@ function openPositionsRiskView() {
                   state.trades.remoteStatus === "connected"
                     ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
                     : state.trades.remoteStatus === "fallback_local"
-                      ? `local · ${safeText(state.trades.remoteError || "worker / supabase indisponible")}`
+                      ? `fallback local · ${safeText(state.trades.remoteError || "worker / supabase indisponible")}`
                       : "local uniquement"
                 }</div>
               </div>
