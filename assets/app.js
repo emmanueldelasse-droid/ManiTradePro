@@ -828,8 +828,9 @@ function averageRange(candles, count = 14) {
 }
 
 function decisionBadgeClass(decision) {
-  if (decision === "Trade propose" || decision === "Trade conseille") return "decision-strong";
-  if (decision === "A surveiller" || decision === "Trade possible") return "decision-watch";
+  if (decision === "Trade conseille") return "decision-strong";
+  if (decision === "Trade possible") return "decision-medium";
+  if (decision === "A surveiller") return "decision-watch";
   if (decision === "A eviter") return "decision-avoid";
   return "decision-none";
 }
@@ -842,203 +843,26 @@ function detectedTrendLabel(direction) {
 }
 
 function decisionFromReliability(score) {
-  if (score >= 80) return "Trade propose";
-  if (score >= 65) return "A surveiller";
+  if (score >= 70) return "Trade propose";
+  if (score >= 55) return "A surveiller";
   return "Pas de trade";
 }
 
 function planSummaryText(plan) {
   if (!plan) return "Aucune lecture exploitable pour le moment.";
   if (plan.decision === "Trade propose") return "Le moteur voit un trade assez fiable pour etre ouvert automatiquement.";
-  if (plan.decision === "A surveiller") return "Le contexte existe, mais la confiance reste insuffisante pour ouvrir un trade maintenant.";
+  if (plan.decision === "A surveiller") return "Le contexte existe, mais la fiabilite reste insuffisante pour ouvrir un trade maintenant.";
   return "Le moteur prefere ne pas ouvrir de trade sur cet actif pour le moment.";
 }
 
 function lightweightTradePlan(item) {
-  if (!item || item.price == null || typeof item.score !== "number") return null;
-  const score = Number(item.score || 0);
-  const dir = String(item.direction || "neutral");
-  const synthetic = {
-    ...item,
-    breakdown: {
-      regime: 50,
-      trend: dir === "long" ? Math.max(50, score) : dir === "short" ? Math.max(50, 100 - score) : 50,
-      momentum: dir === "long" ? Math.max(50, score) : dir === "short" ? Math.max(50, 100 - score) : 50,
-      entryQuality: 50,
-      risk: 50,
-      participation: 50
-    },
-    candles: []
-  };
-  return generateTradePlan(synthetic);
+  if (!item || !item.plan || typeof item.plan !== "object") return null;
+  return item.plan;
 }
 
 function generateTradePlan(detail) {
-  if (!detail || detail.price == null) return null;
-
-  const rawScore = Number(detail.score ?? 0);
-  const direction = String(detail.direction || "neutral");
-  const confidenceRaw = detail.confidence || "low";
-  const breakdown = detail.breakdown || {};
-  const momentum = Number(breakdown.momentum ?? 50);
-  const entryQuality = Number(breakdown.entryQuality ?? 50);
-  const trend = Number(breakdown.trend ?? 50);
-  const regime = Number(breakdown.regime ?? 50);
-  const risk = Number(breakdown.risk ?? 50);
-  const participation = Number(breakdown.participation ?? 50);
-
-  const avgRange = averageRange(detail.candles || [], 14);
-  const fallbackVol = detail.price * (detail.assetClass === "crypto" ? 0.028 : 0.018);
-  const vol = avgRange && avgRange > 0 ? avgRange : fallbackVol;
-
-  const aiContext = [];
-  if (regime >= 58) aiContext.push("contexte porteur");
-  if (regime <= 42) aiContext.push("contexte moyen");
-  if (entryQuality >= 65) aiContext.push("entree correcte");
-  if (entryQuality <= 45) aiContext.push("entree delicate");
-  if (risk >= 60) aiContext.push("risque acceptable");
-  if (risk <= 42) aiContext.push("risque eleve");
-  if (participation >= 70) aiContext.push("marche assez actif");
-
-  const directionQuality =
-    direction === "long" ? rawScore :
-    direction === "short" ? (100 - rawScore) :
-    35;
-
-  const finalScore = Math.round(
-    regime * 0.14 +
-    trend * 0.20 +
-    momentum * 0.16 +
-    entryQuality * 0.22 +
-    risk * 0.18 +
-    participation * 0.05 +
-    directionQuality * 0.05
-  );
-
-  let decision = decisionFromReliability(finalScore);
-  let side = direction === "neutral" ? null : direction;
-  let urgency = decision === "Trade propose" ? "maintenant" : decision === "A surveiller" ? "attendre confirmation" : "ne rien faire";
-  let timing = entryQuality >= 70 ? "bon" : entryQuality >= 55 ? "moyen" : "mauvais";
-  let trendLabel = detectedTrendLabel(direction);
-  let safety = finalScore >= 70 ? "elevee" : finalScore >= 55 ? "moyenne" : "faible";
-  let reason = "";
-  let aiSummary = "";
-  let refusalReason = null;
-  let blockerType = null;
-  let waitFor = null;
-
-  if (decision === "Trade propose" && side) {
-    reason = `${trendLabel}, entree encore exploitable et risque acceptable.`;
-    aiSummary = `Le moteur detecte une ${trendLabel} et juge le plan assez fiable pour ouvrir un trade.`;
-    blockerType = "aucun";
-    waitFor = "rien de special";
-  } else if (decision === "A surveiller") {
-    side = null;
-    if (entryQuality < 55) {
-      blockerType = "timing";
-      waitFor = "attendre confirmation un meilleur point d'entree";
-      reason = `${trendLabel}, mais le timing d'entree reste moyen.`;
-      aiSummary = `Le scenario existe, mais le moteur prefere attendre confirmation un meilleur point d'entree.`;
-      refusalReason = "Trade non ouvert : timing encore trop moyen.";
-    } else if (risk < 50) {
-      blockerType = "risque";
-      waitFor = "attendre confirmation un risque plus propre";
-      reason = `${trendLabel}, mais le risque reste trop present pour entrer maintenant.`;
-      aiSummary = `Le signal existe, mais le risque reste encore trop important.`;
-      refusalReason = "Trade non ouvert : risque encore trop eleve.";
-    } else {
-      blockerType = "confirmation";
-      waitFor = "attendre confirmation une confirmation de marche";
-      reason = `${trendLabel}, mais le signal demande encore une confirmation.`;
-      aiSummary = `Le contexte est interessant, mais le moteur prefere attendre confirmation une confirmation plus nette.`;
-      refusalReason = "Trade non ouvert : confirmation encore insuffisante.";
-    }
-  } else {
-    side = null;
-    if (trend < 45 && momentum < 45) {
-      blockerType = "signal";
-      waitFor = "attendre confirmation un signal plus clair";
-      reason = `${trendLabel}, mais le mouvement reste trop faible pour proposer un trade.`;
-      aiSummary = `Le moteur refuse le trade car le signal reste trop faible.`;
-      refusalReason = "Pas de trade : signal trop faible.";
-    } else if (entryQuality < 45) {
-      blockerType = "timing";
-      waitFor = "attendre confirmation un meilleur point d'entree";
-      reason = `${trendLabel}, mais l'entree est trop mauvaise pour etre exploitee.`;
-      aiSummary = `Le moteur refuse le trade car le timing d'entree est mauvais.`;
-      refusalReason = "Pas de trade : timing d'entree mauvais.";
-    } else if (risk < 45) {
-      blockerType = "risque";
-      waitFor = "attendre confirmation moins de risque";
-      reason = `${trendLabel}, mais le risque reste trop eleve.`;
-      aiSummary = `Le moteur refuse le trade car le risque reste trop eleve.`;
-      refusalReason = "Pas de trade : risque trop eleve.";
-    } else {
-      blockerType = "ratio";
-      waitFor = "attendre confirmation un meilleur ratio gain / risque";
-      reason = `${trendLabel}, mais le trade n'offre pas encore un plan assez propre.`;
-      aiSummary = `Le moteur refuse le trade car le plan global reste trop faible.`;
-      refusalReason = "Pas de trade : plan encore insuffisant.";
-    }
-  }
-
-  if (!side) {
-    return {
-      decision,
-      side: null,
-      entry: null,
-      stopLoss: null,
-      takeProfit: null,
-      rr: null,
-      confidence: simpleConfidenceLabel(confidenceRaw),
-      urgency,
-      timing,
-      horizon: "a definir",
-      reason,
-      refusalReason,
-      aiSummary,
-      safety,
-      aiContext,
-      finalScore,
-      trendLabel,
-      blockerType,
-      waitFor
-    };
-  }
-
-  const riskDistance = Math.max(
-    vol * (detail.assetClass === "crypto" ? 1.0 : 0.85),
-    detail.price * (detail.assetClass === "crypto" ? 0.013 : 0.009)
-  );
-  const rewardMultiplier = finalScore >= 80 ? 2.6 : 2.1;
-  const rewardDistance = riskDistance * rewardMultiplier;
-  const entry = detail.price;
-  const stopLoss = side === "long" ? entry - riskDistance : entry + riskDistance;
-  const takeProfit = side === "long" ? entry + rewardDistance : entry - rewardDistance;
-  const rr = rewardDistance / riskDistance;
-  const horizonDays = finalScore >= 80 ? (detail.assetClass === "crypto" ? 2 : 4) : (detail.assetClass === "crypto" ? 3 : 5);
-
-  return {
-    decision,
-    side,
-    entry,
-    stopLoss,
-    takeProfit,
-    rr,
-    confidence: simpleConfidenceLabel(confidenceRaw),
-    urgency,
-    timing,
-    horizon: horizonLabel(horizonDays),
-    reason,
-    refusalReason,
-    aiSummary,
-    safety,
-    aiContext,
-    finalScore,
-    trendLabel,
-    blockerType,
-    waitFor
-  };
+  if (!detail || !detail.plan || typeof detail.plan !== "object") return null;
+  return detail.plan;
 }
 
 
@@ -1114,15 +938,12 @@ function rowTrendLabel(item) {
 async function hydrateNonCryptoRows(rows) { return; }
 
 function rowTradePlan(item) {
-  if (!item) return null;
-  if (item.plan) return item.plan;
-  const detail = detailEngineInputFor(item);
-  if (detail) return generateTradePlan(detail);
-  return lightweightTradePlan(item);
+  if (!item || !item.plan) return null;
+  return item.plan;
 }
 
 function currentTradePlan() {
-  return state.detail?.plan || null;
+  return officialPlanForDetail(state.detail) || state.detail?.plan || null;
 }
 
 function simpleRiskQualityLabel(score) {
@@ -1259,6 +1080,9 @@ function confirmTradeFromModal() {
 }
 
   function normalizeOpportunity(item) {
+    const officialScore = Number(
+      item?.officialScore ?? item?.plan?.exploitabilityScore ?? item?.exploitabilityScore ?? NaN
+    );
     return {
       symbol: item?.symbol || "",
       name: item?.name || "Nom indisponible",
@@ -1269,6 +1093,7 @@ function confirmTradeFromModal() {
       freshness: item?.freshness || "unknown",
       status: item?.status || (item?.price != null ? "ok" : "unavailable"),
       score: typeof item?.score === "number" ? item.score : null,
+      officialScore: Number.isFinite(officialScore) ? Math.max(0, Math.min(100, Math.round(officialScore))) : null,
       scoreStatus: item?.scoreStatus || (item?.price != null ? "complete" : "unavailable"),
       direction: item?.direction || "neutral",
       analysisLabel: item?.analysisLabel || null,
@@ -1277,16 +1102,15 @@ function confirmTradeFromModal() {
       breakdown: item?.breakdown || null,
       reasonShort: item?.reasonShort || null,
       decision: item?.decision || null,
+      officialDecision: item?.officialDecision || item?.decision || item?.plan?.decision || null,
       trendLabel: item?.trendLabel || null,
+      officialTrendLabel: item?.officialTrendLabel || item?.trendLabel || item?.plan?.trendLabel || null,
+      officialWaitFor: item?.officialWaitFor || item?.plan?.waitFor || null,
       plan: item?.plan || null,
       setupStatus: item?.setupStatus || item?.plan?.setupStatus || null,
       tradeNow: item?.tradeNow === true || item?.plan?.tradeNow === true,
       confirmationCount: typeof item?.confirmationCount === "number" ? item.confirmationCount : (typeof item?.plan?.confirmationCount === "number" ? item.plan.confirmationCount : null),
       blockers: Array.isArray(item?.blockers) ? item.blockers : (Array.isArray(item?.plan?.blockers) ? item.plan.blockers : []),
-      aiContextReview: item?.aiContextReview || null,
-      aiContextStatus: item?.aiContextStatus || item?.plan?.aiContextStatus || null,
-      aiModifier: typeof item?.aiModifier === "number" ? item.aiModifier : (typeof item?.plan?.aiModifier === "number" ? item.plan.aiModifier : 0),
-      aiInfluence: item?.aiInfluence || item?.plan?.aiInfluence || "aucune",
       candles: Array.isArray(item?.candles) ? item.candles : [],
       error: compactError(item?.error || item?.reasonShort || null)
     };
@@ -1305,14 +1129,14 @@ function confirmTradeFromModal() {
       price: stored.price ?? current.price,
       change24hPct: stored.change24hPct ?? current.change24hPct,
       score: stored.score ?? current.score,
+      officialScore: stored.officialScore ?? current.officialScore,
       decision: stored.decision || current.decision || null,
+      officialDecision: stored.officialDecision || current.officialDecision || null,
       trendLabel: stored.trendLabel || current.trendLabel || null,
+      officialTrendLabel: stored.officialTrendLabel || current.officialTrendLabel || null,
+      officialWaitFor: stored.officialWaitFor || current.officialWaitFor || null,
       reasonShort: stored.reasonShort || current.reasonShort || null,
       plan: stored.plan || current.plan || null,
-      aiContextReview: stored.aiContextReview || current.aiContextReview || null,
-      aiContextStatus: stored.aiContextStatus || current.aiContextStatus || null,
-      aiModifier: typeof stored.aiModifier === "number" ? stored.aiModifier : (typeof current.aiModifier === "number" ? current.aiModifier : 0),
-      aiInfluence: stored.aiInfluence || current.aiInfluence || "aucune",
       status: stored.status || current.status || null,
       freshness: stored.freshness || current.freshness || "unknown"
     });
@@ -1371,69 +1195,63 @@ function confirmTradeFromModal() {
 
   async function loadAiReview(detail, localPlan) {
     if (!detail) return null;
-
-    const aiMeta = aiDisplayState(localPlan || detail?.plan || {});
-    const review = detail?.aiContextReview || null;
-
-    state.loadingAiReview = false;
-
-    if (review) {
-      const supportMap = {
-        soutien_fort: "contexte favorable et coherent",
-        soutien_modere: "contexte plutot favorable",
-        neutre: "contexte neutre",
-        contradictoire: "contexte contradictoire",
-        fortement_contradictoire: "contexte fortement contradictoire",
-        insuffisant: "sources insuffisantes"
-      };
-      const toneMap = {
-        haussier: "haussier",
-        plutot_haussier: "plutot haussier",
-        neutre: "neutre",
-        plutot_baissier: "plutot baissier",
-        baissier: "baissier",
-        incertain: "incertain"
-      };
-      const contradiction = Number(review?.contradiction_level || 0);
-      const confidence = Number(review?.confidence || 0);
-      const sourceCount = Number(review?.source_count || 0);
-      const support = supportMap[String(review?.support_level || "")] || "contexte analyse";
-      const tone = toneMap[String(review?.tone || "")] || "incertain";
-      const summary = String(review?.summary_strict || "").trim() || (localPlan?.aiSummary || localPlan?.reason || "Lecture contextuelle disponible.");
-      const contradictionText = contradiction >= 3
-        ? "contradiction forte entre contexte et setup"
-        : contradiction === 2
-          ? "contradictions notables a surveiller"
-          : contradiction === 1
-            ? "quelques contradictions mineures"
-            : "pas de contradiction majeure detectee";
-
+    const aiMeta = aiDisplayState(localPlan || {});
+    if (aiMeta.title === "LECTURE MOTEUR SEULE") {
+      state.loadingAiReview = false;
       state.aiReview = {
-        provider: "worker_context_review",
-        externalAiUsed: true,
-        decision: localPlan?.decision || detail?.decision || "A surveiller",
-        prudence: contradiction >= 3 ? "elevee" : confidence >= 0.7 ? "moyenne" : "moyenne",
-        reason: `${support} · tonalite ${tone} · ${sourceCount} source${sourceCount > 1 ? "s" : ""}.`,
-        invalidation: contradictionText,
-        summary,
-        warning: aiMeta.message || null
+        provider: aiMeta.source,
+        externalAiUsed: false,
+        decision: localPlan?.decision || "A surveiller",
+        prudence: localPlan?.safety || "moyenne",
+        reason: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
+        invalidation: localPlan?.refusalReason || localPlan?.reason || "Pas d'invalidation supplementaire.",
+        summary: localPlan?.aiSummary || localPlan?.reason || "Lecture moteur seule.",
+        warning: aiMeta.message
       };
       render();
       return state.aiReview;
     }
 
-    state.aiReview = {
-      provider: aiMeta.source,
-      externalAiUsed: false,
-      decision: localPlan?.decision || detail?.decision || "A surveiller",
-      prudence: localPlan?.safety || "moyenne",
-      reason: localPlan?.aiSummary || localPlan?.reason || "Lecture locale.",
-      invalidation: localPlan?.refusalReason || localPlan?.reason || "Pas d'invalidation supplementaire.",
-      summary: localPlan?.aiSummary || localPlan?.reason || "Lecture locale.",
-      warning: aiMeta.message
-    };
+    state.loadingAiReview = true;
+    state.aiReview = null;
     render();
-    return state.aiReview;
+    try {
+      const payload = {
+        symbol: detail.symbol,
+        detail: {
+          symbol: detail.symbol,
+          name: detail.name,
+          assetClass: detail.assetClass,
+          price: detail.price,
+          change24hPct: detail.change24hPct,
+          score: detail.score,
+          scoreStatus: detail.scoreStatus,
+          direction: detail.direction,
+          analysisLabel: detail.analysisLabel,
+          confidence: detail.confidence,
+          breakdown: detail.breakdown || {},
+          sourceUsed: detail.sourceUsed,
+          freshness: detail.freshness
+        },
+        localPlan
+      };
+      const review = await apiPost("/api/ai/trade-review", payload);
+      state.aiReview = review?.data || null;
+    } catch (e) {
+      state.aiReview = {
+        provider: "local_fallback",
+        externalAiUsed: false,
+        decision: localPlan?.decision || "Pas de trade conseille",
+        prudence: localPlan?.safety || "moyenne",
+        reason: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
+        invalidation: localPlan?.refusalReason || "Attendre un signal plus propre.",
+        summary: localPlan?.aiSummary || localPlan?.reason || "Lecture prudente locale utilisee.",
+        warning: "IA externe indisponible, fallback local utilise."
+      };
+    } finally {
+      state.loadingAiReview = false;
+      render();
+    }
   }
 
   async function loadDashboard() {
@@ -1928,10 +1746,10 @@ function fidelityLabel(item) {
         : Number.isFinite(Number(item?.score))
           ? Number(item.score)
           : null;
-    if (raw == null) return "confiance inconnue";
-    if (raw >= 80) return "confiance elevee";
-    if (raw >= 65) return "confiance moyenne";
-    return "confiance faible";
+    if (raw == null) return "fiabilite inconnue";
+    if (raw >= 80) return "fiabilite elevee";
+    if (raw >= 65) return "fiabilite moyenne";
+    return "fiabilite faible";
   }
 
   function fidelityClass(item) {
@@ -1973,11 +1791,9 @@ function priorityClass(priority) {
 
 function actionabilityScoreFrom(source) {
     const raw = Number(
-      source?.exploitabilityScore ??
+      source?.officialScore ??
       source?.plan?.exploitabilityScore ??
-      source?.finalScore ??
-      source?.plan?.finalScore ??
-      source?.score ??
+      source?.exploitabilityScore ??
       NaN
     );
     return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
@@ -1995,14 +1811,14 @@ function actionabilityScoreFrom(source) {
 
   function actionabilityLabel(score) {
     if (score == null) return "indisponible";
-    if (score >= 80) return "actionnable";
-    if (score >= 65) return "a suivre";
-    return "peu exploitable";
+    if (score >= 74) return "actionnable";
+    if (score >= 65) return "a surveiller";
+    return "non actionnable";
   }
 
   function actionabilityTone(score) {
     if (score == null) return "notrade";
-    if (score >= 80) return "proposed";
+    if (score >= 74) return "proposed";
     if (score >= 65) return "blocked";
     return "notrade";
   }
@@ -2014,16 +1830,16 @@ function shortBlockerLabel(plan, item) {
     const reason = String(plan?.refusalReason || item?.reasonShort || "").trim().toLowerCase();
     const combined = `${first} ${reason}`.trim();
 
-    if (combined.includes("confirm")) return "confirmation encore faible";
+    if (combined.includes("confirm")) return "confirmation insuffisante";
     if (combined.includes("risque")) return "risque trop eleve";
     if (combined.includes("timing")) return "timing encore tot";
     if (combined.includes("volatil")) return "volatilite trop elevee";
-    if (combined.includes("contexte")) return "contexte trop tendu";
-    if (combined.includes("data") || combined.includes("donnee")) return "donnees trop tendus";
+    if (combined.includes("contexte")) return "contexte trop fragile";
+    if (combined.includes("data") || combined.includes("donnee")) return "donnees trop fragiles";
     if (combined.includes("ratio")) return "ratio insuffisant";
     if (combined.includes("entree")) return "entree pas assez propre";
     if (combined.includes("signal")) return "signal encore trop faible";
-    if (combined.includes("attendre confirmation")) return "attendre confirmation une confirmation";
+    if (combined.includes("attendre")) return "attendre une confirmation";
     if (plan?.tradeNow === true) return "actionnable maintenant";
     return "surveillance active";
   }
@@ -2031,7 +1847,7 @@ function shortBlockerLabel(plan, item) {
 function shortActionLabel(plan, item) {
     const decision = rowDecisionLabel(item);
     if (decision === "Trade propose" || plan?.tradeNow === true) return "actionnable maintenant";
-    if (decision === "A surveiller") return "attendre confirmation";
+    if (decision === "A surveiller") return "attendre";
     return "ne pas agir";
   }
 
@@ -2201,23 +2017,9 @@ function renderOppRow(item, rank) {
 
 function prudentShortlist(limit = 5) {
     return (state.opportunities || [])
-      .filter(x => x && x.price != null)
-      .map((item) => {
-        const pseudoDetail = {
-          ...item,
-          candles: [],
-          breakdown: item.breakdown || {}
-        };
-        const plan = generateTradePlan(pseudoDetail);
-        return { ...item, plan };
-      })
-      .filter(x => x.plan && (x.plan.decision === "Trade propose" || x.plan.decision === "A surveiller"))
-      .sort((a, b) => {
-        const aw = a.plan?.decision === "Trade propose" ? 2 : 1;
-        const bw = b.plan?.decision === "Trade propose" ? 2 : 1;
-        if (bw !== aw) return bw - aw;
-        return (b.score || 0) - (a.score || 0);
-      })
+      .filter((item) => item && item.price != null && item.plan)
+      .filter((item) => item.plan?.decision === "Trade propose" || item.plan?.decision === "A surveiller")
+      .sort((a, b) => (actionabilityScoreFrom(b) || 0) - (actionabilityScoreFrom(a) || 0))
       .slice(0, limit);
   }
 
@@ -2264,15 +2066,6 @@ function dashboardTopPick(opps) {
     return d.toLocaleString("fr-FR");
   }
 
-
-  function marketToneLabel(value) {
-    const raw = String(value || "").toLowerCase();
-    if (raw.includes("hauss")) return "haussier";
-    if (raw.includes("baiss")) return "baissier";
-    if (raw.includes("mitig")) return "mitige";
-    return raw || "mitige";
-  }
-
   function newsToneBadgeClass(tone) {
     const t = String(tone || "").toLowerCase();
     if (t.includes("hauss")) return "positive";
@@ -2288,14 +2081,14 @@ function dashboardTopPick(opps) {
         <div class="section-title"><span>News + IA</span><span>${items.length}</span></div>
 
         <div class="grid trades-stats" style="margin-bottom:14px">
-          <div class="stat-card"><div class="stat-label">Biais marche</div><div class="stat-value" style="font-size:1rem">${safeText(marketToneLabel(overview.marketTone || "mitige"))}</div></div>
+          <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
           <div class="stat-card"><div class="stat-label">Themes</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,2).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,3).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Maj</div><div class="stat-value" style="font-size:1rem">${safeNewsDate(state.news?.asOf)}</div></div>
         </div>
 
         <div class="card" style="padding:14px;margin-bottom:14px;background:var(--bg-elevated)">
-          <div class="muted" style="margin-bottom:6px">Synthese</div>
+          <div class="muted" style="margin-bottom:6px">Lecture IA</div>
           <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
         </div>
 
@@ -2356,18 +2149,12 @@ function dashboardTopPick(opps) {
 
   function newsSourceLabel(item) {
     const src = String(item?.source || "").trim();
-    if (src && src !== "news.google.com") return src;
+    if (src) return src;
     try {
       const url = new URL(String(item?.link || ""));
-      const host = url.hostname.replace(/^www\./, "");
-      if (host.includes("news.google")) return "Google News";
-      if (host.includes("lesechos")) return "Les Echos";
-      if (host.includes("zonebourse")) return "Zonebourse";
-      if (host.includes("boursorama")) return "Boursorama";
-      if (host.includes("aktionnaire")) return "L'Actionnaire";
-      return host;
+      return url.hostname.replace(/^www\./, "");
     } catch {
-      return src || "Source";
+      return "Source";
     }
   }
 
@@ -2426,28 +2213,28 @@ function dashboardTopPick(opps) {
         </div>
 
         <div class="grid trades-stats">
-          <div class="stat-card"><div class="stat-label">Biais marche</div><div class="stat-value" style="font-size:1rem">${safeText(marketToneLabel(overview.marketTone || "mitige"))}</div></div>
+          <div class="stat-card"><div class="stat-label">Biais news</div><div class="stat-value" style="font-size:1rem">${safeText(overview.marketTone || "mitige")}</div></div>
           <div class="stat-card"><div class="stat-label">Themes dominants</div><div class="stat-value" style="font-size:1rem">${safeText((overview.keyThemes || []).slice(0,3).join(" · ") || "—")}</div></div>
           <div class="stat-card"><div class="stat-label">Actifs a surveiller</div><div class="stat-value" style="font-size:1rem">${safeText((overview.watchAssets || []).slice(0,4).join(" · ") || "—")}</div></div>
-          <div class="stat-card"><div class="stat-label">Articles utiles</div><div class="stat-value">${allItems.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Articles</div><div class="stat-value">${allItems.length}</div></div>
         </div>
 
         <div class="card" style="margin-top:18px">
           <div class="section-title"><span>Synthese IA</span><span>priorite</span></div>
           <div class="news-summary-grid">
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">Synthese</div>
+              <div class="muted" style="margin-bottom:6px">Lecture IA</div>
               <div>${safeText(overview.summary || state.news?.message || "Aucune synthese news disponible pour le moment.")}</div>
             </div>
             <div class="news-summary-box">
-              <div class="muted" style="margin-bottom:6px">Priorite</div>
+              <div class="muted" style="margin-bottom:6px">Focus utile</div>
               <div>${safeText((overview.watchAssets || []).length ? `Surveiller en priorite : ${(overview.watchAssets || []).join(" · ")}.` : "Aucun actif dominant ne ressort pour le moment.")}</div>
             </div>
           </div>
         </div>
 
-        ${renderNewsPageSection("A la une du marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
-        ${renderNewsPageSection("Macro et banques centrales", "Ce qui peut impacter les taux, les indices et le risque global.", groups.macro, 6)}
+        ${renderNewsPageSection("A la une marche", "Ce qui donne la temperature generale du marche.", groups.market, 6)}
+        ${renderNewsPageSection("Macro / banques centrales", "Ce qui peut impacter les taux, les indices et le risque global.", groups.macro, 6)}
         ${renderNewsPageSection("Crypto", "Flux crypto utiles pour BTC, ETH et le sentiment speculatif.", groups.crypto, 6)}
         ${renderNewsPageSection("Tech / actions", "News societes et themes croissance / IA / Nasdaq.", groups.tech, 6)}
       </div>
@@ -2472,15 +2259,15 @@ function dashboardPriorityTop(opps) {
     const top = dashboardPriorityTop(opps);
     const decision = top ? rowDecisionLabel(top) : "";
     if (decision === "Trade propose") return "Actif le plus propre a traiter maintenant.";
-    if (decision === "A surveiller") return "Priorite actuelle a surveiller.";
-    return "Priorite actuelle du marche.";
+    if (decision === "A surveiller") return "Actif le plus interessant a surveiller maintenant.";
+    return "Actif le plus pertinent du moment, sans signal tradable net.";
   }
 
   function dashboardPriorityBadgeLabel(item) {
     if (!item) return "indisponible";
     const actionScore = actionabilityScoreFrom(rowTradePlan(item) || item);
     if (actionScore != null && actionScore >= 80) return "actionnable";
-    return "a suivre";
+    return "a surveiller";
   }
 
   function dashboardPriorityBadgeTone(item) {
@@ -2600,7 +2387,7 @@ function renderDashboard() {
                   ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
                   ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
                   ${dashboardMetricLine("Score actionnable", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
-                  ${dashboardMetricLine("Source", safeText(newsSourceLabel({ source: topVm.item.sourceUsed }) || "—"))}
+                  ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
                 </div>
                 <div style="${mobile ? `margin-top:14px` : `display:flex;align-items:flex-start;justify-content:flex-end;`}">
                   <button class="btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche</button>
@@ -2646,7 +2433,7 @@ function renderDashboard() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Opportunites</div>
-          <div class="screen-subtitle">Lecture simple avec statut, priorite reelle et point de vigilance principal.</div>
+          <div class="screen-subtitle">Lecture simple avec statut setup, confirmations, priorite reelle et blocage principal.</div>
         </div>
 
         <div class="opp-toolbar">
@@ -2698,7 +2485,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "Trades proposes",
-          "Actifs les plus propres du moment.",
+          "Actifs a regarder en premier, sans blocage majeur.",
           groups.proposed,
           1,
           "Aucun trade propose pour le moment."
@@ -2706,7 +2493,7 @@ function renderDashboard() {
 
         ${renderOpportunitySection(
           "A surveiller",
-          "Actifs a surveiller avant ouverture.",
+          "Actifs a surveiller avant ouverture, attente d'une meilleure confirmation.",
           groups.watch,
           groups.proposed.length + 1,
           "Aucun actif a surveiller pour le moment."
@@ -2748,17 +2535,17 @@ function simpleReliabilityLabel(score, decision = "") {
   const kind = String(decision || "");
   if (score == null) return "indisponible";
   if (kind === "Trade propose") {
-    if (score >= 78) return "exploitable maintenant";
-    if (score >= 65) return "plutot propre";
-    return "encore fragile";
+    if (score >= 78) return "elevee";
+    if (score >= 65) return "moyenne";
+    return "faible";
   }
   if (kind === "A surveiller") {
-    if (score >= 72) return "a surveiller";
-    if (score >= 58) return "encore a confirmer";
+    if (score >= 72) return "dossier interessant";
+    if (score >= 58) return "a surveiller";
     return "encore fragile";
   }
   if (score >= 60) return "non actionnable";
-  return "trop fragile";
+  return "fragile";
 }
 
 function simpleTrendWord(label) {
@@ -2771,7 +2558,7 @@ function simpleTrendWord(label) {
 function simpleDecisionSentence(plan) {
   const decision = String(plan?.decision || "").toLowerCase();
   if (decision.includes("trade propose")) return "Le trade semble assez propre pour etre envisage maintenant.";
-  if (decision.includes("surveiller")) return "Le scenario existe, mais il vaut mieux attendre confirmation encore.";
+  if (decision.includes("surveiller")) return "Le scenario existe, mais il vaut mieux attendre encore.";
   return "Le signal n'est pas assez propre pour prendre position maintenant.";
 }
 
@@ -2790,10 +2577,10 @@ function simpleBlockerText(plan) {
   if (String(plan?.decision || "") === "Trade propose") return "Rien de bloquant pour le moment.";
   if (flags.includes("risk_too_high")) return "Le plan existe, mais le risque reste trop eleve.";
   if (flags.includes("entry_too_late")) return "Le setup existe, mais le timing n'est pas encore assez propre.";
-  if (flags.includes("trend_conflict")) return "Le contexte reste trop contradictoire pour valider un trade.";
-  if (flags.includes("data_quality_low")) return "Les donnees sont trop tendus pour juger le setup.";
+  if (flags.includes("trend_conflict")) return "Le contexte est trop contradictoire pour valider un trade.";
+  if (flags.includes("data_quality_low")) return "Les donnees sont trop fragiles pour juger le setup.";
   if (score < 40) return "Le signal est trop faible pour prendre position.";
-  if (trend === "hausse" || trend === "baisse") return "Le scenario existe, mais il vaut mieux attendre confirmation encore.";
+  if (trend === "hausse" || trend === "baisse") return "Le scenario existe, mais il vaut mieux attendre encore.";
   return "Le marche reste trop flou pour proposer un trade.";
 }
 
@@ -2840,7 +2627,7 @@ function simpleWaitForText(plan) {
 }
 
 
-function computeOfficialPlan(detail) { return detail ? generateTradePlan(detail) : null; }
+function computeOfficialPlan(detail) { return detail?.plan || null; }
 
 function applyOfficialPlanToRow(item) { return item; }
 
@@ -2871,25 +2658,16 @@ function lockDetailToOfficialRow(detail) {
 function strictDisplayScore(detail) {
   if (!detail) return null;
   const locked = lockDetailToOfficialRow(detail);
-  if (locked?.officialScore != null && !Number.isNaN(Number(locked.officialScore))) return Number(locked.officialScore);
-  if (locked?.score != null && !Number.isNaN(Number(locked.score))) return Number(locked.score);
-  return null;
+  return actionabilityScoreFrom(locked);
 }
 
 function officialPlanForDetail(detail) {
   const locked = lockDetailToOfficialRow(detail);
-  const plan = computeOfficialPlan(locked);
-  if (!plan) return plan;
-
-  const displayScore = strictDisplayScore(locked);
-  if (displayScore != null) {
-    plan.finalScore = displayScore;
-  }
-
+  if (!locked?.plan) return null;
+  const plan = { ...locked.plan };
   if (locked?.officialDecision) plan.decision = locked.officialDecision;
   if (locked?.officialTrendLabel) plan.trendLabel = locked.officialTrendLabel;
   if (locked?.officialWaitFor) plan.waitFor = locked.officialWaitFor;
-
   return plan;
 }
 
@@ -2900,8 +2678,8 @@ function aiDisplayState(plan) {
     if (status.startsWith("ai_not_needed")) {
       return {
         title: "LECTURE MOTEUR SEULE",
-        source: "analyse_locale",
-        message: "Le moteur suffit pour ce dossier.",
+        source: "moteur_local",
+        message: "Contexte IA non necessaire sur ce cas.",
         externalAiUsed: false
       };
     }
@@ -2909,7 +2687,7 @@ function aiDisplayState(plan) {
       return {
         title: "FALLBACK LOCAL",
         source: "local_fallback",
-        message: "IA externe indisponible, lecture locale utilise.",
+        message: "IA externe indisponible, fallback local utilise.",
         externalAiUsed: false
       };
     }
@@ -2923,8 +2701,8 @@ function aiDisplayState(plan) {
     }
     return {
       title: "LECTURE MOTEUR SEULE",
-      source: "analyse_locale",
-      message: "Lecture locale.",
+      source: "moteur_local",
+      message: "Lecture moteur seule.",
       externalAiUsed: false
     };
   }
@@ -2943,10 +2721,10 @@ function detailTileValue(kind, plan, detail) {
       if (Number.isFinite(context)) {
         if (context >= 75) return "solide";
         if (context >= 60) return "correct";
-        if (context >= 45) return "encore fragile";
+        if (context >= 45) return "fragile";
         return "faible";
       }
-      return score != null && score >= 65 ? "correct" : "encore fragile";
+      return score != null && score >= 65 ? "correct" : "fragile";
     }
 
     if (kind === "trend") {
@@ -3027,7 +2805,7 @@ function renderDetail() {
                   ${badge(simpleAssetClassLabel(d.assetClass), d.assetClass)}
                   ${badge(d.trendLabel || simpleDirectionLabel(d.direction, d.score), d.direction || "")}
                   ${badge(simpleScoreStatusLabel(d.scoreStatus || "n/a"), d.scoreStatus || "")}
-                  ${badge(`confiance ${safeText(d.confidenceLabel || simpleConfidenceLabel(d.confidence || "low"))}`)}
+                  ${badge(`fiabilite ${safeText(d.confidenceLabel || simpleConfidenceLabel(d.confidence || "low"))}`)}
                   ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
@@ -3039,18 +2817,20 @@ function renderDetail() {
                       <div class="kv plan-grid">
                         <div class="muted">Decision simple</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
                         <div class="muted">Tendance</div><div>${safeText(plan?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</div>
-                        ${plan?.decision === "Trade propose" ? `
-                          <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
-                          <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
-                          <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
-                          <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        ` : ``}
-                        <div class="muted">Niveau actionnable</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div>
-                        <div class="muted">Score dossier</div><div>${dossierScoreFrom(plan) != null ? `${num(dossierScoreFrom(plan), 0)}/100` : "—"}</div>
+                        <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
+                        <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
+                        <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
+                        <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
+                        <div class="muted">Niveau actionnable</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div><div class="muted">Score dossier</div><div>${dossierScoreFrom(plan) != null ? `${num(dossierScoreFrom(plan), 0)}/100` : "—"}</div>
                         <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
-                        <div class="muted">Resume simple</div><div>${safeText(simpleDecisionSentence(plan))}</div>
+                        <div class="muted">En clair</div><div>${safeText(simpleDecisionSentence(plan))}</div>
+                        <div class="muted">Resume simple</div><div>${safeText(simpleContextSentence(plan))} ${safeText(plan?.aiSummary || "")}</div>
                       </div>
                       <div class="plan-reason">${safeText(plan?.reason || plan?.refusalReason || "Pas d'analyse disponible.")}</div>
+                      <div class="plan-ai-summary">
+                        <div class="muted">Resume court</div>
+                        <div>${safeText(plan?.aiSummary || "Pas d'avis complementaire.")}</div>
+                      </div>
                       <div class="plan-context">
                         ${(plan?.aiContext || []).map(label => `<span class="mini-pill">${safeText(label)}</span>`).join("")}
                         ${plan?.safety ? `<span class="mini-pill strong">niveau : ${safeText(plan.safety)}</span>` : ""}
@@ -3063,20 +2843,23 @@ function renderDetail() {
               </div>
 
               <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>Lecture complementaire</span><span>vue synthese</span></div>
-                <div class="ai-review-box">
-                  <div class="legend">
-                    ${badge(currentTradePlan()?.decision || "—", decisionBadgeClass(currentTradePlan()?.decision || ""))}
-                    ${badge(`prudence ${currentTradePlan()?.safety || "moyenne"}`)}
-                    ${badge("lecture simplifiee")}
+                <div class="section-title"><span>Lecture complementaire</span><span>${state.loadingAiReview ? "analyse..." : safeText((state.aiReview?.provider === "moteur_local") ? "lecture moteur seule" : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local"))}</span></div>
+                ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
+                  <div class="ai-review-box">
+                    <div class="legend">
+                      ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}
+                      ${badge(`prudence ${state.aiReview.prudence || "—"}`)}
+                      ${badge(state.aiReview.externalAiUsed ? "IA externe" : (state.aiReview?.provider === "moteur_local" ? "lecture moteur seule" : "lecture locale"))}
+                    </div>
+                    <div class="ai-summary">${safeText(state.aiReview.summary || state.aiReview.reason || "—")}</div>
+                    <div class="kv" style="margin-top:12px">
+                      <div class="muted">Pourquoi</div><div>${safeText(state.aiReview.reason || "—")}</div>
+                      <div class="muted">Ce qui bloque</div><div>${safeText(state.aiReview.invalidation || "—")}</div>
+                      <div class="muted">Source</div><div>${safeText(state.aiReview.provider || "—")}</div>
+                    </div>
+                    ${state.aiReview.warning ? `<div class="muted" style="margin-top:10px">${safeText(state.aiReview.warning)}</div>` : ""}
                   </div>
-                  <div class="ai-summary">${safeText(simpleDecisionSentence(currentTradePlan()))}</div>
-                  <div class="kv" style="margin-top:12px">
-                    <div class="muted">Pourquoi</div><div>${safeText(simpleContextSentence(currentTradePlan()))} ${safeText(currentTradePlan()?.aiSummary || "")}</div>
-                    <div class="muted">Point de vigilance</div><div>${safeText(simpleBlockerText(currentTradePlan()))}</div>
-                    <div class="muted">Ce qu'il faut attendre</div><div>${safeText(simpleWaitForText(currentTradePlan()))}</div>
-                  </div>
-                </div>
+                ` : `<div class="empty-state">Aucune validation IA disponible pour le moment.</div>`}
               </div>
 
               <div class="card" style="margin-bottom:18px">
@@ -3097,7 +2880,7 @@ function renderDetail() {
                       </article>
                     `).join("")}
                   </div>
-                ` : `<div class="empty-state">Pas de news importante liee a cet actif pour le moment.</div>`}
+                ` : `<div class="empty-state">Aucune news directement reliee a cet actif pour le moment.</div>`}
               </div>
 
               <div class="card">
@@ -3112,7 +2895,7 @@ function renderDetail() {
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
-                    <div class="conclusion-line">Niveau actionnable : <strong>${actionabilityScoreFrom(currentTradePlan() || d) != null ? `${num(actionabilityScoreFrom(currentTradePlan() || d), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(currentTradePlan() || d)))}` : "indisponible"}</strong></div>
+                    <div class="conclusion-line">Niveau actionnable : <strong>${safeText(actionabilityLabel(actionabilityScoreFrom(currentTradePlan() || d)))}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(currentTradePlan()?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</strong></div>
                     <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
                     <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
@@ -3127,21 +2910,21 @@ function renderDetail() {
                   <div>${safeText(simpleDecisionSentence(currentTradePlan()))}</div>
                 </div>
                 <div class="conclusion-text">
-                  <div class="muted">Point de vigilance</div>
+                  <div class="muted">Ce qui bloque</div>
                   <div>${safeText(simpleBlockerText(currentTradePlan()))}</div>
                 </div>
                 <div class="conclusion-text">
-                  <div class="muted">Ce qu'il faut attendre confirmation</div>
+                  <div class="muted">Ce qu'il faut attendre</div>
                   <div>${safeText(simpleWaitForText(currentTradePlan()))}</div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
                   <div class="breakdown" style="margin-top:14px">
-                    <div class="break-item"><div class="break-name">Contexte</div><div class="break-value">${safeText(detailTileValue("context", currentTradePlan(), d))}</div></div>
-                    <div class="break-item"><div class="break-name">Tendance</div><div class="break-value">${safeText(detailTileValue("trend", currentTradePlan(), d))}</div></div>
-                    <div class="break-item"><div class="break-name">Elan</div><div class="break-value">${safeText(detailTileValue("momentum", currentTradePlan(), d))}</div></div>
-                    <div class="break-item"><div class="break-name">Entree</div><div class="break-value">${safeText(detailTileValue("entry", currentTradePlan(), d))}</div></div>
-                    <div class="break-item"><div class="break-name">Risque</div><div class="break-value">${safeText(detailTileValue("risk", currentTradePlan(), d))}</div></div>
-                    <div class="break-item"><div class="break-name">Activite</div><div class="break-value">${safeText(detailTileValue("activity", currentTradePlan(), d))}</div></div>
+                    <div class="break-item"><div class="break-name">Contexte</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.regime))}</div></div>
+                    <div class="break-item"><div class="break-name">Tendance</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.trend))}</div></div>
+                    <div class="break-item"><div class="break-name">Elan</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.momentum))}</div></div>
+                    <div class="break-item"><div class="break-name">Entree</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.entryQuality))}</div></div>
+                    <div class="break-item"><div class="break-name">Risque</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.risk))}</div></div>
+                    <div class="break-item"><div class="break-name">Activite</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.participation))}</div></div>
                   </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
                 }
               </div>
@@ -4001,7 +3784,7 @@ function openPositionsRiskView() {
             state.trades.remoteStatus === "connected"
               ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
               : state.trades.remoteStatus === "fallback_local"
-                ? `lecture locale · ${safeText(state.trades.remoteError || "erreur distante")}`
+                ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
                 : "local uniquement"
           }</div>
           ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
@@ -4201,7 +3984,7 @@ function openPositionsRiskView() {
                   state.trades.remoteStatus === "connected"
                     ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
                     : state.trades.remoteStatus === "fallback_local"
-                      ? `lecture locale · ${safeText(state.trades.remoteError || "worker / supabase indisponible")}`
+                      ? `fallback local · ${safeText(state.trades.remoteError || "worker / supabase indisponible")}`
                       : "local uniquement"
                 }</div>
               </div>
