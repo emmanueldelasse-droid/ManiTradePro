@@ -2639,25 +2639,39 @@ function renderDashboard() {
           <div class="card dashboard-feature-card" style="${mobile ? "margin-bottom:14px;" : ""}">
             <div class="section-title"><span>Priorite du moment</span><span>${topVm ? safeText(topVm.item.symbol) : "—"}</span></div>
             ${topVm ? `
-              <div class="top-pick-box dashboard-signal-shell" style="${mobile ? `` : `display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(170px,.8fr) minmax(240px,1fr) auto;gap:18px;align-items:start;`}">
-                <div class="dashboard-signal-copy">
-                  <div class="dashboard-signal-kicker">Signal leader</div>
-                  <div class="trade-symbol dashboard-top-symbol">${safeText(topVm.item.symbol)}</div>
-                  <div class="trade-name dashboard-top-name">${safeText(topVm.item.name || "Nom indisponible")}</div>
-                  <div class="muted dashboard-top-summary" style="margin-top:8px">${safeText(topVm.subtitle)}</div>
-                </div>
-                <div class="legend dashboard-signal-badges" style="${mobile ? `justify-content:flex-start;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;` : `display:flex;flex-direction:column;gap:8px;align-items:flex-start;`}">
-                  ${badge(safeText(topVm.badgeLabel), topVm.decisionState.tone)}
-                  ${badge(safeText(rowTrendLabel(topVm.item)), topVm.item.direction || "")}
-                </div>
-                <div class="top-pick-metrics dashboard-signal-metrics" style="${mobile ? `margin-top:14px;display:grid;gap:10px;` : `display:grid;gap:10px;`}">
-                  ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
-                  ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
-                  ${dashboardMetricLine("Score dossier", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
-                  ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
-                </div>
-                <div class="dashboard-signal-action" style="${mobile ? `margin-top:14px` : `display:flex;align-items:flex-start;justify-content:flex-end;`}">
-                  <button class="btn dashboard-open-btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche</button>
+              <div class="top-pick-box dashboard-signal-shell">
+                <div class="dashboard-signal-main">
+                  <div class="dashboard-signal-copy">
+                    <div class="dashboard-signal-kicker">Signal leader</div>
+                    <div class="trade-symbol dashboard-top-symbol">${safeText(topVm.item.symbol)}</div>
+                    <div class="trade-name dashboard-top-name">${safeText(topVm.item.name || "Nom indisponible")}</div>
+                    <div class="muted dashboard-top-summary">${safeText(topVm.subtitle)}</div>
+                    <div class="legend dashboard-signal-badges">
+                      ${badge(safeText(topVm.badgeLabel), topVm.decisionState.tone)}
+                      ${badge(safeText(rowTrendLabel(topVm.item)), topVm.item.direction || "")}
+                    </div>
+                  </div>
+                  <div class="dashboard-signal-panel">
+                    <div class="dashboard-signal-highlight">
+                      <div class="dashboard-signal-score">
+                        ${scoreRing(topVm.scoreState.score, topVm.scoreState.tone)}
+                      </div>
+                      <div class="dashboard-signal-highlight-copy">
+                        <div class="dashboard-signal-highlight-label">Lecture dominante</div>
+                        <div class="dashboard-signal-highlight-title">${safeText(topVm.decisionLabel)}</div>
+                        <div class="dashboard-signal-highlight-text">${safeText(dominantStatusReason(topVm.item))}</div>
+                      </div>
+                    </div>
+                    <div class="top-pick-metrics dashboard-signal-metrics">
+                      ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
+                      ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
+                      ${dashboardMetricLine("Score dossier", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
+                      ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
+                    </div>
+                    <div class="dashboard-signal-action">
+                      <button class="btn dashboard-open-btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ` : `<div class="empty-state">Aucune priorite exploitable pour le moment.</div>`}
