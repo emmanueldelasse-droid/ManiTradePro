@@ -2636,40 +2636,41 @@ function renderDashboard() {
         </div>
 
         <div class="dashboard-grid" style="${mobile ? "display:block;" : ""}">
-          <div class="card" style="${mobile ? "margin-bottom:14px;" : ""}">
+          <div class="card dashboard-feature-card" style="${mobile ? "margin-bottom:14px;" : ""}">
             <div class="section-title"><span>Priorite du moment</span><span>${topVm ? safeText(topVm.item.symbol) : "—"}</span></div>
             ${topVm ? `
-              <div class="top-pick-box" style="${mobile ? `` : `display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(170px,.8fr) minmax(240px,1fr) auto;gap:18px;align-items:start;`}">
-                <div>
-                  <div class="trade-symbol">${safeText(topVm.item.symbol)}</div>
-                  <div class="trade-name">${safeText(topVm.item.name || "Nom indisponible")}</div>
-                  <div class="muted" style="margin-top:8px">${safeText(topVm.subtitle)}</div>
+              <div class="top-pick-box dashboard-signal-shell" style="${mobile ? `` : `display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(170px,.8fr) minmax(240px,1fr) auto;gap:18px;align-items:start;`}">
+                <div class="dashboard-signal-copy">
+                  <div class="dashboard-signal-kicker">Signal leader</div>
+                  <div class="trade-symbol dashboard-top-symbol">${safeText(topVm.item.symbol)}</div>
+                  <div class="trade-name dashboard-top-name">${safeText(topVm.item.name || "Nom indisponible")}</div>
+                  <div class="muted dashboard-top-summary" style="margin-top:8px">${safeText(topVm.subtitle)}</div>
                 </div>
-                <div class="legend" style="${mobile ? `justify-content:flex-start;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;` : `display:flex;flex-direction:column;gap:8px;align-items:flex-start;`}">
+                <div class="legend dashboard-signal-badges" style="${mobile ? `justify-content:flex-start;margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;` : `display:flex;flex-direction:column;gap:8px;align-items:flex-start;`}">
                   ${badge(safeText(topVm.badgeLabel), topVm.decisionState.tone)}
                   ${badge(safeText(rowTrendLabel(topVm.item)), topVm.item.direction || "")}
                 </div>
-                <div class="top-pick-metrics" style="${mobile ? `margin-top:14px;display:grid;gap:10px;` : `display:grid;gap:10px;`}">
+                <div class="top-pick-metrics dashboard-signal-metrics" style="${mobile ? `margin-top:14px;display:grid;gap:10px;` : `display:grid;gap:10px;`}">
                   ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
                   ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
                   ${dashboardMetricLine("Score dossier", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
                   ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
                 </div>
-                <div style="${mobile ? `margin-top:14px` : `display:flex;align-items:flex-start;justify-content:flex-end;`}">
-                  <button class="btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche</button>
+                <div class="dashboard-signal-action" style="${mobile ? `margin-top:14px` : `display:flex;align-items:flex-start;justify-content:flex-end;`}">
+                  <button class="btn dashboard-open-btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche</button>
                 </div>
               </div>
             ` : `<div class="empty-state">Aucune priorite exploitable pour le moment.</div>`}
           </div>
 
-          <div class="card">
+          <div class="card dashboard-side-card">
             <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
-            ${recentAlgo.length ? recentAlgo.map((item) => {
+            ${recentAlgo.length ? `<div class="algo-card-stack">${recentAlgo.map((item) => {
               const algoDecision = item.decision || "Pas de trade";
               const algoReason = item.reasonShort || item.summary || "";
               const algoDate = displayAlgoDate(item.createdAt || item.at || item.timestamp || "");
               return `
-                <div class="journal-card" style="margin-bottom:10px">
+                <div class="journal-card dashboard-journal-card" style="margin-bottom:10px">
                   <div class="journal-head">
                     <div class="trade-symbol">${safeText(item.symbol || "—")}</div>
                     ${statusBadge(algoDecision)}
@@ -2678,7 +2679,7 @@ function renderDashboard() {
                   ${algoReason ? `<div class="muted" style="margin-top:8px">${safeText(algoReason)}</div>` : ""}
                 </div>
               `;
-            }).join("") : `<div class="empty-state">Aucune decision recente.</div>`}
+            }).join("")}</div>` : `<div class="empty-state">Aucune decision recente.</div>`}
           </div>
         </div>
 
