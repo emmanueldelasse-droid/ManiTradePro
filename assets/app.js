@@ -4283,6 +4283,57 @@ function renderMain() {
     document.body.classList.toggle("theme-light-root", !!state.settings.lightTheme);
   }
 
+  function syncOpportunityScoreDisplay() {
+    const rows = Array.from(app.querySelectorAll(".opp-row[data-symbol]"));
+    const items = Array.isArray(state.opportunities) ? state.opportunities : [];
+    rows.forEach((row) => {
+      const symbol = String(row.getAttribute("data-symbol") || "").toUpperCase();
+      const item = items.find((entry) => String(entry?.symbol || "").toUpperCase() === symbol);
+      if (!item) return;
+      const notes = row.querySelectorAll(".opp-note");
+      if (notes[1]) {
+        notes[1].textContent = shortBlockerLabel(rowTradePlan(item) || {}, item);
+      }
+    });
+  }
+
+  function syncDetailScoreDisplay() {
+    if (state.route !== "asset-detail" || !state.detail) return;
+    const card = app.querySelector(".conclusion-card");
+    if (!card) return;
+
+    const locked = lockDetailToOfficialRow(state.detail);
+    const source = currentTradePlan() || locked || state.detail;
+    if (!source) return;
+
+    const primaryScore = dossierScoreFrom(source) ?? actionabilityScoreFrom(source);
+    const primaryTone = actionabilityTone(primaryScore, source);
+    const actionScore = actionabilityScoreFrom(source);
+    const actionLabel = actionabilityLabel(actionScore, source);
+
+    const headerScore = card.querySelector(".section-title span:last-child");
+    if (headerScore) {
+      headerScore.textContent = `${primaryScore != null ? primaryScore : "-"}/100`;
+    }
+
+    const scoreBox = card.querySelector(".conclusion-score");
+    if (scoreBox) {
+      const secondaryLine = actionScore != null && actionScore !== primaryScore
+        ? `actionnable ${actionScore}/100`
+        : `niveau ${actionLabel}`;
+      scoreBox.innerHTML = `
+        ${scoreRing(primaryScore, primaryTone)}
+        <div class="muted" style="text-align:center; margin-top:8px;">${safeText(`dossier ${primaryScore != null ? primaryScore : "-"}/100`)}</div>
+        <div class="muted" style="text-align:center;">${safeText(secondaryLine)}</div>
+      `;
+    }
+  }
+
+  function syncDisplayedScores() {
+    syncOpportunityScoreDisplay();
+    syncDetailScoreDisplay();
+  }
+
   function render() {
     app.innerHTML = `
       <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${state.settings.lightTheme ? "theme-light" : ""}">
@@ -4294,6 +4345,7 @@ function renderMain() {
     `;
     applyThemeMode();
     bindEvents();
+    syncDisplayedScores();
   }
 
   function bindEvents() {
