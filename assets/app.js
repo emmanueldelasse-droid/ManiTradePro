@@ -1701,10 +1701,10 @@ function groupedOpportunities(rows) {
   });
 
   const sorter = (a, b) => {
-    const actionDelta = (Number(b._actionScore ?? -1) - Number(a._actionScore ?? -1));
-    if (actionDelta) return actionDelta;
     const dossierDelta = (Number(b._dossierScore ?? -1) - Number(a._dossierScore ?? -1));
     if (dossierDelta) return dossierDelta;
+    const actionDelta = (Number(b._actionScore ?? -1) - Number(a._actionScore ?? -1));
+    if (actionDelta) return actionDelta;
     return String(a.symbol || "").localeCompare(String(b.symbol || ""));
   };
 
@@ -1944,7 +1944,7 @@ function getDecisionState(item) {
 
 function getScoreState(item) {
   const plan = rowTradePlan(item) || item || {};
-  const score = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
+  const score = dossierScoreFrom(plan) ?? dossierScoreFrom(item) ?? actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
   const tone = actionabilityTone(score, item);
   const label = actionabilityLabel(score, item);
   return { score, tone, label };
@@ -1954,7 +1954,14 @@ function getOpportunityCardViewModel(item) {
   const plan = rowTradePlan(item) || {};
   const decisionState = getDecisionState(item);
   const scoreState = getScoreState(item);
+  const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
   const confirmationText = confirmationLabelText(plan);
+  const scoreLine = scoreState.score != null
+    ? `${scoreState.score}/100 · ${scoreState.label}`
+    : "score dossier indisponible";
+  const blockerLine = (decisionState.key === "pas_de_trade" && scoreState.score != null && actionScore != null && Math.abs(actionScore - scoreState.score) >= 4)
+    ? `${shortBlockerLabel(plan, item)} · actionnable ${actionScore}/100`
+    : shortBlockerLabel(plan, item);
   return {
     item,
     plan,
@@ -1964,7 +1971,7 @@ function getOpportunityCardViewModel(item) {
     decisionTone: decisionState.tone,
     trendLabel: rowTrendLabel(item),
     assetBadge: assetClassLabel(item.assetClass),
-    blockerLine: shortBlockerLabel(plan, item),
+    blockerLine,
     nextActionLine: shortActionLabel(plan, item),
     confirmationText,
     riskBadge: plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "",
@@ -1973,7 +1980,7 @@ function getOpportunityCardViewModel(item) {
     priceHtml: item.price != null ? renderPriceStack(item.price) : "Donnee indisponible",
     changeClass: item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "",
     changeText: pct(item.change24hPct),
-    scoreLine: scoreState.score != null ? `${scoreState.score}/100 · ${scoreState.label}` : "score actionnable indisponible"
+    scoreLine
   };
 }
 
@@ -2335,14 +2342,14 @@ function dashboardPriorityTop(opps) {
 
   function dashboardPriorityBadgeLabel(item) {
     if (!item) return "indisponible";
-    const actionScore = actionabilityScoreFrom(rowTradePlan(item) || item);
-    if (actionScore != null && actionScore >= 80) return "actionnable";
-    return "a surveiller";
+    const decision = rowDecisionLabel(item);
+    if (decision === "Trade propose") return "actionnable";
+    if (decision === "A surveiller") return "a surveiller";
+    return "pas de trade";
   }
 
   function dashboardPriorityBadgeTone(item) {
-    const actionScore = actionabilityScoreFrom(rowTradePlan(item) || item);
-    return actionabilityTone(actionScore, item);
+    return statusToneFromDecision(rowDecisionLabel(item));
   }
 
 
@@ -2645,7 +2652,7 @@ function renderDashboard() {
                 <div class="top-pick-metrics" style="${mobile ? `margin-top:14px;display:grid;gap:10px;` : `display:grid;gap:10px;`}">
                   ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
                   ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
-                  ${dashboardMetricLine("Score actionnable", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
+                  ${dashboardMetricLine("Score dossier", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
                   ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
                 </div>
                 <div style="${mobile ? `margin-top:14px` : `display:flex;align-items:flex-start;justify-content:flex-end;`}">
