@@ -65,6 +65,12 @@
       asOf: null,
       message: null
     },
+    market: {
+      eurusdRate: 0.92,
+      regime: null,
+      asOf: null,
+      message: null
+    },
     trades: {
       mode: "training",
       positions: [],
@@ -654,8 +660,48 @@
     }).format(v);
   }
 
+  function isValidEurusdRate(value) {
+    const rate = Number(value);
+    return Number.isFinite(rate) && rate > 0.5 && rate < 2;
+  }
+
+  function extractFxRateFromRows(rows) {
+    if (!Array.isArray(rows)) return null;
+    for (const row of rows) {
+      if (isValidEurusdRate(row?.fxUsdToEur)) return Number(row.fxUsdToEur);
+    }
+    return null;
+  }
+
+  function extractRegimeFromRows(rows) {
+    if (!Array.isArray(rows)) return null;
+    for (const row of rows) {
+      if (row?.regime && typeof row.regime === "object") return row.regime;
+    }
+    return null;
+  }
+
+  function syncMarketContext(meta = null, rows = null) {
+    const fxRate =
+      (meta && isValidEurusdRate(meta.eurusdRate) && Number(meta.eurusdRate)) ||
+      extractFxRateFromRows(rows) ||
+      extractFxRateFromRows(state.opportunities) ||
+      extractFxRateFromRows(state.opportunitiesSnapshot);
+    if (isValidEurusdRate(fxRate)) state.market.eurusdRate = Number(fxRate);
+
+    const regime = meta?.regime || extractRegimeFromRows(rows) || state.market.regime;
+    if (regime) state.market.regime = regime;
+
+    state.market.asOf = meta?.asOf || state.market.asOf || null;
+    state.market.message = meta?.message || state.market.message || null;
+  }
+
   function fxRateUsdToEur() {
-    return 0.92;
+    if (isValidEurusdRate(state.market?.eurusdRate)) return Number(state.market.eurusdRate);
+    const fallbackRate =
+      extractFxRateFromRows(state.opportunities) ||
+      extractFxRateFromRows(state.opportunitiesSnapshot);
+    return isValidEurusdRate(fallbackRate) ? Number(fallbackRate) : 0.92;
   }
 
   function priceDisplay(vUsd) {
@@ -763,7 +809,11 @@
 
   function compactError(message) {
     const msg = String(message || "");
+    const lower = msg.toLowerCase();
     if (!msg) return null;
+    if (lower.includes("alpha vantage") || lower.includes("alphavantage.co")) {
+      return "Source temporairement indisponible";
+    }
     if (msg.includes("Minute quota reached")) return "Quota minute atteint";
     if (msg.includes("Provider key rejected")) return "Cle fournisseur refusee";
     if (msg.includes("Cloudflare subrequest limit reached")) return "Limite Cloudflare atteinte";
@@ -892,10 +942,6 @@ function rowIsUnavailable(item) {
   if (item.scoreStatus === "unavailable") return true;
   if (item.error && item.price == null && item.score == null && item.officialScore == null) return true;
   return false;
-}
-
-function rowIsUnavailable(item) {
-  return !item || item.status === "unavailable" || item.scoreStatus === "unavailable";
 }
 
 
@@ -1106,12 +1152,14 @@ function confirmTradeFromModal() {
       trendLabel: item?.trendLabel || null,
       officialTrendLabel: item?.officialTrendLabel || item?.trendLabel || item?.plan?.trendLabel || null,
       officialWaitFor: item?.officialWaitFor || item?.plan?.waitFor || null,
+      regime: item?.regime || null,
       plan: item?.plan || null,
       setupStatus: item?.setupStatus || item?.plan?.setupStatus || null,
       tradeNow: item?.tradeNow === true || item?.plan?.tradeNow === true,
       confirmationCount: typeof item?.confirmationCount === "number" ? item.confirmationCount : (typeof item?.plan?.confirmationCount === "number" ? item.plan.confirmationCount : null),
       blockers: Array.isArray(item?.blockers) ? item.blockers : (Array.isArray(item?.plan?.blockers) ? item.plan.blockers : []),
       candles: Array.isArray(item?.candles) ? item.candles : [],
+      fxUsdToEur: isValidEurusdRate(item?.fxUsdToEur) ? Number(item.fxUsdToEur) : null,
       error: compactError(item?.error || item?.reasonShort || null)
     };
   }
@@ -1156,6 +1204,7 @@ function confirmTradeFromModal() {
     const prepared = Array.isArray(rows) ? backfillOpportunities(rows).map(normalizeOpportunity) : [];
     state.opportunities = prepared;
     saveOpportunitiesSnapshot(prepared);
+    syncMarketContext(null, prepared);
     applyFilter();
     state.opportunitiesFetchedAt = Date.now();
     state.opportunitiesLastGoodAt = state.opportunitiesFetchedAt;
@@ -1319,6 +1368,12 @@ function confirmTradeFromModal() {
       const result = await api("/api/opportunities", 12000);
       if (requestId !== state.opportunitiesRequestId) return;
       const rows = Array.isArray(result?.data) ? result.data : [];
+      syncMarketContext({
+        eurusdRate: result?.meta?.eurusdRate,
+        regime: result?.meta?.regime,
+        asOf: result?.asOf,
+        message: result?.message
+      }, rows);
       if (rows.length) {
         setOpportunities(rows);
         rows.forEach((row) => updateJournalMoteurFromOpportunity(normalizeOpportunity(row)));
@@ -1330,6 +1385,7 @@ function confirmTradeFromModal() {
       if (requestId !== state.opportunitiesRequestId) return;
       if (!state.opportunities.length && state.opportunitiesSnapshot?.length) {
         state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);
+        syncMarketContext(null, state.opportunities);
         applyFilter();
       }
       state.error = state.opportunities.length ? "Mise a jour impossible pour le moment. Derniere liste conservee." : (e.message || "Chargement impossible");
@@ -4133,6 +4189,7 @@ function renderMain() {
     await loadTradesState();
     if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
       state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);
+      syncMarketContext(null, state.opportunities);
       applyFilter();
     }
     render();
