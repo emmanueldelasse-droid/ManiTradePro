@@ -955,7 +955,7 @@ function decisionBadgeTone(item) {
 
 function rowDecisionLabel(item) {
   if (rowIsUnavailable(item)) return "Indisponible";
-  return item?.decision || "Pas de trade";
+  return item?.officialDecision || item?.decision || item?.plan?.decision || "Pas de trade";
 }
 function opportunityDecisionTone(item) {
   const decision = rowDecisionLabel(item);
@@ -1871,17 +1871,25 @@ function actionabilityScoreFrom(source) {
     return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
   }
 
-  function actionabilityLabel(score) {
+  function actionabilityLabel(score, source = null) {
+    const decision = source?.officialDecision || source?.decision || source?.plan?.decision || null;
+    if (decision === "Trade propose") return "actionnable";
+    if (decision === "A surveiller") return "a surveiller";
+    if (decision === "Pas de trade" || decision === "Indisponible") return "non actionnable";
     if (score == null) return "indisponible";
     if (score >= 74) return "actionnable";
-    if (score >= 65) return "a surveiller";
+    if (score >= 62) return "a surveiller";
     return "non actionnable";
   }
 
-  function actionabilityTone(score) {
+  function actionabilityTone(score, source = null) {
+    const decision = source?.officialDecision || source?.decision || source?.plan?.decision || null;
+    if (decision === "Trade propose") return "proposed";
+    if (decision === "A surveiller") return "blocked";
+    if (decision === "Pas de trade" || decision === "Indisponible") return "notrade";
     if (score == null) return "notrade";
     if (score >= 74) return "proposed";
-    if (score >= 65) return "blocked";
+    if (score >= 62) return "blocked";
     return "notrade";
   }
 
@@ -1937,8 +1945,8 @@ function getDecisionState(item) {
 function getScoreState(item) {
   const plan = rowTradePlan(item) || item || {};
   const score = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
-  const tone = actionabilityTone(score);
-  const label = actionabilityLabel(score);
+  const tone = actionabilityTone(score, item);
+  const label = actionabilityLabel(score, item);
   return { score, tone, label };
 }
 
@@ -2334,7 +2342,7 @@ function dashboardPriorityTop(opps) {
 
   function dashboardPriorityBadgeTone(item) {
     const actionScore = actionabilityScoreFrom(rowTradePlan(item) || item);
-    return actionabilityTone(actionScore);
+    return actionabilityTone(actionScore, item);
   }
 
 
@@ -2549,7 +2557,7 @@ function renderTradePlanHero(detail, plan) {
       </div>
 
       <div class="grid trades-stats" style="margin-top:12px">
-        ${renderTradePlanStat("Score actionnable", actionScore != null ? safeText(`${num(actionScore, 0)}/100`) : "—", actionabilityLabel(actionScore))}
+        ${renderTradePlanStat("Score actionnable", actionScore != null ? safeText(`${num(actionScore, 0)}/100`) : "—", actionabilityLabel(actionScore, plan))}
         ${renderTradePlanStat("Score dossier", dossierScore != null ? safeText(`${num(dossierScore, 0)}/100`) : "—", `confiance ${confidenceText}`)}
         ${renderTradePlanStat("Horizon", safeText(plan?.horizon || "—"), actionText)}
         ${renderTradePlanStat("Confirmations", safeText(String(Number(plan?.confirmationCount ?? 0) || 0)), confirmationLabelText(plan))}
@@ -3147,14 +3155,14 @@ function renderDetail() {
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
-                    <div class="conclusion-line">Niveau actionnable : <strong>${safeText(actionabilityLabel(actionabilityScoreFrom(currentTradePlan() || d)))}</strong></div>
+                    <div class="conclusion-line">Niveau actionnable : <strong>${safeText(actionabilityLabel(actionabilityScoreFrom(currentTradePlan() || d), currentTradePlan() || d))}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(currentTradePlan()?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</strong></div>
                     <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
                     <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
                     <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
                   </div>
                   <div class="conclusion-score">
-                    ${scoreRing(actionabilityScoreFrom(currentTradePlan() || d), actionabilityTone(actionabilityScoreFrom(currentTradePlan() || d)))}<div class="muted" style="text-align:center; margin-top:8px;">${safeText(`actionnable ${actionabilityScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div><div class="muted" style="text-align:center;">${safeText(`dossier ${dossierScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div>
+                    ${scoreRing(actionabilityScoreFrom(currentTradePlan() || d), actionabilityTone(actionabilityScoreFrom(currentTradePlan() || d), currentTradePlan() || d))}<div class="muted" style="text-align:center; margin-top:8px;">${safeText(`actionnable ${actionabilityScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div><div class="muted" style="text-align:center;">${safeText(`dossier ${dossierScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div>
                   </div>
                 </div>
                 <div class="conclusion-text">
