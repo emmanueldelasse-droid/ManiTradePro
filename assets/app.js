@@ -1426,6 +1426,12 @@ function confirmTradeFromModal() {
           : (candles?.data || cachedDetail?.candles || [])
       });
 
+      syncMarketContext({
+        eurusdRate: detail?.data?.fxUsdToEur,
+        regime: detail?.data?.regime,
+        asOf: detail?.asOf
+      }, detail?.data ? [detail.data] : null);
+
       state.detail = merged;
       updateJournalMoteurFromOpportunity(merged);
       saveDetailCache(cleanSymbol, merged);
@@ -2381,6 +2387,193 @@ function dashboardMetricLine(label, value, extraClass = "") {
   return `<div class="top-pick-line"><span>${safeText(label)}</span><strong class="${safeText(extraClass)}">${value}</strong></div>`;
 }
 
+function relativeUpdateLabel(value) {
+  if (!value) return "mise a jour inconnue";
+  const time = new Date(value).getTime();
+  if (!Number.isFinite(time)) return `mise a jour le ${safeNewsDate(value)}`;
+  const deltaMs = Math.max(0, Date.now() - time);
+  if (deltaMs < 60000) return "mis a jour a l'instant";
+  const minutes = Math.round(deltaMs / 60000);
+  if (minutes < 60) return `mis a jour il y a ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `mis a jour il y a ${hours} h`;
+  return `mise a jour le ${safeNewsDate(value)}`;
+}
+
+function marketSignalLabel(signal) {
+  const value = String(signal || "").toLowerCase();
+  if (value === "bullish") return "haussier";
+  if (value === "bearish") return "baissier";
+  return "neutre";
+}
+
+function marketRegimeViewModel(regime = state.market?.regime) {
+  const current = regime && typeof regime === "object" ? regime : null;
+  const code = String(current?.regime || "").toUpperCase();
+  let label = "Range";
+  let title = "Contexte d'attente";
+  let tone = "neutral";
+
+  if (code === "RISK_ON") {
+    label = "Risk-On";
+    title = "Contexte porteur";
+    tone = "positive";
+  } else if (code === "RISK_OFF") {
+    label = "Risk-Off";
+    title = "Contexte defensif";
+    tone = "negative";
+  }
+
+  const reason =
+    current?.reason ||
+    (code === "RISK_ON"
+      ? "Le marche soutient davantage les actifs de risque."
+      : code === "RISK_OFF"
+        ? "Le marche reste defensif et demande plus de prudence."
+        : "Pas de direction claire sur les grands proxies.");
+
+  const signals = [
+    current?.spySignal ? `SPY ${marketSignalLabel(current.spySignal)}` : null,
+    current?.qqqSignal ? `QQQ ${marketSignalLabel(current.qqqSignal)}` : null,
+    current?.tltSignal ? `TLT ${marketSignalLabel(current.tltSignal)}` : null
+  ].filter(Boolean);
+
+  return {
+    label,
+    title,
+    tone,
+    reason,
+    signals,
+    updatedLabel: relativeUpdateLabel(current?.updatedAt || state.market?.asOf || null),
+    panelMessage: state.market?.message || null
+  };
+}
+
+function renderMarketRegimeBanner(regime = state.market?.regime) {
+  const vm = marketRegimeViewModel(regime);
+  const borderColor = vm.tone === "positive"
+    ? "rgba(16,185,129,.30)"
+    : vm.tone === "negative"
+      ? "rgba(239,68,68,.28)"
+      : "rgba(245,158,11,.24)";
+  const background = vm.tone === "positive"
+    ? "linear-gradient(135deg, rgba(16,185,129,.14), rgba(15,23,42,.95))"
+    : vm.tone === "negative"
+      ? "linear-gradient(135deg, rgba(239,68,68,.12), rgba(15,23,42,.95))"
+      : "linear-gradient(135deg, rgba(245,158,11,.10), rgba(15,23,42,.95))";
+
+  return `
+    <div class="card" style="margin-bottom:18px;border:1px solid ${borderColor};background:${background}">
+      <div class="section-title"><span>Regime global</span><span>${badge(vm.label, vm.tone)}</span></div>
+      <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:1.08rem;font-weight:800;">${safeText(vm.title)}</div>
+          <div class="muted" style="margin-top:6px">${safeText(vm.reason)}</div>
+          <div class="muted" style="margin-top:8px">${safeText(vm.updatedLabel)}</div>
+          ${vm.panelMessage ? `<div class="muted" style="margin-top:8px">Panel : ${safeText(vm.panelMessage)}</div>` : ""}
+        </div>
+        <div class="legend" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+          ${vm.signals.map((label) => badge(label)).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function tradeLevelMovePct(entry, level, side = "long") {
+  const base = Number(entry);
+  const target = Number(level);
+  if (!Number.isFinite(base) || base <= 0 || !Number.isFinite(target)) return null;
+  return String(side || "").toLowerCase() === "short"
+    ? ((base - target) / base) * 100
+    : ((target - base) / base) * 100;
+}
+
+function renderTradePlanStat(label, primaryHtml, note = "") {
+  return `
+    <div class="stat-card">
+      <div class="stat-label">${safeText(label)}</div>
+      <div class="stat-value" style="font-size:1rem">${primaryHtml}</div>
+      ${note ? `<div class="muted" style="margin-top:6px">${safeText(note)}</div>` : ""}
+    </div>
+  `;
+}
+
+function renderTradePlanHero(detail, plan) {
+  if (!plan) {
+    return `<div class="empty-state">Le worker n'a pas encore fourni de plan de trade sur cet actif.</div>`;
+  }
+
+  const side = String(plan?.side || detail?.direction || "long").toLowerCase();
+  const actionScore = actionabilityScoreFrom(plan);
+  const dossierScore = dossierScoreFrom(plan);
+  const confidenceText =
+    (detail?.confidence && typeof detail.confidence === "object" && detail.confidence.display) ||
+    detail?.confidenceLabel ||
+    simpleConfidenceLabel(detail?.confidence || "low");
+  const regimeVm = marketRegimeViewModel(detail?.regime || state.market?.regime);
+  const setupLabel = setupTypeLabel(plan?.setupType || detail?.setupType || "setup");
+  const setupStatus = plan?.setupStatus || detail?.setupStatus || "";
+  const stopPct = tradeLevelMovePct(plan?.entry, plan?.stopLoss, side);
+  const targetPct = tradeLevelMovePct(plan?.entry, plan?.takeProfit, side);
+  const actionText = actionNowLabel(plan);
+  const reason = plan?.reason || plan?.refusalReason || simpleDecisionSentence(plan);
+  const summary = plan?.aiSummary || simpleContextSentence(plan);
+  const signalChips = [
+    ...regimeVm.signals,
+    setupStatus ? setupStatusLabel(setupStatus) : "",
+    confirmationLabelText(plan)
+  ].filter(Boolean);
+
+  return `
+    <div class="plan-card" style="border:1px solid rgba(255,255,255,.10);background:linear-gradient(135deg, rgba(21,31,58,.96), rgba(10,16,32,.96));padding:18px">
+      <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
+        <div style="min-width:0;flex:1;">
+          <div class="muted" style="text-transform:uppercase;letter-spacing:.08em;font-size:12px">Plan de trade</div>
+          <div style="font-size:1.35rem;font-weight:800;margin-top:6px">${safeText(simpleDecisionTitle(plan))}</div>
+          <div class="muted" style="margin-top:8px">${safeText(reason)}</div>
+        </div>
+        <div class="legend" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+          ${badge(plan?.decision || "Pas de trade", statusToneFromDecision(plan?.decision))}
+          ${badge(setupLabel)}
+          ${badge(regimeVm.label, regimeVm.tone)}
+          ${badge(`confiance ${confidenceText}`)}
+        </div>
+      </div>
+
+      <div class="grid trades-stats" style="margin-top:16px">
+        ${renderTradePlanStat("Entree", plan?.entry != null ? priceDisplay(plan.entry) : "—", `timing ${simpleTimingLabel(plan)}`)}
+        ${renderTradePlanStat("Stop", plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—", stopPct == null ? "niveau de protection" : `${pct(stopPct)} depuis l'entree`)}
+        ${renderTradePlanStat("Objectif", plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—", targetPct == null ? "niveau cible" : `${pct(targetPct)} depuis l'entree`)}
+        ${renderTradePlanStat("Ratio", plan?.rr != null ? safeText(num(plan.rr, 2)) : "—", setupStatus ? setupStatusLabel(setupStatus) : "qualite du setup")}
+      </div>
+
+      <div class="grid trades-stats" style="margin-top:12px">
+        ${renderTradePlanStat("Score actionnable", actionScore != null ? safeText(`${num(actionScore, 0)}/100`) : "—", actionabilityLabel(actionScore))}
+        ${renderTradePlanStat("Score dossier", dossierScore != null ? safeText(`${num(dossierScore, 0)}/100`) : "—", `confiance ${confidenceText}`)}
+        ${renderTradePlanStat("Horizon", safeText(plan?.horizon || "—"), actionText)}
+        ${renderTradePlanStat("Confirmations", safeText(String(Number(plan?.confirmationCount ?? 0) || 0)), confirmationLabelText(plan))}
+      </div>
+
+      <div class="kv" style="margin-top:16px">
+        <div class="muted">Regime</div><div>${safeText(regimeVm.label)} · ${safeText(regimeVm.reason)}</div>
+        <div class="muted">Setup</div><div>${safeText(setupLabel)}${setupStatus ? ` · ${safeText(setupStatusLabel(setupStatus))}` : ""}</div>
+        <div class="muted">Ce qu'il faut faire</div><div>${safeText(actionText)}</div>
+        <div class="muted">Ce qu'il faut attendre</div><div>${safeText(simpleWaitForText(plan))}</div>
+      </div>
+
+      <div class="plan-reason" style="margin-top:14px">${safeText(summary)}</div>
+      <div class="plan-context">
+        ${signalChips.map((label) => `<span class="mini-pill">${safeText(label)}</span>`).join("")}
+        ${plan?.safety ? `<span class="mini-pill strong">niveau : ${safeText(plan.safety)}</span>` : ""}
+      </div>
+      <div class="trade-actions">
+        ${plan && plan.decision === "Trade propose" && plan.side ? `<button class="btn trade-btn primary" data-create-trade-plan>Ouvrir le trade propose</button>` : ""}
+      </div>
+    </div>
+  `;
+}
+
 function renderDashboard() {
     const opps = Array.isArray(state.opportunities) ? state.opportunities.slice() : [];
     const stats = trainingStats();
@@ -2397,6 +2590,8 @@ function renderDashboard() {
           <div class="screen-title">Tableau de bord</div>
           <div class="screen-subtitle">Vue rapide, lecture simple, priorites utiles.</div>
         </div>
+
+        ${renderMarketRegimeBanner()}
 
         <div class="card dashboard-hero-card" style="margin-bottom:18px">
           <div class="dashboard-hero-top" style="${mobile ? "display:block;" : ""}">
@@ -2865,10 +3060,11 @@ function renderDetail() {
                   ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
+                ${renderTradePlanHero(d, currentTradePlan())}
                 ${(() => {
                   const plan = currentTradePlan();
                   return `
-                    <div class="plan-card">
+                    <div class="plan-card" style="display:none">
                       <div class="section-title"><span>Decision automatique</span><span>${safeText(plan?.decision || "—")}</span></div>
                       <div class="kv plan-grid">
                         <div class="muted">Decision simple</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
