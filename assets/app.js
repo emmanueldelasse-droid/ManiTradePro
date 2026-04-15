@@ -1028,15 +1028,16 @@ function mainBlockerText(plan) {
 
 function priorityLevel(item) {
   const plan = rowTradePlan(item) || {};
+  const safetyScore = safetyScoreFrom(plan) ?? safetyScoreFrom(item) ?? 0;
   const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item) ?? 0;
   const dossierScore = dossierScoreFrom(plan) ?? dossierScoreFrom(item) ?? 0;
   const tradeNow = plan?.tradeNow === true;
   const confirmations = Number(plan?.confirmationCount ?? item?.confirmationCount ?? 0);
   const blockers = Array.isArray(plan?.blockers) ? plan.blockers.filter(Boolean).length : 0;
 
-  if (tradeNow && actionScore >= 78 && confirmations >= 4 && blockers === 0) return "priorite haute";
-  if (actionScore >= 68 || (tradeNow && dossierScore >= 70)) return "priorite utile";
-  if (actionScore >= 50 || dossierScore >= 65) return "secondaire";
+  if (tradeNow && safetyScore >= 78 && actionScore >= 72 && confirmations >= 4 && blockers === 0) return "priorite haute";
+  if (safetyScore >= 68 || (tradeNow && dossierScore >= 70)) return "priorite utile";
+  if (safetyScore >= 58 || dossierScore >= 65) return "secondaire";
   return "faible";
 }
 
@@ -1127,7 +1128,7 @@ function confirmTradeFromModal() {
 
   function normalizeOpportunity(item) {
     const officialScore = Number(
-      item?.officialScore ?? item?.plan?.exploitabilityScore ?? item?.exploitabilityScore ?? NaN
+      item?.officialScore ?? item?.plan?.safetyScore ?? item?.safetyScore ?? item?.plan?.exploitabilityScore ?? item?.exploitabilityScore ?? NaN
     );
     return {
       symbol: item?.symbol || "",
@@ -1691,6 +1692,7 @@ function groupedOpportunities(rows) {
     const decision = rowDecisionLabel(item);
     const enriched = {
       ...item,
+      _safetyScore: safetyScoreFrom(rowTradePlan(item) || item),
       _actionScore: actionabilityScoreFrom(rowTradePlan(item) || item),
       _dossierScore: dossierScoreFrom(rowTradePlan(item) || item)
     };
@@ -1701,6 +1703,8 @@ function groupedOpportunities(rows) {
   });
 
   const sorter = (a, b) => {
+    const safetyDelta = (Number(b._safetyScore ?? -1) - Number(a._safetyScore ?? -1));
+    if (safetyDelta) return safetyDelta;
     const dossierDelta = (Number(b._dossierScore ?? -1) - Number(a._dossierScore ?? -1));
     if (dossierDelta) return dossierDelta;
     const actionDelta = (Number(b._actionScore ?? -1) - Number(a._actionScore ?? -1));
@@ -1851,9 +1855,18 @@ function priorityClass(priority) {
 
 
 
-function actionabilityScoreFrom(source) {
+function safetyScoreFrom(source) {
     const raw = Number(
       source?.officialScore ??
+      source?.plan?.safetyScore ??
+      source?.safetyScore ??
+      NaN
+    );
+    return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
+  }
+
+function actionabilityScoreFrom(source) {
+    const raw = Number(
       source?.plan?.exploitabilityScore ??
       source?.exploitabilityScore ??
       NaN
@@ -1871,22 +1884,37 @@ function actionabilityScoreFrom(source) {
     return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
   }
 
-  function actionabilityLabel(score, source = null) {
+  function safetyLabel(score, source = null) {
     const decision = source?.officialDecision || source?.decision || source?.plan?.decision || null;
-    if (decision === "Trade propose") return "actionnable";
+    if (decision === "Trade propose") return "fiable";
     if (decision === "A surveiller") return "a surveiller";
-    if (decision === "Pas de trade" || decision === "Indisponible") return "non actionnable";
+    if (decision === "Pas de trade") return "fragile";
+    if (decision === "Indisponible") return "indisponible";
     if (score == null) return "indisponible";
-    if (score >= 74) return "actionnable";
+    if (score >= 76) return "fiable";
     if (score >= 62) return "a surveiller";
-    return "non actionnable";
+    return "fragile";
   }
 
-  function actionabilityTone(score, source = null) {
+  function safetyTone(score, source = null) {
     const decision = source?.officialDecision || source?.decision || source?.plan?.decision || null;
     if (decision === "Trade propose") return "proposed";
     if (decision === "A surveiller") return "blocked";
     if (decision === "Pas de trade" || decision === "Indisponible") return "notrade";
+    if (score == null) return "notrade";
+    if (score >= 76) return "proposed";
+    if (score >= 62) return "blocked";
+    return "notrade";
+  }
+
+  function actionabilityLabel(score) {
+    if (score == null) return "indisponible";
+    if (score >= 74) return "exploitable";
+    if (score >= 62) return "correcte";
+    return "fragile";
+  }
+
+  function actionabilityTone(score) {
     if (score == null) return "notrade";
     if (score >= 74) return "proposed";
     if (score >= 62) return "blocked";
@@ -1944,9 +1972,9 @@ function getDecisionState(item) {
 
 function getScoreState(item) {
   const plan = rowTradePlan(item) || item || {};
-  const score = dossierScoreFrom(plan) ?? dossierScoreFrom(item) ?? actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
-  const tone = actionabilityTone(score, item);
-  const label = actionabilityLabel(score, item);
+  const score = safetyScoreFrom(plan) ?? safetyScoreFrom(item) ?? dossierScoreFrom(plan) ?? dossierScoreFrom(item) ?? actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
+  const tone = safetyTone(score, item);
+  const label = safetyLabel(score, item);
   return { score, tone, label };
 }
 
@@ -1958,9 +1986,9 @@ function getOpportunityCardViewModel(item) {
   const confirmationText = confirmationLabelText(plan);
   const scoreLine = scoreState.score != null
     ? `${scoreState.score}/100 · ${scoreState.label}`
-    : "score dossier indisponible";
+    : "score de surete indisponible";
   const blockerLine = (decisionState.key === "pas_de_trade" && scoreState.score != null && actionScore != null && Math.abs(actionScore - scoreState.score) >= 4)
-    ? `${shortBlockerLabel(plan, item)} · actionnable ${actionScore}/100`
+    ? `${shortBlockerLabel(plan, item)} · exploitabilite ${actionScore}/100`
     : shortBlockerLabel(plan, item);
   return {
     item,
@@ -2096,7 +2124,7 @@ function prudentShortlist(limit = 5) {
     return (state.opportunities || [])
       .filter((item) => item && item.price != null && item.plan)
       .filter((item) => item.plan?.decision === "Trade propose" || item.plan?.decision === "A surveiller")
-      .sort((a, b) => (actionabilityScoreFrom(b) || 0) - (actionabilityScoreFrom(a) || 0))
+      .sort((a, b) => (safetyScoreFrom(b) || 0) - (safetyScoreFrom(a) || 0))
       .slice(0, limit);
   }
 
@@ -2564,9 +2592,9 @@ function renderTradePlanHero(detail, plan) {
       </div>
 
       <div class="grid trades-stats" style="margin-top:12px">
-        ${renderTradePlanStat("Score actionnable", actionScore != null ? safeText(`${num(actionScore, 0)}/100`) : "—", actionabilityLabel(actionScore, plan))}
+        ${renderTradePlanStat("Score de surete", safetyScoreFrom(plan) != null ? safeText(`${num(safetyScoreFrom(plan), 0)}/100`) : "—", safetyLabel(safetyScoreFrom(plan), plan))}
+        ${renderTradePlanStat("Exploitabilite", actionScore != null ? safeText(`${num(actionScore, 0)}/100`) : "—", actionabilityLabel(actionScore))}
         ${renderTradePlanStat("Score dossier", dossierScore != null ? safeText(`${num(dossierScore, 0)}/100`) : "—", `confiance ${confidenceText}`)}
-        ${renderTradePlanStat("Horizon", safeText(plan?.horizon || "—"), actionText)}
         ${renderTradePlanStat("Confirmations", safeText(String(Number(plan?.confirmationCount ?? 0) || 0)), confirmationLabelText(plan))}
       </div>
 
@@ -2665,7 +2693,7 @@ function renderDashboard() {
                     <div class="top-pick-metrics dashboard-signal-metrics">
                       ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
                       ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
-                      ${dashboardMetricLine("Score dossier", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
+                      ${dashboardMetricLine("Score de surete", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
                       ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
                     </div>
                     <div class="dashboard-signal-action">
@@ -2939,7 +2967,7 @@ function lockDetailToOfficialRow(detail) {
 function strictDisplayScore(detail) {
   if (!detail) return null;
   const locked = lockDetailToOfficialRow(detail);
-  return actionabilityScoreFrom(locked);
+  return safetyScoreFrom(locked);
 }
 
 function officialPlanForDetail(detail) {
@@ -3103,7 +3131,7 @@ function renderDetail() {
                         <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
                         <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
                         <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        <div class="muted">Niveau actionnable</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div><div class="muted">Score dossier</div><div>${dossierScoreFrom(plan) != null ? `${num(dossierScoreFrom(plan), 0)}/100` : "—"}</div>
+                        <div class="muted">Score de surete</div><div>${safetyScoreFrom(plan) != null ? `${num(safetyScoreFrom(plan), 0)}/100 · ${safeText(safetyLabel(safetyScoreFrom(plan), plan))}` : "—"}</div><div class="muted">Exploitabilite</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div>
                         <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
                         <div class="muted">En clair</div><div>${safeText(simpleDecisionSentence(plan))}</div>
                         <div class="muted">Resume simple</div><div>${safeText(simpleContextSentence(plan))} ${safeText(plan?.aiSummary || "")}</div>
@@ -3177,14 +3205,14 @@ function renderDetail() {
                 <div class="conclusion-top">
                   <div class="conclusion-main">
                     <div class="conclusion-decision">${safeText(simpleDecisionTitle(currentTradePlan()))}</div>
-                    <div class="conclusion-line">Niveau actionnable : <strong>${safeText(actionabilityLabel(actionabilityScoreFrom(currentTradePlan() || d), currentTradePlan() || d))}</strong></div>
+                    <div class="conclusion-line">Niveau de surete : <strong>${safeText(safetyLabel(safetyScoreFrom(currentTradePlan() || d), currentTradePlan() || d))}</strong></div>
                     <div class="conclusion-line">Tendance : <strong>${safeText(currentTradePlan()?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</strong></div>
                     <div class="conclusion-line">Force de la tendance : <strong>${safeText(simpleTrendStrengthLabel(d))}</strong></div>
                     <div class="conclusion-line">Timing d'entree : <strong>${safeText(simpleTimingLabel(currentTradePlan()))}</strong></div>
                     <div class="conclusion-line">A faire maintenant : <strong>${safeText(actionNowLabel(currentTradePlan()))}</strong></div>
                   </div>
                   <div class="conclusion-score">
-                    ${scoreRing(actionabilityScoreFrom(currentTradePlan() || d), actionabilityTone(actionabilityScoreFrom(currentTradePlan() || d), currentTradePlan() || d))}<div class="muted" style="text-align:center; margin-top:8px;">${safeText(`actionnable ${actionabilityScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div><div class="muted" style="text-align:center;">${safeText(`dossier ${dossierScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div>
+                    ${scoreRing(safetyScoreFrom(currentTradePlan() || d), safetyTone(safetyScoreFrom(currentTradePlan() || d), currentTradePlan() || d))}<div class="muted" style="text-align:center; margin-top:8px;">${safeText(`surete ${safetyScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div><div class="muted" style="text-align:center;">${safeText(`exploitabilite ${actionabilityScoreFrom(currentTradePlan() || d) ?? "—"}/100`)}</div>
                   </div>
                 </div>
                 <div class="conclusion-text">
@@ -4321,24 +4349,30 @@ function renderMain() {
     const source = currentTradePlan() || locked || state.detail;
     if (!source) return;
 
-    const primaryScore = dossierScoreFrom(source) ?? actionabilityScoreFrom(source);
-    const primaryTone = actionabilityTone(primaryScore, source);
+    const primaryScore = safetyScoreFrom(source) ?? dossierScoreFrom(source) ?? actionabilityScoreFrom(source);
+    const primaryTone = safetyTone(primaryScore, source);
     const actionScore = actionabilityScoreFrom(source);
-    const actionLabel = actionabilityLabel(actionScore, source);
+    const primaryLabel = safetyLabel(primaryScore, source);
 
     const headerScore = card.querySelector(".section-title span:last-child");
     if (headerScore) {
       headerScore.textContent = `${primaryScore != null ? primaryScore : "-"}/100`;
     }
 
+    const conclusionLines = Array.from(card.querySelectorAll(".conclusion-line"));
+    const safetyLine = conclusionLines.find((line) => line.textContent.includes("Niveau"));
+    if (safetyLine) {
+      safetyLine.innerHTML = `Niveau de surete : <strong>${safeText(primaryLabel)}</strong>`;
+    }
+
     const scoreBox = card.querySelector(".conclusion-score");
     if (scoreBox) {
       const secondaryLine = actionScore != null && actionScore !== primaryScore
-        ? `actionnable ${actionScore}/100`
-        : `niveau ${actionLabel}`;
+        ? `exploitabilite ${actionScore}/100`
+        : `niveau ${primaryLabel}`;
       scoreBox.innerHTML = `
         ${scoreRing(primaryScore, primaryTone)}
-        <div class="muted" style="text-align:center; margin-top:8px;">${safeText(`dossier ${primaryScore != null ? primaryScore : "-"}/100`)}</div>
+        <div class="muted" style="text-align:center; margin-top:8px;">${safeText(`surete ${primaryScore != null ? primaryScore : "-"}/100`)}</div>
         <div class="muted" style="text-align:center;">${safeText(secondaryLine)}</div>
       `;
     }
