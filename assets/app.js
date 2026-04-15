@@ -2844,16 +2844,18 @@ function simpleReliabilityLabel(score, decision = "") {
   const kind = String(decision || "");
   if (score == null) return "indisponible";
   if (kind === "Trade propose") {
-    if (score >= 78) return "elevee";
-    if (score >= 65) return "moyenne";
-    return "faible";
+    if (score >= 78) return "solide";
+    if (score >= 65) return "constructif";
+    return "fragile";
   }
   if (kind === "A surveiller") {
-    if (score >= 72) return "dossier interessant";
-    if (score >= 58) return "a surveiller";
-    return "encore fragile";
+    if (score >= 72) return "constructif";
+    if (score >= 58) return "a confirmer";
+    return "fragile";
   }
-  if (score >= 60) return "non actionnable";
+  if (score >= 78) return "solide";
+  if (score >= 64) return "constructif";
+  if (score >= 50) return "mitige";
   return "fragile";
 }
 
