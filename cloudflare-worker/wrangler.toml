@@ -1,0 +1,16 @@
+name = "manitradepro"
+main = "worker.js"
+compatibility_date = "2026-03-29"
+account_id = "a44ec708d7642c774dc1f8c63f653c6b"
+workers_dev = true
+
+kv_namespaces = [
+  { binding = "MTP_CACHE", id = "17eb7ddc41a949dd99bd840142832cfd" }
+]
+
+[triggers]
+crons = [
+  "*/30 13-20 * * MON-FRI",
+  "0 */2 * * MON-FRI",
+  "0 */2 * * SAT,SUN"
+]
