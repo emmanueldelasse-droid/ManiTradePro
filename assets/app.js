@@ -28,6 +28,7 @@
     compactCards: false,
     lightTheme: false,
     displayCurrency: "EUR_PLUS_USD",
+    workerAdminToken: "",
     showAlgoJournal: true,
     supabaseEnabled: false,
     supabaseUrl: "",
@@ -185,17 +186,45 @@
     sync: "/api/trades/sync"
   };
 
+  function workerAdminHeaders() {
+    const token = String(state.settings?.workerAdminToken || "").trim();
+    if (!token) return {};
+    return { Authorization: `Bearer ${token}` };
+  }
+
+  function normalizeWorkerError(status, rawText = "") {
+    const text = String(rawText || "").toLowerCase();
+    if (Number(status) === 403) return "worker_admin_auth_required";
+    if (text.includes("admin token required")) return "worker_admin_auth_required";
+    if (text.includes("allowed app origin required")) return "worker_origin_not_allowed";
+    return rawText || String(status || "worker_request_failed");
+  }
+
+  function remoteStatusText() {
+    const raw = String(state.trades.remoteError || "");
+    if (state.trades.remoteStatus === "connected") {
+      return `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`;
+    }
+    if (raw.includes("worker_admin_auth_required")) return "fallback local · token admin worker requis";
+    if (raw.includes("worker_origin_not_allowed")) return "fallback local · origine de l'app non autorisee";
+    if (state.trades.remoteStatus === "fallback_local") {
+      return `fallback local · ${raw || "worker / supabase indisponible"}`;
+    }
+    return "local uniquement";
+  }
+
   async function workerTradesRequest(path, options = {}) {
     const res = await fetch(`${API_BASE}${path}`, {
       ...options,
       headers: {
         "Content-Type": "application/json",
+        ...workerAdminHeaders(),
         ...(options.headers || {})
       }
     });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
-      throw new Error(`worker_${res.status}:${txt || res.statusText}`);
+      throw new Error(normalizeWorkerError(res.status, txt || res.statusText));
     }
     const ct = res.headers.get("content-type") || "";
     if (ct.includes("application/json")) return res.json();
@@ -1235,7 +1264,7 @@ function confirmTradeFromModal() {
   async function apiPost(path, payload) {
     const res = await fetch(`${API_BASE}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...workerAdminHeaders() },
       body: JSON.stringify(payload)
     });
     const data = await res.json();
@@ -4092,13 +4121,7 @@ function openPositionsRiskView() {
           <div class="screen-title">Mes trades</div>
           <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts. Le mode entrainement suit maintenant un vrai capital fictif.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
-          <div class="muted">Etat distant : ${
-            state.trades.remoteStatus === "connected"
-              ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
-              : state.trades.remoteStatus === "fallback_local"
-                ? `fallback local · ${safeText(state.trades.remoteError || "erreur distante")}`
-                : "local uniquement"
-          }</div>
+          <div class="muted">Etat distant : ${safeText(remoteStatusText())}</div>
           ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
         </div>
 
@@ -4292,16 +4315,23 @@ function openPositionsRiskView() {
             <div class="setting-row">
               <div>
                 <div class="setting-title">Etat distant</div>
-                <div class="setting-desc">${
-                  state.trades.remoteStatus === "connected"
-                    ? `connecte${state.trades.lastRemoteSyncAt ? " · sync " + new Date(state.trades.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`
-                    : state.trades.remoteStatus === "fallback_local"
-                      ? `fallback local · ${safeText(state.trades.remoteError || "worker / supabase indisponible")}`
-                      : "local uniquement"
-                }</div>
+                <div class="setting-desc">${safeText(remoteStatusText())}</div>
               </div>
             </div>
-            <div class="muted">Secrets attendus dans Cloudflare : SUPABASE_URL et SUPABASE_ANON_KEY.</div>
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Token admin Worker</div>
+                <div class="setting-desc">Optionnel. Si tu le renseignes dans ce navigateur, l'app peut continuer a utiliser les routes protegees du Worker pour le sync trades et l'IA externe.</div>
+              </div>
+              <input class="setting-input" type="password" autocomplete="off" spellcheck="false" data-setting-input="workerAdminToken" value="${safeText(state.settings.workerAdminToken || "")}" placeholder="Bearer token local">
+            </label>
+            <div class="setting-row">
+              <div>
+                <div class="setting-title">Etat du token local</div>
+                <div class="setting-desc">${state.settings.workerAdminToken ? "token present dans ce navigateur" : "aucun token enregistre localement"}</div>
+              </div>
+            </div>
+            <div class="muted">Secrets attendus dans Cloudflare : SUPABASE_URL, SUPABASE_ANON_KEY et ADMIN_API_TOKEN pour activer la protection complete.</div>
           </div>
         </div>
       </div>`;
@@ -4490,6 +4520,20 @@ function renderMain() {
     app.querySelectorAll("[data-setting-select]").forEach(el => {
       el.addEventListener("change", () => {
         const key = el.getAttribute("data-setting-select");
+        state.settings[key] = el.value;
+        persistSettings();
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-setting-input]").forEach(el => {
+      el.addEventListener("input", () => {
+        const key = el.getAttribute("data-setting-input");
+        state.settings[key] = el.value;
+        persistSettings();
+      });
+      el.addEventListener("change", () => {
+        const key = el.getAttribute("data-setting-input");
         state.settings[key] = el.value;
         persistSettings();
         render();
