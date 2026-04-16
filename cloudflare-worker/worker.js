@@ -3218,6 +3218,73 @@ async function handleTrainingSettingsSave(request, env) {
 const SUPABASE_POSITION_KEYS = ["id","symbol","name","mode","status","side","asset_class","quantity","entry_price","invested","stop_loss","take_profit","score","trend_label","trade_decision","trade_reason","horizon","source_used","opened_at","analysis_snapshot","execution","live","updated_at"];
 const SUPABASE_TRADE_KEYS = ["id","symbol","name","mode","status","side","asset_class","quantity","entry_price","exit_price","invested","stop_loss","take_profit","pnl","pnl_pct","score","adj_score","rr_ratio","trend_label","trade_decision","trade_reason","horizon","source_used","opened_at","closed_at","analysis_snapshot","execution","live","closed_execution","updated_at"];
 
+function normalizeSupabasePositionRow(row) {
+  const safe = row && typeof row === "object" ? row : {};
+  return normalizeRowByKeys({
+    ...safe,
+    id: safe.id || null,
+    symbol: parseSymbol(safe.symbol || ""),
+    name: safe.name || parseSymbol(safe.symbol || ""),
+    mode: safe.mode || "training",
+    status: safe.status || "open",
+    side: safe.side ?? safe.direction ?? safe?.analysis_snapshot?.direction ?? safe?.analysisSnapshot?.direction ?? null,
+    asset_class: safe.asset_class ?? safe.assetClass ?? getAssetClass(parseSymbol(safe.symbol || "")),
+    quantity: finiteOrNull(safe.quantity ?? safe?.execution?.quantity),
+    entry_price: finiteOrNull(safe.entry_price ?? safe.entryPrice ?? safe?.execution?.entryPrice ?? safe?.analysis_snapshot?.entry ?? safe?.analysisSnapshot?.entry),
+    invested: finiteOrNull(safe.invested ?? safe?.execution?.invested),
+    stop_loss: finiteOrNull(safe.stop_loss ?? safe.stopLoss ?? safe?.analysis_snapshot?.stopLoss ?? safe?.analysisSnapshot?.stopLoss),
+    take_profit: finiteOrNull(safe.take_profit ?? safe.takeProfit ?? safe?.analysis_snapshot?.takeProfit ?? safe?.analysisSnapshot?.takeProfit),
+    score: finiteOrNull(safe.score ?? safe?.analysis_snapshot?.score ?? safe?.analysisSnapshot?.score),
+    trend_label: safe.trend_label ?? safe.trendLabel ?? safe?.analysis_snapshot?.trendLabel ?? safe?.analysisSnapshot?.trendLabel ?? null,
+    trade_decision: safe.trade_decision ?? safe.tradeDecision ?? safe.decision ?? safe?.analysis_snapshot?.decision ?? safe?.analysisSnapshot?.decision ?? null,
+    trade_reason: safe.trade_reason ?? safe.tradeReason ?? safe.reason ?? safe?.analysis_snapshot?.reason ?? safe?.analysisSnapshot?.reason ?? null,
+    horizon: safe.horizon ?? safe?.analysis_snapshot?.horizon ?? safe?.analysisSnapshot?.horizon ?? null,
+    source_used: safe.source_used ?? safe.sourceUsed ?? safe?.analysis_snapshot?.sourceUsed ?? safe?.analysisSnapshot?.sourceUsed ?? null,
+    opened_at: safe.opened_at ?? safe.openedAt ?? safe?.execution?.openedAt ?? null,
+    analysis_snapshot: safe.analysis_snapshot ?? safe.analysisSnapshot ?? null,
+    execution: safe.execution ?? null,
+    live: safe.live ?? null,
+    updated_at: safe.updated_at ?? safe.updatedAt ?? nowIso()
+  }, SUPABASE_POSITION_KEYS);
+}
+
+function normalizeSupabaseTradeRow(row) {
+  const safe = row && typeof row === "object" ? row : {};
+  return normalizeRowByKeys({
+    ...safe,
+    id: safe.id || null,
+    symbol: parseSymbol(safe.symbol || ""),
+    name: safe.name || parseSymbol(safe.symbol || ""),
+    mode: safe.mode || "training",
+    status: safe.status || "closed",
+    side: safe.side ?? safe.direction ?? safe?.analysis_snapshot?.direction ?? safe?.analysisSnapshot?.direction ?? null,
+    asset_class: safe.asset_class ?? safe.assetClass ?? getAssetClass(parseSymbol(safe.symbol || "")),
+    quantity: finiteOrNull(safe.quantity ?? safe?.execution?.quantity),
+    entry_price: finiteOrNull(safe.entry_price ?? safe.entryPrice ?? safe?.execution?.entryPrice ?? safe?.analysis_snapshot?.entry ?? safe?.analysisSnapshot?.entry),
+    exit_price: finiteOrNull(safe.exit_price ?? safe.exitPrice ?? safe?.closed_execution?.exitPrice ?? safe?.closedExecution?.exitPrice),
+    invested: finiteOrNull(safe.invested ?? safe?.execution?.invested),
+    stop_loss: finiteOrNull(safe.stop_loss ?? safe.stopLoss ?? safe?.analysis_snapshot?.stopLoss ?? safe?.analysisSnapshot?.stopLoss),
+    take_profit: finiteOrNull(safe.take_profit ?? safe.takeProfit ?? safe?.analysis_snapshot?.takeProfit ?? safe?.analysisSnapshot?.takeProfit),
+    pnl: finiteOrNull(safe.pnl),
+    pnl_pct: finiteOrNull(safe.pnl_pct ?? safe.pnlPct),
+    score: finiteOrNull(safe.score ?? safe?.analysis_snapshot?.score ?? safe?.analysisSnapshot?.score),
+    adj_score: finiteOrNull(safe.adj_score ?? safe.adjScore ?? safe?.analysis_snapshot?.actionabilityScore ?? safe?.analysisSnapshot?.actionabilityScore),
+    rr_ratio: finiteOrNull(safe.rr_ratio ?? safe.rrRatio ?? safe.rr ?? safe?.analysis_snapshot?.ratio ?? safe?.analysisSnapshot?.ratio),
+    trend_label: safe.trend_label ?? safe.trendLabel ?? safe?.analysis_snapshot?.trendLabel ?? safe?.analysisSnapshot?.trendLabel ?? null,
+    trade_decision: safe.trade_decision ?? safe.tradeDecision ?? safe.decision ?? safe?.analysis_snapshot?.decision ?? safe?.analysisSnapshot?.decision ?? null,
+    trade_reason: safe.trade_reason ?? safe.tradeReason ?? safe.reason ?? safe?.analysis_snapshot?.reason ?? safe?.analysisSnapshot?.reason ?? null,
+    horizon: safe.horizon ?? safe?.analysis_snapshot?.horizon ?? safe?.analysisSnapshot?.horizon ?? null,
+    source_used: safe.source_used ?? safe.sourceUsed ?? safe?.analysis_snapshot?.sourceUsed ?? safe?.analysisSnapshot?.sourceUsed ?? null,
+    opened_at: safe.opened_at ?? safe.openedAt ?? safe?.execution?.openedAt ?? null,
+    closed_at: safe.closed_at ?? safe.closedAt ?? safe?.closed_execution?.closedAt ?? safe?.closedExecution?.closedAt ?? null,
+    analysis_snapshot: safe.analysis_snapshot ?? safe.analysisSnapshot ?? null,
+    execution: safe.execution ?? null,
+    live: safe.live ?? null,
+    closed_execution: safe.closed_execution ?? safe.closedExecution ?? null,
+    updated_at: safe.updated_at ?? safe.updatedAt ?? nowIso()
+  }, SUPABASE_TRADE_KEYS);
+}
+
 function isAuthoritativeClosedTradeRow(row) {
   if (!row || !row.id) return false;
   const status = String(row.status || "").toLowerCase();
@@ -3245,21 +3312,24 @@ async function handleTradesSync(request, env) {
   const body = await request.json().catch(() => ({}));
   const inputPositions = Array.isArray(body?.positions) ? body.positions : [];
   const inputHistory = Array.isArray(body?.history) ? body.history : [];
-  const positions = normalizeTrainingPositions(inputPositions);
-  const history = normalizeTrainingTrades(inputHistory);
+  const normalizedPositionRows = inputPositions.map(normalizeSupabasePositionRow).filter(row => row && row.id);
+  const normalizedHistoryRows = inputHistory.map(normalizeSupabaseTradeRow).filter(row => row && row.id);
+  const positions = normalizeTrainingPositions(normalizedPositionRows);
+  const history = normalizeTrainingTrades(normalizedHistoryRows);
 
-  if (inputPositions.length) {
+  if (normalizedPositionRows.length) {
     await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(inputPositions)
+      body: JSON.stringify(normalizedPositionRows)
     });
   }
-  if (inputHistory.filter(isAuthoritativeClosedTradeRow).length) {
+  const authoritativeClosedRows = normalizedHistoryRows.filter(isAuthoritativeClosedTradeRow);
+  if (authoritativeClosedRows.length) {
     await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
       method: "POST",
       headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(inputHistory.filter(isAuthoritativeClosedTradeRow))
+      body: JSON.stringify(authoritativeClosedRows)
     });
   }
   return tradesPayload(true, positions, history, "sync_ok");
