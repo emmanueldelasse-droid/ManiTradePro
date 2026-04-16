@@ -22,6 +22,22 @@ Variables attendues par le worker :
 - `SUPABASE_ANON_KEY`
 - `CLAUDE_API_KEY`
 - `CLAUDE_MODEL`
+- `ADMIN_API_TOKEN` (recommande pour verrouiller les routes sensibles)
+- `ALLOWED_ORIGINS` (optionnel, liste separee par virgules des origines front autorisees)
+
+## Protection d'acces
+
+Le worker distingue maintenant :
+
+- routes publiques : `GET /health` (version reduite), `GET /api/opportunities`, endpoints de lecture pure
+- routes front protegees : `GET /api/trades/state`, `POST /api/trades/sync`, `POST /api/ai/trade-review`
+- routes admin : `GET /api/debug/circuits`, `GET /api/training/*`, `POST /api/training/settings`, `POST /api/training/auto-cycle`, `GET /api/signals*`
+
+Regles :
+
+- si `ADMIN_API_TOKEN` est configure, les routes sensibles exigent `Authorization: Bearer <token>`
+- si aucun token admin n'est configure, les routes front protegees basculent sur un controle d'origine (`ALLOWED_ORIGINS`) pour eviter de casser l'app
+- les routes admin restent refusees tant qu'aucun token admin n'est configure
 
 ## Deploiement
 
