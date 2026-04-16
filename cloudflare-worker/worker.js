@@ -8,8 +8,16 @@
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, X-Admin-Token",
 };
+
+const DEFAULT_ALLOWED_ORIGINS = [
+  "https://emmanueldelasse-droid.github.io",
+  "http://localhost:3000",
+  "http://127.0.0.1:3000",
+  "http://localhost:5173",
+  "http://127.0.0.1:5173"
+];
 
 // ============================================================
 // CONSTANTES
@@ -226,6 +234,88 @@ function safeErrorMessage(error) {
 function cloneJsonPayload(value) {
   try { return value == null ? value : JSON.parse(JSON.stringify(value)); }
   catch { return value; }
+}
+
+function requestOrigin(request) {
+  try { return String(request?.headers?.get("Origin") || "").trim(); }
+  catch { return ""; }
+}
+
+function getAllowedOrigins(env) {
+  const configured = String(env?.ALLOWED_ORIGINS || env?.PUBLIC_APP_ORIGINS || "")
+    .split(",")
+    .map((entry) => String(entry || "").trim())
+    .filter(Boolean);
+  return [...new Set(configured.length ? configured : DEFAULT_ALLOWED_ORIGINS)];
+}
+
+function adminApiToken(env) {
+  return String(env?.ADMIN_API_TOKEN || env?.MTP_ADMIN_TOKEN || "").trim();
+}
+
+function hasConfiguredAdminToken(env) {
+  return !!adminApiToken(env);
+}
+
+function requestHasAllowedOrigin(request, env) {
+  const origin = requestOrigin(request);
+  if (!origin) return false;
+  return getAllowedOrigins(env).includes(origin);
+}
+
+function requestHasAdminAccess(request, env) {
+  const expected = adminApiToken(env);
+  if (!expected) return false;
+  const bearer = String(request?.headers?.get("Authorization") || "").trim();
+  const explicit = String(request?.headers?.get("X-Admin-Token") || request?.headers?.get("x-admin-token") || "").trim();
+  const fromBearer = bearer.toLowerCase().startsWith("bearer ") ? bearer.slice(7).trim() : "";
+  const candidate = explicit || fromBearer;
+  return !!candidate && candidate === expected;
+}
+
+function requestHasFrontAccess(request, env) {
+  if (requestHasAdminAccess(request, env)) return true;
+  if (hasConfiguredAdminToken(env)) return false;
+  return requestHasAllowedOrigin(request, env);
+}
+
+function requireFrontAccess(request, env) {
+  if (requestHasFrontAccess(request, env)) return null;
+  const message = hasConfiguredAdminToken(env)
+    ? "Admin token required"
+    : "Allowed app origin required";
+  return fail(message, "forbidden", 403);
+}
+
+function requireAdminAccess(request, env) {
+  if (requestHasAdminAccess(request, env)) return null;
+  const message = hasConfiguredAdminToken(env)
+    ? "Admin token required"
+    : "Admin token not configured on worker";
+  return fail(message, "forbidden", 403);
+}
+
+function corsHeadersFor(request, env) {
+  const allowed = getAllowedOrigins(env);
+  const origin = requestOrigin(request);
+  const allowOrigin = origin && allowed.includes(origin) ? origin : (allowed[0] || "https://emmanueldelasse-droid.github.io");
+  return {
+    ...CORS_HEADERS,
+    "Access-Control-Allow-Origin": allowOrigin,
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, X-Admin-Token",
+    "Vary": "Origin"
+  };
+}
+
+function withCors(request, env, response) {
+  if (!(response instanceof Response)) return response;
+  const headers = new Headers(response.headers);
+  Object.entries(corsHeadersFor(request, env)).forEach(([key, value]) => headers.set(key, value));
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
 }
 
 // ============================================================
@@ -1269,7 +1359,7 @@ function getTradeDecisionProfile(assetClass = "stock") {
     watchDecisionMin: 63,
     watchSafetyMin: 61,
     watchActionabilityMin: 58,
-    watchEntryMin: 58,
+    watchEntryMin: 56,
     watchRiskMin: 50,
     watchContextMin: 50,
     structuredDecisionMin: 73,
@@ -1361,9 +1451,9 @@ function getTradeDecisionProfile(assetClass = "stock") {
       tradeEntryMin: 62,
       tradeRiskMin: 54,
       tradeContextMin: 54,
-      watchDecisionMin: 62,
-      watchSafetyMin: 60,
-      watchActionabilityMin: 58,
+      watchDecisionMin: 59,
+      watchSafetyMin: 61,
+      watchActionabilityMin: 60,
       watchEntryMin: 58,
       watchRiskMin: 52,
       watchContextMin: 50,
@@ -3657,7 +3747,8 @@ async function handleAiTradeReview(request, env) {
 // ============================================================
 // ROUTE HEALTH
 // ============================================================
-async function handleHealth(env) {
+async function handleHealth(request, env) {
+  const adminAccess = requestHasAdminAccess(request, env);
   const circuits = {
     twelvedata: circuitStatus("twelvedata"),
     yahoo: circuitStatus("yahoo"),
@@ -3665,11 +3756,19 @@ async function handleHealth(env) {
     binance: circuitStatus("binance")
   };
   const rateWindow = rateLimiter.calls.filter(t => t > Date.now() - rateLimiter.windowMs).length;
-  return ok({
+  const basePayload = {
     app: "ManiTradePro API V2",
     engineVersion: ENGINE_VERSION,
     engineRuleset: ENGINE_RULESET,
     liveDataOnly: true,
+    panel: { symbols: LIGHT_SYMBOLS.length, proxyRegime: PROXY_REGIME_SYMBOLS },
+    strategies: { enabled: ["pullback","breakout","continuation"], disabled: ["mean_reversion"], shorts: false },
+    cron: { configured: true, schedule: "*/30 13-20 utc weekdays + 0 */2 off-hours" },
+    adminProtectionEnabled: hasConfiguredAdminToken(env)
+  };
+  if (!adminAccess) return ok(basePayload, "worker-v2", nowIso(), "live", null);
+  return ok({
+    ...basePayload,
     budgetConfig: { dailyLimit: DAILY_TWELVE_BUDGET, rateLimitPerMinute: rateLimiter.maxPerWindow, callsInLastMinute: rateWindow },
     circuits,
     kvConfigured: true,
@@ -3677,9 +3776,6 @@ async function handleHealth(env) {
     claudeConfigured: !!env?.CLAUDE_API_KEY,
     twelveKeysConfigured: getTwelveKeys(env).length,
     alphaConfigured: !!env?.ALPHAVANTAGE_KEY,
-    panel: { symbols: LIGHT_SYMBOLS.length, proxyRegime: PROXY_REGIME_SYMBOLS },
-    strategies: { enabled: ["pullback","breakout","continuation"], disabled: ["mean_reversion"], shorts: false },
-    cron: { configured: true, schedule: "*/30 13-20 utc weekdays + 0 */2 off-hours" },
     trainingDefaults: getTrainingDefaults()
   }, "worker-v2", nowIso(), "live", null);
 }
@@ -3689,22 +3785,46 @@ async function handleHealth(env) {
 // ============================================================
 async function handleRequest(request, env) {
   const url = new URL(request.url);
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS_HEADERS });
+  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeadersFor(request, env) });
 
   // POST routes
   if (request.method === "POST") {
-    if (url.pathname === "/api/ai/trade-review") return safeRoute(() => handleAiTradeReview(request, env));
-    if (url.pathname === "/api/trades/sync") return safeRoute(() => handleTradesSync(request, env));
-    if (url.pathname === "/api/training/settings") return safeRoute(() => handleTrainingSettingsSave(request, env));
-    if (url.pathname === "/api/training/auto-cycle") return safeRoute(() => handleTrainingAutoCycle(env));
+    if (url.pathname === "/api/ai/trade-review") {
+      const denied = requireFrontAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleAiTradeReview(request, env));
+    }
+    if (url.pathname === "/api/trades/sync") {
+      const denied = requireFrontAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTradesSync(request, env));
+    }
+    if (url.pathname === "/api/training/settings") {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingSettingsSave(request, env));
+    }
+    if (url.pathname === "/api/training/auto-cycle") {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingAutoCycle(env));
+    }
     return fail("Method not allowed", "error", 405);
   }
 
   // GET routes
   if (request.method === "GET") {
-    if (url.pathname === "/api/trades/state") return safeRoute(() => handleTradesState(env));
-    if (url.pathname === "/api/signals" || url.pathname.startsWith("/api/signals/")) return safeRoute(() => handleSignals(url, env));
-    if (url.pathname === "/" || url.pathname === "/health") return safeRoute(() => handleHealth(env));
+    if (url.pathname === "/api/trades/state") {
+      const denied = requireFrontAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTradesState(env));
+    }
+    if (url.pathname === "/api/signals" || url.pathname.startsWith("/api/signals/")) {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleSignals(url, env));
+    }
+    if (url.pathname === "/" || url.pathname === "/health") return safeRoute(() => handleHealth(request, env));
     if (url.pathname === "/api/quotes") return safeRoute(() => handleQuotes(url, env));
     if (url.pathname.startsWith("/api/quotes/")) return safeRoute(() => handleQuotes(url, env));
     if (url.pathname.startsWith("/api/market-snapshot/")) return safeRoute(() => handleMarketSnapshot(decodeURIComponent(url.pathname.replace("/api/market-snapshot/","")), env));
@@ -3717,14 +3837,30 @@ async function handleRequest(request, env) {
     if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar());
     if (url.pathname === "/api/portfolio/summary") return safeRoute(() => handlePortfolioSummary());
     if (url.pathname === "/api/portfolio/positions") return safeRoute(() => handlePortfolioPositions());
-    if (url.pathname === "/api/training/account") return safeRoute(() => handleTrainingAccount(env));
-    if (url.pathname === "/api/training/positions") return safeRoute(() => handleTrainingPositions(env));
-    if (url.pathname === "/api/training/settings") return safeRoute(() => handleTrainingSettingsGet(env));
+    if (url.pathname === "/api/training/account") {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingAccount(env));
+    }
+    if (url.pathname === "/api/training/positions") {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingPositions(env));
+    }
+    if (url.pathname === "/api/training/settings") {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingSettingsGet(env));
+    }
     // Route de debug état des circuits
-    if (url.pathname === "/api/debug/circuits") return json({
-      circuits: { twelvedata: circuitStatus("twelvedata"), yahoo: circuitStatus("yahoo"), supabase: circuitStatus("supabase"), binance: circuitStatus("binance") },
-      rateLimiter: { callsInLastMinute: rateLimiter.calls.filter(t => t > Date.now() - rateLimiter.windowMs).length, maxPerWindow: rateLimiter.maxPerWindow }
-    });
+    if (url.pathname === "/api/debug/circuits") {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return json({
+        circuits: { twelvedata: circuitStatus("twelvedata"), yahoo: circuitStatus("yahoo"), supabase: circuitStatus("supabase"), binance: circuitStatus("binance") },
+        rateLimiter: { callsInLastMinute: rateLimiter.calls.filter(t => t > Date.now() - rateLimiter.windowMs).length, maxPerWindow: rateLimiter.maxPerWindow }
+      });
+    }
     return fail("Route not found", "error", 404);
   }
 
@@ -3736,8 +3872,8 @@ async function handleRequest(request, env) {
 // ============================================================
 export default {
   async fetch(request, env) {
-    try { return await handleRequest(request, env); }
-    catch (error) { return fail(safeErrorMessage(error), "error", 500); }
+    try { return withCors(request, env, await handleRequest(request, env)); }
+    catch (error) { return withCors(request, env, fail(safeErrorMessage(error), "error", 500)); }
   },
 
   async scheduled(event, env, ctx) {
