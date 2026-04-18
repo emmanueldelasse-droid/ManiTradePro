@@ -1968,7 +1968,11 @@ function buildWorkerPlan(base, regime = null) {
       confirmationCount: structuredDecision === "Trade propose" ? 5 : structuredDecision === "A surveiller" ? 4 : 3,
       confirmationLabel: structuredDecision === "Trade propose" ? "forte" : "moyenne",
       trendLabel: direction === "long" ? "tendance haussiere" : direction === "short" ? "tendance baissiere" : "tendance neutre",
-      waitFor: structuredDecision === "Trade propose" ? "rien de special" : structuredDecision === "A surveiller" ? "validation d execution" : "contexte plus propre",
+      waitFor: structuredDecision === "Trade propose"
+        ? "rien de special"
+        : structuredDecision === "A surveiller"
+          ? "validation d execution"
+          : "contexte plus propre",
       timing: entryQuality >= profile.tradeEntryMin + 4 ? "bon" : entryQuality >= profile.watchEntryMin ? "moyen" : "faible",
       safety: safetyScore >= 82 ? "elevee" : safetyScore >= 66 ? "moyenne" : "faible",
       reason: structuredDecision === "Trade propose"
@@ -2353,6 +2357,113 @@ function getComparableOpportunityScore(row) {
 }
 
 // ============================================================
+// RISK STATE TRAINING
+// ============================================================
+function startOfUtcDayIso(date = new Date()) {
+  const d = new Date(date);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 0, 0, 0, 0)).toISOString();
+}
+
+function startOfUtcWeekIso(date = new Date()) {
+  const d = new Date(date);
+  const day = d.getUTCDay();
+  const diffToMonday = (day + 6) % 7;
+  const monday = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - diffToMonday, 0, 0, 0, 0));
+  return monday.toISOString();
+}
+
+function closedTradeTimestampMs(row) {
+  const value = row?.closed_at || row?.closedAt || row?.closed_execution?.closedAt || null;
+  const ms = new Date(value || 0).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function closedTradePnl(row) {
+  const value = Number(row?.pnl ?? 0);
+  return Number.isFinite(value) ? value : 0;
+}
+
+function buildTrainingRiskState(settings, openRows, closedRows) {
+  const safeSettings = settings || getTrainingDefaults();
+  const openList = Array.isArray(openRows) ? openRows : [];
+  const closedList = Array.isArray(closedRows) ? closedRows : [];
+  const now = new Date();
+  const dayStartMs = new Date(startOfUtcDayIso(now)).getTime();
+  const weekStartMs = new Date(startOfUtcWeekIso(now)).getTime();
+
+  const dayTrades = closedList.filter((row) => closedTradeTimestampMs(row) >= dayStartMs);
+  const weekTrades = closedList.filter((row) => closedTradeTimestampMs(row) >= weekStartMs);
+
+  const dayPnl = dayTrades.reduce((sum, row) => sum + closedTradePnl(row), 0);
+  const weekPnl = weekTrades.reduce((sum, row) => sum + closedTradePnl(row), 0);
+
+  const orderedClosed = closedList
+    .slice()
+    .sort((a, b) => closedTradeTimestampMs(b) - closedTradeTimestampMs(a));
+
+  let currentLossStreak = 0;
+  for (const trade of orderedClosed) {
+    if (closedTradePnl(trade) < 0) currentLossStreak += 1;
+    else break;
+  }
+
+  const capitalBase = Math.max(0, Number(safeSettings.capital_base || 0));
+  const maxDailyLossPct = Math.max(0, Number(safeSettings.max_daily_loss_pct || 0.03));
+  const maxWeeklyLossPct = Math.max(0, Number(safeSettings.max_weekly_loss_pct || 0.06));
+  const maxLossStreak = Math.max(0, Number(safeSettings.max_consecutive_losses || 3));
+
+  const maxDailyLossValue = capitalBase * maxDailyLossPct;
+  const maxWeeklyLossValue = capitalBase * maxWeeklyLossPct;
+
+  const dayBlocked = maxDailyLossValue > 0 && dayPnl <= -maxDailyLossValue;
+  const weekBlocked = maxWeeklyLossValue > 0 && weekPnl <= -maxWeeklyLossValue;
+  const streakBlocked = maxLossStreak > 0 && currentLossStreak >= maxLossStreak;
+
+  const blockers = [];
+  if (dayBlocked) blockers.push("daily_loss_limit_reached");
+  if (weekBlocked) blockers.push("weekly_loss_limit_reached");
+  if (streakBlocked) blockers.push("loss_streak_limit_reached");
+
+  return {
+    tradingEnabled: !blockers.length,
+    blockers,
+    openPositionsCount: openList.length,
+    closedTradesCount: closedList.length,
+    currentLossStreak,
+    limits: {
+      capitalBase,
+      maxDailyLossPct,
+      maxWeeklyLossPct,
+      maxConsecutiveLosses: maxLossStreak,
+      maxDailyLossValue,
+      maxWeeklyLossValue
+    },
+    day: {
+      startAt: startOfUtcDayIso(now),
+      closedTrades: dayTrades.length,
+      pnl: dayPnl,
+      pnlPct: capitalBase > 0 ? (dayPnl / capitalBase) * 100 : null,
+      blocked: dayBlocked
+    },
+    week: {
+      startAt: startOfUtcWeekIso(now),
+      closedTrades: weekTrades.length,
+      pnl: weekPnl,
+      pnlPct: capitalBase > 0 ? (weekPnl / capitalBase) * 100 : null,
+      blocked: weekBlocked
+    },
+    updatedAt: nowIso()
+  };
+}
+
+function riskStateBlockerMessage(flag) {
+  if (flag === "daily_loss_limit_reached") return "Perte jour maximale atteinte";
+  if (flag === "weekly_loss_limit_reached") return "Perte semaine maximale atteinte";
+  if (flag === "loss_streak_limit_reached") return "Serie de pertes maximale atteinte";
+  return String(flag || "Blocage risque actif");
+}
+
+// ============================================================
 // HANDLE OPPORTUNITIES — avec régime global
 // ============================================================
 async function handleOpportunities(_url, env) {
@@ -2616,14 +2727,18 @@ function getTrainingDefaults() {
     max_holding_hours: 240,          // 10 jours max
     allowed_symbols: [],
     allowed_setups: ["pullback", "breakout", "continuation"],
-    mean_reversion_enabled: false    // désactivé jusqu'à 30 trades clôturés
+    mean_reversion_enabled: false,   // désactivé jusqu'à 30 trades clôturés
+    max_daily_loss_pct: 0.03,
+    max_weekly_loss_pct: 0.06,
+    max_consecutive_losses: 3
   };
 }
 
-function isTrainingCandidateAllowed(row, settings, openRows) {
+function isTrainingCandidateAllowed(row, settings, openRows, riskState = null) {
   if (!row || row.status !== "ok") return false;
   if (row.decision !== "Trade propose") return false;
   if (!row.plan?.tradeNow) return false;
+  if (riskState && riskState.tradingEnabled === false) return false;
 
   // Setup autorisé ?
   const setupType = String(row.plan?.setupType || row.setupType || "").toLowerCase();
@@ -2684,7 +2799,8 @@ async function handleTrainingAutoCycle(env) {
     startedAt: nowIso(),
     enabled: settings.is_enabled,
     closed: [], opened: [], skipped: [], errors: [],
-    interrupted: false
+    interrupted: false,
+    riskState: null
   };
 
   if (!settings.is_enabled) {
@@ -2694,6 +2810,9 @@ async function handleTrainingAutoCycle(env) {
   try {
     const rawOpen = await withTimeout(getOpenTrainingPositionsRaw(env), 8000, "get_open_positions");
     let openRows = Array.isArray(rawOpen) ? rawOpen : [];
+    let closedRows = await withTimeout(getClosedTrainingTradesRaw(env, 500), 8000, "get_closed_trades");
+    let riskState = buildTrainingRiskState(settings, openRows, closedRows);
+    log.riskState = riskState;
 
     // PHASE FERMETURE — chaque position indépendante
     if (settings.auto_close_enabled) {
@@ -2723,32 +2842,39 @@ async function handleTrainingAutoCycle(env) {
       // Rafraîchir la liste des positions ouvertes
       try {
         openRows = await withTimeout(getOpenTrainingPositionsRaw(env), 8000, "refresh_open_positions");
+        closedRows = await withTimeout(getClosedTrainingTradesRaw(env, 500), 8000, "refresh_closed_trades");
+        riskState = buildTrainingRiskState(settings, openRows, closedRows);
+        log.riskState = riskState;
       } catch {}
     }
 
     // PHASE OUVERTURE — chaque position indépendante
     if (settings.auto_open_enabled && openRows.length < Number(settings.max_open_positions || 10)) {
-      const rows = await buildOpportunityRowsForTraining(env);
-      const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows));
+      if (riskState && !riskState.tradingEnabled) {
+        log.skipped.push({ reason: riskState.blockers.map(riskStateBlockerMessage).join(" · ") || "Blocage risque actif" });
+      } else {
+        const rows = await buildOpportunityRowsForTraining(env);
+        const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows, riskState));
 
-      let availableCash = Number(settings.capital_base || 0) - openRows.reduce((acc, row) => acc + (Number(row?.invested || row?.execution?.invested || 0) || 0), 0);
+        let availableCash = Number(settings.capital_base || 0) - openRows.reduce((acc, row) => acc + (Number(row?.invested || row?.execution?.invested || 0) || 0), 0);
 
-      for (const row of candidates) {
-        if (openRows.length >= Number(settings.max_open_positions || 10)) break;
-        try {
-          const opened = await withTimeout(
-            openTrainingPositionFromRow(env, row, settings, availableCash),
-            8000, `open:${row.symbol}`
-          );
-          if (!opened) {
-            log.skipped.push({ symbol: row.symbol, reason: "execution_unavailable" });
-            continue;
+        for (const row of candidates) {
+          if (openRows.length >= Number(settings.max_open_positions || 10)) break;
+          try {
+            const opened = await withTimeout(
+              openTrainingPositionFromRow(env, row, settings, availableCash),
+              8000, `open:${row.symbol}`
+            );
+            if (!opened) {
+              log.skipped.push({ symbol: row.symbol, reason: "execution_unavailable" });
+              continue;
+            }
+            log.opened.push({ symbol: opened.symbol, trade_id: opened.id, entry_price: opened.entry_price, stop_loss: opened.stop_loss, take_profit: opened.take_profit, invested: opened.invested, setup_type: row.plan?.setupType || "unknown" });
+            openRows.push(opened);
+            availableCash -= Number(opened.invested || 0);
+          } catch (e) {
+            log.skipped.push({ symbol: row.symbol, reason: e.message });
           }
-          log.opened.push({ symbol: opened.symbol, trade_id: opened.id, entry_price: opened.entry_price, stop_loss: opened.stop_loss, take_profit: opened.take_profit, invested: opened.invested, setup_type: row.plan?.setupType || "unknown" });
-          openRows.push(opened);
-          availableCash -= Number(opened.invested || 0);
-        } catch (e) {
-          log.skipped.push({ symbol: row.symbol, reason: e.message });
         }
       }
     }
@@ -2763,7 +2889,8 @@ async function handleTrainingAutoCycle(env) {
       closed_count: log.closed.length,
       skipped_count: log.skipped.length,
       error_count: log.errors.length,
-      interrupted: log.interrupted
+      interrupted: log.interrupted,
+      risk_state: log.riskState || null
     }).catch(() => {});
   }
 
@@ -2870,6 +2997,9 @@ function normalizeTrainingSettingsRow(row) {
     allowed_symbols: Array.isArray(safe.allowed_symbols) ? safe.allowed_symbols.map(x => parseSymbol(x)).filter(Boolean).slice(0, 100) : base.allowed_symbols,
     allowed_setups: Array.isArray(safe.allowed_setups) ? safe.allowed_setups : base.allowed_setups,
     mean_reversion_enabled: coerceBoolean(safe.mean_reversion_enabled, base.mean_reversion_enabled),
+    max_daily_loss_pct: clampFloat(safe.max_daily_loss_pct, 0.001, 0.5, base.max_daily_loss_pct),
+    max_weekly_loss_pct: clampFloat(safe.max_weekly_loss_pct, 0.001, 0.8, base.max_weekly_loss_pct),
+    max_consecutive_losses: clampInt(safe.max_consecutive_losses, 1, 20, base.max_consecutive_losses),
     updated_at: nowIso()
   };
 }
@@ -3189,14 +3319,17 @@ async function handleTrainingAccount(env) {
   const engaged = openRows.reduce((acc, row) => acc + (Number(row.invested || 0) || 0), 0);
   const realized = closedRows.reduce((acc, row) => acc + (Number(row.pnl || 0) || 0), 0);
   const available = capitalBase + realized - engaged;
-  return ok({ configured: true, settings, capitalBase, available, engaged, realized, equity: available + engaged, openCount: openRows.length, closedCount: closedRows.length }, "worker_training", nowIso(), "recent", null);
+  const riskState = buildTrainingRiskState(settings, openRows, closedRows);
+  return ok({ configured: true, settings, capitalBase, available, engaged, realized, equity: available + engaged, openCount: openRows.length, closedCount: closedRows.length, riskState }, "worker_training", nowIso(), "recent", null);
 }
 
 async function handleTrainingPositions(env) {
   if (!supabaseConfigured(env)) return ok({ configured: false, positions: [], history: [] }, "worker_training", nowIso(), "recent", "Supabase non configure");
   const positions = normalizeTrainingPositions(await getOpenTrainingPositionsRaw(env));
   const history = normalizeTrainingTrades(await getClosedTrainingTradesRaw(env, 200));
-  return ok({ configured: true, positions, history }, "worker_training", nowIso(), "recent", null);
+  const settings = await getTrainingSettings(env);
+  const riskState = buildTrainingRiskState(settings, positions, history);
+  return ok({ configured: true, positions, history, riskState }, "worker_training", nowIso(), "recent", null);
 }
 
 async function handleTrainingSettingsGet(env) {
@@ -3387,7 +3520,7 @@ function filterTradeRelevantNews(items) {
   return(items||[]).filter(item=>{
     const s=`${item.title} ${item.summary} ${item.source}`.toLowerCase();
     if(!item.title||item.title.length<24||!item.link)return false;
-    const mustKeep=/résultat|resultat|results|earnings|guidance|prévision|prevision|forecast|fed|bce|ecb|inflation|taux|bond|treasury|dollar|oil|pétrole|petrole|emploi|macro|récession|recession|amd|nvidia|microsoft|apple|bitcoin|ethereum|crypto|semi|semiconductor|ia|ai|régulation|regulation|sanction|fusion|acquisition|rachat/.test(s);
+    const mustKeep=/résultat|resultat|results|earnings|guidance|prévision|prevision|forecast|fed|bce|ecb|inflation|taux|bond|treasury|dollar|oil|pétrole|petrole|emploi|macro|amd|nvidia|microsoft|apple|bitcoin|ethereum|crypto|semi|semiconductor|ia|ai|régulation|regulation|sanction|fusion|acquisition|rachat/.test(s);
     const maybeKeep=/marché|marche|bourse|actions|indices|nasdaq|s&p 500|wall street/.test(s);
     if(/assurance vie|credit immobilier|livret a|impot|budget famille|epargne retraite/.test(s))return false;
     if(/people|culture|sport|voyage|maison|lifestyle/.test(s))return false;
