@@ -2886,6 +2886,26 @@ const TRADE_TABLES = { positions: "mtp_positions", trades: "mtp_trades" };
 const TRAINING_SETTINGS_TABLE = "mtp_training_settings";
 const TRAINING_EVENTS_TABLE = "mtp_training_events";
 const SIGNAL_TABLE = "mtp_signals";
+const LEGACY_TRAINING_SETTINGS_KEYS = [
+  "mode",
+  "is_enabled",
+  "auto_open_enabled",
+  "auto_close_enabled",
+  "allow_long",
+  "allow_short",
+  "max_open_positions",
+  "max_positions_per_symbol",
+  "min_actionability_score",
+  "min_dossier_score",
+  "capital_base",
+  "risk_per_trade_pct",
+  "allocation_per_trade_pct",
+  "max_holding_hours",
+  "allowed_symbols",
+  "allowed_setups",
+  "mean_reversion_enabled",
+  "updated_at"
+];
 
 function coerceBoolean(value, fallback = false) {
   if (typeof value === "boolean") return value;
@@ -2940,6 +2960,22 @@ function normalizeTrainingSettingsRow(row) {
   };
 }
 
+function pickTrainingSettingsKeys(row, keys) {
+  const safe = row && typeof row === "object" ? row : {};
+  const out = {};
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(safe, key)) out[key] = safe[key];
+  }
+  return out;
+}
+
+function isTrainingSettingsSchemaMismatch(error) {
+  const message = String(error?.message || error || "");
+  return message.includes("PGRST204")
+    && message.includes("mtp_training_settings")
+    && message.includes("exploration_");
+}
+
 async function getTrainingSettings(env) {
   const defaults = normalizeTrainingSettingsRow(getTrainingDefaults());
   if (!supabaseConfigured(env)) return defaults;
@@ -2953,11 +2989,21 @@ async function getTrainingSettings(env) {
 async function saveTrainingSettings(env, input) {
   if (!supabaseConfigured(env)) throw new Error("supabase_not_configured");
   const row = normalizeTrainingSettingsRow(input);
-  await supabaseFetch(env, `${TRAINING_SETTINGS_TABLE}?on_conflict=mode`, {
-    method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify([row])
-  });
+  try {
+    await supabaseFetch(env, `${TRAINING_SETTINGS_TABLE}?on_conflict=mode`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify([row])
+    });
+  } catch (error) {
+    if (!isTrainingSettingsSchemaMismatch(error)) throw error;
+    const legacyRow = pickTrainingSettingsKeys(row, LEGACY_TRAINING_SETTINGS_KEYS);
+    await supabaseFetch(env, `${TRAINING_SETTINGS_TABLE}?on_conflict=mode`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify([legacyRow])
+    });
+  }
   return row;
 }
 
