@@ -2622,6 +2622,14 @@ function getTrainingDefaults() {
     exploration_min_safety_score: 66,
     exploration_min_rr: 1.8,
     exploration_max_holding_hours: 120,
+    slippage_bps: 8,
+    spread_bps: 4,
+    fee_bps: 10,
+    execution_delay_seconds: 15,
+    kill_switch_enabled: true,
+    max_daily_loss_pct: 0.03,
+    max_weekly_loss_pct: 0.06,
+    max_consecutive_losses: 4,
     allowed_symbols: [],
     allowed_setups: ["pullback", "breakout", "continuation"],
     mean_reversion_enabled: false    // désactivé jusqu'à 30 trades clôturés
@@ -2754,7 +2762,7 @@ async function handleTrainingAutoCycle(env) {
           if (!trigger) continue;
 
           const closed = await withTimeout(
-            closeTrainingPosition(env, position, trigger.exitPrice, trigger.type, detailPayload),
+            closeTrainingPosition(env, position, trigger.exitPrice, trigger.type, detailPayload, settings),
             8000, `close:${symbol}`
           );
           log.closed.push({ symbol, trade_id: closed.id, close_type: trigger.type, exit_price: closed.exit_price, pnl: closed.pnl, pnl_pct: closed.pnl_pct });
@@ -2927,6 +2935,65 @@ function clampFloat(value, min, max, fallback) {
   return Math.max(min, Math.min(max, num));
 }
 
+function applyBps(value, bps) {
+  const num = Number(value);
+  const rate = Number(bps);
+  if (!Number.isFinite(num) || !Number.isFinite(rate)) return null;
+  return num * (rate / 10000);
+}
+
+function applyEntryFriction(rawPrice, side, spreadBps = 0, slippageBps = 0) {
+  const price = finiteOrNull(rawPrice);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  const totalBps = Math.max(0, Number(spreadBps || 0) + Number(slippageBps || 0));
+  const multiplier = totalBps / 10000;
+  return String(side || "").toLowerCase() === "short"
+    ? price * (1 - multiplier)
+    : price * (1 + multiplier);
+}
+
+function applyExitFriction(rawPrice, side, spreadBps = 0, slippageBps = 0) {
+  const price = finiteOrNull(rawPrice);
+  if (!Number.isFinite(price) || price <= 0) return null;
+  const totalBps = Math.max(0, Number(spreadBps || 0) + Number(slippageBps || 0));
+  const multiplier = totalBps / 10000;
+  return String(side || "").toLowerCase() === "short"
+    ? price * (1 + multiplier)
+    : price * (1 - multiplier);
+}
+
+function sumFinite(...values) {
+  let saw = false;
+  let total = 0;
+  for (const value of values) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) continue;
+    total += num;
+    saw = true;
+  }
+  return saw ? total : null;
+}
+
+function averageFinite(values) {
+  const clean = (Array.isArray(values) ? values : []).map(Number).filter(Number.isFinite);
+  if (!clean.length) return null;
+  return clean.reduce((acc, value) => acc + value, 0) / clean.length;
+}
+
+function pctOrNull(numerator, denominator) {
+  const num = Number(numerator);
+  const den = Number(denominator);
+  if (!Number.isFinite(num) || !Number.isFinite(den) || den === 0) return null;
+  return (num / den) * 100;
+}
+
+function computeHoldingHours(openedAt, closedAt = nowIso()) {
+  const openedMs = new Date(openedAt || 0).getTime();
+  const closedMs = new Date(closedAt || 0).getTime();
+  if (!Number.isFinite(openedMs) || !Number.isFinite(closedMs) || openedMs <= 0 || closedMs < openedMs) return null;
+  return (closedMs - openedMs) / (1000 * 60 * 60);
+}
+
 function normalizeTrainingSettingsRow(row) {
   const base = getTrainingDefaults();
   const safe = row && typeof row === "object" ? row : {};
@@ -2953,6 +3020,14 @@ function normalizeTrainingSettingsRow(row) {
     exploration_min_safety_score: clampInt(safe.exploration_min_safety_score, 1, 100, base.exploration_min_safety_score),
     exploration_min_rr: clampFloat(safe.exploration_min_rr, 1, 5, base.exploration_min_rr),
     exploration_max_holding_hours: clampInt(safe.exploration_max_holding_hours, 1, 24*365, base.exploration_max_holding_hours),
+    slippage_bps: clampFloat(safe.slippage_bps, 0, 200, base.slippage_bps),
+    spread_bps: clampFloat(safe.spread_bps, 0, 200, base.spread_bps),
+    fee_bps: clampFloat(safe.fee_bps, 0, 200, base.fee_bps),
+    execution_delay_seconds: clampInt(safe.execution_delay_seconds, 0, 3600, base.execution_delay_seconds),
+    kill_switch_enabled: coerceBoolean(safe.kill_switch_enabled, base.kill_switch_enabled),
+    max_daily_loss_pct: clampFloat(safe.max_daily_loss_pct, 0.001, 0.5, base.max_daily_loss_pct),
+    max_weekly_loss_pct: clampFloat(safe.max_weekly_loss_pct, 0.001, 0.8, base.max_weekly_loss_pct),
+    max_consecutive_losses: clampInt(safe.max_consecutive_losses, 1, 20, base.max_consecutive_losses),
     allowed_symbols: Array.isArray(safe.allowed_symbols) ? safe.allowed_symbols.map(x => parseSymbol(x)).filter(Boolean).slice(0, 100) : base.allowed_symbols,
     allowed_setups: Array.isArray(safe.allowed_setups) ? safe.allowed_setups : base.allowed_setups,
     mean_reversion_enabled: coerceBoolean(safe.mean_reversion_enabled, base.mean_reversion_enabled),
@@ -2972,8 +3047,7 @@ function pickTrainingSettingsKeys(row, keys) {
 function isTrainingSettingsSchemaMismatch(error) {
   const message = String(error?.message || error || "");
   return message.includes("PGRST204")
-    && message.includes("mtp_training_settings")
-    && message.includes("exploration_");
+    && message.includes("mtp_training_settings");
 }
 
 async function getTrainingSettings(env) {
@@ -3110,7 +3184,7 @@ async function getClosedTrainingTradesRaw(env, limit = 200) {
   return Array.isArray(rows) ? rows : [];
 }
 
-function buildTrainingAnalysisSnapshotFromPayload(payload, candidate = null) {
+function buildTrainingAnalysisSnapshotFromPayload(payload, candidate = null, execution = null) {
   const plan = payload?.plan || {};
   const entryMode = normalizeTrainingEntryMode(candidate?.entryMode);
   return {
@@ -3136,6 +3210,13 @@ function buildTrainingAnalysisSnapshotFromPayload(payload, candidate = null) {
     setupStatus: plan?.setupStatus || null,
     entryMode,
     decisionAtOpen: candidate?.decisionAtOpen || payload?.decision || plan?.decision || null,
+    marketRegime: payload?.regime?.regime || payload?.marketRegime || null,
+    marketRegimeReason: payload?.regime?.reason || payload?.marketRegimeReason || null,
+    allocationMultiplier: finiteOrNull(execution?.allocationMultiplier),
+    spreadBps: finiteOrNull(execution?.spreadBps),
+    slippageBps: finiteOrNull(execution?.slippageBps),
+    feeOpen: finiteOrNull(execution?.feeOpen),
+    executionDelaySeconds: finiteOrNull(execution?.executionDelaySeconds),
     confirmationCount: Number.isFinite(Number(plan?.confirmationCount)) ? Number(plan.confirmationCount) : null,
     blockerFlags: Array.isArray(plan?.blockerFlags) ? plan.blockerFlags : [],
     analysisTimestamp: nowIso()
@@ -3144,11 +3225,11 @@ function buildTrainingAnalysisSnapshotFromPayload(payload, candidate = null) {
 
 function chooseTrainingExecution(payload, settings, currentAvailableCash, candidate = null) {
   const plan = payload?.plan || {};
-  const price = finiteOrNull(plan?.entry ?? payload?.price);
+  const rawEntryPrice = finiteOrNull(plan?.entry ?? payload?.price);
   const stopLoss = finiteOrNull(plan?.stopLoss);
   const takeProfit = finiteOrNull(plan?.takeProfit);
   const rr = finiteOrNull(plan?.rr);
-  if (!Number.isFinite(price) || price <= 0) return null;
+  if (!Number.isFinite(rawEntryPrice) || rawEntryPrice <= 0) return null;
   if (!Number.isFinite(stopLoss) || !Number.isFinite(takeProfit)) return null;
   const side = String(plan?.side || "").toLowerCase();
   if (!["long","short"].includes(side)) return null;
@@ -3157,13 +3238,33 @@ function chooseTrainingExecution(payload, settings, currentAvailableCash, candid
   const allocationMultiplier = clampFloat(candidate?.allocationMultiplier, 0.1, 1, 1);
   const allocatedCash = Math.min(availableCash, capitalBase * Number(settings?.allocation_per_trade_pct || 0.10) * allocationMultiplier);
   if (!Number.isFinite(allocatedCash) || allocatedCash <= 50) return null;
-  const quantity = allocatedCash / price;
+  const spreadBps = finiteOrNull(settings?.spread_bps) ?? 0;
+  const slippageBps = finiteOrNull(settings?.slippage_bps) ?? 0;
+  const feeBps = finiteOrNull(settings?.fee_bps) ?? 0;
+  const executionDelaySeconds = Math.max(0, Number(settings?.execution_delay_seconds || 0));
+  const entryPrice = applyEntryFriction(rawEntryPrice, side, spreadBps, slippageBps);
+  if (!Number.isFinite(entryPrice) || entryPrice <= 0) return null;
+  const quantity = allocatedCash / entryPrice;
   if (!Number.isFinite(quantity) || quantity <= 0) return null;
+  const investedGross = quantity * entryPrice;
+  const feeOpen = applyBps(investedGross, feeBps) ?? 0;
+  const invested = investedGross + feeOpen;
+  const riskPerUnit = side === "short"
+    ? Math.max(0, stopLoss - entryPrice)
+    : Math.max(0, entryPrice - stopLoss);
   return {
     side,
-    entryPrice: price,
+    rawEntryPrice,
+    entryPrice,
     quantity,
-    invested: quantity * price,
+    investedGross,
+    invested,
+    feeOpen,
+    feeBps,
+    spreadBps,
+    slippageBps,
+    executionDelaySeconds,
+    riskAmount: quantity * riskPerUnit,
     stopLoss,
     takeProfit,
     rr,
@@ -3223,7 +3324,7 @@ function computePnlForClose(position, exitPrice) {
 }
 
 function buildTrainingPositionRowFromSignal(payload, execution, settings, candidate = null) {
-  const analysisSnapshot = buildTrainingAnalysisSnapshotFromPayload(payload, candidate);
+  const analysisSnapshot = buildTrainingAnalysisSnapshotFromPayload(payload, candidate, execution);
   const id = `${parseSymbol(payload?.symbol)}:training:${Date.now()}`;
   return {
     id, symbol: parseSymbol(payload?.symbol), name: payload?.name || parseSymbol(payload?.symbol),
@@ -3241,9 +3342,17 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings, candid
     analysis_snapshot: analysisSnapshot,
     execution: {
       openedAt: nowIso(),
+      rawEntryPrice: execution.rawEntryPrice,
       entryPrice: execution.entryPrice,
       quantity: execution.quantity,
+      investedGross: execution.investedGross,
       invested: execution.invested,
+      feeOpen: execution.feeOpen,
+      feeBps: execution.feeBps,
+      spreadBps: execution.spreadBps,
+      slippageBps: execution.slippageBps,
+      executionDelaySeconds: execution.executionDelaySeconds,
+      riskAmount: execution.riskAmount,
       entryMode: normalizeTrainingEntryMode(execution.entryMode),
       allocationMultiplier: finiteOrNull(execution.allocationMultiplier)
     },
@@ -3252,9 +3361,27 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings, candid
   };
 }
 
-function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload) {
-  const analysisSnapshot = position?.analysis_snapshot || buildTrainingAnalysisSnapshotFromPayload(detailPayload || {});
-  const { pnl, pnlPct } = computePnlForClose(position, exitPrice);
+function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload, settings) {
+  const execution = position?.execution || {};
+  const side = String(position?.side || "").toLowerCase();
+  const spreadBps = finiteOrNull(settings?.spread_bps) ?? finiteOrNull(execution?.spreadBps) ?? 0;
+  const slippageBps = finiteOrNull(settings?.slippage_bps) ?? finiteOrNull(execution?.slippageBps) ?? 0;
+  const feeBps = finiteOrNull(settings?.fee_bps) ?? finiteOrNull(execution?.feeBps) ?? 0;
+  const adjustedExitPrice = applyExitFriction(exitPrice, side, spreadBps, slippageBps);
+  const analysisSnapshot = position?.analysis_snapshot || buildTrainingAnalysisSnapshotFromPayload(detailPayload || {}, { entryMode: getTrainingEntryModeFromRow(position) }, execution);
+  const { pnl: grossPnl } = computePnlForClose(position, adjustedExitPrice);
+  const quantity = finiteOrNull(position?.quantity ?? execution?.quantity);
+  const closeFee = Number.isFinite(quantity) && Number.isFinite(adjustedExitPrice)
+    ? (applyBps(adjustedExitPrice * quantity, feeBps) ?? 0)
+    : 0;
+  const openFee = finiteOrNull(execution?.feeOpen) ?? 0;
+  const totalFees = sumFinite(openFee, closeFee) ?? 0;
+  const netPnl = Number.isFinite(grossPnl) ? grossPnl - totalFees : null;
+  const investedBase = finiteOrNull(position?.invested ?? execution?.invested ?? execution?.investedGross);
+  const pnlPct = Number.isFinite(netPnl) && Number.isFinite(investedBase) && investedBase > 0
+    ? (netPnl / investedBase) * 100
+    : null;
+  const closedAt = nowIso();
   return {
     id: position?.id || null,
     symbol: parseSymbol(position?.symbol || ""),
@@ -3263,11 +3390,11 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
     asset_class: position?.asset_class || null,
     quantity: finiteOrNull(position?.quantity ?? position?.execution?.quantity),
     entry_price: finiteOrNull(position?.entry_price ?? position?.entryPrice ?? position?.execution?.entryPrice),
-    exit_price: finiteOrNull(exitPrice),
+    exit_price: finiteOrNull(adjustedExitPrice),
     invested: finiteOrNull(position?.invested ?? position?.execution?.invested),
     stop_loss: finiteOrNull(position?.stop_loss ?? position?.stopLoss ?? analysisSnapshot?.stopLoss),
     take_profit: finiteOrNull(position?.take_profit ?? position?.takeProfit ?? analysisSnapshot?.takeProfit),
-    pnl, pnl_pct: pnlPct,
+    pnl: netPnl, pnl_pct: pnlPct,
     score: finiteOrNull(position?.score ?? analysisSnapshot?.score),
     adj_score: finiteOrNull(analysisSnapshot?.actionabilityScore ?? null),
     rr_ratio: finiteOrNull(analysisSnapshot?.ratio ?? null),
@@ -3277,17 +3404,30 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
     horizon: position?.horizon || analysisSnapshot?.horizon || null,
     source_used: position?.source_used || analysisSnapshot?.sourceUsed || null,
     opened_at: position?.opened_at || null,
-    closed_at: nowIso(),
+    closed_at: closedAt,
     analysis_snapshot: analysisSnapshot,
     execution: position?.execution || null,
-    live: { lastPrice: finiteOrNull(exitPrice), updatedAt: nowIso() },
-    closed_execution: { exitPrice: finiteOrNull(exitPrice), closedAt: nowIso(), closeType: String(closeType || "unknown") },
-    updated_at: nowIso()
+    live: { lastPrice: finiteOrNull(adjustedExitPrice), updatedAt: closedAt },
+    closed_execution: {
+      rawExitPrice: finiteOrNull(exitPrice),
+      exitPrice: finiteOrNull(adjustedExitPrice),
+      closedAt,
+      closeType: String(closeType || "unknown"),
+      grossPnl: finiteOrNull(grossPnl),
+      netPnl: finiteOrNull(netPnl),
+      openFee: finiteOrNull(openFee),
+      closeFee: finiteOrNull(closeFee),
+      totalFees: finiteOrNull(totalFees),
+      spreadBps: finiteOrNull(spreadBps),
+      slippageBps: finiteOrNull(slippageBps),
+      holdingHours: computeHoldingHours(position?.opened_at ?? execution?.openedAt, closedAt)
+    },
+    updated_at: closedAt
   };
 }
 
-async function closeTrainingPosition(env, position, exitPrice, closeType, detailPayload) {
-  const closedRow = buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload);
+async function closeTrainingPosition(env, position, exitPrice, closeType, detailPayload, settings) {
+  const closedRow = buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload, settings);
   await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -3369,6 +3509,108 @@ async function handleTrainingPositions(env) {
   const positions = normalizeTrainingPositions(await getOpenTrainingPositionsRaw(env));
   const history = normalizeTrainingTrades(await getClosedTrainingTradesRaw(env, 200));
   return ok({ configured: true, positions, history }, "worker_training", nowIso(), "recent", null);
+}
+
+function buildTrainingPerformanceSummary(rows) {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const pnlValues = safeRows.map((row) => Number(row?.pnl)).filter(Number.isFinite);
+  const pnlPctValues = safeRows.map((row) => Number(row?.pnl_pct)).filter(Number.isFinite);
+  const holdingHoursValues = safeRows.map((row) => {
+    const closedExecution = row?.closedExecution ?? row?.closed_execution ?? {};
+    return Number(closedExecution?.holdingHours ?? computeHoldingHours(row?.opened_at, row?.closed_at));
+  }).filter(Number.isFinite);
+  const wins = safeRows.filter((row) => Number(row?.pnl) > 0);
+  const losses = safeRows.filter((row) => Number(row?.pnl) < 0);
+  const breakeven = safeRows.length - wins.length - losses.length;
+  const grossProfit = wins.reduce((acc, row) => acc + (Number(row?.pnl) || 0), 0);
+  const grossLoss = Math.abs(losses.reduce((acc, row) => acc + (Number(row?.pnl) || 0), 0));
+  const netPnl = pnlValues.length ? pnlValues.reduce((acc, value) => acc + value, 0) : 0;
+  return {
+    count: safeRows.length,
+    wins: wins.length,
+    losses: losses.length,
+    breakeven,
+    winRate: pctOrNull(wins.length, safeRows.length),
+    netPnl,
+    grossProfit,
+    grossLoss,
+    profitFactor: grossLoss > 0 ? grossProfit / grossLoss : (grossProfit > 0 ? null : null),
+    avgPnl: averageFinite(pnlValues),
+    avgPnlPct: averageFinite(pnlPctValues),
+    avgHoldingHours: averageFinite(holdingHoursValues)
+  };
+}
+
+function buildTrainingGroupedSummary(rows, accessor) {
+  const groups = new Map();
+  for (const row of (Array.isArray(rows) ? rows : [])) {
+    const rawKey = accessor(row);
+    const key = String(rawKey || "unknown").trim() || "unknown";
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(row);
+  }
+  return Array.from(groups.entries())
+    .map(([key, bucketRows]) => ({ key, ...buildTrainingPerformanceSummary(bucketRows) }))
+    .sort((a, b) => Number(b.netPnl || 0) - Number(a.netPnl || 0));
+}
+
+function computeTrainingDrawdown(rows) {
+  const ordered = (Array.isArray(rows) ? [...rows] : [])
+    .sort((a, b) => new Date(a?.closed_at || 0).getTime() - new Date(b?.closed_at || 0).getTime());
+  let equity = 0;
+  let peak = 0;
+  let maxDrawdown = 0;
+  for (const row of ordered) {
+    const pnl = Number(row?.pnl);
+    if (!Number.isFinite(pnl)) continue;
+    equity += pnl;
+    peak = Math.max(peak, equity);
+    maxDrawdown = Math.max(maxDrawdown, peak - equity);
+  }
+  return maxDrawdown;
+}
+
+function buildTrainingAnalytics(closedRows, openRows, settings) {
+  const safeClosed = Array.isArray(closedRows) ? closedRows : [];
+  const safeOpen = Array.isArray(openRows) ? openRows : [];
+  const byMode = buildTrainingGroupedSummary(safeClosed, (row) => getTrainingEntryModeFromRow(row));
+  const bySetup = buildTrainingGroupedSummary(safeClosed, (row) => row?.analysisSnapshot?.setupType || row?.analysis_snapshot?.setupType || "unknown");
+  const byRegime = buildTrainingGroupedSummary(safeClosed, (row) => row?.analysisSnapshot?.marketRegime || row?.analysis_snapshot?.marketRegime || "unknown");
+  const byCloseType = buildTrainingGroupedSummary(safeClosed, (row) => row?.closedExecution?.closeType || row?.closed_execution?.closeType || "unknown");
+  const openByMode = buildTrainingGroupedSummary(
+    safeOpen.map((row) => ({ ...row, pnl: 0, pnl_pct: 0 })),
+    (row) => getTrainingEntryModeFromRow(row)
+  ).map((item) => ({ key: item.key, count: item.count }));
+  return {
+    generatedAt: nowIso(),
+    settingsSnapshot: {
+      exploration_enabled: coerceBoolean(settings?.exploration_enabled, false),
+      slippage_bps: finiteOrNull(settings?.slippage_bps),
+      spread_bps: finiteOrNull(settings?.spread_bps),
+      fee_bps: finiteOrNull(settings?.fee_bps)
+    },
+    totals: buildTrainingPerformanceSummary(safeClosed),
+    openPositions: {
+      count: safeOpen.length,
+      byMode: openByMode
+    },
+    closedTrades: {
+      count: safeClosed.length,
+      drawdown: computeTrainingDrawdown(safeClosed),
+      byMode,
+      bySetup,
+      byRegime,
+      byCloseType
+    }
+  };
+}
+
+async function handleTrainingAnalytics(env) {
+  if (!supabaseConfigured(env)) return ok({ configured: false, analytics: null }, "worker_training", nowIso(), "recent", "Supabase non configure");
+  const settings = await getTrainingSettings(env);
+  const openRows = normalizeTrainingPositions(await getOpenTrainingPositionsRaw(env));
+  const closedRows = normalizeTrainingTrades(await getClosedTrainingTradesRaw(env, 1000));
+  return ok({ configured: true, analytics: buildTrainingAnalytics(closedRows, openRows, settings) }, "worker_training", nowIso(), "recent", null);
 }
 
 async function handleTrainingSettingsGet(env) {
@@ -4088,6 +4330,11 @@ async function handleRequest(request, env) {
       const denied = requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingPositions(env));
+    }
+    if (url.pathname === "/api/training/analytics") {
+      const denied = requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingAnalytics(env));
     }
     if (url.pathname === "/api/training/settings") {
       const denied = requireAdminAccess(request, env);
