@@ -80,6 +80,15 @@
       remoteError: null,
       lastRemoteSyncAt: null
     },
+    trainingBot: {
+      settings: null,
+      analytics: null,
+      remoteStatus: "idle",
+      remoteError: null,
+      partial: false,
+      lastRemoteSyncAt: null,
+      lastAttemptAt: 0
+    },
     tradeLive: {
       lastRunAt: 0,
       bySymbol: {},
@@ -186,6 +195,11 @@
     sync: "/api/trades/sync"
   };
 
+  const WORKER_TRAINING_ROUTES = {
+    settings: "/api/training/settings",
+    analytics: "/api/training/analytics"
+  };
+
   function workerAdminHeaders() {
     const token = String(state.settings?.workerAdminToken || "").trim();
     if (!token) return {};
@@ -229,6 +243,109 @@
     const ct = res.headers.get("content-type") || "";
     if (ct.includes("application/json")) return res.json();
     return res.text();
+  }
+
+  async function workerTrainingAdminRequest(path, options = {}) {
+    return workerTradesRequest(path, options);
+  }
+
+  function hasWorkerAdminToken() {
+    return !!String(state.settings?.workerAdminToken || "").trim();
+  }
+
+  function trainingBotRemoteStatusText() {
+    const raw = String(state.trainingBot?.remoteError || "");
+    if (state.trainingBot?.remoteStatus === "connected") {
+      return `connecte${state.trainingBot?.lastRemoteSyncAt ? " · sync " + new Date(state.trainingBot.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`;
+    }
+    if (state.trainingBot?.remoteStatus === "partial") {
+      return `connecte partiel${state.trainingBot?.lastRemoteSyncAt ? " · sync " + new Date(state.trainingBot.lastRemoteSyncAt).toLocaleString("fr-FR") : ""}`;
+    }
+    if (raw.includes("worker_admin_auth_required") || !hasWorkerAdminToken()) {
+      return "token admin requis pour lire le bot";
+    }
+    if (raw.includes("worker_origin_not_allowed")) return "origine de l'app non autorisee";
+    if (state.trainingBot?.remoteStatus === "unavailable") {
+      return `indisponible · ${raw || "worker training indisponible"}`;
+    }
+    return "lecture en attente";
+  }
+
+  async function loadTrainingBotData(force = false) {
+    const now = Date.now();
+    const previous = state.trainingBot || {};
+    if (!force && previous.lastAttemptAt && (now - previous.lastAttemptAt) < 45000) return previous;
+
+    state.trainingBot.lastAttemptAt = now;
+    if (!hasWorkerAdminToken()) {
+      state.trainingBot = {
+        ...state.trainingBot,
+        settings: null,
+        analytics: null,
+        remoteStatus: "auth_required",
+        remoteError: "worker_admin_auth_required",
+        partial: false,
+        lastAttemptAt: now
+      };
+      return state.trainingBot;
+    }
+
+    const [settingsResult, analyticsResult] = await Promise.allSettled([
+      workerTrainingAdminRequest(WORKER_TRAINING_ROUTES.settings),
+      workerTrainingAdminRequest(WORKER_TRAINING_ROUTES.analytics)
+    ]);
+
+    const errors = [settingsResult, analyticsResult]
+      .filter((result) => result.status === "rejected")
+      .map((result) => result.reason?.message || "worker_training_request_failed")
+      .filter(Boolean);
+    const successCount = [settingsResult, analyticsResult].filter((result) => result.status === "fulfilled").length;
+    const nextSettings = successCount === 0
+      ? null
+      : (settingsResult.status === "fulfilled"
+          ? (settingsResult.value?.data || settingsResult.value || null)
+          : previous.settings);
+    const nextAnalytics = successCount === 0
+      ? null
+      : (analyticsResult.status === "fulfilled"
+          ? (analyticsResult.value?.data?.analytics || analyticsResult.value?.analytics || null)
+          : previous.analytics);
+
+    state.trainingBot = {
+      ...state.trainingBot,
+      settings: nextSettings,
+      analytics: nextAnalytics,
+      remoteStatus:
+        successCount === 2 ? "connected" :
+        successCount === 1 ? "partial" :
+        (errors.some((msg) => String(msg || "").includes("worker_admin_auth_required")) ? "auth_required" : "unavailable"),
+      remoteError: errors[0] || null,
+      partial: successCount === 1,
+      lastRemoteSyncAt: successCount > 0 ? now : previous.lastRemoteSyncAt,
+      lastAttemptAt: now
+    };
+
+    return state.trainingBot;
+  }
+
+  async function maybeRefreshTrainingBotData(force = false) {
+    const shouldAttempt = force || state.route === "portfolio" || state.route === "settings";
+    if (!shouldAttempt) return state.trainingBot;
+    try {
+      const next = await loadTrainingBotData(force);
+      if (state.route === "portfolio" || state.route === "settings") render();
+      return next;
+    } catch (err) {
+      state.trainingBot = {
+        ...state.trainingBot,
+        remoteStatus: String(err?.message || "").includes("worker_admin_auth_required") ? "auth_required" : "unavailable",
+        remoteError: err?.message || "worker_training_request_failed",
+        partial: false,
+        lastAttemptAt: Date.now()
+      };
+      if (state.route === "portfolio" || state.route === "settings") render();
+      return state.trainingBot;
+    }
   }
 
   async function loadTradesFromWorker() {
@@ -1785,6 +1902,9 @@ function applyFilter() {
       loadDetail(symbol);
     } else {
       render();
+      if (route === "portfolio" || route === "settings") {
+        maybeRefreshTrainingBotData().catch(() => {});
+      }
     }
   }
 
@@ -3753,6 +3873,244 @@ function renderHistoryRow(item) {
     return { best: arr.slice(0, 3), worst: arr.slice(-3).reverse() };
   }
 
+  function formatUnsignedPct(value, digits = 1) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "—";
+    return `${num(numeric, digits)}%`;
+  }
+
+  function formatHoursValue(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) return "—";
+    return `${num(numeric, 1)} h`;
+  }
+
+  function trainingAnalyticsRows(rows, limit = 4) {
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    return list
+      .filter((row) => row && row.key != null)
+      .sort((a, b) => {
+        const aUnknown = String(a?.key || "").toLowerCase() === "unknown" ? 1 : 0;
+        const bUnknown = String(b?.key || "").toLowerCase() === "unknown" ? 1 : 0;
+        if (aUnknown !== bUnknown) return aUnknown - bUnknown;
+        const countDiff = Number(b?.count || 0) - Number(a?.count || 0);
+        if (countDiff) return countDiff;
+        return Math.abs(Number(b?.netPnl || 0)) - Math.abs(Number(a?.netPnl || 0));
+      })
+      .slice(0, limit);
+  }
+
+  function trainingAnalyticsBucketLabel(kind, key) {
+    const clean = String(key || "").trim().toLowerCase() || "unknown";
+    if (kind === "mode") {
+      if (clean === "core") return "coeur";
+      if (clean === "exploration") return "exploration";
+      return "legacy / inconnu";
+    }
+    if (kind === "setup") {
+      if (clean === "pullback") return "pullback";
+      if (clean === "breakout") return "breakout";
+      if (clean === "continuation") return "continuation";
+      if (clean === "mean_reversion") return "mean reversion";
+      return "legacy / inconnu";
+    }
+    if (kind === "regime") {
+      if (clean === "risk_on") return "risk on";
+      if (clean === "range") return "range";
+      if (clean === "risk_off") return "risk off";
+      return "legacy / inconnu";
+    }
+    if (kind === "close") {
+      if (clean === "take_profit") return "objectif";
+      if (clean === "stop_loss") return "stop";
+      if (clean === "time_exit") return "temps";
+      if (clean === "engine_invalidation") return "invalidation moteur";
+      if (clean === "risk_kill_switch") return "kill switch";
+      return "legacy / inconnu";
+    }
+    return clean || "inconnu";
+  }
+
+  function trainingAnalyticsBucketTone(kind, key) {
+    const clean = String(key || "").trim().toLowerCase();
+    if (kind === "mode") {
+      if (clean === "core") return "complete";
+      if (clean === "exploration") return "exploration";
+    }
+    if (kind === "close") {
+      if (clean === "take_profit") return "positive";
+      if (clean === "stop_loss" || clean === "risk_kill_switch") return "negative";
+    }
+    return "neutral";
+  }
+
+  function renderTrainingAnalyticsBucketList(rows, kind, emptyText) {
+    const items = trainingAnalyticsRows(rows);
+    if (!items.length) return `<div class="empty-mini">${safeText(emptyText)}</div>`;
+    return items.map((row) => `
+      <div class="mini-perf-row">
+        <span>${badge(trainingAnalyticsBucketLabel(kind, row.key), trainingAnalyticsBucketTone(kind, row.key))}</span>
+        <span>${num(row.count, 0)} trade(s) · ${formatUnsignedPct(row.winRate)} · ${money(Number(row.netPnl || 0) * fxRateUsdToEur(), "EUR")}</span>
+      </div>
+    `).join("");
+  }
+
+  function renderTrainingCalibrationCard() {
+    const analytics = state.trainingBot?.analytics;
+    const settings = state.trainingBot?.settings || analytics?.settingsSnapshot || null;
+    const syncAt = state.trainingBot?.lastRemoteSyncAt || analytics?.generatedAt || null;
+
+    if (!analytics) {
+      return `
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Calibration du bot</span><span>remote</span></div>
+          <div class="empty-state">${safeText(trainingBotRemoteStatusText())}</div>
+        </div>
+      `;
+    }
+
+    const totals = analytics?.totals || {};
+    const openPositions = analytics?.openPositions || {};
+    const closedTrades = analytics?.closedTrades || {};
+    const hasUnknownBuckets = [
+      ...(Array.isArray(closedTrades.bySetup) ? closedTrades.bySetup : []),
+      ...(Array.isArray(closedTrades.byRegime) ? closedTrades.byRegime : []),
+      ...(Array.isArray(closedTrades.byCloseType) ? closedTrades.byCloseType : [])
+    ].some((row) => String(row?.key || "").toLowerCase() === "unknown");
+
+    return `
+      <div class="card" style="margin-top:18px">
+        <div class="section-title"><span>Calibration du bot</span><span>${syncAt ? new Date(syncAt).toLocaleString("fr-FR") : "—"}</span></div>
+        <div class="muted">Lecture remote du paper bot : performance nette, modes d'entree, sorties et contexte de marche.</div>
+        <div class="plan-context">
+          ${settings ? badge(settings.is_enabled ? "training actif" : "training coupe", settings.is_enabled ? "complete" : "negative") : ""}
+          ${settings ? badge(settings.exploration_enabled ? "exploration active" : "exploration coupee", settings.exploration_enabled ? "exploration" : "neutral") : ""}
+          ${settings ? badge(settings.kill_switch_enabled ? "kill switch arme" : "kill switch coupe", settings.kill_switch_enabled ? "neutral" : "negative") : ""}
+          ${settings && Number.isFinite(Number(settings.spread_bps)) ? badge(`spread ${num(settings.spread_bps, 0)} bps`) : ""}
+          ${settings && Number.isFinite(Number(settings.slippage_bps)) ? badge(`slippage ${num(settings.slippage_bps, 0)} bps`) : ""}
+          ${settings && Number.isFinite(Number(settings.fee_bps)) ? badge(`frais ${num(settings.fee_bps, 0)} bps`) : ""}
+        </div>
+
+        <div class="grid trades-stats" style="margin-top:14px">
+          <div class="stat-card"><div class="stat-label">Trades calibres</div><div class="stat-value">${num(totals.count, 0)}</div></div>
+          <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-value">${formatUnsignedPct(totals.winRate)}</div></div>
+          <div class="stat-card"><div class="stat-label">P/L net</div><div class="stat-value">${money(Number(totals.netPnl || 0) * fxRateUsdToEur(), "EUR")}</div></div>
+          <div class="stat-card"><div class="stat-label">Profit factor</div><div class="stat-value">${Number.isFinite(Number(totals.profitFactor)) ? num(totals.profitFactor, 2) : "—"}</div></div>
+          <div class="stat-card"><div class="stat-label">Drawdown</div><div class="stat-value">${money(Number(closedTrades.drawdown || 0) * fxRateUsdToEur(), "EUR")}</div></div>
+          <div class="stat-card"><div class="stat-label">Duree moyenne</div><div class="stat-value">${formatHoursValue(totals.avgHoldingHours)}</div></div>
+        </div>
+
+        <div class="perf-columns" style="margin-top:18px">
+          <div>
+            <div class="muted" style="margin-bottom:8px">Par mode d'entree</div>
+            <div class="mini-perf-row">
+              <span>Ouverts maintenant</span>
+              <span>${num(openPositions.count, 0)} position(s)</span>
+            </div>
+            ${renderTrainingAnalyticsBucketList(closedTrades.byMode, "mode", "Les prochains trades diront si coeur et exploration se differencient vraiment.")}
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:8px">Sorties du moteur</div>
+            ${renderTrainingAnalyticsBucketList(closedTrades.byCloseType, "close", "Aucune cloture exploitable pour le moment.")}
+          </div>
+        </div>
+
+        <div class="perf-columns" style="margin-top:18px">
+          <div>
+            <div class="muted" style="margin-bottom:8px">Setups observes</div>
+            ${renderTrainingAnalyticsBucketList(closedTrades.bySetup, "setup", "Le moteur n'a pas encore assez de setups etiquetes.")}
+          </div>
+          <div>
+            <div class="muted" style="margin-bottom:8px">Regimes observes</div>
+            ${renderTrainingAnalyticsBucketList(closedTrades.byRegime, "regime", "Le contexte de marche va se remplir au fil des cycles.")}
+          </div>
+        </div>
+
+        ${hasUnknownBuckets ? `<div class="muted" style="margin-top:12px">Une partie de l'historique reste legacy, donc certains regroupements apparaissent encore en "legacy / inconnu". Les prochains trades seront plus riches.</div>` : ""}
+      </div>
+    `;
+  }
+
+  function renderTrainingBotSettingsCard() {
+    const settings = state.trainingBot?.settings;
+    if (!settings) {
+      return `
+        <div class="card" style="margin-top:18px">
+          <div class="section-title"><span>Bot training distant</span><span>lecture seule</span></div>
+          <div class="empty-state">${safeText(trainingBotRemoteStatusText())}</div>
+        </div>
+      `;
+    }
+
+    const allowedSetups = Array.isArray(settings.allowed_setups) && settings.allowed_setups.length
+      ? settings.allowed_setups.join(", ")
+      : "tous";
+
+    return `
+      <div class="card" style="margin-top:18px">
+        <div class="section-title"><span>Bot training distant</span><span>${state.trainingBot?.lastRemoteSyncAt ? new Date(state.trainingBot.lastRemoteSyncAt).toLocaleString("fr-FR") : "—"}</span></div>
+        <div class="setting-list">
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Etat du moteur</div>
+              <div class="setting-desc">${safeText(trainingBotRemoteStatusText())}</div>
+            </div>
+            <div class="plan-context">
+              ${badge(settings.is_enabled ? "training actif" : "training coupe", settings.is_enabled ? "complete" : "negative")}
+              ${badge(settings.auto_open_enabled ? "auto open" : "ouverture manuelle", settings.auto_open_enabled ? "complete" : "neutral")}
+              ${badge(settings.auto_close_enabled ? "auto close" : "fermeture manuelle", settings.auto_close_enabled ? "complete" : "neutral")}
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Exploration</div>
+              <div class="setting-desc">Le moteur peut ouvrir certains "A surveiller" en taille reduite pour apprendre plus vite.</div>
+            </div>
+            <div class="plan-context">
+              ${badge(settings.exploration_enabled ? "active" : "coupee", settings.exploration_enabled ? "exploration" : "neutral")}
+              ${badge(`taille x${num(settings.exploration_allocation_multiplier, 2)}`)}
+              ${badge(`max ${num(settings.exploration_max_open_positions, 0)} position(s)`)}
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Frictions d'execution</div>
+              <div class="setting-desc">Le training n'utilise plus un prix trop propre : spread, slippage, frais et delai sont appliques.</div>
+            </div>
+            <div class="plan-context">
+              ${badge(`spread ${num(settings.spread_bps, 0)} bps`)}
+              ${badge(`slippage ${num(settings.slippage_bps, 0)} bps`)}
+              ${badge(`frais ${num(settings.fee_bps, 0)} bps`)}
+              ${badge(`delai ${num(settings.execution_delay_seconds, 0)} s`)}
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Discipline bot</div>
+              <div class="setting-desc">Le cadre de risque commence a ressembler a un vrai paper bot : limite jour, semaine et serie de pertes.</div>
+            </div>
+            <div class="plan-context">
+              ${badge(settings.kill_switch_enabled ? "kill switch arme" : "kill switch coupe", settings.kill_switch_enabled ? "neutral" : "negative")}
+              ${badge(`jour ${formatUnsignedPct(Number(settings.max_daily_loss_pct || 0) * 100, 1)}`)}
+              ${badge(`semaine ${formatUnsignedPct(Number(settings.max_weekly_loss_pct || 0) * 100, 1)}`)}
+              ${badge(`${num(settings.max_consecutive_losses, 0)} pertes max`)}
+            </div>
+          </div>
+          <div class="setting-row">
+            <div>
+              <div class="setting-title">Cadre de selection</div>
+              <div class="setting-desc">Les setups autorises et les limites principales restent pilotés par le worker.</div>
+            </div>
+            <div class="setting-desc" style="text-align:right">
+              ${safeText(allowedSetups)}<br>
+              ${safeText(`max ${num(settings.max_open_positions, 0)} positions · ${num(settings.max_positions_per_symbol, 0)} / symbole`)}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   function tradeOperationalLabel(meta) {
     if (!meta) return "a surveiller";
     if (meta.stopDistancePct != null && meta.stopDistancePct <= 5) return "proche stop";
@@ -4183,6 +4541,8 @@ function openPositionsRiskView() {
             <div class="stat-card"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
           </div>
 
+          ${renderTrainingCalibrationCard()}
+
           <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Lecture rapide</span><span>${positions.length}</span></div>
             <div class="portfolio-overview-text">
@@ -4365,6 +4725,8 @@ function openPositionsRiskView() {
             <div class="muted">Secrets attendus dans Cloudflare : SUPABASE_URL, SUPABASE_ANON_KEY et ADMIN_API_TOKEN pour activer la protection complete.</div>
           </div>
         </div>
+
+        ${renderTrainingBotSettingsCard()}
       </div>`;
   }
 
@@ -4469,6 +4831,9 @@ function renderMain() {
         } else {
           state.route = route;
           render();
+          if (route === "portfolio" || route === "settings") {
+            maybeRefreshTrainingBotData().catch(() => {});
+          }
         }
       });
     });
@@ -4567,6 +4932,9 @@ function renderMain() {
         const key = el.getAttribute("data-setting-input");
         state.settings[key] = el.value;
         persistSettings();
+        if (key === "workerAdminToken") {
+          maybeRefreshTrainingBotData(true).catch(() => {});
+        }
         render();
       });
     });
@@ -4582,12 +4950,16 @@ function renderMain() {
       applyFilter();
     }
     render();
+    maybeRefreshTrainingBotData().catch(() => {});
     await loadDashboard();
     render();
     setInterval(() => {
       if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio"].includes(state.route)) {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
+        }
+        if (state.route === "portfolio" || state.route === "settings") {
+          maybeRefreshTrainingBotData().catch(() => {});
         }
         render();
       }
