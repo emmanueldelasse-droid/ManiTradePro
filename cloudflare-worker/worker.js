@@ -2044,7 +2044,7 @@ function buildWorkerPlan(base, regime = null) {
     : profile.rrBaseNormal;
 
   let entry = null, stopLoss = null, takeProfit = null, rr = null;
-  const side = tradeNow && direction !== "neutral" ? direction : null;
+  const side = (direction !== "neutral" && (tradeNow || decision === "A surveiller")) ? direction : null;
 
   if (side && price != null) {
     entry = price;
@@ -2614,26 +2614,46 @@ function getTrainingDefaults() {
     risk_per_trade_pct: 0.02,
     allocation_per_trade_pct: 0.10,  // 10% du capital par trade
     max_holding_hours: 240,          // 10 jours max
+    exploration_enabled: true,
+    exploration_max_open_positions: 2,
+    exploration_allocation_multiplier: 0.35,
+    exploration_min_actionability_score: 60,
+    exploration_min_decision_score: 61,
+    exploration_min_safety_score: 66,
+    exploration_min_rr: 1.8,
+    exploration_max_holding_hours: 120,
     allowed_symbols: [],
     allowed_setups: ["pullback", "breakout", "continuation"],
     mean_reversion_enabled: false    // désactivé jusqu'à 30 trades clôturés
   };
 }
 
-function isTrainingCandidateAllowed(row, settings, openRows) {
-  if (!row || row.status !== "ok") return false;
-  if (row.decision !== "Trade propose") return false;
-  if (!row.plan?.tradeNow) return false;
+function normalizeTrainingEntryMode(value) {
+  return String(value || "").toLowerCase() === "exploration" ? "exploration" : "core";
+}
 
-  // Setup autorisé ?
+function getTrainingEntryModeFromRow(row) {
+  return normalizeTrainingEntryMode(
+    row?.analysis_snapshot?.entryMode ??
+    row?.analysisSnapshot?.entryMode ??
+    row?.execution?.entryMode ??
+    row?.entryMode
+  );
+}
+
+function getTrainingCandidateProfile(row, settings, openRows) {
+  if (!row || row.status !== "ok") return null;
+
+  const decision = String(row.decision || row.plan?.decision || "");
+  const isTradeDecision = decision === "Trade propose";
+  const isWatchDecision = decision === "A surveiller";
+  if (!isTradeDecision && !isWatchDecision) return null;
+
   const setupType = String(row.plan?.setupType || row.setupType || "").toLowerCase();
   const allowedSetups = Array.isArray(settings.allowed_setups) ? settings.allowed_setups : ["pullback","breakout","continuation"];
-  if (setupType && setupType !== "aucun" && !allowedSetups.includes(setupType)) return false;
+  if (setupType && setupType !== "aucun" && !allowedSetups.includes(setupType)) return null;
+  if (setupType === "mean_reversion" && !settings.mean_reversion_enabled) return null;
 
-  // Mean reversion bloquée
-  if (setupType === "mean_reversion" && !settings.mean_reversion_enabled) return false;
-
-  // Scores
   const minActionability = Number(settings.min_actionability_score || 72);
   const minDecision = Number(settings.min_dossier_score || 74);
   const minSafety = Math.max(68, minDecision - 4);
@@ -2643,34 +2663,58 @@ function isTrainingCandidateAllowed(row, settings, openRows) {
     directionalOpportunityScore(row.plan?.finalScore ?? row.score, row.direction)
   );
   const safetyScore = Number(row.plan?.safetyScore ?? row.safetyScore ?? 0);
-  if (actionabilityScore < minActionability) return false;
-  if (decisionScore < minDecision) return false;
-  if (safetyScore < minSafety) return false;
+  const rr = Number(row.plan?.rr || 0);
 
-  // Ratio minimum
-  if (Number(row.plan?.rr || 0) < 1.6) return false;
+  if (rr < 1.6) return null;
+  if (!Number.isFinite(Number(row.plan?.entry))) return null;
+  if (!Number.isFinite(Number(row.plan?.stopLoss))) return null;
+  if (!Number.isFinite(Number(row.plan?.takeProfit))) return null;
+  if ((row.plan?.side || "") === "short" && !settings.allow_short) return null;
+  if ((row.plan?.side || "") === "long" && !settings.allow_long) return null;
 
-  // Plan complet
-  if (!Number.isFinite(Number(row.plan?.entry))) return false;
-  if (!Number.isFinite(Number(row.plan?.stopLoss))) return false;
-  if (!Number.isFinite(Number(row.plan?.takeProfit))) return false;
-
-  // Sens autorisé
-  if ((row.plan?.side || "") === "short" && !settings.allow_short) return false;
-  if ((row.plan?.side || "") === "long" && !settings.allow_long) return false;
-
-  // Symboles autorisés
   const allowedList = Array.isArray(settings.allowed_symbols) ? settings.allowed_symbols : [];
-  if (allowedList.length && !allowedList.includes(parseSymbol(row.symbol))) return false;
+  if (allowedList.length && !allowedList.includes(parseSymbol(row.symbol))) return null;
 
-  // Déjà ouvert
   const alreadyOpen = openRows.filter(x => parseSymbol(x.symbol) === parseSymbol(row.symbol)).length;
-  if (alreadyOpen >= Number(settings.max_positions_per_symbol || 1)) return false;
+  if (alreadyOpen >= Number(settings.max_positions_per_symbol || 1)) return null;
+  if (openRows.length >= Number(settings.max_open_positions || 10)) return null;
 
-  // Max global
-  if (openRows.length >= Number(settings.max_open_positions || 10)) return false;
+  const blockerFlags = Array.isArray(row?.plan?.blockerFlags) ? row.plan.blockerFlags : [];
+  const hasMajorBlocker = majorHardBlockerCount(blockerFlags) > 0;
 
-  return true;
+  if (isTradeDecision && row.plan?.tradeNow) {
+    if (actionabilityScore < minActionability) return null;
+    if (decisionScore < minDecision) return null;
+    if (safetyScore < minSafety) return null;
+    return {
+      entryMode: "core",
+      allocationMultiplier: 1,
+      decisionAtOpen: decision,
+      reason: "trade_propose"
+    };
+  }
+
+  const explorationEnabled = coerceBoolean(settings.exploration_enabled, false);
+  if (!explorationEnabled || !isWatchDecision || hasMajorBlocker) return null;
+
+  const explorationOpenCount = openRows.filter((item) => getTrainingEntryModeFromRow(item) === "exploration").length;
+  if (explorationOpenCount >= Number(settings.exploration_max_open_positions || 2)) return null;
+
+  const explorationMinActionability = Number(settings.exploration_min_actionability_score || Math.max(58, minActionability - 12));
+  const explorationMinDecision = Number(settings.exploration_min_decision_score || Math.max(60, minDecision - 12));
+  const explorationMinSafety = Number(settings.exploration_min_safety_score || Math.max(64, minSafety - 4));
+  const explorationMinRr = Number(settings.exploration_min_rr || 1.8);
+  if (actionabilityScore < explorationMinActionability) return null;
+  if (decisionScore < explorationMinDecision) return null;
+  if (safetyScore < explorationMinSafety) return null;
+  if (rr < explorationMinRr) return null;
+
+  return {
+    entryMode: "exploration",
+    allocationMultiplier: clampFloat(settings.exploration_allocation_multiplier, 0.1, 1, 0.35),
+    decisionAtOpen: decision,
+    reason: "watchlist_exploration"
+  };
 }
 
 // ============================================================
@@ -2729,22 +2773,36 @@ async function handleTrainingAutoCycle(env) {
     // PHASE OUVERTURE — chaque position indépendante
     if (settings.auto_open_enabled && openRows.length < Number(settings.max_open_positions || 10)) {
       const rows = await buildOpportunityRowsForTraining(env);
-      const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows));
+      const candidates = rows.map((row) => ({
+        row,
+        profile: getTrainingCandidateProfile(row, settings, openRows)
+      })).filter((item) => item.profile);
 
       let availableCash = Number(settings.capital_base || 0) - openRows.reduce((acc, row) => acc + (Number(row?.invested || row?.execution?.invested || 0) || 0), 0);
 
-      for (const row of candidates) {
+      for (const item of candidates) {
+        const row = item.row;
+        const profile = item.profile;
         if (openRows.length >= Number(settings.max_open_positions || 10)) break;
         try {
           const opened = await withTimeout(
-            openTrainingPositionFromRow(env, row, settings, availableCash),
+            openTrainingPositionFromRow(env, row, settings, availableCash, profile),
             8000, `open:${row.symbol}`
           );
           if (!opened) {
             log.skipped.push({ symbol: row.symbol, reason: "execution_unavailable" });
             continue;
           }
-          log.opened.push({ symbol: opened.symbol, trade_id: opened.id, entry_price: opened.entry_price, stop_loss: opened.stop_loss, take_profit: opened.take_profit, invested: opened.invested, setup_type: row.plan?.setupType || "unknown" });
+          log.opened.push({
+            symbol: opened.symbol,
+            trade_id: opened.id,
+            entry_price: opened.entry_price,
+            stop_loss: opened.stop_loss,
+            take_profit: opened.take_profit,
+            invested: opened.invested,
+            setup_type: row.plan?.setupType || "unknown",
+            entry_mode: profile.entryMode
+          });
           openRows.push(opened);
           availableCash -= Number(opened.invested || 0);
         } catch (e) {
@@ -2867,6 +2925,14 @@ function normalizeTrainingSettingsRow(row) {
     risk_per_trade_pct: clampFloat(safe.risk_per_trade_pct, 0.001, 0.1, base.risk_per_trade_pct),
     allocation_per_trade_pct: clampFloat(safe.allocation_per_trade_pct, 0.01, 1, base.allocation_per_trade_pct),
     max_holding_hours: clampInt(safe.max_holding_hours, 1, 24*365, base.max_holding_hours),
+    exploration_enabled: coerceBoolean(safe.exploration_enabled, base.exploration_enabled),
+    exploration_max_open_positions: clampInt(safe.exploration_max_open_positions, 0, 10, base.exploration_max_open_positions),
+    exploration_allocation_multiplier: clampFloat(safe.exploration_allocation_multiplier, 0.1, 1, base.exploration_allocation_multiplier),
+    exploration_min_actionability_score: clampInt(safe.exploration_min_actionability_score, 1, 100, base.exploration_min_actionability_score),
+    exploration_min_decision_score: clampInt(safe.exploration_min_decision_score, 1, 100, base.exploration_min_decision_score),
+    exploration_min_safety_score: clampInt(safe.exploration_min_safety_score, 1, 100, base.exploration_min_safety_score),
+    exploration_min_rr: clampFloat(safe.exploration_min_rr, 1, 5, base.exploration_min_rr),
+    exploration_max_holding_hours: clampInt(safe.exploration_max_holding_hours, 1, 24*365, base.exploration_max_holding_hours),
     allowed_symbols: Array.isArray(safe.allowed_symbols) ? safe.allowed_symbols.map(x => parseSymbol(x)).filter(Boolean).slice(0, 100) : base.allowed_symbols,
     allowed_setups: Array.isArray(safe.allowed_setups) ? safe.allowed_setups : base.allowed_setups,
     mean_reversion_enabled: coerceBoolean(safe.mean_reversion_enabled, base.mean_reversion_enabled),
@@ -2925,12 +2991,15 @@ function normalizeRowByKeys(row, keys) {
   return out;
 }
 
-const TRAINING_POSITION_KEYS = ["id","symbol","name","direction","entry_price","quantity","invested","stop_loss","take_profit","mode","status","opened_at","updated_at","score","decision","trend_label","source_used"];
-const TRAINING_TRADE_KEYS = ["id","symbol","name","direction","entry_price","exit_price","quantity","invested","stop_loss","take_profit","pnl","pnl_pct","opened_at","closed_at","duration_days","mode","status","score","adj_score","rr_ratio","decision","trend_label","source_used","updated_at"];
+const TRAINING_POSITION_KEYS = ["id","symbol","name","direction","entry_price","quantity","invested","stop_loss","take_profit","mode","status","opened_at","updated_at","score","decision","tradeDecision","tradeReason","horizon","trend_label","source_used","analysisSnapshot","execution","live","entryMode"];
+const TRAINING_TRADE_KEYS = ["id","symbol","name","direction","entry_price","exit_price","quantity","invested","stop_loss","take_profit","pnl","pnl_pct","opened_at","closed_at","duration_days","mode","status","score","adj_score","rr_ratio","decision","tradeDecision","tradeReason","horizon","trend_label","source_used","analysisSnapshot","execution","live","closedExecution","entryMode","updated_at"];
 
 function normalizeTrainingPositions(rows) {
   return (Array.isArray(rows) ? rows : []).filter(row => row && typeof row === "object").map(row => normalizeRowByKeys({
     ...row,
+    analysisSnapshot: row.analysisSnapshot ?? row.analysis_snapshot ?? null,
+    execution: row.execution ?? null,
+    live: row.live ?? null,
     direction: row.direction ?? row.side ?? row?.analysis_snapshot?.direction ?? null,
     entry_price: row.entry_price ?? row.entryPrice ?? row?.execution?.entryPrice ?? null,
     quantity: row.quantity ?? row?.execution?.quantity ?? null,
@@ -2943,6 +3012,10 @@ function normalizeTrainingPositions(rows) {
     trend_label: row.trend_label ?? row.trendLabel ?? row?.analysis_snapshot?.trendLabel ?? null,
     source_used: row.source_used ?? row.sourceUsed ?? row?.analysis_snapshot?.sourceUsed ?? null,
     decision: row.decision ?? row.trade_decision ?? row?.analysis_snapshot?.decision ?? null,
+    tradeDecision: row.tradeDecision ?? row.trade_decision ?? row.decision ?? row?.analysis_snapshot?.decision ?? null,
+    tradeReason: row.tradeReason ?? row.trade_reason ?? row.reason ?? row?.analysis_snapshot?.reason ?? null,
+    horizon: row.horizon ?? row?.analysis_snapshot?.horizon ?? null,
+    entryMode: normalizeTrainingEntryMode(row.entryMode ?? row?.execution?.entryMode ?? row?.analysis_snapshot?.entryMode),
     status: row.status ?? "open"
   }, TRAINING_POSITION_KEYS));
 }
@@ -2950,6 +3023,10 @@ function normalizeTrainingPositions(rows) {
 function normalizeTrainingTrades(rows) {
   return (Array.isArray(rows) ? rows : []).filter(row => row && typeof row === "object").map(row => normalizeRowByKeys({
     ...row,
+    analysisSnapshot: row.analysisSnapshot ?? row.analysis_snapshot ?? null,
+    execution: row.execution ?? null,
+    live: row.live ?? null,
+    closedExecution: row.closedExecution ?? row.closed_execution ?? null,
     direction: row.direction ?? row.side ?? row?.analysis_snapshot?.direction ?? null,
     entry_price: row.entry_price ?? row.entryPrice ?? row?.execution?.entryPrice ?? null,
     exit_price: row.exit_price ?? row.exitPrice ?? row?.closedExecution?.exitPrice ?? null,
@@ -2968,6 +3045,10 @@ function normalizeTrainingTrades(rows) {
     trend_label: row.trend_label ?? row.trendLabel ?? null,
     source_used: row.source_used ?? row.sourceUsed ?? null,
     decision: row.decision ?? row.trade_decision ?? null,
+    tradeDecision: row.tradeDecision ?? row.trade_decision ?? row.decision ?? null,
+    tradeReason: row.tradeReason ?? row.trade_reason ?? row.reason ?? row?.analysis_snapshot?.reason ?? null,
+    horizon: row.horizon ?? row?.analysis_snapshot?.horizon ?? null,
+    entryMode: normalizeTrainingEntryMode(row.entryMode ?? row?.execution?.entryMode ?? row?.analysis_snapshot?.entryMode),
     status: row.status ?? "closed"
   }, TRAINING_TRADE_KEYS));
 }
@@ -2983,8 +3064,9 @@ async function getClosedTrainingTradesRaw(env, limit = 200) {
   return Array.isArray(rows) ? rows : [];
 }
 
-function buildTrainingAnalysisSnapshotFromPayload(payload) {
+function buildTrainingAnalysisSnapshotFromPayload(payload, candidate = null) {
   const plan = payload?.plan || {};
+  const entryMode = normalizeTrainingEntryMode(candidate?.entryMode);
   return {
     symbol: payload?.symbol || null,
     name: payload?.name || null,
@@ -3006,13 +3088,15 @@ function buildTrainingAnalysisSnapshotFromPayload(payload) {
     sourceUsed: payload?.sourceUsed || null,
     setupType: plan?.setupType || null,
     setupStatus: plan?.setupStatus || null,
+    entryMode,
+    decisionAtOpen: candidate?.decisionAtOpen || payload?.decision || plan?.decision || null,
     confirmationCount: Number.isFinite(Number(plan?.confirmationCount)) ? Number(plan.confirmationCount) : null,
     blockerFlags: Array.isArray(plan?.blockerFlags) ? plan.blockerFlags : [],
     analysisTimestamp: nowIso()
   };
 }
 
-function chooseTrainingExecution(payload, settings, currentAvailableCash) {
+function chooseTrainingExecution(payload, settings, currentAvailableCash, candidate = null) {
   const plan = payload?.plan || {};
   const price = finiteOrNull(plan?.entry ?? payload?.price);
   const stopLoss = finiteOrNull(plan?.stopLoss);
@@ -3024,16 +3108,28 @@ function chooseTrainingExecution(payload, settings, currentAvailableCash) {
   if (!["long","short"].includes(side)) return null;
   const capitalBase = Math.max(0, Number(settings?.capital_base || 0));
   const availableCash = Math.max(0, Number(currentAvailableCash ?? capitalBase));
-  const allocatedCash = Math.min(availableCash, capitalBase * Number(settings?.allocation_per_trade_pct || 0.10));
+  const allocationMultiplier = clampFloat(candidate?.allocationMultiplier, 0.1, 1, 1);
+  const allocatedCash = Math.min(availableCash, capitalBase * Number(settings?.allocation_per_trade_pct || 0.10) * allocationMultiplier);
   if (!Number.isFinite(allocatedCash) || allocatedCash <= 50) return null;
   const quantity = allocatedCash / price;
   if (!Number.isFinite(quantity) || quantity <= 0) return null;
-  return { side, entryPrice: price, quantity, invested: quantity * price, stopLoss, takeProfit, rr };
+  return {
+    side,
+    entryPrice: price,
+    quantity,
+    invested: quantity * price,
+    stopLoss,
+    takeProfit,
+    rr,
+    entryMode: normalizeTrainingEntryMode(candidate?.entryMode),
+    allocationMultiplier
+  };
 }
 
 function trainingCloseTrigger(position, livePrice, detailPayload, settings) {
   const safePrice = finiteOrNull(livePrice);
   const side = String(position?.side || position?.direction || "").toLowerCase();
+  const entryMode = getTrainingEntryModeFromRow(position);
   const stopLoss = finiteOrNull(position?.stop_loss ?? position?.stopLoss ?? position?.analysis_snapshot?.stopLoss);
   const takeProfit = finiteOrNull(position?.take_profit ?? position?.takeProfit ?? position?.analysis_snapshot?.takeProfit);
   if (!Number.isFinite(safePrice) || !["long","short"].includes(side)) return null;
@@ -3043,14 +3139,26 @@ function trainingCloseTrigger(position, livePrice, detailPayload, settings) {
   if (side === "short" && Number.isFinite(takeProfit) && safePrice <= takeProfit) return { type: "take_profit", exitPrice: takeProfit };
 
   const openedMs = new Date(position?.opened_at ?? position?.openedAt ?? position?.execution?.openedAt ?? 0).getTime();
-  const maxHoldingMs = Math.max(1, Number(settings?.max_holding_hours || 240)) * 60 * 60 * 1000;
+  const maxHoldingHours = entryMode === "exploration"
+    ? Math.max(1, Number(settings?.exploration_max_holding_hours || Math.min(Number(settings?.max_holding_hours || 240), 120)))
+    : Math.max(1, Number(settings?.max_holding_hours || 240));
+  const maxHoldingMs = maxHoldingHours * 60 * 60 * 1000;
   if (openedMs > 0 && (Date.now() - openedMs) >= maxHoldingMs) return { type: "time_exit", exitPrice: safePrice };
 
   if (detailPayload && detailPayload.status === "ok") {
     const plan = detailPayload.plan || {};
     const decision = String(detailPayload.decision || plan.decision || "");
     const actionability = Number(plan.exploitabilityScore ?? 0);
-    if (decision === "Pas de trade" || actionability < Math.max(40, Number(settings?.min_actionability_score || 72) - 18)) {
+    const safetyScore = Number(plan.safetyScore ?? detailPayload?.safetyScore ?? 0);
+    const invalidationFloor = entryMode === "exploration"
+      ? Math.max(48, Number(settings?.exploration_min_actionability_score || 60) - 6)
+      : Math.max(40, Number(settings?.min_actionability_score || 72) - 18);
+    const explorationSafetyFloor = Math.max(54, Number(settings?.exploration_min_safety_score || 66) - 8);
+    if (
+      decision === "Pas de trade" ||
+      actionability < invalidationFloor ||
+      (entryMode === "exploration" && safetyScore < explorationSafetyFloor)
+    ) {
       return { type: "engine_invalidation", exitPrice: safePrice };
     }
   }
@@ -3068,8 +3176,8 @@ function computePnlForClose(position, exitPrice) {
   return { pnl, pnlPct };
 }
 
-function buildTrainingPositionRowFromSignal(payload, execution, settings) {
-  const analysisSnapshot = buildTrainingAnalysisSnapshotFromPayload(payload);
+function buildTrainingPositionRowFromSignal(payload, execution, settings, candidate = null) {
+  const analysisSnapshot = buildTrainingAnalysisSnapshotFromPayload(payload, candidate);
   const id = `${parseSymbol(payload?.symbol)}:training:${Date.now()}`;
   return {
     id, symbol: parseSymbol(payload?.symbol), name: payload?.name || parseSymbol(payload?.symbol),
@@ -3085,7 +3193,14 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings) {
     source_used: payload?.sourceUsed || null,
     opened_at: nowIso(),
     analysis_snapshot: analysisSnapshot,
-    execution: { openedAt: nowIso(), entryPrice: execution.entryPrice, quantity: execution.quantity, invested: execution.invested },
+    execution: {
+      openedAt: nowIso(),
+      entryPrice: execution.entryPrice,
+      quantity: execution.quantity,
+      invested: execution.invested,
+      entryMode: normalizeTrainingEntryMode(execution.entryMode),
+      allocationMultiplier: finiteOrNull(execution.allocationMultiplier)
+    },
     live: { lastPrice: execution.entryPrice, updatedAt: nowIso() },
     updated_at: nowIso()
   };
@@ -3140,16 +3255,27 @@ async function closeTrainingPosition(env, position, exitPrice, closeType, detail
   return closedRow;
 }
 
-async function openTrainingPositionFromRow(env, row, settings, availableCash) {
-  const execution = chooseTrainingExecution(row, settings, availableCash);
+async function openTrainingPositionFromRow(env, row, settings, availableCash, candidate = null) {
+  const execution = chooseTrainingExecution(row, settings, availableCash, candidate);
   if (!execution) return null;
-  const positionRow = buildTrainingPositionRowFromSignal(row, execution, settings);
+  const positionRow = buildTrainingPositionRowFromSignal(row, execution, settings, candidate);
   await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
     body: JSON.stringify([positionRow])
   });
-  await logTrainingEvent(env, "trade_opened", { id: positionRow.id, trade_id: positionRow.id, symbol: positionRow.symbol, side: positionRow.side, entry_price: positionRow.entry_price, stop_loss: positionRow.stop_loss, take_profit: positionRow.take_profit, invested: positionRow.invested, setup_type: row.plan?.setupType || null });
+  await logTrainingEvent(env, "trade_opened", {
+    id: positionRow.id,
+    trade_id: positionRow.id,
+    symbol: positionRow.symbol,
+    side: positionRow.side,
+    entry_price: positionRow.entry_price,
+    stop_loss: positionRow.stop_loss,
+    take_profit: positionRow.take_profit,
+    invested: positionRow.invested,
+    setup_type: row.plan?.setupType || null,
+    entry_mode: candidate?.entryMode || "core"
+  });
   return positionRow;
 }
 
