@@ -3519,6 +3519,7 @@ function renderPositionRow(position) {
   const snap = p.analysisSnapshot || {};
   const exec = p.execution || {};
   const live = p.live || {};
+  const entryMode = trainingEntryModeMeta(p);
   const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
 
   return `<div class="trade-row trade-card-row simple-trade-card">
@@ -3530,6 +3531,7 @@ function renderPositionRow(position) {
       <div class="trade-card-badges">
         ${badge(simpleSideLabel(p.side), p.side)}
         ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
+        ${entryMode ? badge(entryMode.label, entryMode.badgeClass) : ""}
         ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
       </div>
     </div>
@@ -3538,6 +3540,7 @@ function renderPositionRow(position) {
 
     <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
     <div class="trade-plan-grid compact">
+      <div><span class="muted">Mode d'entree</span><br>${safeText(entryMode?.description || "selection principale")}</div>
       <div><span class="muted">Score d'entree</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
       <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
       <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
@@ -3608,13 +3611,14 @@ function renderHistoryRow(item) {
     const entryPrice = displayHistoryEntryPrice(p);
     const exitPrice = displayHistoryExitPrice(p);
     const closedAt = displayHistoryClosedAt(p);
+    const entryMode = trainingEntryModeMeta(p);
     const pnl = Number(p?.pnl || 0);
     const pnlPctValue = Number.isFinite(Number(p?.pnlPct)) ? Number(p.pnlPct) : null;
     return `
       <div class="trade-row history simple-history-row">
         <div>
           <div class="trade-symbol">${safeText(p.symbol)}</div>
-          <div class="trade-sub">${validTradeDate(closedAt) ? new Date(closedAt).toLocaleString("fr-FR") : "date indisponible"}</div>
+          <div class="trade-sub">${safeText(validTradeDate(closedAt) ? new Date(closedAt).toLocaleString("fr-FR") : "date indisponible")}${entryMode ? ` Â· ${safeText(entryMode.label)}` : ""}</div>
         </div>
         <div>${badge(simpleSideLabel(p.side), p.side)}</div>
         <div>${badge(historyResultLabel(p), (pnl >= 0 ? "positive" : "negative"))}</div>
@@ -3764,6 +3768,28 @@ function renderHistoryRow(item) {
     return raw;
   }
 
+  function trainingEntryModeMeta(position){
+    const raw = position?.analysisSnapshot?.entryMode || position?.execution?.entryMode || position?.entryMode || null;
+    const mode = String(raw || "").trim().toLowerCase();
+    if (mode === "exploration") {
+      return {
+        mode,
+        label: "exploration",
+        badgeClass: "exploration",
+        description: "exploration controlee"
+      };
+    }
+    if (mode === "core") {
+      return {
+        mode,
+        label: "coeur",
+        badgeClass: "complete",
+        description: "selection principale"
+      };
+    }
+    return null;
+  }
+
   function displayRatioValue(position){
     const snap = position?.analysisSnapshot || {};
     const explicit = Number(snap?.ratio ?? position?.rrRatio);
@@ -3900,6 +3926,7 @@ function createAnalysisSnapshotFromOpportunity(detail){
 function normalizePositionRecord(position){
   if (!position || typeof position !== "object") return position;
 
+  const rawAnalysisSnapshot = position?.analysisSnapshot || position?.analysis_snapshot || {};
   const safeNumber = (value) => {
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
@@ -3909,40 +3936,42 @@ function normalizePositionRecord(position){
     return num != null && num > 0 ? num : null;
   };
 
-  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? position?.analysisSnapshot?.entry);
+  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? rawAnalysisSnapshot?.entry);
   const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
   const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(position?.analysisSnapshot?.stopLoss ?? position?.stopLoss);
-  const takeProfitRaw = positiveOrNull(position?.analysisSnapshot?.takeProfit ?? position?.takeProfit);
-  const ratioRaw = positiveOrNull(position?.analysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
+  const stopLossRaw = positiveOrNull(rawAnalysisSnapshot?.stopLoss ?? position?.stopLoss);
+  const takeProfitRaw = positiveOrNull(rawAnalysisSnapshot?.takeProfit ?? position?.takeProfit);
+  const ratioRaw = positiveOrNull(rawAnalysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
   const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice);
   const livePriceRaw = positiveOrNull(position?.live?.price);
   const pnlRaw = safeNumber(position?.pnl);
   const pnlPctRaw = safeNumber(position?.pnlPct);
-  const sourceUsed = position?.sourceUsed || position?.source || position?.analysisSnapshot?.sourceUsed || null;
+  const sourceUsed = position?.sourceUsed || position?.source || rawAnalysisSnapshot?.sourceUsed || null;
   const inferredClosed = !!(
     position?.closedExecution?.closedAt || position?.closedAt ||
     position?.closedExecution?.exitPrice || position?.exitPrice
   );
   const normalizedStatus = position?.status || (inferredClosed ? "closed" : "open");
+  const entryMode = String(rawAnalysisSnapshot?.entryMode || position?.execution?.entryMode || position?.entryMode || "").trim().toLowerCase() || null;
 
   const snapshot = {
     symbol: position.symbol || null,
     name: position.name || position.symbol || null,
-    score: positiveOrNull(position?.analysisSnapshot?.score ?? position?.score),
-    decision: position?.analysisSnapshot?.decision || position?.tradeDecision || null,
-    trendLabel: position?.analysisSnapshot?.trendLabel || position?.trendLabel || detectedTrendLabel(position?.direction || "neutral"),
-    direction: position?.analysisSnapshot?.direction || position?.direction || null,
+    score: positiveOrNull(rawAnalysisSnapshot?.score ?? position?.score),
+    decision: rawAnalysisSnapshot?.decision || position?.tradeDecision || null,
+    trendLabel: rawAnalysisSnapshot?.trendLabel || position?.trendLabel || detectedTrendLabel(position?.direction || "neutral"),
+    direction: rawAnalysisSnapshot?.direction || position?.direction || null,
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     ratio: ratioRaw,
-    horizon: position?.analysisSnapshot?.horizon || position?.horizon || null,
-    reason: position?.analysisSnapshot?.reason || position?.tradeReason || null,
-    scoreBreakdown: position?.analysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
+    horizon: rawAnalysisSnapshot?.horizon || position?.horizon || null,
+    reason: rawAnalysisSnapshot?.reason || position?.tradeReason || null,
+    scoreBreakdown: rawAnalysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
+    entryMode,
     sourceUsed,
-    analysisTimestamp: position?.analysisSnapshot?.analysisTimestamp || position?.openedAt || Date.now()
+    analysisTimestamp: rawAnalysisSnapshot?.analysisTimestamp || position?.openedAt || Date.now()
   };
 
   return {
@@ -3953,7 +3982,8 @@ function normalizePositionRecord(position){
       openedAt: position?.execution?.openedAt || position?.openedAt || null,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
-      invested: investedRaw
+      invested: investedRaw,
+      entryMode
     },
     live: {
       ...(position.live || {}),
@@ -3975,6 +4005,7 @@ function normalizePositionRecord(position){
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     score: snapshot.score,
+    entryMode,
     entryPrice: entryPriceRaw,
     quantity: quantityRaw,
     invested: investedRaw,
