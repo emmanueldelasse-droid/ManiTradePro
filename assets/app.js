@@ -102,7 +102,8 @@
     },
     priceAlerts: [],
     alertModal: { open: false, symbol: null, name: null, currentPrice: null },
-    alertToast: null
+    alertToast: null,
+    chartTimeframe: "1d"
   };
 
   const app = document.getElementById("app");
@@ -3040,25 +3041,82 @@ function renderDashboard() {
       </div>`;
   }
 
-  function renderChart(candles) {
-    if (!candles || !candles.length) return `<div class="empty-state">Aucune bougie disponible.</div>`;
-    const closes = candles.map(c => c.close);
-    const min = Math.min(...closes);
-    const max = Math.max(...closes);
-    const width = 900, height = 240, pad = 10;
-    const pts = closes.map((v, i) => {
-      const x = pad + i * ((width - pad * 2) / Math.max(1, closes.length - 1));
-      const y = height - pad - ((v - min) / Math.max(1e-9, max - min)) * (height - pad * 2);
-      return `${x},${y}`;
-    }).join(" ");
-    const lineColor = closes[closes.length - 1] >= closes[0] ? "var(--profit)" : "var(--loss)";
+  function renderChart(candles, symbol) {
+    if (!Array.isArray(candles) || !candles.length) {
+      return `<div class="empty-state">Aucune bougie disponible.</div>`;
+    }
+    const sym = symbol || state.detail?.symbol || "";
+    const isCrypto = isCryptoSymbol(sym);
+    const tf = state.chartTimeframe || "1d";
+    const tfs = isCrypto
+      ? [["1d","1J"],["4h","4H"],["1h","1H"]]
+      : [["1d","1J"]];
     return `
       <div class="chart-wrap">
-        <svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-          <polyline fill="none" stroke="var(--bg-elevated)" stroke-width="1" points="${pad},${pad} ${width - pad},${pad}"/>
-          <polyline fill="none" stroke="${lineColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${pts}" />
-        </svg>
+        <div class="chart-tf-row">
+          ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+          <span class="chart-count">${candles.length} bougies</span>
+        </div>
+        <div id="lw-chart-container" data-symbol="${safeText(sym)}" style="width:100%;height:260px;position:relative;"></div>
       </div>`;
+  }
+
+  function initCandlestickChart() {
+    const container = document.getElementById("lw-chart-container");
+    if (!container || !window.LightweightCharts) return;
+    const d = state.detail;
+    if (!d || !Array.isArray(d.candles) || !d.candles.length) return;
+
+    const isLight = !!state.settings.lightTheme;
+    const textColor  = isLight ? "#555" : "#8899aa";
+    const gridColor  = isLight ? "#ebebeb" : "#141928";
+    const borderColor = isLight ? "#d0d0d0" : "#1e2435";
+
+    container.innerHTML = "";
+
+    const chart = LightweightCharts.createChart(container, {
+      width: container.clientWidth,
+      height: 260,
+      layout: { background: { type: "solid", color: "transparent" }, textColor, fontSize: 11 },
+      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      rightPriceScale: { borderColor, scaleMargins: { top: 0.08, bottom: 0.04 } },
+      timeScale: { borderColor, timeVisible: state.chartTimeframe !== "1d", secondsVisible: false },
+      handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: false },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#26a69a", downColor: "#ef5350",
+      borderVisible: false,
+      wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+    });
+
+    const isDaily = state.chartTimeframe === "1d";
+    const data = d.candles
+      .filter(c => c && c.open != null && c.high != null && c.low != null && c.close != null)
+      .map(c => {
+        let t = c.time;
+        if (typeof t === "string") {
+          t = isDaily ? t.substring(0, 10) : Math.floor(new Date(t).getTime() / 1000);
+        } else if (typeof t === "number" && t > 1e10) {
+          t = Math.floor(t / 1000);
+        }
+        return { time: t, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) };
+      })
+      .filter(c => c.time != null && Number.isFinite(c.open) && Number.isFinite(c.high))
+      .sort((a, b) => a.time > b.time ? 1 : -1);
+
+    if (!data.length) {
+      container.innerHTML = `<div class="empty-state">Données insuffisantes.</div>`;
+      return;
+    }
+
+    candleSeries.setData(data);
+    chart.timeScale().fitContent();
+
+    const ro = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth }));
+    ro.observe(container);
   }
 
   
@@ -3424,7 +3482,7 @@ function renderDetail() {
 
               <div class="card">
                 <div class="section-title"><span>Evolution recente</span><span>${Array.isArray(d.candles) && d.candles.length ? `${d.candles.length} bougies` : "historique recent"}</span></div>
-                ${renderChart(d.candles)}
+                ${renderChart(d.candles, d.symbol)}
               </div>
             </div>
 
@@ -4787,6 +4845,7 @@ function renderMain() {
     applyThemeMode();
     bindEvents();
     syncDisplayedScores();
+    if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
   }
 
   function bindEvents() {
@@ -4812,6 +4871,26 @@ function renderMain() {
 
     app.querySelectorAll("[data-refresh='opportunities']").forEach(el => {
       el.addEventListener("click", () => loadOpportunities(true));
+    });
+
+    app.querySelectorAll("[data-chart-tf]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const tf = btn.getAttribute("data-chart-tf");
+        if (!tf || !state.detail?.symbol) return;
+        state.chartTimeframe = tf;
+        app.querySelectorAll("[data-chart-tf]").forEach(b => b.classList.toggle("active", b === btn));
+        const container = document.getElementById("lw-chart-container");
+        if (container) container.innerHTML = `<div class="chart-loading">Chargement…</div>`;
+        const limit = tf === "1d" ? 90 : 60;
+        try {
+          const res = await api(`/api/candles/${encodeURIComponent(state.detail.symbol)}?timeframe=${tf}&limit=${limit}`);
+          const candles = Array.isArray(res?.data) ? res.data : [];
+          if (state.detail) state.detail.candles = candles;
+          initCandlestickChart();
+        } catch {
+          if (container) container.innerHTML = `<div class="empty-state">Données non disponibles pour ce délai.</div>`;
+        }
+      });
     });
 
     app.querySelectorAll(".opp-row[data-symbol], .ai-card[data-symbol]").forEach(el => {
