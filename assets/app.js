@@ -102,7 +102,8 @@
     },
     priceAlerts: [],
     alertModal: { open: false, symbol: null, name: null, currentPrice: null },
-    alertToast: null
+    alertToast: null,
+    chartTimeframe: "1d"
   };
 
   const app = document.getElementById("app");
@@ -1702,6 +1703,7 @@ function addTrainingTradeFromDetail(side) {
     name: d.name,
     assetClass: d.assetClass,
     side,
+    source: "manual",
     quantity,
     entryPrice: d.price,
     invested: investedUsd,
@@ -1765,6 +1767,7 @@ function createRecommendedTrade() {
     name: d.name,
     assetClass: d.assetClass,
     side: plan.side,
+    source: "algo",
     quantity,
     entryPrice: plan.entry,
     invested: investedUsd,
@@ -3040,25 +3043,82 @@ function renderDashboard() {
       </div>`;
   }
 
-  function renderChart(candles) {
-    if (!candles || !candles.length) return `<div class="empty-state">Aucune bougie disponible.</div>`;
-    const closes = candles.map(c => c.close);
-    const min = Math.min(...closes);
-    const max = Math.max(...closes);
-    const width = 900, height = 240, pad = 10;
-    const pts = closes.map((v, i) => {
-      const x = pad + i * ((width - pad * 2) / Math.max(1, closes.length - 1));
-      const y = height - pad - ((v - min) / Math.max(1e-9, max - min)) * (height - pad * 2);
-      return `${x},${y}`;
-    }).join(" ");
-    const lineColor = closes[closes.length - 1] >= closes[0] ? "var(--profit)" : "var(--loss)";
+  function renderChart(candles, symbol) {
+    if (!Array.isArray(candles) || !candles.length) {
+      return `<div class="empty-state">Aucune bougie disponible.</div>`;
+    }
+    const sym = symbol || state.detail?.symbol || "";
+    const isCrypto = isCryptoSymbol(sym);
+    const tf = state.chartTimeframe || "1d";
+    const tfs = isCrypto
+      ? [["1d","1J"],["4h","4H"],["1h","1H"]]
+      : [["1d","1J"]];
     return `
       <div class="chart-wrap">
-        <svg class="chart-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
-          <polyline fill="none" stroke="var(--bg-elevated)" stroke-width="1" points="${pad},${pad} ${width - pad},${pad}"/>
-          <polyline fill="none" stroke="${lineColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="${pts}" />
-        </svg>
+        <div class="chart-tf-row">
+          ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+          <span class="chart-count">${candles.length} bougies</span>
+        </div>
+        <div id="lw-chart-container" data-symbol="${safeText(sym)}" style="width:100%;height:260px;position:relative;"></div>
       </div>`;
+  }
+
+  function initCandlestickChart() {
+    const container = document.getElementById("lw-chart-container");
+    if (!container || !window.LightweightCharts) return;
+    const d = state.detail;
+    if (!d || !Array.isArray(d.candles) || !d.candles.length) return;
+
+    const isLight = !!state.settings.lightTheme;
+    const textColor  = isLight ? "#555" : "#8899aa";
+    const gridColor  = isLight ? "#ebebeb" : "#141928";
+    const borderColor = isLight ? "#d0d0d0" : "#1e2435";
+
+    container.innerHTML = "";
+
+    const chart = LightweightCharts.createChart(container, {
+      width: container.clientWidth,
+      height: 260,
+      layout: { background: { type: "solid", color: "transparent" }, textColor, fontSize: 11 },
+      grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
+      crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+      rightPriceScale: { borderColor, scaleMargins: { top: 0.08, bottom: 0.04 } },
+      timeScale: { borderColor, timeVisible: state.chartTimeframe !== "1d", secondsVisible: false },
+      handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+      handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: false },
+    });
+
+    const candleSeries = chart.addCandlestickSeries({
+      upColor: "#26a69a", downColor: "#ef5350",
+      borderVisible: false,
+      wickUpColor: "#26a69a", wickDownColor: "#ef5350",
+    });
+
+    const isDaily = state.chartTimeframe === "1d";
+    const data = d.candles
+      .filter(c => c && c.open != null && c.high != null && c.low != null && c.close != null)
+      .map(c => {
+        let t = c.time;
+        if (typeof t === "string") {
+          t = isDaily ? t.substring(0, 10) : Math.floor(new Date(t).getTime() / 1000);
+        } else if (typeof t === "number" && t > 1e10) {
+          t = Math.floor(t / 1000);
+        }
+        return { time: t, open: Number(c.open), high: Number(c.high), low: Number(c.low), close: Number(c.close) };
+      })
+      .filter(c => c.time != null && Number.isFinite(c.open) && Number.isFinite(c.high))
+      .sort((a, b) => a.time > b.time ? 1 : -1);
+
+    if (!data.length) {
+      container.innerHTML = `<div class="empty-state">Données insuffisantes.</div>`;
+      return;
+    }
+
+    candleSeries.setData(data);
+    chart.timeScale().fitContent();
+
+    const ro = new ResizeObserver(() => chart.applyOptions({ width: container.clientWidth }));
+    ro.observe(container);
   }
 
   
@@ -3424,7 +3484,7 @@ function renderDetail() {
 
               <div class="card">
                 <div class="section-title"><span>Evolution recente</span><span>${Array.isArray(d.candles) && d.candles.length ? `${d.candles.length} bougies` : "historique recent"}</span></div>
-                ${renderChart(d.candles)}
+                ${renderChart(d.candles, d.symbol)}
               </div>
             </div>
 
@@ -3717,61 +3777,97 @@ function renderPositionRow(position) {
   const snap = p.analysisSnapshot || {};
   const exec = p.execution || {};
   const live = p.live || {};
-  const entryMode = trainingEntryModeMeta(p);
-  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
 
-  return `<div class="trade-row trade-card-row simple-trade-card">
-    <div class="trade-card-top">
-      <div>
-        <div class="trade-symbol">${safeText(p.symbol)}</div>
-        <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
+  const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const stopPrice  = Number(snap.stopLoss ?? p.stopLoss ?? 0);
+  const tpPrice    = Number(snap.takeProfit ?? p.takeProfit ?? 0);
+  const livePrice  = meta.livePrice ?? (Number.isFinite(entryPrice) ? entryPrice : null);
+
+  const hasEntry = Number.isFinite(entryPrice) && entryPrice > 0;
+  const hasStop  = stopPrice > 0;
+  const hasTP    = tpPrice > 0;
+  const hasLive  = livePrice != null;
+
+  const pnlPct = live?.pnlPct ?? meta.pnlPctLive ?? null;
+  const pnlEur = live?.pnl != null ? live.pnl * fxRateUsdToEur() : null;
+  const pnlPositive = pnlPct != null && pnlPct >= 0;
+
+  const stopDistPct  = hasStop && hasLive ? ((p.side === "long" ? livePrice - stopPrice : stopPrice - livePrice) / livePrice * 100) : null;
+  const tpDistPct    = hasTP  && hasLive ? ((p.side === "long" ? tpPrice - livePrice : livePrice - tpPrice) / livePrice * 100) : null;
+  const ratio        = displayRatioValue(p);
+
+  let progressPct = null;
+  if (hasStop && hasTP && hasLive) {
+    const range = Math.abs(tpPrice - stopPrice);
+    if (range > 0) {
+      const fill = p.side === "long"
+        ? (livePrice - stopPrice) / range
+        : (stopPrice - livePrice) / range;
+      progressPct = Math.min(100, Math.max(0, fill * 100));
+    }
+  }
+
+  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+  const ms = getMarketStatus(p.symbol, inferAssetClass(p.symbol, p.assetClass));
+
+  return `
+  <div class="pos-card">
+    <div class="pos-header">
+      <div class="pos-header-left">
+        <div class="pos-symbol">${safeText(p.symbol)}</div>
+        <div class="pos-name">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}${snap.horizon || p.horizon ? ` · ${safeText(snap.horizon || p.horizon)}` : ""}</div>
       </div>
-      <div class="trade-card-badges">
+      <div class="pos-header-right">
         ${badge(simpleSideLabel(p.side), p.side)}
-        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
-        ${entryMode ? badge(entryMode.label, entryMode.badgeClass) : ""}
-        ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
+        ${pnlPct != null
+          ? `<div class="pos-pnl ${pnlPositive ? "pos" : "neg"}">${pnlEur != null ? money(pnlEur, "EUR") + " · " : ""}${pct(pnlPct)}</div>`
+          : `<div class="pos-pnl neutral">P/L —</div>`}
       </div>
     </div>
 
-    <div class="trade-summary-line">${safeText(actionTradeSummary(meta))}</div>
-
-    <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Mode d'entree</span><br>${safeText(entryMode?.description || "selection principale")}</div>
-      <div><span class="muted">Score d'entree</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
-      <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
-      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
-      <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
-      <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
-      <div><span class="muted">Stop</span><br>${(Number(snap.stopLoss ?? p.stopLoss) > 0) ? priceDisplay(snap.stopLoss ?? p.stopLoss) : "—"}</div>
-      <div><span class="muted">Objectif</span><br>${(Number(snap.takeProfit ?? p.takeProfit) > 0) ? priceDisplay(snap.takeProfit ?? p.takeProfit) : "—"}</div>
-      <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
+    <div class="pos-prices">
+      <div class="pos-price-item">
+        <div class="pos-price-label">Entrée</div>
+        <div class="pos-price-val">${hasEntry ? priceDisplay(entryPrice) : "—"}</div>
+      </div>
+      <div class="pos-price-arrow">${hasLive && hasEntry ? (livePrice >= entryPrice ? "↑" : "↓") : "→"}</div>
+      <div class="pos-price-item">
+        <div class="pos-price-label">Actuel ${lastLive ? `· ${lastLive}` : ""}</div>
+        <div class="pos-price-val ${hasLive && hasEntry ? (livePrice >= entryPrice ? "live-up" : "live-down") : ""}">${hasLive ? priceDisplay(livePrice) : "—"}</div>
+      </div>
+      <div class="pos-market-badge">${renderMarketBadge(p.symbol, p.assetClass)}</div>
     </div>
 
-    <div class="muted" style="margin:14px 0 6px">Etat live</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
-      <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
-      <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
-      <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-      <div><span class="muted">Investi</span><br>${displayInvestedValue(p) == null ? "—" : money(displayInvestedValue(p) * fxRateUsdToEur(), "EUR")}</div>
-      <div style="grid-column:span 2"><span class="muted">Marche</span><br>${(() => { const ms = getMarketStatus(p.symbol, inferAssetClass(p.symbol, p.assetClass)); return `${renderMarketBadge(p.symbol, p.assetClass)} <span style="font-size:.78rem;color:var(--text-muted)">${safeText(ms.detail)}</span>`; })()}</div>
+    <div class="pos-levels">
+      <div class="pos-level">
+        <span class="pos-level-label">Stop</span>
+        <span class="pos-level-val">${hasStop ? priceDisplay(stopPrice) : "—"}</span>
+        ${stopDistPct != null ? `<span class="pos-level-dist ${stopDistPct < 2 ? "danger" : "warn"}">${num(stopDistPct, 1)}%</span>` : ""}
+      </div>
+      <div class="pos-level center">
+        <span class="pos-level-label">Ratio</span>
+        <span class="pos-level-val">${ratio != null ? num(ratio, 2) : "—"}</span>
+      </div>
+      <div class="pos-level right">
+        <span class="pos-level-label">Objectif</span>
+        <span class="pos-level-val">${hasTP ? priceDisplay(tpPrice) : "—"}</span>
+        ${tpDistPct != null ? `<span class="pos-level-dist green">+${num(tpDistPct, 1)}%</span>` : ""}
+      </div>
     </div>
 
-    <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
-      <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
-      <div style="grid-column: span 2"><span class="muted">Pourquoi</span><br>${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
+    ${progressPct != null ? `
+    <div class="pos-progress-track">
+      <div class="pos-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
+      <div class="pos-progress-marker" style="left:clamp(4px, calc(${progressPct.toFixed(1)}% - 6px), calc(100% - 16px))"></div>
     </div>
+    <div class="pos-progress-labels">
+      <span class="danger">Stop</span>
+      <span class="green">Objectif</span>
+    </div>` : ""}
 
-    <div class="trade-actions split">
-      <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
-      <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
+    <div class="pos-actions">
+      <button class="btn btn-secondary pos-btn" data-close-half="${safeText(p.id)}">Clôturer 50%</button>
+      <button class="btn btn-primary pos-btn" data-close-trade="${safeText(p.id)}">Clôturer</button>
     </div>
   </div>`;
 }
@@ -3803,6 +3899,14 @@ function displayHistoryEntryPrice(position) {
     if (text === "target" || text === "takeprofit" || text === "take_profit") return "objectif touche";
     return raw;
   }
+
+function tradeSource(p) {
+  if (p?.source === "algo") return "algo";
+  if (p?.source === "manual") return "manual";
+  const dec = String(p?.tradeDecision || p?.trade_decision || p?.analysisSnapshot?.decision || "").toLowerCase();
+  if (dec.includes("trade propose") || dec === "conseille") return "algo";
+  return "manual";
+}
 
 function renderHistoryRow(item) {
     const p = normalizePositionRecord(item);
@@ -4135,12 +4239,19 @@ function normalizePositionRecord(position){
     return num != null && num > 0 ? num : null;
   };
 
-  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? rawAnalysisSnapshot?.entry);
-  const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
-  const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
+  const quantityRaw  = positiveOrNull(position?.execution?.quantity  ?? position?.quantity);
+  const investedRaw  = positiveOrNull(position?.execution?.invested  ?? position?.invested);
+  const entryPriceRaw = positiveOrNull(
+    position?.execution?.entryPrice ??
+    position?.entry_price ??
+    position?.entryPrice ??
+    rawAnalysisSnapshot?.entry ??
+    (investedRaw != null && quantityRaw != null && quantityRaw > 0 ? investedRaw / quantityRaw : null)
+  );
+  const investedFinal = investedRaw
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(rawAnalysisSnapshot?.stopLoss ?? position?.stopLoss);
-  const takeProfitRaw = positiveOrNull(rawAnalysisSnapshot?.takeProfit ?? position?.takeProfit);
+  const stopLossRaw   = positiveOrNull(rawAnalysisSnapshot?.stopLoss  ?? position?.stop_loss  ?? position?.stopLoss);
+  const takeProfitRaw = positiveOrNull(rawAnalysisSnapshot?.takeProfit ?? position?.take_profit ?? position?.takeProfit);
   const ratioRaw = positiveOrNull(rawAnalysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
   const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice);
   const livePriceRaw = positiveOrNull(position?.live?.price);
@@ -4158,15 +4269,15 @@ function normalizePositionRecord(position){
     symbol: position.symbol || null,
     name: position.name || position.symbol || null,
     score: positiveOrNull(rawAnalysisSnapshot?.score ?? position?.score),
-    decision: rawAnalysisSnapshot?.decision || position?.tradeDecision || null,
-    trendLabel: rawAnalysisSnapshot?.trendLabel || position?.trendLabel || detectedTrendLabel(position?.direction || "neutral"),
+    decision: rawAnalysisSnapshot?.decision || position?.trade_decision || position?.tradeDecision || null,
+    trendLabel: rawAnalysisSnapshot?.trendLabel || position?.trend_label || position?.trendLabel || detectedTrendLabel(position?.direction || "neutral"),
     direction: rawAnalysisSnapshot?.direction || position?.direction || null,
     entry: entryPriceRaw,
     stopLoss: stopLossRaw,
     takeProfit: takeProfitRaw,
     ratio: ratioRaw,
     horizon: rawAnalysisSnapshot?.horizon || position?.horizon || null,
-    reason: rawAnalysisSnapshot?.reason || position?.tradeReason || null,
+    reason: rawAnalysisSnapshot?.reason || position?.trade_reason || position?.tradeReason || null,
     scoreBreakdown: rawAnalysisSnapshot?.scoreBreakdown || position?.scoreBreakdown || null,
     entryMode,
     sourceUsed,
@@ -4181,7 +4292,7 @@ function normalizePositionRecord(position){
       openedAt: position?.execution?.openedAt || position?.openedAt || null,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
-      invested: investedRaw,
+      invested: investedFinal,
       entryMode
     },
     live: {
@@ -4207,7 +4318,7 @@ function normalizePositionRecord(position){
     entryMode,
     entryPrice: entryPriceRaw,
     quantity: quantityRaw,
-    invested: investedRaw,
+    invested: investedFinal,
     exitPrice: exitPriceRaw,
     pnl: pnlRaw,
     pnlPct: pnlPctRaw,
@@ -4439,24 +4550,39 @@ function openPositionsRiskView() {
           <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Trades ouverts</span><span>${positions.length}</span></div>
             ${positions.length ? `
-              <div class="trade-table simplified-open-trades">
+              <div class="pos-list">
                 ${positions.map(renderPositionRow).join("")}
               </div>
             ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
           </div>
 
-          <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Trades clotures</span><span>${history.length}</span></div>
-            <div class="muted" style="margin-bottom:12px">Les lignes legacy sans vraie date de cloture, sans prix de sortie valide et sans fermeture exploitable sont maintenant masquees.</div>
-            ${history.length ? `
-              <div class="trade-table simplified-history">
+          ${(() => {
+            const algoHistory   = history.filter(p => tradeSource(p) === "algo");
+            const manualHistory = history.filter(p => tradeSource(p) === "manual");
+            function historyTable(rows) {
+              return `<div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Resultat</div><div>Entree</div><div>Sortie</div><div>P/L</div><div>Source / cloture</div>
+                  <div>Actif</div><div>Sens</div><div>Résultat</div><div>Entrée</div><div>Sortie</div><div>P/L</div><div>Clôture</div>
                 </div>
-                ${history.map(renderHistoryRow).join("")}
+                ${rows.map(renderHistoryRow).join("")}
+              </div>`;
+            }
+            return `
+              <div class="card" style="margin-top:18px">
+                <div class="section-title">
+                  <span>Historique — Algo <span class="badge">${algoHistory.length}</span></span>
+                  ${algoHistory.length ? `<button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" data-clear-history="algo">Vider</button>` : ""}
+                </div>
+                ${algoHistory.length ? historyTable(algoHistory) : `<div class="empty-state">Aucun trade algo cloture.</div>`}
               </div>
-            ` : `<div class="empty-state">Aucun trade cloture pour le moment.</div>`}
-          </div>
+              <div class="card" style="margin-top:14px">
+                <div class="section-title">
+                  <span>Historique — Manuel <span class="badge">${manualHistory.length}</span></span>
+                  ${manualHistory.length ? `<button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" data-clear-history="manual">Vider</button>` : ""}
+                </div>
+                ${manualHistory.length ? historyTable(manualHistory) : `<div class="empty-state">Aucun trade manuel cloture.</div>`}
+              </div>`;
+          })()}
           ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
         `}
       </div>`;
@@ -4787,6 +4913,7 @@ function renderMain() {
     applyThemeMode();
     bindEvents();
     syncDisplayedScores();
+    if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
   }
 
   function bindEvents() {
@@ -4812,6 +4939,26 @@ function renderMain() {
 
     app.querySelectorAll("[data-refresh='opportunities']").forEach(el => {
       el.addEventListener("click", () => loadOpportunities(true));
+    });
+
+    app.querySelectorAll("[data-chart-tf]").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const tf = btn.getAttribute("data-chart-tf");
+        if (!tf || !state.detail?.symbol) return;
+        state.chartTimeframe = tf;
+        app.querySelectorAll("[data-chart-tf]").forEach(b => b.classList.toggle("active", b === btn));
+        const container = document.getElementById("lw-chart-container");
+        if (container) container.innerHTML = `<div class="chart-loading">Chargement…</div>`;
+        const limit = tf === "1d" ? 90 : 60;
+        try {
+          const res = await api(`/api/candles/${encodeURIComponent(state.detail.symbol)}?timeframe=${tf}&limit=${limit}`);
+          const candles = Array.isArray(res?.data) ? res.data : [];
+          if (state.detail) state.detail.candles = candles;
+          initCandlestickChart();
+        } catch {
+          if (container) container.innerHTML = `<div class="empty-state">Données non disponibles pour ce délai.</div>`;
+        }
+      });
     });
 
     app.querySelectorAll(".opp-row[data-symbol], .ai-card[data-symbol]").forEach(el => {
@@ -4852,6 +4999,18 @@ function renderMain() {
 
     app.querySelectorAll("[data-close-half]").forEach(el => {
       el.addEventListener("click", () => partialClosePosition(el.getAttribute("data-close-half"), 50));
+    });
+
+    app.querySelectorAll("[data-clear-history]").forEach(el => {
+      el.addEventListener("click", () => {
+        const src = el.getAttribute("data-clear-history");
+        const label = src === "algo" ? "algo" : "manuel";
+        if (!confirm(`Supprimer tout l'historique ${label} ? Cette action est irréversible.`)) return;
+        state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
+        persistTradesState();
+        syncTradesToSupabase().catch(() => {});
+        render();
+      });
     });
 
     app.querySelectorAll("[data-reset-training-capital]").forEach(el => {
