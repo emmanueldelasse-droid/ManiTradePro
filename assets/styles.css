@@ -490,6 +490,24 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
   .trade-actions.split{justify-content:stretch;flex-direction:column}
 }
 
+/* ── Market status + class stats ────────────────────── */
+.market-status-pill{display:inline-flex;align-items:center;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:20px;margin-left:6px}
+.market-status-pill.open{background:rgba(15,159,104,.15);color:#0f9f68}
+.market-status-pill.closed{background:rgba(212,79,79,.12);color:#d44f4f}
+.class-stats-wrap{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+.class-stat-block{border-radius:14px;padding:14px;border:1px solid var(--border-subtle)}
+.class-stat-block.crypto{border-color:rgba(247,147,26,.25);background:rgba(247,147,26,.04)}
+.class-stat-block.stock{border-color:rgba(59,130,246,.2);background:rgba(59,130,246,.04)}
+.class-stat-header{font-size:.78rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.class-stat-block.crypto .class-stat-header{color:#f7931a}
+.class-stat-block.stock .class-stat-header{color:#3b82f6}
+.class-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.trade-context-pill{display:inline-block;font-size:.72rem;font-weight:600;padding:3px 10px;border-radius:20px;margin:6px 0 2px}
+.trade-context-pill.crypto{background:rgba(247,147,26,.15);color:#f7931a}
+.trade-context-pill.stock{background:rgba(59,130,246,.12);color:#3b82f6}
+.class-crypto-lbl{color:#f7931a !important}
+.class-stock-lbl{color:#3b82f6 !important}
+
 /* ── AI Insight cards (journal + priority) ───────────── */
 .ai-insight-card{display:flex;flex-direction:column;gap:12px;padding-top:4px}
 .ai-insight-resume{font-size:.92rem;line-height:1.55;color:var(--text-primary);padding:10px 12px;background:var(--bg-elevated);border-radius:10px;border:1px solid var(--border-subtle)}

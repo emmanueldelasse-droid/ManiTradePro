@@ -1220,23 +1220,33 @@ function renderTradeConfirmModal() {
   const plan = currentTradePlan() || {};
   const side = state.tradeConfirm?.side || plan?.side || null;
   const entry = plan?.entry ?? d?.price ?? null;
-  const quantity = entry > 500 ? 1 : entry > 50 ? 2 : 10;
+  const isCrypto = isCryptoSymbol(d?.symbol);
+  const wallet = trainingWallet();
+  const capitalUsd = (wallet.availableEur || 1000) / (state.market.eurusdRate || 0.92);
+  const stopPct = (plan?.stopLoss != null && entry) ? Math.abs(entry - plan.stopLoss) / entry : (isCrypto ? 0.04 : 0.02);
+  const riskUsd = capitalUsd * 0.01;
+  const rawQty = stopPct > 0 ? riskUsd / (entry * stopPct) : (entry > 500 ? 1 : entry > 50 ? 2 : 10);
+  const quantity = isCrypto ? Math.max(0.0001, parseFloat(rawQty.toFixed(entry > 10000 ? 4 : 3))) : Math.max(1, Math.round(rawQty));
   const invested = (Number(entry) || 0) * quantity;
+  const riskAmount = invested * stopPct;
   const title = state.tradeConfirm?.mode === "recommended" ? "Confirmer le trade propose" : "Confirmer le trade manuel";
   const reason = state.tradeConfirm?.mode === "recommended"
     ? (plan?.reason || "Le moteur propose ce setup.")
     : "Trade manuel d'entrainement depuis la fiche actif.";
+  const contextLabel = isCrypto ? "Crypto · volatilite elevee · stop ~" + num(stopPct * 100, 1) + "%" : "Action/ETF · stop ~" + num(stopPct * 100, 1) + "%";
 
   return `
     <div class="modal-backdrop" data-cancel-trade-confirm style="position:fixed;inset:0;background:rgba(3,8,20,.72);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px">
       <div class="card" style="width:min(560px,100%);padding:18px 18px 16px;border:1px solid rgba(255,255,255,.12)" onclick="event.stopPropagation()">
         <div class="section-title"><span>${safeText(title)}</span><span>${safeText(d?.symbol || "—")}</span></div>
+        <div class="trade-context-pill ${isCrypto ? "crypto" : "stock"}">${safeText(contextLabel)}</div>
         <div class="kv" style="margin-top:10px">
           <div class="muted">Actif</div><div>${safeText(d?.symbol || "—")} · ${safeText(d?.name || "")}</div>
           <div class="muted">Sens</div><div>${safeText(simpleSideLabel(side || "long"))}</div>
           <div class="muted">Entree</div><div>${entry != null ? priceDisplay(entry) : "—"}</div>
           <div class="muted">Quantite</div><div>${quantity}</div>
           <div class="muted">Investi</div><div>${entry != null ? priceDisplay(invested) : "—"}</div>
+          <div class="muted">Risque (1%)</div><div class="negative">~${priceDisplay(riskUsd)} USD</div>
           <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
           <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
           <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
@@ -1565,9 +1575,12 @@ function confirmTradeFromModal() {
     state.journalAnalysis = null;
     render();
     try {
+      const norm = p => normalizePositionRecord(p);
       const result = await apiPost("/api/ai/journal-analysis", {
-        history: history.map(p => normalizePositionRecord(p)),
-        positions: state.trades.positions.map(p => normalizePositionRecord(p))
+        history: history.map(norm),
+        positions: state.trades.positions.map(norm),
+        cryptoHistory: history.filter(p => isCryptoSymbol(p.symbol)).map(norm),
+        stockHistory: history.filter(p => !isCryptoSymbol(p.symbol)).map(norm)
       });
       state.journalAnalysis = result?.data || null;
     } catch(e) {
@@ -1980,6 +1993,37 @@ function closeTrainingTrade(id, livePrice = null) {
       profitFactor: grossLossAbs > 0 ? grossWin / grossLossAbs : (grossWin > 0 ? 999 : null),
       wallet
     };
+  }
+
+  function trainingStatsByClass(isCrypto) {
+    const filter = s => isCrypto ? isCryptoSymbol(s) : !isCryptoSymbol(s);
+    const positions = state.trades.positions.filter(p => filter(p.symbol));
+    const history = state.trades.history.filter(p => filter(p.symbol));
+    const wins = history.filter(t => Number(t.pnl || 0) > 0);
+    const losses = history.filter(t => Number(t.pnl || 0) < 0);
+    const grossWin = wins.reduce((s, t) => s + Number(t.pnl || 0), 0);
+    const grossLossAbs = Math.abs(losses.reduce((s, t) => s + Number(t.pnl || 0), 0));
+    const realized = history.reduce((s, t) => s + Number(t.pnl || 0), 0);
+    return {
+      openCount: positions.length,
+      closedCount: history.length,
+      realizedEur: realized * fxRateUsdToEur(),
+      winRate: history.length ? (wins.length / history.length) * 100 : null,
+      profitFactor: grossLossAbs > 0 ? grossWin / grossLossAbs : (grossWin > 0 ? 999 : null),
+    };
+  }
+
+  function isStockMarketOpen() {
+    const utcMin = new Date().getUTCHours() * 60 + new Date().getUTCMinutes();
+    return utcMin >= 8 * 60 && utcMin < 21 * 60;
+  }
+
+  function marketStatusBadge() {
+    const cryptoOpen = true;
+    const stockOpen = isStockMarketOpen();
+    return `<span class="market-status-pill ${stockOpen ? "open" : "closed"}">
+      ${stockOpen ? "Marchés ouverts" : "Marchés fermés"}
+    </span><span class="market-status-pill open">Crypto 24/7</span>`;
   }
 
   
@@ -4569,6 +4613,8 @@ function openPositionsRiskView() {
             <div class="ai-stat"><div class="ai-stat-val">${a.stats.avgLossUsd!=null?"$"+num(a.stats.avgLossUsd,2):"—"}</div><div class="ai-stat-lbl">Perte moy</div></div>
             <div class="ai-stat"><div class="ai-stat-val">${a.stats.expectancy!=null?"$"+num(a.stats.expectancy,2):"—"}</div><div class="ai-stat-lbl">Esperance</div></div>
           </div>` : ""}
+          ${(a.crypto?.resume||a.crypto?.points?.length) ? `<div class="ai-insight-section"><div class="ai-insight-label class-crypto-lbl">Crypto</div>${a.crypto.resume?`<div class="ai-insight-item">${safeText(a.crypto.resume)}</div>`:""}${(a.crypto.points||[]).map(p=>`<div class="ai-insight-item">· ${safeText(p)}</div>`).join("")}</div>` : ""}
+          ${(a.stocks?.resume||a.stocks?.points?.length) ? `<div class="ai-insight-section"><div class="ai-insight-label class-stock-lbl">Actions / ETF</div>${a.stocks.resume?`<div class="ai-insight-item">${safeText(a.stocks.resume)}</div>`:""}${(a.stocks.points||[]).map(p=>`<div class="ai-insight-item">· ${safeText(p)}</div>`).join("")}</div>` : ""}
         </div>` : `<div class="empty-state">Lance l'analyse pour identifier tes biais de trading.</div>`}
     </div>`;
   }
@@ -4612,6 +4658,28 @@ function openPositionsRiskView() {
             <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
             <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
           </div>
+
+          ${(() => {
+            const crypto = trainingStatsByClass(true);
+            const stocks = trainingStatsByClass(false);
+            function classStatCard(label, cls, s) {
+              if (s.openCount + s.closedCount === 0) return "";
+              const pnlClass = s.realizedEur > 0 ? "positive" : s.realizedEur < 0 ? "negative" : "";
+              return `<div class="class-stat-block ${cls}">
+                <div class="class-stat-header">${label} ${marketStatusBadge().includes("open") && cls === "stock" ? '<span class="market-status-pill ' + (isStockMarketOpen() ? "open" : "closed") + '">' + (isStockMarketOpen() ? "ouvert" : "ferme") + '</span>' : ""}</div>
+                <div class="class-stat-row">
+                  <div class="stat-card"><div class="stat-label">P/L realise</div><div class="stat-value ${pnlClass}">${money(s.realizedEur, "EUR")}</div></div>
+                  <div class="stat-card"><div class="stat-label">Trades</div><div class="stat-value">${s.closedCount}</div></div>
+                  <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-value">${s.winRate != null ? num(s.winRate, 0) + "%" : "—"}</div></div>
+                  <div class="stat-card"><div class="stat-label">Profit factor</div><div class="stat-value">${s.profitFactor != null ? num(Math.min(s.profitFactor, 99), 2) : "—"}</div></div>
+                </div>
+              </div>`;
+            }
+            return `<div class="class-stats-wrap">
+              ${classStatCard("Crypto", "crypto", crypto)}
+              ${classStatCard("Actions / ETF", "stock", stocks)}
+            </div>`;
+          })()}
 
           <div class="grid trades-stats" style="margin-top:14px">
             <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
@@ -5364,8 +5432,9 @@ function renderMain() {
           refreshOpenTradesLive().catch(() => {});
         }
         if (state.settings.autoRefreshOpportunities && !state.opportunitiesRefreshing) {
-          const intervalMs = Number(state.settings.autoScanIntervalMin || 5) * 60 * 1000;
-          if (Date.now() - (state.opportunitiesLastGoodAt || 0) >= intervalMs) {
+          const stockOpen = isStockMarketOpen();
+          const intervalMin = stockOpen ? Number(state.settings.autoScanIntervalMin || 5) : 15;
+          if (Date.now() - (state.opportunitiesLastGoodAt || 0) >= intervalMin * 60 * 1000) {
             loadOpportunities(false).catch(() => {});
           }
         }

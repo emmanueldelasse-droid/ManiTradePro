@@ -3991,17 +3991,20 @@ async function handleAiJournalAnalysis(request, env) {
   if (!payload) return fail("Invalid payload", "error", 400);
   if (!env.CLAUDE_API_KEY) return fail("CLAUDE_API_KEY manquant", "error", 503);
   const history = Array.isArray(payload.history) ? payload.history.slice(0, 50) : [];
-  if (history.length < 3) return ok({ resume: "Pas assez de trades pour analyser (minimum 3).", biais: [], patterns: [], forces: [], recommandations: ["Ferme quelques trades pour obtenir une analyse."], stats: null }, "local_fallback", nowIso(), "recent", null);
+  if (history.length < 3) return ok({ resume: "Pas assez de trades pour analyser (minimum 3).", biais: [], patterns: [], forces: [], recommandations: ["Ferme quelques trades pour obtenir une analyse."], stats: null, crypto: null, stocks: null }, "local_fallback", nowIso(), "recent", null);
   const positions = Array.isArray(payload.positions) ? payload.positions.slice(0, 10) : [];
-  const prompt = `Tu es un coach de trading. Analyse ce journal et identifie les biais comportementaux, patterns et axes d'amélioration. Réponds UNIQUEMENT en JSON valide, sans markdown.
+  const cryptoHistory = Array.isArray(payload.cryptoHistory) ? payload.cryptoHistory.slice(0, 25) : [];
+  const stockHistory = Array.isArray(payload.stockHistory) ? payload.stockHistory.slice(0, 25) : [];
+  const tradeRow = t => ({ symbol: t.symbol, side: t.side, result: t.result, pnlUsd: t.pnlUsd, entryPrice: t.entryPrice, exitPrice: t.exitPrice, stopLoss: t.stopLoss, takeProfit: t.takeProfit, source: t.source, closedAt: t.closedAt });
+  const prompt = `Tu es un coach de trading. Analyse ce journal et identifie biais, patterns et axes d'amélioration. Distingue bien la crypto (marché 24/7, haute volatilité) des actions/ETF (heures de marché, moins volatile). Réponds UNIQUEMENT en JSON valide, sans markdown.
 
-Journal (${history.length} trades clôturés) :
-${JSON.stringify(history.map(t => ({ symbol: t.symbol, side: t.side, result: t.result, pnlUsd: t.pnlUsd, entryPrice: t.entryPrice, exitPrice: t.exitPrice, stopLoss: t.stopLoss, takeProfit: t.takeProfit, source: t.source, closedAt: t.closedAt })))}
+Journal global (${history.length} trades) : ${JSON.stringify(history.map(tradeRow))}
+Crypto uniquement (${cryptoHistory.length}) : ${JSON.stringify(cryptoHistory.map(tradeRow))}
+Actions/ETF uniquement (${stockHistory.length}) : ${JSON.stringify(stockHistory.map(tradeRow))}
+Positions ouvertes : ${JSON.stringify(positions.map(p => ({ symbol: p.symbol, side: p.side, pnlUsd: p.pnlUsd })))}
 
-Positions ouvertes (${positions.length}) : ${JSON.stringify(positions.map(p => ({ symbol: p.symbol, side: p.side, pnlUsd: p.pnlUsd })))}
-
-JSON attendu (champs exacts) :
-{"resume":"string","biais":["string"],"patterns":["string"],"forces":["string"],"recommandations":["string"],"stats":{"winRate":number,"avgWinUsd":number,"avgLossUsd":number,"expectancy":number}}`;
+JSON attendu :
+{"resume":"string","biais":["string"],"patterns":["string"],"forces":["string"],"recommandations":["string"],"stats":{"winRate":number,"avgWinUsd":number,"avgLossUsd":number,"expectancy":number},"crypto":{"resume":"string ou null","points":["string"]},"stocks":{"resume":"string ou null","points":["string"]}}`;
   try {
     const res = await fetchWithRetry("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": env.CLAUDE_API_KEY, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 650, temperature: 0.2, messages: [{ role: "user", content: prompt }] }) }, { timeoutMs: 20000, maxRetries: 1 });
     if (!res.ok) return fail(`IA HTTP ${res.status}`, "error", 502);
