@@ -894,6 +894,19 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 }
 .app-shell.theme-light .positive{color:#0f9f68}
 .app-shell.theme-light .negative{color:#d44f4f}
+.app-shell.theme-light .dashboard-signal-shell{
+  background:rgba(255,255,255,.88);
+  border-color:rgba(0,0,0,.08);
+  backdrop-filter:blur(8px);
+}
+.app-shell.theme-light .dashboard-signal-main,
+.app-shell.theme-light .dashboard-signal-copy{
+  color:#0f172a;
+}
+.app-shell.theme-light .dashboard-signal-highlight{
+  background:linear-gradient(180deg,rgba(0,180,130,.06),rgba(0,180,130,.02));
+  border-color:rgba(0,180,130,.15);
+}
 
 
 
