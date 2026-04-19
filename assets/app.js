@@ -618,9 +618,10 @@
       const remoteHasMoreHistory = remoteHistoryCount > localHistoryCount;
       const localHasMorePositions = localPositionsCount > remotePositionsCount;
       const localHasMoreHistory = localHistoryCount > remoteHistoryCount;
+      const recentWipe = meta.lastWipedAt && (Date.now() - meta.lastWipedAt) < 300000;
 
-      if (remoteHasMorePositions || remoteHasMoreHistory || !hasLocalTrades) {
-        // Supabase a plus de données → toujours prioritaire
+      if (!recentWipe && (remoteHasMorePositions || remoteHasMoreHistory || !hasLocalTrades)) {
+        // Supabase a plus de données → prioritaire (sauf si suppression récente côté local)
         state.trades.positions = remote.positions;
         state.trades.history = remote.history;
         saveTradesMeta({
@@ -5193,8 +5194,8 @@ function renderMain() {
         const label = src === "algo" ? "algo" : "manuel";
         if (!confirm(`Supprimer tout l'historique ${label} ? Cette action est irréversible.`)) return;
         state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
+        saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
-        syncTradesToSupabase().catch(() => {});
         render();
       });
     });
@@ -5203,8 +5204,8 @@ function renderMain() {
       el.addEventListener("click", () => {
         if (!confirm("Supprimer tout l'historique ? Cette action est irréversible.")) return;
         state.trades.history = [];
+        saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
-        syncTradesToSupabase().catch(() => {});
         render();
       });
     });
