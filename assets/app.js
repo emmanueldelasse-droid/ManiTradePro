@@ -1703,6 +1703,7 @@ function addTrainingTradeFromDetail(side) {
     name: d.name,
     assetClass: d.assetClass,
     side,
+    source: "manual",
     quantity,
     entryPrice: d.price,
     invested: investedUsd,
@@ -1766,6 +1767,7 @@ function createRecommendedTrade() {
     name: d.name,
     assetClass: d.assetClass,
     side: plan.side,
+    source: "algo",
     quantity,
     entryPrice: plan.entry,
     invested: investedUsd,
@@ -3898,6 +3900,14 @@ function displayHistoryEntryPrice(position) {
     return raw;
   }
 
+function tradeSource(p) {
+  if (p?.source === "algo") return "algo";
+  if (p?.source === "manual") return "manual";
+  const dec = String(p?.tradeDecision || p?.trade_decision || p?.analysisSnapshot?.decision || "").toLowerCase();
+  if (dec.includes("trade propose") || dec === "conseille") return "algo";
+  return "manual";
+}
+
 function renderHistoryRow(item) {
     const p = normalizePositionRecord(item);
     const scoreValue = displayScoreValue(p);
@@ -4546,18 +4556,33 @@ function openPositionsRiskView() {
             ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
           </div>
 
-          <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Trades clotures</span><span>${history.length}</span></div>
-            <div class="muted" style="margin-bottom:12px">Les lignes legacy sans vraie date de cloture, sans prix de sortie valide et sans fermeture exploitable sont maintenant masquees.</div>
-            ${history.length ? `
-              <div class="trade-table simplified-history">
+          ${(() => {
+            const algoHistory   = history.filter(p => tradeSource(p) === "algo");
+            const manualHistory = history.filter(p => tradeSource(p) === "manual");
+            function historyTable(rows) {
+              return `<div class="trade-table simplified-history">
                 <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Resultat</div><div>Entree</div><div>Sortie</div><div>P/L</div><div>Source / cloture</div>
+                  <div>Actif</div><div>Sens</div><div>Résultat</div><div>Entrée</div><div>Sortie</div><div>P/L</div><div>Clôture</div>
                 </div>
-                ${history.map(renderHistoryRow).join("")}
+                ${rows.map(renderHistoryRow).join("")}
+              </div>`;
+            }
+            return `
+              <div class="card" style="margin-top:18px">
+                <div class="section-title">
+                  <span>Historique — Algo <span class="badge">${algoHistory.length}</span></span>
+                  ${algoHistory.length ? `<button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" data-clear-history="algo">Vider</button>` : ""}
+                </div>
+                ${algoHistory.length ? historyTable(algoHistory) : `<div class="empty-state">Aucun trade algo cloture.</div>`}
               </div>
-            ` : `<div class="empty-state">Aucun trade cloture pour le moment.</div>`}
-          </div>
+              <div class="card" style="margin-top:14px">
+                <div class="section-title">
+                  <span>Historique — Manuel <span class="badge">${manualHistory.length}</span></span>
+                  ${manualHistory.length ? `<button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" data-clear-history="manual">Vider</button>` : ""}
+                </div>
+                ${manualHistory.length ? historyTable(manualHistory) : `<div class="empty-state">Aucun trade manuel cloture.</div>`}
+              </div>`;
+          })()}
           ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
         `}
       </div>`;
@@ -4974,6 +4999,18 @@ function renderMain() {
 
     app.querySelectorAll("[data-close-half]").forEach(el => {
       el.addEventListener("click", () => partialClosePosition(el.getAttribute("data-close-half"), 50));
+    });
+
+    app.querySelectorAll("[data-clear-history]").forEach(el => {
+      el.addEventListener("click", () => {
+        const src = el.getAttribute("data-clear-history");
+        const label = src === "algo" ? "algo" : "manuel";
+        if (!confirm(`Supprimer tout l'historique ${label} ? Cette action est irréversible.`)) return;
+        state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
+        persistTradesState();
+        syncTradesToSupabase().catch(() => {});
+        render();
+      });
     });
 
     app.querySelectorAll("[data-reset-training-capital]").forEach(el => {
