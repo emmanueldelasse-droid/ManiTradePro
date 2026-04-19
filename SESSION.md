@@ -6,25 +6,40 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | À REMPLIR |
-| **IA utilisée** | À REMPLIR (Claude / ChatGPT / Codex) |
+| **Dernière mise à jour** | 2026-04-19 |
+| **IA utilisée** | Claude (claude-sonnet-4-6) |
 | **Branche active** | main |
-| **Repo GitHub** : | emmanueldelasse-droid / [nom du repo ManiTradePro] |
-| **Déployé sur** | GitHub Pages |
+| **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
+| **Déployé sur** | GitHub Pages + Cloudflare Worker |
+| **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
 
 ---
 
 ## Stack technique
 - **Type** : PWA — iPhone + web, vanilla JS, zéro dépendances
-- **Bundle** : Tout en un seul fichier `app-bundle.js` (~5000 lignes)
-- **APIs** : Binance, Twelve Data (4 clés en rotation), Yahoo Finance, CoinGecko, Alpha Vantage, Finnhub, Claude AI
+- **Frontend** : `assets/app.js` (~4700 lignes) + `assets/styles.css`
+- **APIs marché** : Binance, Twelve Data (4 clés en rotation), Yahoo Finance, CoinGecko, Alpha Vantage, Finnhub, Claude AI
 - **Sync cross-device** : Supabase (dont quota Claude AI partagé)
-- **Proxy CORS** : Cloudflare Worker (pour Binance iOS Safari)
+- **Proxy CORS** : Cloudflare Worker `cloudflare-worker/worker.js` (pour Binance iOS Safari)
 - **EUR/USD** : Sourcé depuis Yahoo Finance `EURUSD=X` (PAS Binance EURUSDT — erreur systématique de 32% corrigée)
+- **Auth admin** : PIN → session token HMAC-SHA256 24h (depuis PR #16)
 
 ## Indicateurs du moteur d'analyse (8)
 ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volatilité
 → Score de risque 0–100
+
+## Clés localStorage
+| Clé | Usage |
+|-----|-------|
+| `mtp_session_v1` | Token de session admin (PIN auth) |
+| `mtp_settings_v1` | Paramètres utilisateur |
+| `mtp_training_positions_v1` | Positions en mode entraînement |
+| `mtp_training_history_v1` | Historique entraînement |
+| `mtp_algo_journal_v1` | Journal algo |
+| `mtp_budget_tracker_v1` | Suivi budget |
+| `mtp_detail_cache_v1` | Cache détails assets |
+| `mtp_opportunities_snapshot_v1` | Snapshot opportunités |
+| `mtp_training_capital_v1` | Capital entraînement |
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
@@ -32,55 +47,84 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 ---
 
 ## État actuel du projet
-<!-- ✏️ À mettre à jour à chaque fin de session -->
 
 ### Ce qui fonctionne
-- [ ] À compléter
+- [x] Dashboard avec carte prioritaire et liste d'opportunités filtrables
+- [x] Détail d'un asset avec score de risque, régime de marché, décision trade
+- [x] Mode entraînement (paper trading) avec capital virtuel et historique
+- [x] Analyse IA via Claude AI (review d'opportunité)
+- [x] Worker Cloudflare sécurisé — auth à deux niveaux (front / admin)
+- [x] **Auth PIN → session token 24h** (PR #16 mergée le 2026-04-19)
+  - POST `/api/session` → valide ADMIN_PIN, retourne token signé HMAC-SHA256
+  - Token stocké dans `mtp_session_v1`, envoyé en header `X-Session-Token`
+  - Modal PIN accessible depuis Réglages (une seule fois, auto-renouvellement)
+  - Bouton connect/disconnect dans Réglages
+- [x] Sync Supabase (optionnel, activable dans Réglages)
+- [x] Thème sombre premium
+- [x] Bandeau régime de marché (bull/bear/lateral)
+- [x] Seuils watchlist calibrés par type d'asset (crypto vs actions/ETF)
+- [x] Labels sécurité sur les cartes d'assets
 
 ### Ce qui est cassé / en cours
-- [ ] À compléter
+- [ ] Alertes de prix (non implémentées)
+- [ ] Graphiques en chandeliers (non implémentés)
+- [ ] Journal de trading dédié (partiellement via algo journal)
+- [ ] Rapports PDF hebdomadaires (non implémentés)
 
 ---
 
 ## Dernière session
-<!-- ✏️ Écraser à chaque nouvelle fin de session -->
 
-**Date** : À REMPLIR
-**IA** : À REMPLIR
+**Date** : 2026-04-19
+**IA** : Claude (claude-sonnet-4-6)
 
 ### Tâches accomplies
-- 
+- Création du système de continuité SESSION.md
+- Implémentation auth session PIN → token HMAC-SHA256 (PR #16, mergée)
+  - Worker : `createSessionToken` / `verifySessionToken` via `crypto.subtle`
+  - Worker : endpoint `POST /api/session`
+  - Worker : `requestHasAdminAccess` / `requireFrontAccess` / `requireAdminAccess` rendues async
+  - Frontend : modal PIN dans Réglages
+  - Frontend : `workerAdminHeaders()` préfère le session token
+  - Frontend : statut session + bouton connect/disconnect dans Réglages
+  - CSS : styles `modal-overlay`, `pin-modal`, `btn-primary/secondary`
 
 ### Bugs résolus
-- 
+- Authentification admin manuelle (paste token) → remplacée par login PIN one-shot
 
 ### Décisions techniques prises
-- 
+- `ADMIN_PIN` = mot de passe simple dans les secrets Cloudflare
+- `ADMIN_API_TOKEN` reste la clé de signature HMAC (ne pas confondre les deux)
+- Session token valable 24h, stocké en localStorage
 
-### Sections de app-bundle.js modifiées
-| Section / Ligne approx. | Changement |
-|------------------------|------------|
-| | |
+### Fichiers modifiés
+| Fichier | Changement |
+|---------|------------|
+| `assets/app.js` | +134 lignes — modal PIN, session state, workerAdminHeaders, statut Réglages |
+| `assets/styles.css` | +12 lignes — styles modal PIN |
+| `cloudflare-worker/worker.js` | +91 lignes — createSessionToken, verifySessionToken, POST /api/session, auth async |
 
 ---
 
 ## Prochaine étape prioritaire
-<!-- ✏️ La chose la plus importante à faire au prochain démarrage -->
 
-> **TODO #1** : À définir
+> **TODO #1** : Implémenter les **alertes de prix** — notification push (PWA) ou alerte in-app quand un asset dépasse un seuil configuré par l'utilisateur
 
 **Fonctionnalités planifiées (backlog)**
-- [ ] Alertes de prix
+- [ ] Alertes de prix (priorité 1)
 - [ ] Graphiques en chandeliers
-- [ ] Journal de trading
+- [ ] Journal de trading dédié (export CSV/PDF)
 - [ ] Rapports PDF hebdomadaires
+- [ ] Mode hors-ligne complet (cache SW)
 
 ---
 
 ## Contraintes de déploiement
-- Déploiement via **GitHub web UI uniquement** (pas de Git en local sur PC bureau)
-- Réseau corporate bloque les API externes
-- Tout doit rester dans `app-bundle.js` — pas de séparation en modules
+- Déploiement frontend via **GitHub web UI** ou push git (pas de CLI local sur PC bureau)
+- Déploiement worker via **Wrangler CLI** ou dashboard Cloudflare
+- Réseau corporate peut bloquer les API externes (tester depuis mobile)
+- Tout le frontend doit rester dans `assets/app.js` — pas de séparation en modules
+- `wrangler.toml` dans `cloudflare-worker/` configure le worker
 
 ---
 
@@ -88,4 +132,4 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 | Date | IA | Résumé |
 |------|----|--------|
-| | | |
+| 2026-04-19 | Claude sonnet-4-6 | Création SESSION.md + PR #16 auth PIN session token |
