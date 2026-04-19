@@ -9,7 +9,8 @@
     detailCache: "mtp_detail_cache_v1",
     opportunitiesSnapshot: "mtp_opportunities_snapshot_v1",
     trainingCapital: "mtp_training_capital_v1",
-    session: "mtp_session_v1"
+    session: "mtp_session_v1",
+    priceAlerts: "mtp_price_alerts_v1"
   };
 
   const TRADE_STORAGE = {
@@ -98,14 +99,17 @@
       open: false,
       mode: null,
       side: null
-    }
+    },
+    priceAlerts: [],
+    alertModal: { open: false, symbol: null, name: null, currentPrice: null },
+    alertToast: null
   };
 
   const app = document.getElementById("app");
   const navItems = [
     ["dashboard", "Accueil", "⌂"],
     ["opportunities", "Opportunites", "◎"],
-    ["news", "News", "◌"],
+    ["alerts", "Alertes", "◉"],
     ["portfolio", "Mes trades", "◫"],
     ["settings", "Reglages", "◦"]
   ];
@@ -1322,6 +1326,88 @@ function confirmTradeFromModal() {
     });
   }
 
+  // =========================
+  // price alerts
+  // =========================
+  function loadPriceAlerts() {
+    return readJson(STORAGE_KEYS.priceAlerts, []);
+  }
+
+  function savePriceAlerts() {
+    writeJson(STORAGE_KEYS.priceAlerts, state.priceAlerts);
+  }
+
+  function addPriceAlert(symbol, name, condition, targetPrice, currentPrice) {
+    state.priceAlerts.push({
+      id: Date.now() + Math.random(),
+      symbol: String(symbol).toUpperCase(),
+      name: name || symbol,
+      condition,
+      targetPrice: Number(targetPrice),
+      currentPriceAtCreation: currentPrice != null ? Number(currentPrice) : null,
+      active: true,
+      createdAt: Date.now(),
+      triggeredAt: null
+    });
+    savePriceAlerts();
+  }
+
+  function removePriceAlert(id) {
+    state.priceAlerts = state.priceAlerts.filter(a => a.id !== id);
+    savePriceAlerts();
+  }
+
+  function clearTriggeredAlerts() {
+    state.priceAlerts = state.priceAlerts.filter(a => a.active);
+    savePriceAlerts();
+  }
+
+  function showAlertToast(title, body) {
+    state.alertToast = { title, body, shownAt: Date.now() };
+    render();
+    setTimeout(() => {
+      if (state.alertToast && (Date.now() - state.alertToast.shownAt) >= 4500) {
+        state.alertToast = null;
+        render();
+      }
+    }, 5000);
+  }
+
+  function fireAlertNotification(alert, currentPrice) {
+    const dir = alert.condition === "above" ? "au-dessus de" : "en-dessous de";
+    const title = `Alerte ${alert.symbol}`;
+    const body = `${alert.symbol} est ${dir} ${priceDisplay(alert.targetPrice)} (actuel\u00a0: ${priceDisplay(currentPrice)})`;
+    if ("Notification" in window && Notification.permission === "granted") {
+      try { new Notification(title, { body, icon: "/ManiTradePro/icons/icon-192.png" }); } catch (_) {}
+    }
+    showAlertToast(title, body);
+  }
+
+  function checkPriceAlerts() {
+    if (!state.priceAlerts.length) return;
+    let changed = false;
+    state.priceAlerts.forEach(alert => {
+      if (!alert.active) return;
+      const item = (state.opportunities || []).find(o => String(o.symbol || "").toUpperCase() === alert.symbol);
+      if (!item || item.price == null) return;
+      const triggered = alert.condition === "above" ? item.price >= alert.targetPrice : item.price <= alert.targetPrice;
+      if (triggered) {
+        alert.active = false;
+        alert.triggeredAt = Date.now();
+        changed = true;
+        fireAlertNotification(alert, item.price);
+      }
+    });
+    if (changed) savePriceAlerts();
+  }
+
+  async function requestNotificationsPermission() {
+    if (!("Notification" in window)) return "unsupported";
+    if (Notification.permission === "granted") return "granted";
+    if (Notification.permission === "denied") return "denied";
+    return await Notification.requestPermission();
+  }
+
   function setOpportunities(rows) {
     const prepared = Array.isArray(rows) ? backfillOpportunities(rows).map(normalizeOpportunity) : [];
     state.opportunities = prepared;
@@ -1330,6 +1416,7 @@ function confirmTradeFromModal() {
     applyFilter();
     state.opportunitiesFetchedAt = Date.now();
     state.opportunitiesLastGoodAt = state.opportunitiesFetchedAt;
+    checkPriceAlerts();
   }
 
   // =========================
@@ -3247,6 +3334,9 @@ function renderDetail() {
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
                 <div style="font-size:.78rem;color:var(--text-muted);margin-top:6px">${safeText(getMarketStatus(d.symbol, d.assetClass).detail)}</div>
+                <div style="margin-top:10px">
+                  <button class="btn btn-secondary" style="font-size:.8rem" data-open-alert-modal="${safeText(d.symbol)}" data-alert-name="${safeText(d.name || d.symbol)}" data-alert-price="${d.price != null ? d.price : ""}">+ Alerte prix</button>
+                </div>
                 ${renderTradePlanHero(d, currentTradePlan())}
                 ${(() => {
                   const plan = currentTradePlan();
@@ -4362,6 +4452,83 @@ function openPositionsRiskView() {
       </div>`;
   }
 
+  function renderAlerts() {
+    const active = state.priceAlerts.filter(a => a.active);
+    const triggered = state.priceAlerts.filter(a => !a.active);
+    const notifStatus = "Notification" in window ? Notification.permission : "unsupported";
+
+    function alertRow(a) {
+      const dir = a.condition === "above" ? "Au-dessus de" : "En-dessous de";
+      const ago = a.triggeredAt
+        ? `Declenche ${Math.round((Date.now() - a.triggeredAt) / 60000)} min`
+        : `Cree ${Math.round((Date.now() - a.createdAt) / 60000)} min ago`;
+      return `
+        <div class="alert-row ${a.active ? "" : "alert-triggered"}">
+          <div class="alert-row-info">
+            <div class="alert-symbol">${safeText(a.symbol)}</div>
+            <div class="alert-cond">${dir} ${priceDisplay(a.targetPrice)}</div>
+            <div class="alert-meta">${safeText(a.name)} · ${ago}</div>
+          </div>
+          ${a.active ? `<button class="btn btn-secondary alert-remove-btn" data-remove-alert="${a.id}">Suppr.</button>` : `<span class="badge badge-positive">OK</span>`}
+        </div>`;
+    }
+
+    return `
+      <div class="screen">
+        <div class="section-title"><span>Alertes de prix</span><span>${active.length} active${active.length !== 1 ? "s" : ""}</span></div>
+
+        ${notifStatus !== "granted" ? `
+          <div class="info-box" style="margin-bottom:14px">
+            ${notifStatus === "denied"
+              ? "Notifications bloquees par le navigateur. Autorise-les dans les reglages de ton navigateur pour recevoir les alertes."
+              : "Active les notifications pour recevoir une alerte meme si l'appli est en arriere-plan."}
+            ${notifStatus === "default" ? `<button class="btn btn-primary" style="margin-top:8px" data-request-notif-perm>Activer les notifications</button>` : ""}
+          </div>` : ""}
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title"><span>Alertes actives</span><span>${active.length}</span></div>
+          ${active.length ? active.map(alertRow).join("") : `<div class="empty-state">Aucune alerte active. Ouvre la fiche d'un actif pour en creer une.</div>`}
+        </div>
+
+        ${triggered.length ? `
+          <div class="card">
+            <div class="section-title"><span>Historique</span><span>${triggered.length}</span></div>
+            ${triggered.map(alertRow).join("")}
+            <button class="btn btn-secondary" style="margin-top:12px;width:100%" data-clear-triggered-alerts>Effacer l'historique</button>
+          </div>` : ""}
+      </div>`;
+  }
+
+  function renderAlertModal() {
+    if (!state.alertModal.open) return "";
+    const { symbol, name, currentPrice } = state.alertModal;
+    return `
+      <div class="modal-overlay" id="alert-modal-overlay">
+        <div class="modal-box pin-modal">
+          <div class="modal-title">Alerte prix — ${safeText(symbol)}</div>
+          <div class="modal-desc">${safeText(name)}${currentPrice != null ? ` · Prix actuel\u00a0: ${priceDisplay(currentPrice)}` : ""}</div>
+          <select class="setting-input" id="alert-condition" style="margin-bottom:10px">
+            <option value="above">Au-dessus de</option>
+            <option value="below">En-dessous de</option>
+          </select>
+          <input class="setting-input pin-input" type="number" id="alert-target-price" placeholder="Prix cible (USD)" step="any" ${currentPrice != null ? `value="${currentPrice}"` : ""}>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" data-alert-cancel>Annuler</button>
+            <button class="btn btn-primary" data-alert-submit>Creer l'alerte</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function renderAlertToast() {
+    if (!state.alertToast) return "";
+    return `
+      <div class="alert-toast">
+        <div class="alert-toast-title">${safeText(state.alertToast.title)}</div>
+        <div class="alert-toast-body">${safeText(state.alertToast.body)}</div>
+      </div>`;
+  }
+
   function renderSettings() {
     return `
       <div class="screen">
@@ -4477,6 +4644,7 @@ function renderMain() {
       case "news": return renderNews();
       case "asset-detail": return renderDetail();
       case "portfolio": return renderPortfolio();
+      case "alerts": return renderAlerts();
       case "settings": return renderSettings();
       default: return renderDashboard();
     }
@@ -4602,6 +4770,8 @@ function renderMain() {
         ${renderBottomNav()}
         ${renderTradeConfirmModal()}
         ${renderPinModal()}
+        ${renderAlertModal()}
+        ${renderAlertToast()}
       </div>
     `;
     applyThemeMode();
@@ -4767,9 +4937,86 @@ function renderMain() {
       });
     });
 
+    // Alert modal open
+    app.querySelectorAll("[data-open-alert-modal]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const symbol = el.getAttribute("data-open-alert-modal");
+        const name = el.getAttribute("data-alert-name") || symbol;
+        const rawPrice = el.getAttribute("data-alert-price");
+        const currentPrice = rawPrice ? Number(rawPrice) : null;
+        state.alertModal = { open: true, symbol, name, currentPrice };
+        render();
+        const inp = document.getElementById("alert-target-price");
+        if (inp) inp.focus();
+      });
+    });
+
+    // Alert modal cancel
+    app.querySelectorAll("[data-alert-cancel]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+        render();
+      });
+    });
+
+    // Alert modal submit
+    app.querySelectorAll("[data-alert-submit]").forEach(el => {
+      el.addEventListener("click", async () => {
+        const condEl = document.getElementById("alert-condition");
+        const priceEl = document.getElementById("alert-target-price");
+        if (!condEl || !priceEl) return;
+        const targetPrice = parseFloat(priceEl.value);
+        if (!targetPrice || isNaN(targetPrice) || targetPrice <= 0) {
+          priceEl.focus();
+          return;
+        }
+        const perm = await requestNotificationsPermission();
+        if (perm !== "granted" && perm !== "denied") {
+          // permission denied or unsupported — alert still works in-app
+        }
+        addPriceAlert(
+          state.alertModal.symbol,
+          state.alertModal.name,
+          condEl.value,
+          targetPrice,
+          state.alertModal.currentPrice
+        );
+        state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+        render();
+      });
+    });
+
+    // Remove individual alert
+    app.querySelectorAll("[data-remove-alert]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const id = parseFloat(el.getAttribute("data-remove-alert"));
+        removePriceAlert(id);
+        render();
+      });
+    });
+
+    // Clear triggered alerts history
+    app.querySelectorAll("[data-clear-triggered-alerts]").forEach(el => {
+      el.addEventListener("click", () => {
+        clearTriggeredAlerts();
+        render();
+      });
+    });
+
+    // Request notification permission
+    app.querySelectorAll("[data-request-notif-perm]").forEach(el => {
+      el.addEventListener("click", async () => {
+        await requestNotificationsPermission();
+        render();
+      });
+    });
+
   }
 
   async function boot() {
+    state.priceAlerts = loadPriceAlerts();
     await loadTradesState();
     if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
       state.opportunities = state.opportunitiesSnapshot.map(normalizeOpportunity);
@@ -4780,7 +5027,7 @@ function renderMain() {
     await loadDashboard();
     render();
     setInterval(() => {
-      if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio"].includes(state.route)) {
+      if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio", "alerts"].includes(state.route)) {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
         }
