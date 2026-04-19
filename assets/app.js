@@ -4229,12 +4229,19 @@ function normalizePositionRecord(position){
     return num != null && num > 0 ? num : null;
   };
 
-  const entryPriceRaw = positiveOrNull(position?.execution?.entryPrice ?? position?.entryPrice ?? rawAnalysisSnapshot?.entry);
-  const quantityRaw = positiveOrNull(position?.execution?.quantity ?? position?.quantity);
-  const investedRaw = positiveOrNull(position?.execution?.invested ?? position?.invested)
+  const quantityRaw  = positiveOrNull(position?.execution?.quantity  ?? position?.quantity);
+  const investedRaw  = positiveOrNull(position?.execution?.invested  ?? position?.invested);
+  const entryPriceRaw = positiveOrNull(
+    position?.execution?.entryPrice ??
+    position?.entry_price ??
+    position?.entryPrice ??
+    rawAnalysisSnapshot?.entry ??
+    (investedRaw != null && quantityRaw != null && quantityRaw > 0 ? investedRaw / quantityRaw : null)
+  );
+  const investedFinal = investedRaw
     ?? ((entryPriceRaw != null && quantityRaw != null) ? entryPriceRaw * quantityRaw : null);
-  const stopLossRaw = positiveOrNull(rawAnalysisSnapshot?.stopLoss ?? position?.stopLoss);
-  const takeProfitRaw = positiveOrNull(rawAnalysisSnapshot?.takeProfit ?? position?.takeProfit);
+  const stopLossRaw   = positiveOrNull(rawAnalysisSnapshot?.stopLoss  ?? position?.stop_loss  ?? position?.stopLoss);
+  const takeProfitRaw = positiveOrNull(rawAnalysisSnapshot?.takeProfit ?? position?.take_profit ?? position?.takeProfit);
   const ratioRaw = positiveOrNull(rawAnalysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
   const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice);
   const livePriceRaw = positiveOrNull(position?.live?.price);
@@ -4275,7 +4282,7 @@ function normalizePositionRecord(position){
       openedAt: position?.execution?.openedAt || position?.openedAt || null,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
-      invested: investedRaw,
+      invested: investedFinal,
       entryMode
     },
     live: {
@@ -4301,7 +4308,7 @@ function normalizePositionRecord(position){
     entryMode,
     entryPrice: entryPriceRaw,
     quantity: quantityRaw,
-    invested: investedRaw,
+    invested: investedFinal,
     exitPrice: exitPriceRaw,
     pnl: pnlRaw,
     pnlPct: pnlPctRaw,
