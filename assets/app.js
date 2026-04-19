@@ -2972,113 +2972,108 @@ function renderDashboard() {
     const grouped = groupedOpportunities(opps);
     const topRows = [...grouped.proposed, ...grouped.watch, ...grouped.noTrade].slice(0, 5);
     const recentAlgo = state.algoJournal.slice(0, 3);
+    const mobile = isPhoneLayout();
     const topVm = getDashboardTopViewModel(opps);
 
-    const icoPortfolio = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>`;
-    const icoScan = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`;
-    const icoUp = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`;
-    const icoDown = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>`;
-
     return `
-      <div class="screen screen-dashboard">
-        <div class="screen-header" style="margin-bottom:20px">
+      <div class="screen">
+        <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
-          <div class="screen-subtitle">${safeText(summary.title)} · ${safeText(summary.text || "Lecture du marche")}</div>
+          <div class="screen-subtitle">Vue rapide, lecture simple, priorites utiles.</div>
         </div>
 
         ${renderMarketRegimeBanner()}
 
-        ${state.opportunitiesRefreshing ? `
-          <div class="db-refresh-notice">Mise a jour en cours — derniere liste valide affichee</div>
-        ` : ""}
-
-        <div class="db-stats-row">
-          <div class="db-stat-tile db-stat-portfolio">
-            <div class="db-stat-icon">${icoPortfolio}</div>
-            <div class="db-stat-value">${stats.openCount}</div>
-            <div class="db-stat-label">Positions ouvertes</div>
-          </div>
-          <div class="db-stat-tile db-stat-scan">
-            <div class="db-stat-icon">${icoScan}</div>
-            <div class="db-stat-value">${opps.length}</div>
-            <div class="db-stat-label">Opportunites</div>
-          </div>
-          <div class="db-stat-tile db-stat-bull">
-            <div class="db-stat-icon">${icoUp}</div>
-            <div class="db-stat-value">${summary.bullish}</div>
-            <div class="db-stat-label">Haussier</div>
-          </div>
-          <div class="db-stat-tile db-stat-bear">
-            <div class="db-stat-icon">${icoDown}</div>
-            <div class="db-stat-value">${summary.bearish}</div>
-            <div class="db-stat-label">Baissier</div>
+        <div class="card dashboard-hero-card" style="margin-bottom:18px">
+          <div class="dashboard-hero-top" style="${mobile ? "display:block;" : ""}">
+            <div>
+              <div class="dashboard-hero-title">${stats.openCount} position${stats.openCount > 1 ? "s ouvertes" : " ouverte"}</div>
+              <div class="dashboard-hero-subtitle">${safeText(summary.title + " · " + (summary.text || ""))}</div>
+            </div>
+            <div class="legend" style="${mobile ? "margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;" : ""}">
+              ${badge("Training")}
+              ${badge(`${stats.closedCount} trade${stats.closedCount > 1 ? "s" : ""} cloture${stats.closedCount > 1 ? "s" : ""}`)}
+              ${badge(`${money(stats.realized * fxRateUsdToEur(), "EUR")} realise`)}
+            </div>
           </div>
         </div>
 
-        <div class="db-bento">
-          <div class="card db-bento-signal">
-            <div class="section-title">
-              <span>Signal leader</span>
-              ${topVm ? `<span>${safeText(topVm.item.symbol)}</span>` : ""}
-            </div>
+        ${state.opportunitiesRefreshing ? `
+          <div class="card" style="margin-bottom:12px;padding:12px 16px">
+            <div class="muted">Mise a jour en cours. La derniere liste valide reste affichee.</div>
+          </div>
+        ` : ""}
+
+        <div class="grid trades-stats" style="margin-bottom:18px">
+          <div class="stat-card"><div class="stat-label">Opportunites visibles</div><div class="stat-value">${opps.length}</div></div>
+          <div class="stat-card"><div class="stat-label">Hausse</div><div class="stat-value">${summary.bullish}</div></div>
+          <div class="stat-card"><div class="stat-label">Baisse</div><div class="stat-value">${summary.bearish}</div></div>
+          <div class="stat-card"><div class="stat-label">Neutre</div><div class="stat-value">${summary.neutral}</div></div>
+        </div>
+
+        <div class="dashboard-grid" style="${mobile ? "display:block;" : ""}">
+          <div class="card dashboard-feature-card" style="${mobile ? "margin-bottom:14px;" : ""}">
+            <div class="section-title"><span>Priorite du moment</span><span>${topVm ? safeText(topVm.item.symbol) : "—"}</span></div>
             ${topVm ? `
-              <div class="db-signal-body">
-                <div class="db-signal-left">
-                  <div class="db-signal-kicker">Priorite du moment</div>
-                  <div class="db-signal-symbol">${safeText(topVm.item.symbol)}</div>
-                  <div class="db-signal-name">${safeText(topVm.item.name || "Nom indisponible")}</div>
-                  <div class="db-signal-summary">${safeText(topVm.subtitle)}</div>
-                  <div class="db-signal-badges">
-                    ${badge(safeText(topVm.badgeLabel), topVm.decisionState.tone)}
-                    ${badge(safeText(rowTrendLabel(topVm.item)), topVm.item.direction || "")}
-                    ${renderMarketBadge(topVm.item.symbol, topVm.item.assetClass)}
-                  </div>
-                </div>
-                <div class="db-signal-right">
-                  <div class="db-signal-score-wrap">
-                    ${scoreRing(topVm.scoreState.score, topVm.scoreState.tone)}
-                    <div class="db-signal-decision">
-                      <div class="db-signal-decision-label">Lecture dominante</div>
-                      <div class="db-signal-decision-title">${safeText(topVm.decisionLabel)}</div>
-                      <div class="db-signal-decision-text">${safeText(dominantStatusReason(topVm.item))}</div>
+              <div class="top-pick-box dashboard-signal-shell">
+                <div class="dashboard-signal-main">
+                  <div class="dashboard-signal-copy">
+                    <div class="dashboard-signal-kicker">Signal leader</div>
+                    <div class="trade-symbol dashboard-top-symbol">${safeText(topVm.item.symbol)}</div>
+                    <div class="trade-name dashboard-top-name">${safeText(topVm.item.name || "Nom indisponible")}</div>
+                    <div class="muted dashboard-top-summary">${safeText(topVm.subtitle)}</div>
+                    <div class="legend dashboard-signal-badges">
+                      ${badge(safeText(topVm.badgeLabel), topVm.decisionState.tone)}
+                      ${badge(safeText(rowTrendLabel(topVm.item)), topVm.item.direction || "")}
                     </div>
                   </div>
-                  <div class="top-pick-metrics db-signal-metrics">
-                    ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
-                    ${dashboardMetricLine("Var. 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
-                    ${dashboardMetricLine("Surete", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
-                    ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
+                  <div class="dashboard-signal-panel">
+                    <div class="dashboard-signal-highlight">
+                      <div class="dashboard-signal-score">
+                        ${scoreRing(topVm.scoreState.score, topVm.scoreState.tone)}
+                      </div>
+                      <div class="dashboard-signal-highlight-copy">
+                        <div class="dashboard-signal-highlight-label">Lecture dominante</div>
+                        <div class="dashboard-signal-highlight-title">${safeText(topVm.decisionLabel)}</div>
+                        <div class="dashboard-signal-highlight-text">${safeText(dominantStatusReason(topVm.item))}</div>
+                      </div>
+                    </div>
+                    <div class="top-pick-metrics dashboard-signal-metrics">
+                      ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
+                      ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
+                      ${dashboardMetricLine("Score de surete", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
+                      ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
+                    </div>
+                    <div class="dashboard-signal-action">
+                      <button class="btn dashboard-open-btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche</button>
+                    </div>
                   </div>
-                  <button class="btn db-open-btn" data-open-detail="${safeText(topVm.item.symbol)}">Ouvrir la fiche &rarr;</button>
                 </div>
               </div>
             ` : `<div class="empty-state">Aucune priorite exploitable pour le moment.</div>`}
           </div>
 
-          <div class="card db-bento-algo">
-            <div class="section-title"><span>Decisions algo</span><span>${recentAlgo.length}</span></div>
-            ${recentAlgo.length ? `
-              <div class="db-algo-stack">
-                ${recentAlgo.map((item) => {
-                  const algoDecision = item.decision || "Pas de trade";
-                  const algoReason = item.reasonShort || item.summary || "";
-                  const algoDate = displayAlgoDate(item.createdAt || item.at || item.timestamp || "");
-                  return `
-                    <div class="db-algo-card">
-                      <div class="db-algo-head">
-                        <span class="db-algo-symbol">${safeText(item.symbol || "—")}</span>
-                        ${statusBadge(algoDecision)}
-                      </div>
-                      ${algoDate ? `<div class="db-algo-date">${safeText(algoDate)}</div>` : ""}
-                      ${algoReason ? `<div class="db-algo-reason">${safeText(algoReason)}</div>` : ""}
-                    </div>`;
-                }).join("")}
-              </div>
-            ` : `<div class="empty-state">Aucune decision recente.</div>`}
+          <div class="card dashboard-side-card">
+            <div class="section-title"><span>Dernieres decisions algo</span><span>${recentAlgo.length}</span></div>
+            ${recentAlgo.length ? `<div class="algo-card-stack">${recentAlgo.map((item) => {
+              const algoDecision = item.decision || "Pas de trade";
+              const algoReason = item.reasonShort || item.summary || "";
+              const algoDate = displayAlgoDate(item.createdAt || item.at || item.timestamp || "");
+              return `
+                <div class="journal-card dashboard-journal-card" style="margin-bottom:10px">
+                  <div class="journal-head">
+                    <div class="trade-symbol">${safeText(item.symbol || "—")}</div>
+                    ${statusBadge(algoDecision)}
+                  </div>
+                  ${algoDate ? `<div class="muted">${safeText(algoDate)}</div>` : ""}
+                  ${algoReason ? `<div class="muted" style="margin-top:8px">${safeText(algoReason)}</div>` : ""}
+                </div>
+              `;
+            }).join("")}</div>` : `<div class="empty-state">Aucune decision recente.</div>`}
           </div>
         </div>
 
-        <div class="card db-list-card">
+        <div class="card" style="margin-top:18px">
           <div class="section-title"><span>Priorites classees</span><span>${topRows.length}</span></div>
           ${topRows.length ? topRows.map((item, index) => renderOppRow(item, index + 1)).join("") : `<div class="empty-state">Aucune opportunite a afficher.</div>`}
         </div>
