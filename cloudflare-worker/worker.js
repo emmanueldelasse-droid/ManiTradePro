@@ -253,8 +253,42 @@ function adminApiToken(env) {
   return String(env?.ADMIN_API_TOKEN || env?.MTP_ADMIN_TOKEN || "").trim();
 }
 
+function adminPin(env) {
+  return String(env?.ADMIN_PIN || adminApiToken(env) || "").trim();
+}
+
 function hasConfiguredAdminToken(env) {
   return !!adminApiToken(env);
+}
+
+// Session token helpers — HMAC-SHA256 signé avec ADMIN_API_TOKEN
+async function createSessionToken(secret, validHours = 24) {
+  const exp = Math.floor(Date.now() / 1000) + validHours * 3600;
+  const payload = btoa(JSON.stringify({ exp }));
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload));
+  const sigB64 = btoa(String.fromCharCode(...new Uint8Array(sig)));
+  return `${payload}.${sigB64}`;
+}
+
+async function verifySessionToken(token, secret) {
+  try {
+    const dot = token.indexOf(".");
+    if (dot < 0) return false;
+    const payload = token.slice(0, dot);
+    const sig = token.slice(dot + 1);
+    const { exp } = JSON.parse(atob(payload));
+    if (!exp || Math.floor(Date.now() / 1000) > exp) return false;
+    const key = await crypto.subtle.importKey(
+      "raw", new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" }, false, ["verify"]
+    );
+    const sigBytes = Uint8Array.from(atob(sig), c => c.charCodeAt(0));
+    return await crypto.subtle.verify("HMAC", key, sigBytes, new TextEncoder().encode(payload));
+  } catch { return false; }
 }
 
 function requestHasAllowedOrigin(request, env) {
@@ -263,36 +297,50 @@ function requestHasAllowedOrigin(request, env) {
   return getAllowedOrigins(env).includes(origin);
 }
 
-function requestHasAdminAccess(request, env) {
-  const expected = adminApiToken(env);
-  if (!expected) return false;
+async function requestHasAdminAccess(request, env) {
+  const secret = adminApiToken(env);
+  if (!secret) return false;
   const bearer = String(request?.headers?.get("Authorization") || "").trim();
   const explicit = String(request?.headers?.get("X-Admin-Token") || request?.headers?.get("x-admin-token") || "").trim();
   const fromBearer = bearer.toLowerCase().startsWith("bearer ") ? bearer.slice(7).trim() : "";
   const candidate = explicit || fromBearer;
-  return !!candidate && candidate === expected;
+  if (!candidate) return false;
+  if (candidate === secret) return true;
+  return verifySessionToken(candidate, secret);
 }
 
-function requestHasFrontAccess(request, env) {
-  if (requestHasAdminAccess(request, env)) return true;
+async function requestHasFrontAccess(request, env) {
+  if (await requestHasAdminAccess(request, env)) return true;
   if (hasConfiguredAdminToken(env)) return false;
   return requestHasAllowedOrigin(request, env);
 }
 
-function requireFrontAccess(request, env) {
-  if (requestHasFrontAccess(request, env)) return null;
+async function requireFrontAccess(request, env) {
+  if (await requestHasFrontAccess(request, env)) return null;
   const message = hasConfiguredAdminToken(env)
     ? "Admin token required"
     : "Allowed app origin required";
   return fail(message, "forbidden", 403);
 }
 
-function requireAdminAccess(request, env) {
-  if (requestHasAdminAccess(request, env)) return null;
+async function requireAdminAccess(request, env) {
+  if (await requestHasAdminAccess(request, env)) return null;
   const message = hasConfiguredAdminToken(env)
     ? "Admin token required"
     : "Admin token not configured on worker";
   return fail(message, "forbidden", 403);
+}
+
+async function handleSessionLogin(request, env) {
+  const pin = adminPin(env);
+  const secret = adminApiToken(env);
+  if (!pin || !secret) return fail("Session auth non configuree sur le worker", "error", 503);
+  let body = {};
+  try { body = await request.json(); } catch { /* ignore */ }
+  const candidate = String(body?.pin || "").trim();
+  if (!candidate || candidate !== pin) return fail("PIN invalide", "forbidden", 403);
+  const token = await createSessionToken(secret, 24);
+  return json({ token, expiresIn: 86400 });
 }
 
 function corsHeadersFor(request, env) {
@@ -3922,23 +3970,26 @@ async function handleRequest(request, env) {
 
   // POST routes
   if (request.method === "POST") {
+    if (url.pathname === "/api/session") {
+      return safeRoute(() => handleSessionLogin(request, env));
+    }
     if (url.pathname === "/api/ai/trade-review") {
-      const denied = requireFrontAccess(request, env);
+      const denied = await requireFrontAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleAiTradeReview(request, env));
     }
     if (url.pathname === "/api/trades/sync") {
-      const denied = requireFrontAccess(request, env);
+      const denied = await requireFrontAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTradesSync(request, env));
     }
     if (url.pathname === "/api/training/settings") {
-      const denied = requireAdminAccess(request, env);
+      const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingSettingsSave(request, env));
     }
     if (url.pathname === "/api/training/auto-cycle") {
-      const denied = requireAdminAccess(request, env);
+      const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingAutoCycle(env));
     }
@@ -3948,12 +3999,12 @@ async function handleRequest(request, env) {
   // GET routes
   if (request.method === "GET") {
     if (url.pathname === "/api/trades/state") {
-      const denied = requireFrontAccess(request, env);
+      const denied = await requireFrontAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTradesState(env));
     }
     if (url.pathname === "/api/signals" || url.pathname.startsWith("/api/signals/")) {
-      const denied = requireAdminAccess(request, env);
+      const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleSignals(url, env));
     }
@@ -3971,23 +4022,23 @@ async function handleRequest(request, env) {
     if (url.pathname === "/api/portfolio/summary") return safeRoute(() => handlePortfolioSummary());
     if (url.pathname === "/api/portfolio/positions") return safeRoute(() => handlePortfolioPositions());
     if (url.pathname === "/api/training/account") {
-      const denied = requireAdminAccess(request, env);
+      const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingAccount(env));
     }
     if (url.pathname === "/api/training/positions") {
-      const denied = requireAdminAccess(request, env);
+      const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingPositions(env));
     }
     if (url.pathname === "/api/training/settings") {
-      const denied = requireAdminAccess(request, env);
+      const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingSettingsGet(env));
     }
     // Route de debug état des circuits
     if (url.pathname === "/api/debug/circuits") {
-      const denied = requireAdminAccess(request, env);
+      const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return json({
         circuits: { twelvedata: circuitStatus("twelvedata"), yahoo: circuitStatus("yahoo"), supabase: circuitStatus("supabase"), binance: circuitStatus("binance") },
