@@ -808,6 +808,77 @@
     return map[value] || value || "inconnu";
   }
 
+  function inferAssetClass(symbol, assetClass) {
+    if (assetClass && assetClass !== "unknown") return assetClass;
+    const s = String(symbol || "").toUpperCase();
+    if (isCryptoSymbol(s)) return "crypto";
+    if (["EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD"].includes(s)) return "forex";
+    if (["GOLD","SILVER","OIL"].includes(s)) return "commodity";
+    if (["SPY","QQQ","GLD","TLT"].includes(s)) return "etf";
+    return "stock";
+  }
+
+  function getMarketStatus(symbol, assetClass) {
+    const cls = inferAssetClass(symbol, assetClass);
+    const now = new Date();
+    const utcDay = now.getUTCDay();
+    const utcMins = now.getUTCHours() * 60 + now.getUTCMinutes();
+
+    function fmtH(utcH, utcM = 0) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), utcH, utcM));
+      return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris" });
+    }
+    function countdown(totalMins) {
+      const h = Math.floor(totalMins / 60), m = totalMins % 60;
+      return h > 0 ? `${h}h${m > 0 ? String(m).padStart(2,"0") : ""}` : `${m}min`;
+    }
+
+    if (cls === "crypto") {
+      return { open: true, status: "open", label: "Ouvert", detail: "24h/24 · 7j/7" };
+    }
+
+    if (cls === "forex") {
+      const closed = utcDay === 6 || (utcDay === 0 && utcMins < 22 * 60) || (utcDay === 5 && utcMins >= 22 * 60);
+      if (closed) return { open: false, status: "closed", label: "Ferme", detail: `Ouvre dim. ${fmtH(22)} · Lun–Ven 24h/24` };
+      return { open: true, status: "open", label: "Ouvert", detail: `Ferme ven. ${fmtH(22)} · Lun–Ven 24h/24` };
+    }
+
+    if (cls === "commodity") {
+      const weClosed = utcDay === 6 || (utcDay === 0 && utcMins < 23 * 60) || (utcDay === 5 && utcMins >= 22 * 60);
+      const brk = !weClosed && utcMins >= 22 * 60 && utcMins < 23 * 60;
+      if (weClosed) return { open: false, status: "closed", label: "Ferme", detail: `Ouvre dim. ${fmtH(23)} · Lun–Ven 23h–22h (CME)` };
+      if (brk) return { open: false, status: "break", label: "Pause", detail: `Ouvre a ${fmtH(23)} · pause 22h–23h (CME)` };
+      return { open: true, status: "open", label: "Ouvert", detail: `${fmtH(23)}–${fmtH(22)} · Lun–Ven (CME)` };
+    }
+
+    // stock / etf — NYSE/NASDAQ
+    if (utcDay === 0 || utcDay === 6) {
+      return { open: false, status: "closed", label: "Ferme", detail: `Lun–Ven ${fmtH(14,30)}–${fmtH(21)} (NYSE)` };
+    }
+    const PRE = 9 * 60, REG = 14 * 60 + 30, CLOSE = 21 * 60;
+    if (utcMins >= REG && utcMins < CLOSE) {
+      return { open: true, status: "open", label: "Ouvert", detail: `Ferme dans ${countdown(CLOSE - utcMins)} · ${fmtH(14,30)}–${fmtH(21)}` };
+    }
+    if (utcMins >= PRE && utcMins < REG) {
+      return { open: false, status: "premarket", label: "Pre-marche", detail: `Ouvre dans ${countdown(REG - utcMins)} · ${fmtH(14,30)}–${fmtH(21)}` };
+    }
+    if (utcMins >= CLOSE && utcMins < CLOSE + 4 * 60 && utcDay <= 4) {
+      return { open: false, status: "afterhours", label: "Apres-bourse", detail: `Seance terminee · ${fmtH(14,30)}–${fmtH(21)} demain` };
+    }
+    if (utcMins < PRE) {
+      return { open: false, status: "closed", label: "Ferme", detail: `Pre-marche dans ${countdown(PRE - utcMins)} · ${fmtH(14,30)}–${fmtH(21)}` };
+    }
+    return { open: false, status: "closed", label: "Ferme", detail: `${fmtH(14,30)}–${fmtH(21)} · reprise lundi` };
+  }
+
+  function renderMarketBadge(symbol, assetClass) {
+    const s = getMarketStatus(symbol, assetClass);
+    const color = s.status === "open" ? "var(--profit)"
+      : (s.status === "premarket" || s.status === "afterhours" || s.status === "break") ? "#f59e0b"
+      : "var(--loss)";
+    return `<span class="badge" style="color:${color};border-color:${color}33"><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${color};margin-right:4px;vertical-align:middle"></span>${safeText(s.label)}</span>`;
+  }
+
   function simpleAnalysisLabel(value) {
     const map = {
       "Constructive bullish bias": "biais haussier leger",
@@ -2133,7 +2204,9 @@ function renderOppRow(item, rank) {
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
             ${mobileBadges}
+            ${renderMarketBadge(item.symbol, item.assetClass)}
           </div>
+          <div style="font-size:.72rem;color:var(--text-muted);margin-top:6px">${safeText(getMarketStatus(item.symbol, item.assetClass).detail)}</div>
         </div>`;
     }
 
@@ -2163,9 +2236,11 @@ function renderOppRow(item, rank) {
         </div>
         <div class="badges-col" style="display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
           ${badge(vm.assetBadge, item.assetClass || "")}
+          ${renderMarketBadge(item.symbol, item.assetClass)}
           ${vm.fidelityBadge}
           ${vm.confirmationBadge}
           ${vm.riskBadge}
+          <div style="width:100%;font-size:.72rem;color:var(--text-muted);margin-top:1px">${safeText(getMarketStatus(item.symbol, item.assetClass).detail)}</div>
         </div>
       </div>`;
   }
@@ -3164,12 +3239,14 @@ function renderDetail() {
                 </div>
                 <div class="legend">
                   ${badge(simpleAssetClassLabel(d.assetClass), d.assetClass)}
+                  ${renderMarketBadge(d.symbol, d.assetClass)}
                   ${badge(d.trendLabel || simpleDirectionLabel(d.direction, d.score), d.direction || "")}
                   ${badge(simpleScoreStatusLabel(d.scoreStatus || "n/a"), d.scoreStatus || "")}
                   ${badge(`fiabilite ${safeText(d.confidenceLabel || simpleConfidenceLabel(d.confidence || "low"))}`)}
                   ${state.settings.showSourceBadges ? badge(d.sourceUsed || "source?") : ""}
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
+                <div style="font-size:.78rem;color:var(--text-muted);margin-top:6px">${safeText(getMarketStatus(d.symbol, d.assetClass).detail)}</div>
                 ${renderTradePlanHero(d, currentTradePlan())}
                 ${(() => {
                   const plan = currentTradePlan();
@@ -3582,6 +3659,7 @@ function renderPositionRow(position) {
       <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
       <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
       <div><span class="muted">Investi</span><br>${displayInvestedValue(p) == null ? "—" : money(displayInvestedValue(p) * fxRateUsdToEur(), "EUR")}</div>
+      <div style="grid-column:span 2"><span class="muted">Marche</span><br>${(() => { const ms = getMarketStatus(p.symbol, inferAssetClass(p.symbol, p.assetClass)); return `${renderMarketBadge(p.symbol, p.assetClass)} <span style="font-size:.78rem;color:var(--text-muted)">${safeText(ms.detail)}</span>`; })()}</div>
     </div>
 
     <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
