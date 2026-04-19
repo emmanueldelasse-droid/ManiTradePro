@@ -142,6 +142,27 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Analyse des manques — ce qui fait défaut au bot
+
+### Critique — le bot ne peut pas vraiment trader
+1. **Pas d'exécution réelle** — tout est manuel. Propose des trades mais ne peut pas en ouvrir sur Binance/broker. C'est un assistant de décision, pas un bot autonome.
+2. **Pas de gestion automatique des stops** — si le prix touche le stop loss en pleine nuit, aucune action, aucune alerte automatique.
+
+### Important — qualité des signaux
+3. **Liste d'actifs fixe** ⭐ *priorité #1* — 35 actifs codés en dur dans le worker. Impossible d'ajouter un actif personnalisé (ex: BNB, SOL, une action spécifique).
+4. **Pas de backtesting** — impossible de valider la stratégie sur données historiques.
+5. **Multi-timeframe non fusionné** — signaux crypto sur 1J/4H/1H mais le score final ne fusionne pas vraiment les 3 timeframes.
+
+### Pratique — suivi des trades
+6. **Pas de notes sur les trades** — impossible d'annoter pourquoi on a pris une entrée/sortie. Essentiel pour progresser.
+7. **Alerte "signal disparu"** — notifié quand un signal apparaît mais pas quand il s'annule.
+
+### Infrastructure
+8. **Web Push VAPID** — notifications quand l'app est fermée (nécessite VAPID key pair + Supabase pour stocker les subscriptions)
+9. **Rapports PDF hebdomadaires**
+
+---
+
 ## Contraintes de déploiement
 - Frontend : push sur `main` → GitHub Pages (2-5 min, Ctrl+Shift+R)
 - Worker : `wrangler deploy` dans le dossier `cloudflare-worker/` (toujours `git pull origin main` avant)
