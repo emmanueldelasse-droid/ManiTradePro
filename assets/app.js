@@ -215,7 +215,10 @@
     if (raw.includes("worker_admin_auth_required")) return "fallback local · token admin worker requis";
     if (raw.includes("worker_origin_not_allowed")) return "fallback local · origine de l'app non autorisee";
     if (state.trades.remoteStatus === "fallback_local") {
-      return `fallback local · ${raw || "worker / supabase indisponible"}`;
+      let msg = raw || "worker / supabase indisponible";
+      if (msg.startsWith("{")) msg = "erreur serveur";
+      else if (msg.length > 80) msg = msg.slice(0, 80) + "…";
+      return `fallback local · ${msg}`;
     }
     return "local uniquement";
   }
@@ -4339,7 +4342,7 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Lecture simple des positions ouvertes, des trades clotures et des zones a surveiller. La carte trade separe maintenant le snapshot d'ouverture, l'etat live et le statut operationnel. Connexion distante automatique via le Worker avec mise a jour live des trades ouverts. Le mode entrainement suit maintenant un vrai capital fictif.</div>
+          <div class="screen-subtitle">Positions ouvertes, historique et capital fictif.</div>
           ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
           <div class="muted">Etat distant : ${safeText(remoteStatusText())}</div>
           ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
