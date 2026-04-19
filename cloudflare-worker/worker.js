@@ -3421,6 +3421,57 @@ async function handleTradesState(env) {
   return tradesPayload(true, positions, history);
 }
 
+function pickSupabaseCols(row, keys) {
+  if (!row || typeof row !== "object") return {};
+  const out = {};
+  for (const k of keys) if (k in row && row[k] !== undefined) out[k] = row[k];
+  return out;
+}
+
+function mapPositionForSupabase(p) {
+  const merged = {
+    ...p,
+    side:           p.side          ?? p.direction    ?? null,
+    asset_class:    p.asset_class   ?? p.assetClass   ?? null,
+    entry_price:    p.entry_price   ?? p.entryPrice   ?? p?.execution?.entryPrice ?? null,
+    stop_loss:      p.stop_loss     ?? p.stopLoss     ?? p?.analysisSnapshot?.stopLoss ?? null,
+    take_profit:    p.take_profit   ?? p.takeProfit   ?? p?.analysisSnapshot?.takeProfit ?? null,
+    trend_label:    p.trend_label   ?? p.trendLabel   ?? null,
+    trade_decision: p.trade_decision ?? p.tradeDecision ?? p.decision ?? p?.analysisSnapshot?.decision ?? null,
+    trade_reason:   p.trade_reason  ?? p.tradeReason  ?? null,
+    source_used:    p.source_used   ?? p.sourceUsed   ?? null,
+    opened_at:      p.opened_at     ?? p.openedAt     ?? p?.execution?.openedAt ?? null,
+    updated_at:     p.updated_at    ?? p.updatedAt    ?? null,
+    analysis_snapshot: p.analysis_snapshot ?? p.analysisSnapshot ?? null,
+  };
+  return pickSupabaseCols(merged, SUPABASE_POSITION_KEYS);
+}
+
+function mapTradeForSupabase(t) {
+  const merged = {
+    ...t,
+    side:            t.side           ?? t.direction    ?? null,
+    asset_class:     t.asset_class    ?? t.assetClass   ?? null,
+    entry_price:     t.entry_price    ?? t.entryPrice   ?? t?.execution?.entryPrice ?? null,
+    exit_price:      t.exit_price     ?? t.exitPrice    ?? t?.closedExecution?.exitPrice ?? null,
+    stop_loss:       t.stop_loss      ?? t.stopLoss     ?? null,
+    take_profit:     t.take_profit    ?? t.takeProfit   ?? null,
+    pnl_pct:         t.pnl_pct        ?? t.pnlPct       ?? null,
+    adj_score:       t.adj_score      ?? t.adjScore     ?? null,
+    rr_ratio:        t.rr_ratio       ?? t.rrRatio      ?? t.rr ?? null,
+    trend_label:     t.trend_label    ?? t.trendLabel   ?? null,
+    trade_decision:  t.trade_decision ?? t.tradeDecision ?? t.decision ?? t?.analysisSnapshot?.decision ?? null,
+    trade_reason:    t.trade_reason   ?? t.tradeReason  ?? null,
+    source_used:     t.source_used    ?? t.sourceUsed   ?? null,
+    opened_at:       t.opened_at      ?? t.openedAt     ?? null,
+    closed_at:       t.closed_at      ?? t.closedAt     ?? t?.closedExecution?.closedAt ?? null,
+    updated_at:      t.updated_at     ?? t.updatedAt    ?? null,
+    analysis_snapshot: t.analysis_snapshot ?? t.analysisSnapshot ?? null,
+    closed_execution:  t.closed_execution  ?? t.closedExecution  ?? null,
+  };
+  return pickSupabaseCols(merged, SUPABASE_TRADE_KEYS);
+}
+
 async function handleTradesSync(request, env) {
   if (!supabaseConfigured(env)) return tradesPayload(false, [], [], "Secrets Supabase absents");
   const body = await request.json().catch(() => ({}));
@@ -3430,18 +3481,25 @@ async function handleTradesSync(request, env) {
   const history = normalizeTrainingTrades(inputHistory);
 
   if (inputPositions.length) {
-    await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(inputPositions)
-    });
+    const rows = inputPositions.map(mapPositionForSupabase).filter(r => r.id);
+    if (rows.length) {
+      await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify(rows)
+      });
+    }
   }
-  if (inputHistory.filter(isAuthoritativeClosedTradeRow).length) {
-    await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-      body: JSON.stringify(inputHistory.filter(isAuthoritativeClosedTradeRow))
-    });
+  const closedHistory = inputHistory.filter(isAuthoritativeClosedTradeRow);
+  if (closedHistory.length) {
+    const rows = closedHistory.map(mapTradeForSupabase).filter(r => r.id);
+    if (rows.length) {
+      await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+        body: JSON.stringify(rows)
+      });
+    }
   }
   return tradesPayload(true, positions, history, "sync_ok");
 }
