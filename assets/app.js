@@ -119,6 +119,7 @@
     ["opportunities", "Opportunites", "◎"],
     ["alerts", "Alertes", "◉"],
     ["portfolio", "Mes trades", "◫"],
+    ["performance", "Performance", "◈"],
     ["settings", "Reglages", "◦"]
   ];
 
@@ -1402,13 +1403,32 @@ function confirmTradeFromModal() {
     }, 5000);
   }
 
-  function fireAlertNotification(alert, currentPrice) {
-    const dir = alert.condition === "above" ? "au-dessus de" : "en-dessous de";
-    const title = `Alerte ${alert.symbol}`;
-    const body = `${alert.symbol} est ${dir} ${priceDisplay(alert.targetPrice)} (actuel\u00a0: ${priceDisplay(currentPrice)})`;
-    if ("Notification" in window && Notification.permission === "granted") {
-      try { new Notification(title, { body, icon: "/ManiTradePro/icons/icon-192.png" }); } catch (_) {}
+  async function sendNotification(title, body, opts = {}) {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+    const base = {
+      body,
+      icon: "/ManiTradePro/icons/icon-192.png",
+      badge: "/ManiTradePro/icons/icon-192.png",
+      vibrate: [120, 60, 120],
+      ...opts
+    };
+    try {
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.ready;
+        await reg.showNotification(title, base);
+      } else {
+        new Notification(title, base);
+      }
+    } catch (_) {
+      try { new Notification(title, base); } catch (__) {}
     }
+  }
+
+  function fireAlertNotification(alert, currentPrice) {
+    const dir = alert.condition === "above" ? "⬆ au-dessus de" : "⬇ en-dessous de";
+    const title = `◉ Alerte prix — ${alert.symbol}`;
+    const body = `${alert.symbol} est ${dir} ${priceDisplay(alert.targetPrice)}\nActuel : ${priceDisplay(currentPrice)}`;
+    sendNotification(title, body, { tag: `alert-${alert.symbol}`, renotify: true, requireInteraction: false });
     showAlertToast(title, body);
   }
 
@@ -1448,19 +1468,19 @@ function confirmTradeFromModal() {
       state.algoSignalsPrev = currentSignals;
       return;
     }
-    if (Notification.permission === "granted") {
-      currentSignals.forEach(sym => {
-        if (!state.algoSignalsPrev.has(sym)) {
-          const o = state.opportunities.find(x => x.symbol === sym);
-          if (!o) return;
-          const scoreStr = o.officialScore != null ? ` · score ${o.officialScore}` : "";
-          const title = `Signal ◉ ${sym}`;
-          const body = `${o.name} — Trade propose${scoreStr}`;
-          try { new Notification(title, { body, icon: "/ManiTradePro/icons/icon-192.png" }); } catch (_) {}
-          showAlertToast(title, body);
-        }
-      });
-    }
+    currentSignals.forEach(sym => {
+      if (!state.algoSignalsPrev.has(sym)) {
+        const o = state.opportunities.find(x => x.symbol === sym);
+        if (!o) return;
+        const scoreStr = o.officialScore != null ? ` · sûreté ${o.officialScore}/100` : "";
+        const changeStr = o.change24hPct != null ? ` · ${o.change24hPct >= 0 ? "+" : ""}${pct(o.change24hPct)}` : "";
+        const dirIcon = String(o.direction || "").toLowerCase() === "long" ? "▲" : String(o.direction || "").toLowerCase() === "short" ? "▼" : "●";
+        const title = `${dirIcon} Signal algo — ${sym}`;
+        const body = `${o.name || sym}\nTrade proposé${scoreStr}${changeStr}`;
+        sendNotification(title, body, { tag: `signal-${sym}`, renotify: true, requireInteraction: true });
+        showAlertToast(title, body);
+      }
+    });
     state.algoSignalsPrev = currentSignals;
   }
 
@@ -2840,6 +2860,39 @@ function marketRegimeViewModel(regime = state.market?.regime) {
   };
 }
 
+function renderFearGreedWidget(fg) {
+  if (!fg || fg.value == null) return "";
+  const v = fg.value;
+  const label = fg.label || "";
+  const tone = v <= 25 ? "extreme-fear" : v <= 45 ? "fear" : v <= 55 ? "neutral" : v <= 75 ? "greed" : "extreme-greed";
+  const color = v <= 25 ? "#ef4444" : v <= 45 ? "#f97316" : v <= 55 ? "#a3a3a3" : v <= 75 ? "#22c55e" : "#00e5a0";
+  const arcLen = Math.round((v / 100) * 251);
+  return `
+    <div class="fg-widget" title="Fear & Greed Index — Alternative.me">
+      <svg class="fg-arc" viewBox="0 0 100 54" aria-hidden="true">
+        <path d="M10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8" stroke-linecap="round"/>
+        <path d="M10 50 A 40 40 0 0 1 90 50" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
+          stroke-dasharray="${arcLen} 251" pathLength="251"/>
+      </svg>
+      <div class="fg-value" style="color:${color}">${v}</div>
+      <div class="fg-label">${safeText(label)}</div>
+    </div>`;
+}
+
+function renderTrendingStrip(trending) {
+  if (!Array.isArray(trending) || !trending.length) return "";
+  const items = trending.map(t => {
+    const up = t.pct24h != null && t.pct24h >= 0;
+    const pctHtml = t.pct24h != null
+      ? `<span class="trending-pct ${up ? "up" : "down"}">${up ? "+" : ""}${t.pct24h.toFixed(1)}%</span>`
+      : "";
+    return `<div class="trending-pill" data-open-detail="${safeText(t.symbol)}">
+      <span class="trending-sym">${safeText(t.symbol)}</span>${pctHtml}
+    </div>`;
+  }).join("");
+  return `<div class="trending-strip"><span class="trending-label">Trending</span>${items}</div>`;
+}
+
 function renderMarketRegimeBanner(regime = state.market?.regime) {
   const vm = marketRegimeViewModel(regime);
   const borderColor = vm.tone === "positive"
@@ -2983,6 +3036,12 @@ function renderDashboard() {
         </div>
 
         ${renderMarketRegimeBanner()}
+
+        ${(state.dashboard.fearGreed || (state.dashboard.trending || []).length) ? `
+        <div class="card" style="margin-bottom:18px;padding:14px 18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+          ${renderFearGreedWidget(state.dashboard.fearGreed)}
+          ${renderTrendingStrip(state.dashboard.trending)}
+        </div>` : ""}
 
         <div class="card dashboard-hero-card" style="margin-bottom:18px">
           <div class="dashboard-hero-top" style="${mobile ? "display:block;" : ""}">
@@ -4568,6 +4627,40 @@ function openPositionsRiskView() {
     });
   }
 
+  function exportTradesToCSV() {
+    const history = Array.isArray(state.trades.history) ? state.trades.history : [];
+    if (!history.length) return;
+    const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const headers = ["Date ouverture","Date cloture","Symbole","Nom","Direction","Prix entree","Prix sortie","Quantite","Investi USD","P&L USD","P&L %","Source","Score","Stop Loss","Take Profit"];
+    const rows = history.map(p => {
+      const openedAt = p?.execution?.openedAt || p?.openedAt || "";
+      const closedAt = p?.closedExecution?.closedAt || p?.closedAt || "";
+      const fmt = ts => ts ? new Date(ts).toISOString().slice(0,10) : "";
+      const src = tradeSource(p);
+      return [
+        fmt(openedAt), fmt(closedAt),
+        p.symbol || "", p.name || p.symbol || "",
+        p.analysisSnapshot?.direction || p.direction || "",
+        p.entryPrice ?? "", p.exitPrice ?? "",
+        p.quantity ?? "", p.invested ?? "",
+        p.pnl ?? "", p.pnlPct != null ? (p.pnlPct * 100).toFixed(2) : "",
+        src, p.score ?? p.analysisSnapshot?.score ?? "",
+        p.stopLoss ?? p.analysisSnapshot?.stopLoss ?? "",
+        p.takeProfit ?? p.analysisSnapshot?.takeProfit ?? ""
+      ].map(esc).join(",");
+    });
+    const csv = [headers.map(esc).join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `manitradepro_trades_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
   function renderPortfolioPriorityCard() {
     const p = state.portfolioPriority;
     const loading = state.loadingPortfolioPriority;
@@ -4618,6 +4711,134 @@ function openPositionsRiskView() {
           ${(a.stocks?.resume||a.stocks?.points?.length) ? `<div class="ai-insight-section"><div class="ai-insight-label class-stock-lbl">Actions / ETF</div>${a.stocks.resume?`<div class="ai-insight-item">${safeText(a.stocks.resume)}</div>`:""}${(a.stocks.points||[]).map(p=>`<div class="ai-insight-item">· ${safeText(p)}</div>`).join("")}</div>` : ""}
         </div>` : `<div class="empty-state">Lance l'analyse pour identifier tes biais de trading.</div>`}
     </div>`;
+  }
+
+  function renderPerformance() {
+    const history = Array.isArray(state.trades.history) ? state.trades.history : [];
+    const positions = Array.isArray(state.trades.positions) ? state.trades.positions : [];
+    const fx = fxRateUsdToEur();
+
+    if (!history.length && !positions.length) {
+      return `<div class="screen"><div class="screen-header"><div class="screen-title">Performance</div></div>
+        <div class="card"><div class="empty-state">Aucun trade enregistré pour le moment.</div></div></div>`;
+    }
+
+    const closed = history.filter(p => p.pnl != null);
+    const wins = closed.filter(p => p.pnl > 0);
+    const losses = closed.filter(p => p.pnl < 0);
+    const totalPnlUsd = closed.reduce((s, p) => s + (p.pnl || 0), 0);
+    const totalPnlEur = totalPnlUsd * fx;
+    const winRate = closed.length ? (wins.length / closed.length) * 100 : null;
+    const avgWinUsd = wins.length ? wins.reduce((s, p) => s + p.pnl, 0) / wins.length : null;
+    const avgLossUsd = losses.length ? losses.reduce((s, p) => s + p.pnl, 0) / losses.length : null;
+    const rrRatio = avgWinUsd != null && avgLossUsd != null && avgLossUsd !== 0
+      ? Math.abs(avgWinUsd / avgLossUsd) : null;
+    const expectancy = (winRate != null && avgWinUsd != null && avgLossUsd != null)
+      ? (winRate / 100) * avgWinUsd + (1 - winRate / 100) * avgLossUsd : null;
+
+    const best = closed.length ? closed.reduce((a, b) => b.pnl > a.pnl ? b : a) : null;
+    const worst = closed.length ? closed.reduce((a, b) => b.pnl < a.pnl ? b : a) : null;
+
+    const sorted = closed
+      .filter(p => p?.closedExecution?.closedAt || p?.closedAt)
+      .sort((a, b) => new Date(a?.closedExecution?.closedAt || a?.closedAt) - new Date(b?.closedExecution?.closedAt || b?.closedAt));
+    let cum = 0;
+    const curvePoints = sorted.map(p => { cum += (p.pnl || 0) * fx; return cum; });
+    const curveLabels = sorted.map(p => new Date(p?.closedExecution?.closedAt || p?.closedAt)
+      .toLocaleDateString("fr-FR", { month: "short", day: "numeric" }));
+
+    function sparklinePath(values) {
+      if (values.length < 2) return null;
+      const w = 400, h = 80;
+      const minV = Math.min(...values, 0), maxV = Math.max(...values, 0);
+      const range = maxV - minV || 1;
+      const pts = values.map((v, i) => `${(i / (values.length - 1)) * w},${h - ((v - minV) / range) * h}`);
+      const zeroY = h - (0 - minV) / range * h;
+      return { line: `M${pts.join(" L")}`, fill: `M0,${h} L${pts.join(" L")} L${w},${h} Z`,
+        zeroY, positive: values[values.length - 1] >= 0 };
+    }
+    const spark = sparklinePath(curvePoints);
+
+    const bySymbol = {};
+    closed.forEach(p => {
+      const sym = p.symbol || "?";
+      if (!bySymbol[sym]) bySymbol[sym] = { symbol: sym, name: p.name || sym, pnl: 0, count: 0 };
+      bySymbol[sym].pnl += p.pnl || 0;
+      bySymbol[sym].count++;
+    });
+    const topAssets = Object.values(bySymbol).sort((a, b) => Math.abs(b.pnl) - Math.abs(a.pnl)).slice(0, 5);
+
+    const pStat = (label, val, cls = "") =>
+      `<div class="perf-stat"><div class="perf-stat-label">${safeText(label)}</div><div class="perf-stat-value ${cls}">${val}</div></div>`;
+
+    return `
+      <div class="screen">
+        <div class="screen-header">
+          <div class="screen-title">Performance</div>
+          <div class="screen-subtitle">${closed.length} trade${closed.length > 1 ? "s" : ""} fermé${closed.length > 1 ? "s" : ""} · ${positions.length} ouvert${positions.length > 1 ? "s" : ""}</div>
+        </div>
+
+        <div class="perf-stats-grid">
+          ${pStat("P&amp;L total", `${totalPnlEur >= 0 ? "+" : ""}${money(totalPnlEur, "EUR")}`, totalPnlEur >= 0 ? "positive" : "negative")}
+          ${pStat("Win rate", winRate != null ? `${num(winRate, 1)}%` : "—", winRate != null && winRate >= 50 ? "positive" : "negative")}
+          ${pStat("Trades fermés", String(closed.length))}
+          ${pStat("Ratio R:R", rrRatio != null ? num(rrRatio, 2) : "—", rrRatio != null && rrRatio >= 1.5 ? "positive" : "")}
+          ${pStat("Gain moyen", avgWinUsd != null ? `+${money(avgWinUsd * fx, "EUR")}` : "—", "positive")}
+          ${pStat("Perte moyenne", avgLossUsd != null ? money(avgLossUsd * fx, "EUR") : "—", "negative")}
+          ${pStat("Espérance/trade", expectancy != null ? `${expectancy >= 0 ? "+" : ""}${money(expectancy * fx, "EUR")}` : "—", expectancy != null && expectancy >= 0 ? "positive" : "negative")}
+          ${pStat("Positions ouvertes", String(positions.length))}
+        </div>
+
+        ${spark ? `
+        <div class="card perf-curve-card">
+          <div class="section-title"><span>Courbe P&amp;L cumulatif</span><span class="${totalPnlEur >= 0 ? "positive" : "negative"}">${totalPnlEur >= 0 ? "+" : ""}${money(totalPnlEur, "EUR")}</span></div>
+          <div class="perf-curve-wrap">
+            <svg class="perf-curve-svg" viewBox="0 0 400 80" preserveAspectRatio="none" aria-hidden="true">
+              <defs><linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="${spark.positive ? "#00e5a0" : "#ef4444"}" stop-opacity="0.22"/>
+                <stop offset="100%" stop-color="${spark.positive ? "#00e5a0" : "#ef4444"}" stop-opacity="0"/>
+              </linearGradient></defs>
+              <path d="${spark.fill}" fill="url(#curveGrad)"/>
+              <line x1="0" y1="${spark.zeroY}" x2="400" y2="${spark.zeroY}" stroke="rgba(255,255,255,.12)" stroke-width="1" stroke-dasharray="4 4"/>
+              <path d="${spark.line}" fill="none" stroke="${spark.positive ? "#00e5a0" : "#ef4444"}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <div class="perf-curve-dates">
+              <span>${safeText(curveLabels[0] || "")}</span>
+              <span>${safeText(curveLabels[curveLabels.length - 1] || "")}</span>
+            </div>
+          </div>
+        </div>` : ""}
+
+        ${best || worst ? `
+        <div class="perf-extremes">
+          ${best ? `<div class="card perf-extreme-card">
+            <div class="perf-extreme-label">Meilleur trade</div>
+            <div class="perf-extreme-sym">${safeText(best.symbol || "—")}</div>
+            <div class="perf-extreme-val positive">+${money((best.pnl || 0) * fx, "EUR")}</div>
+          </div>` : ""}
+          ${worst ? `<div class="card perf-extreme-card">
+            <div class="perf-extreme-label">Pire trade</div>
+            <div class="perf-extreme-sym">${safeText(worst.symbol || "—")}</div>
+            <div class="perf-extreme-val negative">${money((worst.pnl || 0) * fx, "EUR")}</div>
+          </div>` : ""}
+        </div>` : ""}
+
+        ${topAssets.length ? `
+        <div class="card">
+          <div class="section-title"><span>Actifs par P&amp;L absolu</span></div>
+          <div class="perf-asset-list">
+            ${topAssets.map(a => {
+              const pnlEur = a.pnl * fx;
+              return `<div class="perf-asset-row">
+                <span class="perf-asset-sym">${safeText(a.symbol)}</span>
+                <span class="perf-asset-name">${safeText(a.name)}</span>
+                <span class="perf-asset-count">${a.count} trade${a.count > 1 ? "s" : ""}</span>
+                <span class="perf-asset-pnl ${pnlEur >= 0 ? "positive" : "negative"}">${pnlEur >= 0 ? "+" : ""}${money(pnlEur, "EUR")}</span>
+              </div>`;
+            }).join("")}
+          </div>
+        </div>` : ""}
+      </div>`;
   }
 
   function renderPortfolio() {
@@ -4730,6 +4951,7 @@ function openPositionsRiskView() {
               <div class="section-title">
                 <span>Historique <span class="badge">${history.length}</span></span>
                 <div style="display:flex;gap:6px">
+                  <button class="btn btn-secondary" style="font-size:.72rem;padding:3px 9px" data-export-csv>Export CSV</button>
                   ${algoHistory.length ? `<button class="btn btn-secondary" style="font-size:.72rem;padding:3px 9px" data-clear-history="algo">Algo</button>` : ""}
                   ${manualHistory.length ? `<button class="btn btn-secondary" style="font-size:.72rem;padding:3px 9px" data-clear-history="manual">Manuel</button>` : ""}
                   <button class="btn btn-danger-soft" style="font-size:.72rem;padding:3px 9px" data-clear-all-history>Tout vider</button>
@@ -4967,6 +5189,7 @@ function renderMain() {
       case "news": return renderNews();
       case "asset-detail": return renderDetail();
       case "portfolio": return renderPortfolio();
+      case "performance": return renderPerformance();
       case "alerts": return renderAlerts();
       case "settings": return renderSettings();
       default: return renderDashboard();
@@ -5216,6 +5439,10 @@ function renderMain() {
         if (action === "load-journal-analysis") loadJournalAnalysis();
         if (action === "load-portfolio-priority") loadPortfolioPriority();
       });
+    });
+
+    app.querySelectorAll("[data-export-csv]").forEach(el => {
+      el.addEventListener("click", () => exportTradesToCSV());
     });
 
     app.querySelectorAll("[data-reset-training-capital]").forEach(el => {

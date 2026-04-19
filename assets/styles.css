@@ -1134,5 +1134,86 @@ html.theme-light-root :root{
   .screen{padding-left:calc(14px + var(--safe-left));padding-right:calc(14px + var(--safe-right))}
 }
 
+/* =====================================================
+   FEAR & GREED WIDGET
+   ===================================================== */
+.fg-widget{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:72px;flex-shrink:0}
+.fg-arc{width:72px;height:40px;display:block}
+.fg-value{font-family:var(--font-mono);font-size:1.3rem;font-weight:700;line-height:1;margin-top:-6px}
+.fg-label{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+
+/* =====================================================
+   TRENDING STRIP
+   ===================================================== */
+.trending-strip{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1}
+.trending-label{font-size:.65rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);flex-shrink:0}
+.trending-pill{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:5px 10px;border-radius:999px;
+  background:var(--bg-elevated);border:1px solid var(--border-subtle);
+  cursor:pointer;transition:background 150ms,border-color 150ms;
+  font-size:.78rem;
+}
+.trending-pill:hover{background:var(--bg-card-hover);border-color:var(--border-medium)}
+.trending-sym{font-family:var(--font-mono);font-weight:700}
+.trending-pct{font-size:.72rem}
+.trending-pct.up{color:var(--profit)}
+.trending-pct.down{color:var(--loss)}
+
+/* =====================================================
+   PAGE PERFORMANCE
+   ===================================================== */
+.perf-stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px}
+.perf-stat{
+  background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius);
+  padding:16px;display:flex;flex-direction:column;gap:6px;
+}
+.perf-stat-label{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+.perf-stat-value{font-family:var(--font-mono);font-size:1.4rem;font-weight:700;line-height:1}
+.perf-stat-value.positive{color:var(--profit)}
+.perf-stat-value.negative{color:var(--loss)}
+
+.perf-curve-card{margin-bottom:18px}
+.perf-curve-wrap{padding-top:10px}
+.perf-curve-svg{width:100%;height:80px;display:block;border-radius:8px;overflow:hidden}
+.perf-curve-dates{display:flex;justify-content:space-between;font-size:.7rem;color:var(--text-muted);margin-top:4px;padding:0 2px}
+
+.perf-extremes{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.perf-extreme-card{padding:16px;text-align:center}
+.perf-extreme-label{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted);margin-bottom:8px}
+.perf-extreme-sym{font-family:var(--font-mono);font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.perf-extreme-val{font-family:var(--font-mono);font-size:1.3rem;font-weight:800}
+.perf-extreme-val.positive{color:var(--profit)}
+.perf-extreme-val.negative{color:var(--loss)}
+
+.perf-asset-list{display:flex;flex-direction:column;gap:8px}
+.perf-asset-row{
+  display:flex;align-items:center;gap:12px;
+  padding:10px 12px;border-radius:12px;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.015));
+  border:1px solid rgba(255,255,255,.05);
+}
+.perf-asset-sym{font-family:var(--font-mono);font-weight:700;font-size:.9rem;min-width:60px}
+.perf-asset-name{flex:1;font-size:.82rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.perf-asset-count{font-size:.72rem;color:var(--text-muted);flex-shrink:0}
+.perf-asset-pnl{font-family:var(--font-mono);font-weight:700;font-size:.9rem;flex-shrink:0}
+.perf-asset-pnl.positive{color:var(--profit)}
+.perf-asset-pnl.negative{color:var(--loss)}
+
+@media (max-width:860px){
+  .perf-stats-grid{grid-template-columns:repeat(2,1fr)}
+  .perf-extremes{grid-template-columns:1fr 1fr}
+}
+@media (max-width:480px){
+  .perf-stats-grid{grid-template-columns:repeat(2,1fr)}
+  .perf-extremes{grid-template-columns:1fr}
+}
+
+/* light theme */
+.app-shell.theme-light .perf-stat{background:#fff;border-color:rgba(0,0,0,.07)}
+.app-shell.theme-light .perf-asset-row{background:rgba(255,255,255,.7);border-color:rgba(0,0,0,.06)}
+.app-shell.theme-light .trending-pill{background:#f1f5f9;border-color:#e2e8f0}
+.app-shell.theme-light .trending-pill:hover{background:#e2e8f0}
+
 /* Empêche le rebond de scroll sur iOS au niveau du body */
 body{overscroll-behavior:none}
