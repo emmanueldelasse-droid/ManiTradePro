@@ -8,7 +8,8 @@
     budgetTracker: "mtp_budget_tracker_v1",
     detailCache: "mtp_detail_cache_v1",
     opportunitiesSnapshot: "mtp_opportunities_snapshot_v1",
-    trainingCapital: "mtp_training_capital_v1"
+    trainingCapital: "mtp_training_capital_v1",
+    session: "mtp_session_v1"
   };
 
   const TRADE_STORAGE = {
@@ -87,6 +88,7 @@
     },
     algoJournal: [],
     settings: loadSettings(),
+    session: { ...loadSession(), pinOpen: false, pinError: null, pinLoading: false },
     budget: loadBudgetTracker(),
     detailCache: readJson(STORAGE_KEYS.detailCache, {}),
     opportunitiesSnapshot: readJson(STORAGE_KEYS.opportunitiesSnapshot, []),
@@ -187,9 +189,10 @@
   };
 
   function workerAdminHeaders() {
-    const token = String(state.settings?.workerAdminToken || "").trim();
-    if (!token) return {};
-    return { Authorization: `Bearer ${token}` };
+    if (isSessionValid()) return { Authorization: `Bearer ${state.session.token}` };
+    const legacy = String(state.settings?.workerAdminToken || "").trim();
+    if (legacy) return { Authorization: `Bearer ${legacy}` };
+    return {};
   }
 
   function normalizeWorkerError(status, rawText = "") {
@@ -300,6 +303,24 @@
 
   function persistSettings() {
     writeJson(STORAGE_KEYS.settings, state.settings);
+  }
+
+  function loadSession() {
+    return readJson(STORAGE_KEYS.session, { token: null, expiresAt: 0 });
+  }
+
+  function persistSession() {
+    writeJson(STORAGE_KEYS.session, { token: state.session.token, expiresAt: state.session.expiresAt });
+  }
+
+  function clearSession() {
+    state.session.token = null;
+    state.session.expiresAt = 0;
+    localStorage.removeItem(STORAGE_KEYS.session);
+  }
+
+  function isSessionValid() {
+    return !!state.session.token && Date.now() / 1000 < state.session.expiresAt - 300;
   }
 
   function budgetDayKey() {
@@ -4349,20 +4370,18 @@ function openPositionsRiskView() {
                 <div class="setting-desc">${safeText(remoteStatusText())}</div>
               </div>
             </div>
-            <label class="setting-row">
-              <div>
-                <div class="setting-title">Token admin Worker</div>
-                <div class="setting-desc">Optionnel. Si tu le renseignes dans ce navigateur, l'app peut continuer a utiliser les routes protegees du Worker pour le sync trades et l'IA externe.</div>
-              </div>
-              <input class="setting-input" type="password" autocomplete="off" spellcheck="false" data-setting-input="workerAdminToken" value="${safeText(state.settings.workerAdminToken || "")}" placeholder="Bearer token local">
-            </label>
             <div class="setting-row">
               <div>
-                <div class="setting-title">Etat du token local</div>
-                <div class="setting-desc">${state.settings.workerAdminToken ? "token present dans ce navigateur" : "aucun token enregistre localement"}</div>
+                <div class="setting-title">Session Worker</div>
+                <div class="setting-desc">${isSessionValid()
+                  ? `connecte · expire le ${new Date(state.session.expiresAt * 1000).toLocaleString("fr-FR")}`
+                  : "aucune session active"}</div>
               </div>
+              ${isSessionValid()
+                ? `<button class="btn btn-secondary" data-session-logout style="min-width:90px">Deconnecter</button>`
+                : `<button class="btn btn-primary" data-open-pin style="min-width:90px">Se connecter</button>`}
             </div>
-            <div class="muted">Secrets attendus dans Cloudflare : SUPABASE_URL, SUPABASE_ANON_KEY et ADMIN_API_TOKEN pour activer la protection complete.</div>
+            <div class="muted">Secrets attendus dans Cloudflare : SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_API_TOKEN et ADMIN_PIN pour activer la protection complete.</div>
           </div>
         </div>
       </div>`;
@@ -4446,6 +4465,56 @@ function renderMain() {
     syncDetailScoreDisplay();
   }
 
+  function renderPinModal() {
+    if (!state.session.pinOpen) return "";
+    const err = state.session.pinError ? `<div class="pin-error">${safeText(state.session.pinError)}</div>` : "";
+    const loading = state.session.pinLoading;
+    return `
+      <div class="modal-overlay" id="pin-overlay">
+        <div class="modal-box pin-modal">
+          <div class="modal-title">Connexion Worker</div>
+          <div class="modal-desc">Entre ton PIN Cloudflare pour activer l'acces aux routes proteges (trades, IA).</div>
+          ${err}
+          <input class="setting-input pin-input" type="password" id="pin-input" placeholder="PIN" autocomplete="current-password" ${loading ? "disabled" : ""}>
+          <div class="modal-actions">
+            <button class="btn btn-secondary" data-pin-cancel>Annuler</button>
+            <button class="btn btn-primary" data-pin-submit ${loading ? "disabled" : ""}>${loading ? "Connexion..." : "Se connecter"}</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  async function handlePinLogin(pin) {
+    state.session.pinLoading = true;
+    state.session.pinError = null;
+    render();
+    try {
+      const res = await fetch(`${API_BASE}/api/session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        state.session.pinError = data?.message || "PIN invalide";
+        state.session.pinLoading = false;
+        render();
+        return;
+      }
+      state.session.token = data.token;
+      state.session.expiresAt = Math.floor(Date.now() / 1000) + (data.expiresIn || 86400);
+      state.session.pinOpen = false;
+      state.session.pinLoading = false;
+      state.session.pinError = null;
+      persistSession();
+      render();
+    } catch (e) {
+      state.session.pinError = "Erreur reseau";
+      state.session.pinLoading = false;
+      render();
+    }
+  }
+
   function render() {
     app.innerHTML = `
       <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${state.settings.lightTheme ? "theme-light" : ""}">
@@ -4453,6 +4522,7 @@ function renderMain() {
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
         ${renderTradeConfirmModal()}
+        ${renderPinModal()}
       </div>
     `;
     applyThemeMode();
@@ -4571,6 +4641,42 @@ function renderMain() {
       });
     });
 
+    // PIN modal
+    app.querySelectorAll("[data-pin-cancel]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.session.pinOpen = false;
+        state.session.pinError = null;
+        render();
+      });
+    });
+    app.querySelectorAll("[data-pin-submit]").forEach(el => {
+      el.addEventListener("click", () => {
+        const input = document.getElementById("pin-input");
+        if (input) handlePinLogin(input.value.trim());
+      });
+    });
+    const pinInput = document.getElementById("pin-input");
+    if (pinInput) {
+      pinInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") handlePinLogin(pinInput.value.trim());
+      });
+      pinInput.focus();
+    }
+
+    // Boutons session dans les réglages
+    app.querySelectorAll("[data-open-pin]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.session.pinOpen = true;
+        state.session.pinError = null;
+        render();
+      });
+    });
+    app.querySelectorAll("[data-session-logout]").forEach(el => {
+      el.addEventListener("click", () => {
+        clearSession();
+        render();
+      });
+    });
 
   }
 
