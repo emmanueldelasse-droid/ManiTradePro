@@ -4259,6 +4259,7 @@ function openPositionsRiskView() {
           <button class="btn ${state.trades.mode === 'training' ? 'active' : ''}" data-trade-mode="training">Entrainement</button>
           <button class="btn ${state.trades.mode === 'real' ? 'active' : ''}" data-trade-mode="real">Reel</button>
           <button class="btn" data-reset-training-capital>Reinitialiser capital fictif</button>
+          <button class="btn" data-force-sync>${state.trades._syncing ? "Sync..." : "Synchroniser"}</button>
         </div>
 
         ${state.trades.mode === "real" ? `
@@ -4740,6 +4741,16 @@ function renderMain() {
       });
       pinInput.focus();
     }
+
+    app.querySelectorAll("[data-force-sync]").forEach(el => {
+      el.addEventListener("click", async () => {
+        state.trades._syncing = true;
+        render();
+        await syncTradesToSupabase().catch(() => {});
+        state.trades._syncing = false;
+        render();
+      });
+    });
 
     // Boutons session dans les réglages
     app.querySelectorAll("[data-open-pin]").forEach(el => {
