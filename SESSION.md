@@ -8,7 +8,7 @@
 |-------|--------|
 | **Dernière mise à jour** | 2026-04-19 |
 | **IA utilisée** | Claude (claude-sonnet-4-6) |
-| **Branche active** | main |
+| **Branche active** | claude/confident-pasteur-5tWej → main |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -60,6 +60,12 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
   - Modal PIN accessible depuis Réglages (une seule fois, auto-renouvellement)
   - Bouton connect/disconnect dans Réglages
 - [x] Sync Supabase (optionnel, activable dans Réglages)
+- [x] **Bouton "Synchroniser" dans "Mes trades"** (PR #20 mergée le 2026-04-19)
+  - Force le push des trades locaux vers Supabase
+  - Résout le bug des trades invisibles sur iPhone
+  - Feedback visuel "Sync..." pendant l'opération
+- [x] **Statut de marché en temps réel** sur les cartes et fiches (PR #18 + #20)
+  - Badge ouvert/fermé/pré-marché sur cartes opportunités, fiches actif, trades ouverts
 - [x] Thème sombre premium
 - [x] Bandeau régime de marché (bull/bear/lateral)
 - [x] Seuils watchlist calibrés par type d'asset (crypto vs actions/ETF)
@@ -79,30 +85,24 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 **IA** : Claude (claude-sonnet-4-6)
 
 ### Tâches accomplies
-- Création du système de continuité SESSION.md
-- Implémentation auth session PIN → token HMAC-SHA256 (PR #16, mergée)
-  - Worker : `createSessionToken` / `verifySessionToken` via `crypto.subtle`
-  - Worker : endpoint `POST /api/session`
-  - Worker : `requestHasAdminAccess` / `requireFrontAccess` / `requireAdminAccess` rendues async
-  - Frontend : modal PIN dans Réglages
-  - Frontend : `workerAdminHeaders()` préfère le session token
-  - Frontend : statut session + bouton connect/disconnect dans Réglages
-  - CSS : styles `modal-overlay`, `pin-modal`, `btn-primary/secondary`
+- Mise en place du système de continuité SESSION.md
+- **PR #18** : Statut de marché en temps réel (ouvert/fermé/pré-marché/post-marché) sur les cartes opportunités, fiches actif et trades ouverts
+- **PR #20** : Bouton "Synchroniser" dans "Mes trades" pour forcer le push vers Supabase (résout trades invisibles sur iPhone) + market hours sur les trades
 
 ### Bugs résolus
-- Authentification admin manuelle (paste token) → remplacée par login PIN one-shot
+- Trades invisibles sur iPhone → résolu via bouton Synchroniser (force sync Supabase)
 
 ### Décisions techniques prises
 - `ADMIN_PIN` = mot de passe simple dans les secrets Cloudflare
 - `ADMIN_API_TOKEN` reste la clé de signature HMAC (ne pas confondre les deux)
 - Session token valable 24h, stocké en localStorage
+- Le sync Supabase est déclenché manuellement depuis "Mes trades" (pas de sync automatique silencieux)
 
 ### Fichiers modifiés
 | Fichier | Changement |
 |---------|------------|
-| `assets/app.js` | +134 lignes — modal PIN, session state, workerAdminHeaders, statut Réglages |
-| `assets/styles.css` | +12 lignes — styles modal PIN |
-| `cloudflare-worker/worker.js` | +91 lignes — createSessionToken, verifySessionToken, POST /api/session, auth async |
+| `assets/app.js` | PR #18 : badges marché temps réel sur cartes/fiches/trades |
+| `assets/app.js` | PR #20 : +11 lignes — bouton Synchroniser + event listener async |
 
 ---
 
@@ -133,3 +133,4 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 | Date | IA | Résumé |
 |------|----|--------|
 | 2026-04-19 | Claude sonnet-4-6 | Création SESSION.md + PR #16 auth PIN session token |
+| 2026-04-19 | Claude sonnet-4-6 | PR #18 statut marché temps réel + PR #20 bouton Synchroniser |
