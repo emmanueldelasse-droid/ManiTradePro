@@ -106,7 +106,11 @@
     alertModal: { open: false, symbol: null, name: null, currentPrice: null },
     alertToast: null,
     chartTimeframe: "1d",
-    algoSignalsPrev: null
+    algoSignalsPrev: null,
+    journalAnalysis: null,
+    loadingJournalAnalysis: false,
+    portfolioPriority: null,
+    loadingPortfolioPriority: false
   };
 
   const app = document.getElementById("app");
@@ -1553,6 +1557,49 @@ function confirmTradeFromModal() {
       render();
     }
   }
+
+  async function loadJournalAnalysis() {
+    const history = state.trades.history;
+    if (history.length < 3) { showAlertToast("Journal IA", "Besoin d'au moins 3 trades fermes."); return; }
+    state.loadingJournalAnalysis = true;
+    state.journalAnalysis = null;
+    render();
+    try {
+      const result = await apiPost("/api/ai/journal-analysis", {
+        history: history.map(p => normalizePositionRecord(p)),
+        positions: state.trades.positions.map(p => normalizePositionRecord(p))
+      });
+      state.journalAnalysis = result?.data || null;
+    } catch(e) {
+      state.journalAnalysis = { resume: "Erreur : " + (e.message || "IA indisponible"), biais: [], patterns: [], forces: [], recommandations: [], stats: null };
+    } finally {
+      state.loadingJournalAnalysis = false;
+      render();
+    }
+  }
+
+  async function loadPortfolioPriority() {
+    const opps = state.filteredOpportunities.length ? state.filteredOpportunities : state.opportunities;
+    if (!opps.length) { showAlertToast("Priorite IA", "Lance d'abord un scan pour avoir des opportunites."); return; }
+    state.loadingPortfolioPriority = true;
+    state.portfolioPriority = null;
+    render();
+    try {
+      const stats = trainingStats();
+      const result = await apiPost("/api/ai/portfolio-priority", {
+        opportunities: opps.slice(0, 10),
+        positions: state.trades.positions.map(p => normalizePositionRecord(p)),
+        capitalAvailable: stats.wallet.availableEur || 0
+      });
+      state.portfolioPriority = result?.data || null;
+    } catch(e) {
+      state.portfolioPriority = { conseil: "Erreur : " + (e.message || "IA indisponible"), ranking: [], eviter: [] };
+    } finally {
+      state.loadingPortfolioPriority = false;
+      render();
+    }
+  }
+
 
   async function loadDashboard() {
     try {
@@ -4476,6 +4523,56 @@ function openPositionsRiskView() {
     });
   }
 
+  function renderPortfolioPriorityCard() {
+    const p = state.portfolioPriority;
+    const loading = state.loadingPortfolioPriority;
+    const priColor = { haute: "positive", moyenne: "", faible: "muted" };
+    return `<div class="card" style="margin-top:18px">
+      <div class="section-title">
+        <span>IA — Quoi trader maintenant ?</span>
+        <button class="btn" data-action="load-portfolio-priority" ${loading ? "disabled" : ""}>${loading ? "Analyse..." : "Analyser"}</button>
+      </div>
+      ${loading ? `<div class="chart-loading">Analyse en cours...</div>` : p ? `
+        <div class="ai-insight-card">
+          ${p.conseil ? `<div class="ai-insight-resume">${safeText(p.conseil)}</div>` : ""}
+          ${(p.ranking||[]).length ? `<div class="ai-insight-section">
+            <div class="ai-insight-label">Priorites</div>
+            ${p.ranking.map((r,i) => `<div class="ai-priority-row">
+              <span class="ai-priority-rank">${i+1}</span>
+              <span class="ai-priority-symbol">${safeText(r.symbol)}</span>
+              <span class="ai-priority-badge ${priColor[r.priorite]||""}">${safeText(r.priorite)}</span>
+              <span class="ai-priority-reason">${safeText(r.raison)}</span>
+            </div>`).join("")}
+          </div>` : ""}
+          ${(p.eviter||[]).length ? `<div class="ai-insight-section"><div class="ai-insight-label">A eviter</div><div class="ai-insight-warn">${p.eviter.map(s=>safeText(s)).join(", ")}</div></div>` : ""}
+        </div>` : `<div class="empty-state">Lance l'analyse pour savoir quoi trader en priorite.</div>`}
+    </div>`;
+  }
+
+  function renderJournalAnalysisCard() {
+    const a = state.journalAnalysis;
+    const loading = state.loadingJournalAnalysis;
+    return `<div class="card" style="margin-top:18px">
+      <div class="section-title">
+        <span>IA — Analyse journal</span>
+        <button class="btn" data-action="load-journal-analysis" ${loading ? "disabled" : ""}>${loading ? "Analyse..." : "Analyser"}</button>
+      </div>
+      ${loading ? `<div class="chart-loading">Analyse en cours...</div>` : a ? `
+        <div class="ai-insight-card">
+          ${a.resume ? `<div class="ai-insight-resume">${safeText(a.resume)}</div>` : ""}
+          ${(a.biais||[]).length ? `<div class="ai-insight-section"><div class="ai-insight-label">Biais detectes</div>${a.biais.map(b=>`<div class="ai-insight-warn">⚠ ${safeText(b)}</div>`).join("")}</div>` : ""}
+          ${(a.forces||[]).length ? `<div class="ai-insight-section"><div class="ai-insight-label">Points forts</div>${a.forces.map(f=>`<div class="ai-insight-ok">✓ ${safeText(f)}</div>`).join("")}</div>` : ""}
+          ${(a.recommandations||[]).length ? `<div class="ai-insight-section"><div class="ai-insight-label">Recommandations</div>${a.recommandations.map(r=>`<div class="ai-insight-item">→ ${safeText(r)}</div>`).join("")}</div>` : ""}
+          ${a.stats ? `<div class="ai-insight-stats">
+            <div class="ai-stat"><div class="ai-stat-val">${a.stats.winRate!=null?num(a.stats.winRate,1)+"%":"—"}</div><div class="ai-stat-lbl">Win rate</div></div>
+            <div class="ai-stat"><div class="ai-stat-val">${a.stats.avgWinUsd!=null?"$"+num(a.stats.avgWinUsd,2):"—"}</div><div class="ai-stat-lbl">Gain moy</div></div>
+            <div class="ai-stat"><div class="ai-stat-val">${a.stats.avgLossUsd!=null?"$"+num(a.stats.avgLossUsd,2):"—"}</div><div class="ai-stat-lbl">Perte moy</div></div>
+            <div class="ai-stat"><div class="ai-stat-val">${a.stats.expectancy!=null?"$"+num(a.stats.expectancy,2):"—"}</div><div class="ai-stat-lbl">Esperance</div></div>
+          </div>` : ""}
+        </div>` : `<div class="empty-state">Lance l'analyse pour identifier tes biais de trading.</div>`}
+    </div>`;
+  }
+
   function renderPortfolio() {
     restoreTradesFromBackupIfEmpty();
     normalizeTradesHistoryState();
@@ -4578,6 +4675,8 @@ function openPositionsRiskView() {
             </div>
           </div>
 
+          ${renderPortfolioPriorityCard()}
+
           <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Trades ouverts</span><span>${positions.length}</span></div>
             ${positions.length ? `
@@ -4615,6 +4714,7 @@ function openPositionsRiskView() {
               </div>`;
           })()}
           ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
+          ${renderJournalAnalysisCard()}
         `}
       </div>`;
   }
@@ -5062,6 +5162,14 @@ function renderMain() {
         persistTradesState();
         syncTradesToSupabase().catch(() => {});
         render();
+      });
+    });
+
+    app.querySelectorAll("[data-action]").forEach(el => {
+      el.addEventListener("click", () => {
+        const action = el.getAttribute("data-action");
+        if (action === "load-journal-analysis") loadJournalAnalysis();
+        if (action === "load-portfolio-priority") loadPortfolioPriority();
       });
     });
 

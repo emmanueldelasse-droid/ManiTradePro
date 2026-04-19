@@ -3984,6 +3984,64 @@ async function handleAiTradeReview(request, env) {
 }
 
 // ============================================================
+// ROUTE AI JOURNAL ANALYSIS
+// ============================================================
+async function handleAiJournalAnalysis(request, env) {
+  const payload = await request.json().catch(() => null);
+  if (!payload) return fail("Invalid payload", "error", 400);
+  if (!env.CLAUDE_API_KEY) return fail("CLAUDE_API_KEY manquant", "error", 503);
+  const history = Array.isArray(payload.history) ? payload.history.slice(0, 50) : [];
+  if (history.length < 3) return ok({ resume: "Pas assez de trades pour analyser (minimum 3).", biais: [], patterns: [], forces: [], recommandations: ["Ferme quelques trades pour obtenir une analyse."], stats: null }, "local_fallback", nowIso(), "recent", null);
+  const positions = Array.isArray(payload.positions) ? payload.positions.slice(0, 10) : [];
+  const prompt = `Tu es un coach de trading. Analyse ce journal et identifie les biais comportementaux, patterns et axes d'amélioration. Réponds UNIQUEMENT en JSON valide, sans markdown.
+
+Journal (${history.length} trades clôturés) :
+${JSON.stringify(history.map(t => ({ symbol: t.symbol, side: t.side, result: t.result, pnlUsd: t.pnlUsd, entryPrice: t.entryPrice, exitPrice: t.exitPrice, stopLoss: t.stopLoss, takeProfit: t.takeProfit, source: t.source, closedAt: t.closedAt })))}
+
+Positions ouvertes (${positions.length}) : ${JSON.stringify(positions.map(p => ({ symbol: p.symbol, side: p.side, pnlUsd: p.pnlUsd })))}
+
+JSON attendu (champs exacts) :
+{"resume":"string","biais":["string"],"patterns":["string"],"forces":["string"],"recommandations":["string"],"stats":{"winRate":number,"avgWinUsd":number,"avgLossUsd":number,"expectancy":number}}`;
+  try {
+    const res = await fetchWithRetry("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": env.CLAUDE_API_KEY, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: "claude-sonnet-4-6", max_tokens: 650, temperature: 0.2, messages: [{ role: "user", content: prompt }] }) }, { timeoutMs: 20000, maxRetries: 1 });
+    if (!res.ok) return fail(`IA HTTP ${res.status}`, "error", 502);
+    const jr = await res.json();
+    const text = Array.isArray(jr?.content) ? jr.content.map(c => c?.text || "").join("\n") : "";
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    return ok(JSON.parse((fenced ? fenced[1] : text).trim()), "claude_external", nowIso(), "recent", null);
+  } catch (e) { return fail(e.message || "Erreur IA", "error", 500); }
+}
+
+// ============================================================
+// ROUTE AI PORTFOLIO PRIORITY
+// ============================================================
+async function handleAiPortfolioPriority(request, env) {
+  const payload = await request.json().catch(() => null);
+  if (!payload) return fail("Invalid payload", "error", 400);
+  if (!env.CLAUDE_API_KEY) return fail("CLAUDE_API_KEY manquant", "error", 503);
+  const opportunities = Array.isArray(payload.opportunities) ? payload.opportunities.slice(0, 10) : [];
+  if (!opportunities.length) return ok({ ranking: [], eviter: [], conseil: "Aucune opportunite disponible." }, "local_fallback", nowIso(), "recent", null);
+  const positions = Array.isArray(payload.positions) ? payload.positions.slice(0, 10) : [];
+  const capitalAvailable = Number(payload.capitalAvailable) || 0;
+  const prompt = `Tu es un gestionnaire de portefeuille. Priorise ces opportunités de trading en tenant compte du portefeuille ouvert. Réponds UNIQUEMENT en JSON valide, sans markdown.
+
+Capital disponible : ${capitalAvailable.toFixed(0)} EUR
+Positions ouvertes : ${JSON.stringify(positions.map(p => ({ symbol: p.symbol, side: p.side, assetClass: p.assetClass })))}
+Opportunités : ${JSON.stringify(opportunities.map(o => ({ symbol: o.symbol, name: o.name, assetClass: o.assetClass, score: o.officialScore, direction: o.direction, decision: o.officialDecision, confidence: o.confidence })))}
+
+JSON attendu (champs exacts) :
+{"ranking":[{"symbol":"string","raison":"string","priorite":"haute|moyenne|faible"}],"eviter":["string"],"conseil":"string"}`;
+  try {
+    const res = await fetchWithRetry("https://api.anthropic.com/v1/messages", { method: "POST", headers: { "Content-Type": "application/json", "x-api-key": env.CLAUDE_API_KEY, "anthropic-version": "2023-06-01" }, body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 450, temperature: 0.1, messages: [{ role: "user", content: prompt }] }) }, { timeoutMs: 15000, maxRetries: 1 });
+    if (!res.ok) return fail(`IA HTTP ${res.status}`, "error", 502);
+    const jr = await res.json();
+    const text = Array.isArray(jr?.content) ? jr.content.map(c => c?.text || "").join("\n") : "";
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    return ok(JSON.parse((fenced ? fenced[1] : text).trim()), "claude_external", nowIso(), "recent", null);
+  } catch (e) { return fail(e.message || "Erreur IA", "error", 500); }
+}
+
+// ============================================================
 // ROUTE HEALTH
 // ============================================================
 async function handleHealth(request, env) {
@@ -4035,6 +4093,16 @@ async function handleRequest(request, env) {
       const denied = await requireFrontAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleAiTradeReview(request, env));
+    }
+    if (url.pathname === "/api/ai/journal-analysis") {
+      const denied = await requireFrontAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleAiJournalAnalysis(request, env));
+    }
+    if (url.pathname === "/api/ai/portfolio-priority") {
+      const denied = await requireFrontAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleAiPortfolioPriority(request, env));
     }
     if (url.pathname === "/api/trades/sync") {
       const denied = await requireFrontAccess(request, env);

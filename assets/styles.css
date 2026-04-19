@@ -490,6 +490,28 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
   .trade-actions.split{justify-content:stretch;flex-direction:column}
 }
 
+/* ── AI Insight cards (journal + priority) ───────────── */
+.ai-insight-card{display:flex;flex-direction:column;gap:12px;padding-top:4px}
+.ai-insight-resume{font-size:.92rem;line-height:1.55;color:var(--text-primary);padding:10px 12px;background:var(--bg-elevated);border-radius:10px;border:1px solid var(--border-subtle)}
+.ai-insight-section{display:flex;flex-direction:column;gap:6px}
+.ai-insight-label{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-secondary);margin-bottom:2px}
+.ai-insight-warn{font-size:.85rem;color:#e07a3a;padding:5px 0}
+.ai-insight-ok{font-size:.85rem;color:#0f9f68;padding:5px 0}
+.ai-insight-item{font-size:.85rem;color:var(--text-primary);padding:5px 0;border-bottom:1px solid var(--border-subtle)}
+.ai-insight-item:last-child{border-bottom:none}
+.ai-insight-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
+.ai-stat{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:10px 6px;text-align:center}
+.ai-stat-val{font-size:1rem;font-weight:700;font-family:'Space Mono',monospace;color:var(--text-primary)}
+.ai-stat-lbl{font-size:.68rem;color:var(--text-secondary);margin-top:3px}
+.ai-priority-row{display:grid;grid-template-columns:20px 70px 60px 1fr;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border-subtle)}
+.ai-priority-row:last-child{border-bottom:none}
+.ai-priority-rank{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-align:center}
+.ai-priority-symbol{font-size:.88rem;font-weight:700;font-family:'Space Mono',monospace;color:var(--text-primary)}
+.ai-priority-badge{font-size:.72rem;font-weight:600;padding:2px 7px;border-radius:20px;background:rgba(255,255,255,.08);text-align:center}
+.ai-priority-badge.positive{color:#0f9f68;background:rgba(15,159,104,.12)}
+.ai-priority-badge.muted{color:var(--text-secondary);background:rgba(255,255,255,.05)}
+.ai-priority-reason{font-size:.78rem;color:var(--text-secondary);line-height:1.35}
+
 /* ── Position cards ─────────────────────────────────── */
 .pos-list{display:flex;flex-direction:column;gap:14px}
 .pos-card{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px}
