@@ -608,12 +608,12 @@
     const localHistoryCount = localHistory.length;
 
     const localHasMoreClosedHistory = localHistoryCount > remoteHistoryCount;
-    const localHasFewerOpenPositions = localPositionsCount < remotePositionsCount;
+    const localHasMoreOpenPositions = localPositionsCount > remotePositionsCount;
     const preferLocal = hasLocalTrades && (
       meta?.pendingRemoteSync === true ||
       (localUpdatedAt > 0 && lastSuccessfulRemoteSyncAt > 0 && localUpdatedAt > lastSuccessfulRemoteSyncAt) ||
       localHasMoreClosedHistory ||
-      localHasFewerOpenPositions
+      localHasMoreOpenPositions
     );
 
     if (remote.loaded && remote.configured && !preferLocal) {
@@ -633,9 +633,9 @@
         migratedAt: Date.now(),
         positionsCount: state.trades.positions.length,
         historyCount: state.trades.history.length,
-        pendingRemoteSync: meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasFewerOpenPositions
+        pendingRemoteSync: meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasMoreOpenPositions
       });
-      if (remote.configured && (meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasFewerOpenPositions)) {
+      if (remote.configured && (meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasMoreOpenPositions)) {
         syncTradesToSupabase().catch(() => {});
       }
     }
