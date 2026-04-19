@@ -3775,61 +3775,97 @@ function renderPositionRow(position) {
   const snap = p.analysisSnapshot || {};
   const exec = p.execution || {};
   const live = p.live || {};
-  const entryMode = trainingEntryModeMeta(p);
-  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleString("fr-FR") : "—";
 
-  return `<div class="trade-row trade-card-row simple-trade-card">
-    <div class="trade-card-top">
-      <div>
-        <div class="trade-symbol">${safeText(p.symbol)}</div>
-        <div class="trade-sub">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}</div>
+  const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
+  const stopPrice  = Number(snap.stopLoss ?? p.stopLoss ?? 0);
+  const tpPrice    = Number(snap.takeProfit ?? p.takeProfit ?? 0);
+  const livePrice  = meta.livePrice ?? (Number.isFinite(entryPrice) ? entryPrice : null);
+
+  const hasEntry = Number.isFinite(entryPrice) && entryPrice > 0;
+  const hasStop  = stopPrice > 0;
+  const hasTP    = tpPrice > 0;
+  const hasLive  = livePrice != null;
+
+  const pnlPct = live?.pnlPct ?? meta.pnlPctLive ?? null;
+  const pnlEur = live?.pnl != null ? live.pnl * fxRateUsdToEur() : null;
+  const pnlPositive = pnlPct != null && pnlPct >= 0;
+
+  const stopDistPct  = hasStop && hasLive ? ((p.side === "long" ? livePrice - stopPrice : stopPrice - livePrice) / livePrice * 100) : null;
+  const tpDistPct    = hasTP  && hasLive ? ((p.side === "long" ? tpPrice - livePrice : livePrice - tpPrice) / livePrice * 100) : null;
+  const ratio        = displayRatioValue(p);
+
+  let progressPct = null;
+  if (hasStop && hasTP && hasLive) {
+    const range = Math.abs(tpPrice - stopPrice);
+    if (range > 0) {
+      const fill = p.side === "long"
+        ? (livePrice - stopPrice) / range
+        : (stopPrice - livePrice) / range;
+      progressPct = Math.min(100, Math.max(0, fill * 100));
+    }
+  }
+
+  const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+  const ms = getMarketStatus(p.symbol, inferAssetClass(p.symbol, p.assetClass));
+
+  return `
+  <div class="pos-card">
+    <div class="pos-header">
+      <div class="pos-header-left">
+        <div class="pos-symbol">${safeText(p.symbol)}</div>
+        <div class="pos-name">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}${snap.horizon || p.horizon ? ` · ${safeText(snap.horizon || p.horizon)}` : ""}</div>
       </div>
-      <div class="trade-card-badges">
+      <div class="pos-header-right">
         ${badge(simpleSideLabel(p.side), p.side)}
-        ${badge(snap.trendLabel || p.trendLabel || "tendance", "neutral")}
-        ${entryMode ? badge(entryMode.label, entryMode.badgeClass) : ""}
-        ${badge(tradeOperationalLabel(meta), meta.badgeClass)}
+        ${pnlPct != null
+          ? `<div class="pos-pnl ${pnlPositive ? "pos" : "neg"}">${pnlEur != null ? money(pnlEur, "EUR") + " · " : ""}${pct(pnlPct)}</div>`
+          : `<div class="pos-pnl neutral">P/L —</div>`}
       </div>
     </div>
 
-    <div class="trade-summary-line">${safeText(actionTradeSummary(meta))}</div>
-
-    <div class="muted" style="margin:10px 0 6px">Snapshot d'ouverture</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Mode d'entree</span><br>${safeText(entryMode?.description || "selection principale")}</div>
-      <div><span class="muted">Score d'entree</span><br>${displayScoreValue(p) == null ? "—" : `${num(displayScoreValue(p), 0)}/100`}</div>
-      <div><span class="muted">Decision</span><br>${safeText(snap.decision || p.tradeDecision || "—")}</div>
-      <div><span class="muted">Tendance</span><br>${safeText(snap.trendLabel || p.trendLabel || "—")}</div>
-      <div><span class="muted">Horizon</span><br>${safeText(snap.horizon || p.horizon || "—")}</div>
-      <div><span class="muted">Entree</span><br>${Number.isFinite(Number(exec.entryPrice ?? snap.entry ?? p.entryPrice)) ? priceDisplay(exec.entryPrice ?? snap.entry ?? p.entryPrice) : "—"}</div>
-      <div><span class="muted">Stop</span><br>${(Number(snap.stopLoss ?? p.stopLoss) > 0) ? priceDisplay(snap.stopLoss ?? p.stopLoss) : "—"}</div>
-      <div><span class="muted">Objectif</span><br>${(Number(snap.takeProfit ?? p.takeProfit) > 0) ? priceDisplay(snap.takeProfit ?? p.takeProfit) : "—"}</div>
-      <div><span class="muted">Ratio</span><br>${displayRatioValue(p) == null ? "—" : num(displayRatioValue(p), 2)}</div>
+    <div class="pos-prices">
+      <div class="pos-price-item">
+        <div class="pos-price-label">Entrée</div>
+        <div class="pos-price-val">${hasEntry ? priceDisplay(entryPrice) : "—"}</div>
+      </div>
+      <div class="pos-price-arrow">${hasLive && hasEntry ? (livePrice >= entryPrice ? "↑" : "↓") : "→"}</div>
+      <div class="pos-price-item">
+        <div class="pos-price-label">Actuel ${lastLive ? `· ${lastLive}` : ""}</div>
+        <div class="pos-price-val ${hasLive && hasEntry ? (livePrice >= entryPrice ? "live-up" : "live-down") : ""}">${hasLive ? priceDisplay(livePrice) : "—"}</div>
+      </div>
+      <div class="pos-market-badge">${renderMarketBadge(p.symbol, p.assetClass)}</div>
     </div>
 
-    <div class="muted" style="margin:14px 0 6px">Etat live</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Prix actuel</span><br>${meta.livePrice == null ? "—" : priceDisplay(meta.livePrice)}</div>
-      <div><span class="muted">P/L live</span><br>${p.live?.pnl != null && p.live?.pnlPct != null ? `${money(p.live.pnl * fxRateUsdToEur(), "EUR")} · ${pct(p.live.pnlPct)}` : safeText(tradePnlText(meta))}</div>
-      <div><span class="muted">Avant stop</span><br>${meta.stopDistancePct == null ? "—" : `${num(meta.stopDistancePct, 2)}%`}</div>
-      <div><span class="muted">Avant objectif</span><br>${meta.targetDistancePct == null ? "—" : `${num(meta.targetDistancePct, 2)}%`}</div>
-      <div><span class="muted">Maj live</span><br>${safeText(lastLive)}</div>
-      <div><span class="muted">Source</span><br>${safeText(snap.sourceUsed || p.sourceUsed || "—")}</div>
-      <div><span class="muted">Quantite</span><br>${exec.quantity == null ? "—" : num(exec.quantity, 4)}</div>
-      <div><span class="muted">Investi</span><br>${displayInvestedValue(p) == null ? "—" : money(displayInvestedValue(p) * fxRateUsdToEur(), "EUR")}</div>
-      <div style="grid-column:span 2"><span class="muted">Marche</span><br>${(() => { const ms = getMarketStatus(p.symbol, inferAssetClass(p.symbol, p.assetClass)); return `${renderMarketBadge(p.symbol, p.assetClass)} <span style="font-size:.78rem;color:var(--text-muted)">${safeText(ms.detail)}</span>`; })()}</div>
+    <div class="pos-levels">
+      <div class="pos-level">
+        <span class="pos-level-label">Stop</span>
+        <span class="pos-level-val">${hasStop ? priceDisplay(stopPrice) : "—"}</span>
+        ${stopDistPct != null ? `<span class="pos-level-dist ${stopDistPct < 2 ? "danger" : "warn"}">${num(stopDistPct, 1)}%</span>` : ""}
+      </div>
+      <div class="pos-level center">
+        <span class="pos-level-label">Ratio</span>
+        <span class="pos-level-val">${ratio != null ? num(ratio, 2) : "—"}</span>
+      </div>
+      <div class="pos-level right">
+        <span class="pos-level-label">Objectif</span>
+        <span class="pos-level-val">${hasTP ? priceDisplay(tpPrice) : "—"}</span>
+        ${tpDistPct != null ? `<span class="pos-level-dist green">+${num(tpDistPct, 1)}%</span>` : ""}
+      </div>
     </div>
 
-    <div class="muted" style="margin:14px 0 6px">Statut operationnel</div>
-    <div class="trade-plan-grid compact">
-      <div><span class="muted">Etat</span><br>${safeText(tradeOperationalLabel(meta))}</div>
-      <div><span class="muted">Resume</span><br>${safeText(actionTradeSummary(meta))}</div>
-      <div style="grid-column: span 2"><span class="muted">Pourquoi</span><br>${safeText(snap.reason || p.tradeReason || "Pas de commentaire pour le moment.")}</div>
+    ${progressPct != null ? `
+    <div class="pos-progress-track">
+      <div class="pos-progress-fill" style="width:${progressPct.toFixed(1)}%"></div>
+      <div class="pos-progress-marker" style="left:clamp(4px, calc(${progressPct.toFixed(1)}% - 6px), calc(100% - 16px))"></div>
     </div>
+    <div class="pos-progress-labels">
+      <span class="danger">Stop</span>
+      <span class="green">Objectif</span>
+    </div>` : ""}
 
-    <div class="trade-actions split">
-      <button class="btn trade-btn secondary" data-close-half="${safeText(p.id)}">Cloturer 50%</button>
-      <button class="btn trade-btn primary" data-close-trade="${safeText(p.id)}">Cloturer</button>
+    <div class="pos-actions">
+      <button class="btn btn-secondary pos-btn" data-close-half="${safeText(p.id)}">Clôturer 50%</button>
+      <button class="btn btn-primary pos-btn" data-close-trade="${safeText(p.id)}">Clôturer</button>
     </div>
   </div>`;
 }
@@ -4497,7 +4533,7 @@ function openPositionsRiskView() {
           <div class="card" style="margin-top:18px">
             <div class="section-title"><span>Trades ouverts</span><span>${positions.length}</span></div>
             ${positions.length ? `
-              <div class="trade-table simplified-open-trades">
+              <div class="pos-list">
                 ${positions.map(renderPositionRow).join("")}
               </div>
             ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
