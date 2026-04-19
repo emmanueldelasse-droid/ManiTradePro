@@ -4626,163 +4626,129 @@ function openPositionsRiskView() {
     const stats = trainingStats();
     const positions = state.trades.positions;
     const history = state.trades.history;
-    const algoCounts = (typeof algoDecisionCounts === "function") ? algoDecisionCounts() : { total: 0, conseille: 0, possible: 0, surveiller: 0, eviter: 0, aucun: 0, manuel: 0 };
-    const insights = (typeof groupedHistoryInsights === "function") ? groupedHistoryInsights() : { best: [], worst: [] };
-    const riskRows = (typeof openPositionsRiskView === "function") ? openPositionsRiskView() : [];
+    const algoHistory   = history.filter(p => tradeSource(p) === "algo");
+    const manualHistory = history.filter(p => tradeSource(p) === "manual");
+    const cryptoStats   = trainingStatsByClass(true);
+    const stockStats    = trainingStatsByClass(false);
+    const meta = loadTradesMeta();
+
+    function historyTable(rows) {
+      return `<div class="trade-table simplified-history">
+        <div class="trade-row trade-head">
+          <div>Actif</div><div>Sens</div><div>Résultat</div><div>Entrée</div><div>Sortie</div><div>P/L</div><div>Clôture</div>
+        </div>${rows.map(renderHistoryRow).join("")}
+      </div>`;
+    }
 
     return `
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Mes trades</div>
-          <div class="screen-subtitle">Positions ouvertes, historique et capital fictif.</div>
-          ${(() => { const meta = loadTradesMeta(); return meta?.updatedAt ? `<div class="muted">Derniere sauvegarde locale : ${new Date(meta.updatedAt).toLocaleString("fr-FR")}</div>` : ""; })()}
-          <div class="muted">Etat distant : ${safeText(remoteStatusText())}</div>
-          ${Number(state.trades.historyHiddenCount || 0) > 0 ? `<div class="muted">Historique legacy masque automatiquement : ${num(state.trades.historyHiddenCount, 0)} ligne(s) incomplete(s).</div>` : ""}
+          <div class="screen-subtitle muted">${meta?.updatedAt ? `Sauvegarde ${new Date(meta.updatedAt).toLocaleTimeString("fr-FR", {hour:"2-digit",minute:"2-digit"})}` : ""} · ${safeText(remoteStatusText())}</div>
         </div>
 
         <div class="controls">
-          <button class="btn ${state.trades.mode === 'training' ? 'active' : ''}" data-trade-mode="training">Entrainement</button>
-          <button class="btn ${state.trades.mode === 'real' ? 'active' : ''}" data-trade-mode="real">Reel</button>
-          <button class="btn" data-reset-training-capital>Reinitialiser capital fictif</button>
-          <button class="btn" data-force-sync>${state.trades._syncing ? "Sync..." : "Synchroniser"}</button>
+          <button class="btn ${state.trades.mode==="training"?"active":""}" data-trade-mode="training">Entrainement</button>
+          <button class="btn ${state.trades.mode==="real"?"active":""}" data-trade-mode="real">Reel</button>
+          <button class="btn" data-force-sync>${state.trades._syncing ? "Sync…" : "Synchroniser"}</button>
+          <button class="btn" data-reset-training-capital>Reset capital</button>
+          ${history.length ? `<button class="btn btn-danger-soft" data-clear-all-history>Vider historique</button>` : ""}
         </div>
 
         ${state.trades.mode === "real" ? `
-          <div class="empty-state">Le portefeuille reel n'est pas encore branche. Cette partie restera vide tant qu'aucune source reelle n'est connectee.</div>
+          <div class="empty-state" style="margin-top:24px">Le portefeuille reel n'est pas encore branche.</div>
         ` : `
-          <div class="grid trades-stats">
-            <div class="stat-card"><div class="stat-label">Capital de depart</div><div class="stat-value">${money(stats.wallet.startingBalanceEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Disponible</div><div class="stat-value">${money(stats.wallet.availableEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Engage</div><div class="stat-value">${money(stats.wallet.engagedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">P/L latent</div><div class="stat-value">${money(stats.wallet.unrealizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Resultat realise</div><div class="stat-value">${money(stats.wallet.realizedEur, "EUR")}</div></div>
-            <div class="stat-card"><div class="stat-label">Equity</div><div class="stat-value">${money(stats.wallet.equityEur, "EUR")}</div></div>
+
+          <!-- WALLET -->
+          <div class="wallet-strip">
+            <div class="wallet-item">
+              <div class="wallet-label">Disponible</div>
+              <div class="wallet-val">${money(stats.wallet.availableEur, "EUR")}</div>
+            </div>
+            <div class="wallet-item">
+              <div class="wallet-label">Engagé</div>
+              <div class="wallet-val">${money(stats.wallet.engagedEur, "EUR")}</div>
+            </div>
+            <div class="wallet-item">
+              <div class="wallet-label">P/L latent</div>
+              <div class="wallet-val ${stats.wallet.unrealizedEur >= 0 ? "positive" : "negative"}">${money(stats.wallet.unrealizedEur, "EUR")}</div>
+            </div>
+            <div class="wallet-item">
+              <div class="wallet-label">P/L réalisé</div>
+              <div class="wallet-val ${stats.wallet.realizedEur >= 0 ? "positive" : "negative"}">${money(stats.wallet.realizedEur, "EUR")}</div>
+            </div>
+            <div class="wallet-item wallet-item-equity">
+              <div class="wallet-label">Equity</div>
+              <div class="wallet-val">${money(stats.wallet.equityEur, "EUR")}</div>
+            </div>
           </div>
 
-          ${(() => {
-            const crypto = trainingStatsByClass(true);
-            const stocks = trainingStatsByClass(false);
-            function classStatCard(label, cls, s) {
-              if (s.openCount + s.closedCount === 0) return "";
-              const pnlClass = s.realizedEur > 0 ? "positive" : s.realizedEur < 0 ? "negative" : "";
-              return `<div class="class-stat-block ${cls}">
-                <div class="class-stat-header">${label} ${marketStatusBadge().includes("open") && cls === "stock" ? '<span class="market-status-pill ' + (isStockMarketOpen() ? "open" : "closed") + '">' + (isStockMarketOpen() ? "ouvert" : "ferme") + '</span>' : ""}</div>
-                <div class="class-stat-row">
-                  <div class="stat-card"><div class="stat-label">P/L realise</div><div class="stat-value ${pnlClass}">${money(s.realizedEur, "EUR")}</div></div>
-                  <div class="stat-card"><div class="stat-label">Trades</div><div class="stat-value">${s.closedCount}</div></div>
-                  <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-value">${s.winRate != null ? num(s.winRate, 0) + "%" : "—"}</div></div>
-                  <div class="stat-card"><div class="stat-label">Profit factor</div><div class="stat-value">${s.profitFactor != null ? num(Math.min(s.profitFactor, 99), 2) : "—"}</div></div>
+          <!-- PERF PAR CLASSE (si historique) -->
+          ${history.length ? `
+            <div class="class-perf-strip">
+              ${cryptoStats.closedCount > 0 ? `
+                <div class="class-perf-item crypto">
+                  <span class="class-perf-dot">●</span>
+                  <span class="class-perf-name">Crypto</span>
+                  <span class="class-perf-trades">${cryptoStats.closedCount} trades</span>
+                  <span class="class-perf-pnl ${cryptoStats.realizedEur >= 0 ? "positive" : "negative"}">${money(cryptoStats.realizedEur, "EUR")}</span>
+                  <span class="class-perf-wr">${cryptoStats.winRate != null ? num(cryptoStats.winRate,0)+"%" : "—"} win</span>
                 </div>
-              </div>`;
-            }
-            return `<div class="class-stats-wrap">
-              ${classStatCard("Crypto", "crypto", crypto)}
-              ${classStatCard("Actions / ETF", "stock", stocks)}
-            </div>`;
-          })()}
+              ` : ""}
+              ${stockStats.closedCount > 0 ? `
+                <div class="class-perf-item stock">
+                  <span class="class-perf-dot">●</span>
+                  <span class="class-perf-name">Actions/ETF</span>
+                  <span class="class-perf-trades">${stockStats.closedCount} trades</span>
+                  <span class="class-perf-pnl ${stockStats.realizedEur >= 0 ? "positive" : "negative"}">${money(stockStats.realizedEur, "EUR")}</span>
+                  <span class="class-perf-wr">${stockStats.winRate != null ? num(stockStats.winRate,0)+"%" : "—"} win</span>
+                  <span class="market-status-pill ${isStockMarketOpen() ? "open" : "closed"}">${isStockMarketOpen() ? "ouvert" : "fermé"}</span>
+                </div>
+              ` : ""}
+              ${cryptoStats.closedCount === 0 && stockStats.closedCount === 0 ? `<div class="muted" style="padding:8px 0;font-size:.83rem">Aucun trade fermé pour le moment.</div>` : ""}
+            </div>
+          ` : ""}
 
-          <div class="grid trades-stats" style="margin-top:14px">
-            <div class="stat-card"><div class="stat-label">Trades ouverts</div><div class="stat-value">${stats.openCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades clotures</div><div class="stat-value">${stats.closedCount}</div></div>
-            <div class="stat-card"><div class="stat-label">Trades proposes</div><div class="stat-value">${algoCounts.conseille}</div></div>
-            <div class="stat-card"><div class="stat-label">Possibles</div><div class="stat-value">${algoCounts.possible}</div></div>
-            <div class="stat-card"><div class="stat-label">A surveiller</div><div class="stat-value">${algoCounts.surveiller}</div></div>
-            <div class="stat-card"><div class="stat-label">A eviter</div><div class="stat-value">${algoCounts.eviter}</div></div>
-          </div>
-
+          <!-- POSITIONS OUVERTES -->
           <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Lecture rapide</span><span>${positions.length}</span></div>
-            <div class="portfolio-overview-text">
-              ${positions.length
-                ? `${positions.length} trade${positions.length > 1 ? "s sont" : " est"} ouvert${positions.length > 1 ? "s" : ""}. ${riskRows.length ? `${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length} position${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s sont" : " est"} proche${riskRows.filter((r) => r.distanceToStop != null && r.distanceToStop <= 2).length > 1 ? "s" : ""} du stop.` : ""}`
-                : "Aucun trade ouvert pour le moment."}
+            <div class="section-title">
+              <span>Positions ouvertes <span class="badge">${positions.length}</span></span>
+              <span style="display:flex;gap:6px;align-items:center">
+                <span class="market-status-pill open">Crypto 24/7</span>
+                <span class="market-status-pill ${isStockMarketOpen()?"open":"closed"}">${isStockMarketOpen()?"Marchés ouverts":"Marchés fermés"}</span>
+              </span>
             </div>
+            ${positions.length
+              ? `<div class="pos-list">${positions.map(renderPositionRow).join("")}</div>`
+              : `<div class="empty-state">Aucun trade ouvert.</div>`}
           </div>
 
-          <div class="risk-layout">
+          <!-- HISTORIQUE -->
+          ${history.length ? `
             <div class="card" style="margin-top:18px">
-              <div class="section-title"><span>Positions a surveiller</span><span>${riskRows.length}</span></div>
-              ${riskRows.length ? `
-                <div class="risk-list">
-                  ${riskRows.slice(0, 8).map((row) => `
-                    <div class="risk-row">
-                      <div>
-                        <div class="trade-symbol">${safeText(row.symbol)}</div>
-                        <div class="trade-sub">${safeText(row.tradeDecision || "trade ouvert")}</div>
-                      </div>
-                      <div>${badge(simpleSideLabel(row.side), row.side)}</div>
-                      <div>${row.distanceToStop == null ? "stop indisponible" : `${num(row.distanceToStop, 2)}% avant stop`}</div>
-                    </div>
-                  `).join("")}
-                </div>
-              ` : `<div class="empty-state">Aucune position ouverte pour le moment.</div>`}
-            </div>
-
-            <div class="card" style="margin-top:18px">
-              <div class="section-title"><span>Bilan rapide</span><span>historique</span></div>
-              <div class="perf-columns">
-                <div>
-                  <div class="muted" style="margin-bottom:8px">Actifs qui ont le mieux marche</div>
-                  ${insights.best.length ? insights.best.map((row) => `
-                    <div class="mini-perf-row">
-                      <span>${safeText(row.symbol)}</span>
-                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
-                    </div>
-                  `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
-                </div>
-                <div>
-                  <div class="muted" style="margin-bottom:8px">Actifs les plus difficiles</div>
-                  ${insights.worst.length ? insights.worst.map((row) => `
-                    <div class="mini-perf-row">
-                      <span>${safeText(row.symbol)}</span>
-                      <span>${money(row.pnl * fxRateUsdToEur(), "EUR")} · ${row.count} trade(s)</span>
-                    </div>
-                  `).join("") : `<div class="empty-mini">Pas assez d'historique</div>`}
+              <div class="section-title">
+                <span>Historique <span class="badge">${history.length}</span></span>
+                <div style="display:flex;gap:6px">
+                  ${algoHistory.length ? `<button class="btn btn-secondary" style="font-size:.72rem;padding:3px 9px" data-clear-history="algo">Algo</button>` : ""}
+                  ${manualHistory.length ? `<button class="btn btn-secondary" style="font-size:.72rem;padding:3px 9px" data-clear-history="manual">Manuel</button>` : ""}
+                  <button class="btn btn-danger-soft" style="font-size:.72rem;padding:3px 9px" data-clear-all-history>Tout vider</button>
                 </div>
               </div>
+              ${algoHistory.length ? `<div class="history-source-label class-crypto-lbl" style="margin-bottom:4px">Algo (${algoHistory.length})</div>${historyTable(algoHistory)}` : ""}
+              ${manualHistory.length ? `<div class="history-source-label class-stock-lbl" style="margin:${algoHistory.length?"12px":0} 0 4px">Manuel (${manualHistory.length})</div>${historyTable(manualHistory)}` : ""}
             </div>
-          </div>
+          ` : `
+            <div class="card" style="margin-top:18px">
+              <div class="section-title"><span>Historique</span></div>
+              <div class="empty-state">Aucun trade fermé. Base saine !</div>
+            </div>
+          `}
 
+          <!-- IA OUTILS -->
           ${renderPortfolioPriorityCard()}
-
-          <div class="card" style="margin-top:18px">
-            <div class="section-title"><span>Trades ouverts</span><span>${positions.length}</span></div>
-            ${positions.length ? `
-              <div class="pos-list">
-                ${positions.map(renderPositionRow).join("")}
-              </div>
-            ` : `<div class="empty-state">Aucun trade ouvert. Ouvre une fiche actif quand un trade est vraiment propose.</div>`}
-          </div>
-
-          ${(() => {
-            const algoHistory   = history.filter(p => tradeSource(p) === "algo");
-            const manualHistory = history.filter(p => tradeSource(p) === "manual");
-            function historyTable(rows) {
-              return `<div class="trade-table simplified-history">
-                <div class="trade-row trade-head">
-                  <div>Actif</div><div>Sens</div><div>Résultat</div><div>Entrée</div><div>Sortie</div><div>P/L</div><div>Clôture</div>
-                </div>
-                ${rows.map(renderHistoryRow).join("")}
-              </div>`;
-            }
-            return `
-              <div class="card" style="margin-top:18px">
-                <div class="section-title">
-                  <span>Historique — Algo <span class="badge">${algoHistory.length}</span></span>
-                  ${algoHistory.length ? `<button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" data-clear-history="algo">Vider</button>` : ""}
-                </div>
-                ${algoHistory.length ? historyTable(algoHistory) : `<div class="empty-state">Aucun trade algo cloture.</div>`}
-              </div>
-              <div class="card" style="margin-top:14px">
-                <div class="section-title">
-                  <span>Historique — Manuel <span class="badge">${manualHistory.length}</span></span>
-                  ${manualHistory.length ? `<button class="btn btn-secondary" style="font-size:.75rem;padding:4px 10px" data-clear-history="manual">Vider</button>` : ""}
-                </div>
-                ${manualHistory.length ? historyTable(manualHistory) : `<div class="empty-state">Aucun trade manuel cloture.</div>`}
-              </div>`;
-          })()}
-          ${state.settings.showAlgoJournal ? renderJournalMoteurCard() : ""}
           ${renderJournalAnalysisCard()}
+
+          ${state.settings.showAlgoJournal ? `<div style="margin-top:8px">${renderJournalMoteurCard()}</div>` : ""}
         `}
       </div>`;
   }
@@ -5227,6 +5193,16 @@ function renderMain() {
         const label = src === "algo" ? "algo" : "manuel";
         if (!confirm(`Supprimer tout l'historique ${label} ? Cette action est irréversible.`)) return;
         state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
+        persistTradesState();
+        syncTradesToSupabase().catch(() => {});
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-clear-all-history]").forEach(el => {
+      el.addEventListener("click", () => {
+        if (!confirm("Supprimer tout l'historique ? Cette action est irréversible.")) return;
+        state.trades.history = [];
         persistTradesState();
         syncTradesToSupabase().catch(() => {});
         render();

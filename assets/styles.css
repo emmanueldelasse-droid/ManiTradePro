@@ -490,6 +490,33 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
   .trade-actions.split{justify-content:stretch;flex-direction:column}
 }
 
+/* ── Wallet strip ────────────────────────────────────── */
+.wallet-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+.wallet-item{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:14px;padding:12px 14px}
+.wallet-item-equity{grid-column:span 1;border-color:rgba(255,255,255,.12)}
+.wallet-label{font-size:.7rem;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.05em;margin-bottom:4px}
+.wallet-val{font-size:1rem;font-weight:700;font-family:'Space Mono',monospace}
+@media(max-width:520px){
+  .wallet-strip{grid-template-columns:repeat(2,1fr)}
+  .wallet-item-equity{grid-column:span 2}
+}
+
+/* ── Class perf strip ────────────────────────────────── */
+.class-perf-strip{display:flex;flex-direction:column;gap:8px;margin-top:12px}
+.class-perf-item{display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;border:1px solid var(--border-subtle);flex-wrap:wrap}
+.class-perf-item.crypto{border-color:rgba(247,147,26,.2);background:rgba(247,147,26,.04)}
+.class-perf-item.stock{border-color:rgba(59,130,246,.15);background:rgba(59,130,246,.03)}
+.class-perf-dot{font-size:.6rem}
+.class-perf-item.crypto .class-perf-dot{color:#f7931a}
+.class-perf-item.stock .class-perf-dot{color:#3b82f6}
+.class-perf-name{font-size:.82rem;font-weight:700;min-width:80px}
+.class-perf-trades{font-size:.78rem;color:var(--text-secondary)}
+.class-perf-pnl{font-size:.88rem;font-weight:700;font-family:'Space Mono',monospace;margin-left:auto}
+.class-perf-wr{font-size:.75rem;color:var(--text-secondary)}
+.history-source-label{font-size:.72rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:0 2px}
+.btn-danger-soft{background:rgba(212,79,79,.12);color:#d44f4f;border:1px solid rgba(212,79,79,.2)}
+.btn-danger-soft:hover{background:rgba(212,79,79,.22)}
+
 /* ── Market status + class stats ────────────────────── */
 .market-status-pill{display:inline-flex;align-items:center;font-size:.7rem;font-weight:600;padding:2px 8px;border-radius:20px;margin-left:6px}
 .market-status-pill.open{background:rgba(15,159,104,.15);color:#0f9f68}
