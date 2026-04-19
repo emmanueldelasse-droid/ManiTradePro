@@ -6,7 +6,7 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-19 (session 5) |
+| **Dernière mise à jour** | 2026-04-19 (session 6) |
 | **IA utilisée** | Claude (claude-sonnet-4-6) |
 | **Branche active** | `main` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -17,7 +17,7 @@
 
 ## Stack technique
 - **Type** : PWA — iPhone + web, vanilla JS, zéro dépendances
-- **Frontend** : `assets/app.js` (~5430 lignes) + `assets/styles.css`
+- **Frontend** : `assets/app.js` (~5700 lignes) + `assets/styles.css`
 - **Backend** : `cloudflare-worker/worker.js` — déployé via `wrangler deploy` dans `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
 - **APIs marché** : Binance, Twelve Data (4 clés en rotation), Yahoo Finance, CoinGecko, Alpha Vantage, Finnhub, Claude AI
 - **Sync cross-device** : Supabase — tables `mtp_positions` + `mtp_trades`
@@ -25,6 +25,7 @@
 - **EUR/USD** : Sourcé depuis Yahoo Finance `EURUSD=X`
 - **Auth admin** : PIN → session token HMAC-SHA256 24h
 - **Graphiques** : Lightweight Charts v4.2 (TradingView, CDN unpkg dans `index.html`)
+- **Skill UI/UX** : `.claude/skills/ui-ux-pro-max/` — 67 styles, 96 palettes, 57 font pairings
 
 ## Indicateurs du moteur d'analyse (8)
 ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volatilité → Score de risque 0–100
@@ -36,8 +37,9 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 | `ADMIN_PIN` | Mot de passe PIN saisi dans le modal |
 | `SUPABASE_URL` | URL du projet Supabase |
 | `SUPABASE_ANON_KEY` | Clé anon Supabase |
-| `ANTHROPIC_API_KEY` | Clé Claude AI |
-| `TWELVE_DATA_KEY_1..4` | 4 clés Twelve Data en rotation |
+| `CLAUDE_API_KEY` | Clé Claude AI (nom exact dans le worker) |
+| `ALPHAVANTAGE_KEY` | Clé Alpha Vantage |
+| `TWELVE_KEY_1..4` | 4 clés Twelve Data en rotation |
 
 ⚠️ `wrangler deploy` efface les vars dashboard — toujours utiliser `wrangler secret put` et vérifier avec `wrangler secret list` après chaque deploy.
 
@@ -64,84 +66,88 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ### Ce qui fonctionne
 - [x] Dashboard — carte prioritaire, opportunités filtrables, bandeau régime de marché
+- [x] **Fear & Greed Index** — widget arc SVG dans le dashboard (alternative.me, gratuit)
+- [x] **Trending Assets** — strip de pills cliquables dans le dashboard (CoinGecko, gratuit)
 - [x] Fiche actif — score risque, plan trade, review IA Claude, chandeliers (LW Charts v4.2)
   - Timeframes 1J/4H/1H pour crypto, 1J seulement pour actions/ETF
 - [x] Mode entraînement (paper trading) — capital virtuel, positions ouvertes, historique
 - [x] Auth PIN → session token HMAC-SHA256 24h (modal Réglages)
 - [x] Sync Supabase cross-device (positions + historique)
-- [x] **Onglet Mes Trades refondu** (session 5)
-  - Wallet strip compact (5 stats en grille)
-  - Class perf strip : P/L séparé Crypto (orange) vs Actions/ETF (bleu) avec badge marché ouvert/fermé
-  - Badge marché ouvert/fermé uniquement sur Actions/ETF (pas sur Crypto)
-  - Positions ouvertes : pos-card avec barre progression stop→TP
-  - Historique unifié dans 1 carte — boutons "Vider" algo / manuel / tout
-  - IA Outils en bas : Analyse journal (F1) + Priorisation portefeuille (F2)
-- [x] **Analyse journal IA** (session 5) — POST `/api/ai/journal-analysis`
-  - claude-sonnet-4-6, analyse biais/patterns/forces/recommandations
-  - Sections séparées Crypto vs Actions dans le rendu
-- [x] **Priorisation portefeuille IA** (session 5) — POST `/api/ai/portfolio-priority`
-  - claude-haiku-4-5, ranking opportunités selon portefeuille ouvert + capital dispo
-- [x] **Auto-scan opportunités** (session 5) — toutes les N min (3/5/10/15, défaut 5 min)
-  - `isStockMarketOpen()` : intervalle allongé à 15 min si marchés fermés
-  - Alertes signaux : notif push + toast pour nouveaux "Trade proposé"
-  - Réglages : `autoScanIntervalMin` + `algoSignalNotifs`
-- [x] **Position sizing intelligent** (session 5) — 1% risk / stop distance
-  - Crypto : quantité décimale (ex: 0.024 BTC)
-  - Actions : arrondi au lot entier
+- [x] **Fix suppression historique** — `lastWipedAt` dans meta, Supabase ne réimporte plus après "Vider"
+- [x] **Export CSV** historique trades — bouton dans Mes Trades, fichier daté avec BOM UTF-8
+- [x] **Page Performance** ◈ — nouvel onglet avec :
+  - 8 stats (P&L total, win rate, R:R, espérance, gain/perte moyen)
+  - Courbe P&L cumulatif SVG (gradient vert/rouge)
+  - Meilleur / pire trade
+  - Top 5 actifs par P&L absolu
+- [x] **Notifications enrichies** — via `serviceWorker.showNotification()` :
+  - Direction (▲/▼), score de sûreté, variation 24h dans le corps
+  - `requireInteraction: true` sur signaux algo, vibration, tag dedup
+- [x] Onglet Mes Trades — wallet strip, class perf strip, positions ouvertes, historique unifié
+- [x] Analyse journal IA (F1) — POST `/api/ai/journal-analysis`, claude-sonnet-4-6
+- [x] Priorisation portefeuille IA (F2) — POST `/api/ai/portfolio-priority`, claude-haiku-4-5
+- [x] Auto-scan opportunités toutes les N min (3/5/10/15, défaut 5 min)
+- [x] Position sizing intelligent — 1% risk / stop distance
 - [x] Alertes de prix — onglet "Alertes ◉", browser notifications, toast in-app
 - [x] Adaptation iPhone complète (safe-area, 100dvh, touch 44px)
 - [x] Statut de marché temps réel sur cartes (badge coloré + heures Paris)
 - [x] Thème sombre + thème clair
+- [x] Skill ui-ux-pro-max installé dans `.claude/skills/`
 
 ### Ce qui est cassé / en cours
 - [ ] Rapports PDF hebdomadaires (non implémentés)
-- [ ] Fear & Greed Index (désactivé, retourne placeholder)
-- [ ] Trending Assets (désactivé, retourne placeholder)
+- [ ] Trending Assets — données CoinGecko présentes mais affichage conditionnel (s'affiche seulement si données chargées)
+- [ ] Mode hors-ligne complet (cache SW)
 
 ---
 
-## Dernière session (session 5)
+## Dernière session (session 6)
 
 **Date** : 2026-04-19
-**IA** : Claude (claude-sonnet-4-6) — session `01PxdzfigUq43fSNwVwDKFKV`
+**IA** : Claude (claude-sonnet-4-6) — session `01Ri7NPjeWGz87NGGBTKcCzG`
 
 ### Tâches accomplies
-1. **Refonte onglet Mes Trades** — wallet strip, class perf strip, suppression cartes redondantes
-2. **Séparation crypto/actions** — stats P/L séparés, `trainingStatsByClass()`, badge marché
-3. **Position sizing 1% risk** — calcul sur distance stop, remplacement heuristique prix
-4. **Analyse journal IA (F1)** — `/api/ai/journal-analysis`, claude-sonnet-4-6
-5. **Priorisation portefeuille IA (F2)** — `/api/ai/portfolio-priority`, claude-haiku-4-5
-6. **Auto-scan + alertes signaux** — setInterval cadencé, `checkSignalAlerts()`, notifs push
-7. **Fix light theme** — dashboard-signal-shell gris corrigé
+1. **Fix suppression historique** — `lastWipedAt` dans meta empêche Supabase de réimporter après "Vider" (5 min de protection)
+2. **Fear & Greed Index** — alternative.me API, widget arc SVG coloré dans le dashboard
+3. **Trending Assets** — CoinGecko `/search/trending`, strip de pills cliquables
+4. **Export CSV** — bouton dans historique Mes Trades, fichier téléchargeable avec BOM
+5. **Page Performance** — nouvel onglet ◈, stats globales + courbe SVG + top actifs
+6. **Notifications enrichies** — Service Worker `showNotification()`, vibration, dedup par tag
+7. **Fix bug Fear & Greed** — `getCachedOrFetch` incompatible avec `Response` → remplacé par `getMemoryCache`/`setMemoryCache` direct
+8. **Skill ui-ux-pro-max** — installé dans `.claude/skills/ui-ux-pro-max/`
+9. **SESSION.md** — mis à jour
 
-### Fichiers modifiés (session 5)
+### Fichiers modifiés (session 6)
 | Fichier | Changement |
 |---------|------------|
-| `assets/app.js` | Refonte Mes Trades, stats par classe, sizing, IA journal/priorité, auto-scan, alertes |
-| `assets/styles.css` | wallet-strip, class-perf-strip, ai-insight-card, ai-priority-row, btn-danger-soft, light theme fix |
-| `cloudflare-worker/worker.js` | POST /api/ai/journal-analysis, POST /api/ai/portfolio-priority, prompt IA séparé crypto/actions |
+| `assets/app.js` | Fix wipe, Fear&Greed widget, Trending strip, export CSV, page Performance, notifs enrichies, onglet nav ◈ |
+| `assets/styles.css` | .fg-widget, .fg-arc, .trending-strip, .trending-pill, .perf-* (stats, courbe, extremes, assets) |
+| `cloudflare-worker/worker.js` | handleFearGreed + handleTrending — APIs réelles + fix cache mémoire |
+| `SESSION.md` | Mise à jour session 6 |
+| `.claude/skills/ui-ux-pro-max/` | Skill UI/UX installé |
 
 ---
 
 ## Prochaine étape prioritaire
 
-> **TODO #1** : Tester sur iPhone — auto-scan, alertes signaux, analyse journal IA
+> **TODO #1** : Tester sur iPhone — Fear & Greed, Trending, page Performance, Export CSV
 
 > **TODO #2** : Si worker modifié → `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
+> Puis `git pull origin main` avant deploy pour avoir les derniers changements
 
 **Fonctionnalités backlog**
 - [ ] Rapports PDF hebdomadaires
-- [ ] Export CSV historique trades
 - [ ] Mode hors-ligne complet (cache SW)
+- [ ] Web Push VAPID (notifications app fermée)
 
 ---
 
 ## Contraintes de déploiement
 - Frontend : push sur `main` → GitHub Pages (2-5 min, Ctrl+Shift+R)
-- Worker : `wrangler deploy` dans le dossier `cloudflare-worker/`
+- Worker : `wrangler deploy` dans le dossier `cloudflare-worker/` (toujours `git pull origin main` avant)
 - ⚠️ Après `wrangler deploy` : vérifier `wrangler secret list` que SUPABASE_URL est présent
 - Tout le frontend dans `assets/app.js` — pas de séparation en modules
-- Squash merge = commits poussés APRÈS ne sont pas inclus → vérifier avant de merger
+- Le nom exact de la clé Claude dans le worker est `CLAUDE_API_KEY` (pas `ANTHROPIC_API_KEY`)
 
 ---
 
@@ -153,4 +159,5 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 | 2026-04-19 | Claude sonnet-4-6 | Alertes de prix + adaptation iPhone (PR #24) |
 | 2026-04-19 | Claude sonnet-4-6 | Fix trades iPhone : worker mapping + loadTradesState + SW v6.1 |
 | 2026-04-19 | Claude sonnet-4-6 | Chandeliers + pos-card + historique algo/manuel + fixes Supabase (PR #28+29) |
-| 2026-04-19 | Claude sonnet-4-6 | Refonte Mes Trades + IA journal/priorité + auto-scan + sizing (non documenté) |
+| 2026-04-19 | Claude sonnet-4-6 | Refonte Mes Trades + IA journal/priorité + auto-scan + sizing |
+| 2026-04-19 | Claude sonnet-4-6 | Fix wipe historique + Fear&Greed + Trending + CSV + Performance + notifs enrichies |
