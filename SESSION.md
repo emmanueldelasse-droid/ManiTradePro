@@ -6,7 +6,7 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-19 |
+| **Dernière mise à jour** | 2026-04-19 (session 3) |
 | **IA utilisée** | Claude (claude-sonnet-4-6) |
 | **Branche active** | `claude/check-system-oNPEA` (PR #24 ouverte → main) |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -87,16 +87,21 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 - [ ] Graphiques en chandeliers (non implémentés)
 - [ ] Journal de trading dédié (partiellement via algo journal)
 - [ ] Rapports PDF hebdomadaires (non implémentés)
-- [ ] Erreur Supabase `decision column` — colonne manquante dans le schéma DB (à corriger côté Supabase)
+- [x] **Erreur Supabase `decision column`** — corrigé dans worker.js avec `mapPositionForSupabase`/`mapTradeForSupabase` (snake_case uniquement)
+- [x] **Trades invisibles sur iPhone** — chaîne de bugs résolue :
+  1. PGRST204 (colonne `decision`) → circuit breaker → `pendingRemoteSync=true` bloqué
+  2. Logique `preferLocal` inversée (PR #27)
+  3. `pendingRemoteSync` ignoré dans nouvelle `loadTradesState()` — compare counts uniquement
+  4. SW cache v6.1 force rechargement app.js sur iPhone
 
 ---
 
 ## Dernière session
 
-**Date** : 2026-04-19
+**Date** : 2026-04-19 (sessions 2 et 3)
 **IA** : Claude (claude-sonnet-4-6)
 
-### Tâches accomplies
+### Tâches accomplies (session 2)
 1. **Alertes de prix** — système complet
    - Storage `mtp_price_alerts_v1`, fonctions load/save/add/remove/check/notify
    - Onglet "Alertes" dans bottom nav, page dédiée, modal d'ajout depuis fiche actif
@@ -109,33 +114,45 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
    - `remoteStatusText()` : erreurs JSON tronquées/masquées proprement
    - Sous-titre "Mes trades" raccourci
 
+### Tâches accomplies (session 3)
+3. **Fix trades invisibles sur iPhone** — diagnostic + correction complète
+   - `worker.js` : `mapPositionForSupabase` / `mapTradeForSupabase` — mapping camelCase→snake_case, évite PGRST204
+   - `loadTradesState()` complètement réécrite — compare uniquement les comptages, ignore `pendingRemoteSync`
+   - `sw.js` : CACHE_VERSION v6.0 → v6.1 — force rechargement sur iPhone
+
 ### Bugs résolus
 - Contenu débordant horizontalement sur iPhone (overflow-x manquant)
 - Erreur Supabase JSON brute affichée en plein écran
 - Zoom automatique iOS au focus sur les champs de saisie
 - Flash gris au toucher des boutons/items
 - Barre d'adresse Safari qui cassait la hauteur 100vh
+- PGRST204 `decision column` → circuit breaker → trades invisibles sur iPhone
+- `preferLocal` inversé (logique `localHasFewerOpenPositions` au lieu de `More`)
+- `pendingRemoteSync=true` permanent bloquant la récupération Supabase
 
 ### Décisions techniques prises
 - `overflow-x: hidden` sur `.app-shell`, `.main-content`, `.screen` pour bloquer le scroll horizontal
 - `word-break: break-word` + `overflow-wrap: anywhere` sur tous les conteneurs de texte
 - `setting-row > div { flex:1; min-width:0 }` pour que le texte se contracte sans pousser le toggle hors écran
 - Bottom nav à 68px (au lieu de 64) pour meilleure accessibilité
+- `loadTradesState()` : logique counts-only, pas de flag `pendingRemoteSync` dans la décision
 
 ### Fichiers modifiés
 | Fichier | Changement |
 |---------|------------|
-| `assets/app.js` | +350 lignes — alertes de prix, subtitle raccourci, erreur tronquée |
+| `assets/app.js` | +385 lignes — alertes de prix, subtitle raccourci, erreur tronquée, loadTradesState réécrit |
 | `assets/styles.css` | +110 lignes — adaptation iPhone complète, overflow fixes |
 | `index.html` | +4 lignes — meta tags iOS |
+| `cloudflare-worker/worker.js` | mapPositionForSupabase / mapTradeForSupabase |
+| `sw.js` | CACHE_VERSION v6.1 |
 
 ---
 
 ## Prochaine étape prioritaire
 
-> **TODO #1** : Merger la PR #24 sur GitHub (`claude/check-system-oNPEA` → `main`)
+> **TODO #1** : Merger la PR ouverte (`claude/check-system-oNPEA` → `main`) pour déployer le fix trades iPhone
 
-> **TODO #2** : Corriger l'erreur Supabase `PGRST204 — 'decision' column of 'mtp_trades' in the schema` — ajouter la colonne `decision` dans le schéma Supabase
+> **TODO #2** : Vérifier sur iPhone que les 2 trades ouverts (AAPL, SPY) sont bien visibles après merge + rechargement
 
 **Fonctionnalités planifiées (backlog)**
 - [ ] Graphiques en chandeliers
@@ -160,3 +177,4 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 |------|----|--------|
 | 2026-04-19 | Claude sonnet-4-6 | Création SESSION.md + PR #16 auth PIN session token |
 | 2026-04-19 | Claude sonnet-4-6 | Alertes de prix + adaptation iPhone complète (PR #24) |
+| 2026-04-19 | Claude sonnet-4-6 | Fix trades invisibles iPhone : worker mapping + loadTradesState réécriture + SW v6.1 |

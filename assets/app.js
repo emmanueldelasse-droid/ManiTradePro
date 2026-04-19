@@ -598,46 +598,53 @@
     const localPositions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
     const localHistory = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
     const meta = loadTradesMeta();
-    const localUpdatedAt = Number(meta?.localUpdatedAt || meta?.updatedAt || 0);
-    const lastSuccessfulRemoteSyncAt = Number(meta?.lastSuccessfulRemoteSyncAt || 0);
-    const hasLocalTrades = localPositions.length > 0 || localHistory.length > 0;
 
     const remotePositionsCount = Array.isArray(remote.positions) ? remote.positions.length : 0;
     const remoteHistoryCount = Array.isArray(remote.history) ? remote.history.length : 0;
     const localPositionsCount = localPositions.length;
     const localHistoryCount = localHistory.length;
+    const hasLocalTrades = localPositionsCount > 0 || localHistoryCount > 0;
 
-    const localHasMoreClosedHistory = localHistoryCount > remoteHistoryCount;
-    const localHasMoreOpenPositions = localPositionsCount > remotePositionsCount;
-    const preferLocal = hasLocalTrades && (
-      meta?.pendingRemoteSync === true ||
-      (localUpdatedAt > 0 && lastSuccessfulRemoteSyncAt > 0 && localUpdatedAt > lastSuccessfulRemoteSyncAt) ||
-      localHasMoreClosedHistory ||
-      localHasMoreOpenPositions
-    );
+    if (remote.loaded && remote.configured) {
+      const remoteHasMorePositions = remotePositionsCount > localPositionsCount;
+      const remoteHasMoreHistory = remoteHistoryCount > localHistoryCount;
+      const localHasMorePositions = localPositionsCount > remotePositionsCount;
+      const localHasMoreHistory = localHistoryCount > remoteHistoryCount;
 
-    if (remote.loaded && remote.configured && !preferLocal) {
-      state.trades.positions = Array.isArray(remote.positions) ? remote.positions : [];
-      state.trades.history = Array.isArray(remote.history) ? remote.history : [];
-      saveTradesMeta({
-        migratedAt: Date.now(),
-        pendingRemoteSync: false,
-        lastSuccessfulRemoteSyncAt: Date.now(),
-        positionsCount: state.trades.positions.length,
-        historyCount: state.trades.history.length
-      });
+      if (remoteHasMorePositions || remoteHasMoreHistory || !hasLocalTrades) {
+        // Supabase a plus de données → toujours prioritaire
+        state.trades.positions = remote.positions;
+        state.trades.history = remote.history;
+        saveTradesMeta({
+          migratedAt: Date.now(),
+          pendingRemoteSync: false,
+          lastSuccessfulRemoteSyncAt: Date.now(),
+          positionsCount: state.trades.positions.length,
+          historyCount: state.trades.history.length
+        });
+      } else {
+        // Local a au moins autant → utiliser local et synchroniser
+        state.trades.positions = localPositions;
+        state.trades.history = localHistory;
+        const needsSync = localHasMorePositions || localHasMoreHistory;
+        saveTradesMeta({
+          migratedAt: Date.now(),
+          positionsCount: state.trades.positions.length,
+          historyCount: state.trades.history.length,
+          pendingRemoteSync: needsSync
+        });
+        if (needsSync) syncTradesToSupabase().catch(() => {});
+      }
     } else {
+      // Supabase inaccessible → local uniquement
       state.trades.positions = localPositions;
       state.trades.history = localHistory;
       saveTradesMeta({
         migratedAt: Date.now(),
         positionsCount: state.trades.positions.length,
         historyCount: state.trades.history.length,
-        pendingRemoteSync: meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasMoreOpenPositions
+        pendingRemoteSync: hasLocalTrades
       });
-      if (remote.configured && (meta?.pendingRemoteSync === true || localHasMoreClosedHistory || localHasMoreOpenPositions)) {
-        syncTradesToSupabase().catch(() => {});
-      }
     }
 
     state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
