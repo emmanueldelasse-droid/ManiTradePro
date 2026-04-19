@@ -3914,48 +3914,48 @@ function mergeEngineWithAi(enginePayload, aiReview) {
 // AUTRES ROUTES
 // ============================================================
 async function handleFearGreed() {
-  return getCachedOrFetch("fear_greed", TTL.fearGreed, async () => {
-    try {
-      const res = await fetch("https://api.alternative.me/fng/?limit=1", { cf: { cacheTtl: 300 } });
-      if (!res.ok) throw new Error(`fng_http_${res.status}`);
-      const body = await res.json();
-      const entry = Array.isArray(body?.data) ? body.data[0] : null;
-      if (!entry) throw new Error("fng_empty");
-      const value = parseInt(entry.value, 10);
-      const label = entry.value_classification || "Unknown";
-      return ok({ value, label, timestamp: entry.timestamp }, "alternative.me", nowIso(), "fresh");
-    } catch (err) {
-      return partial({ value: null, label: null }, "error", nowIso(), "unknown", String(err?.message || err));
-    }
-  });
+  const cached = getMemoryCache("fear_greed");
+  if (cached) return json(cached);
+  try {
+    const res = await fetch("https://api.alternative.me/fng/?limit=1");
+    if (!res.ok) throw new Error(`fng_http_${res.status}`);
+    const body = await res.json();
+    const entry = Array.isArray(body?.data) ? body.data[0] : null;
+    if (!entry) throw new Error("fng_empty");
+    const value = parseInt(entry.value, 10);
+    const payload = { status: "ok", source: "alternative.me", asOf: nowIso(), freshness: "fresh", data: { value, label: entry.value_classification || "Unknown", timestamp: entry.timestamp } };
+    setMemoryCache("fear_greed", TTL.fearGreed, payload);
+    return json(payload);
+  } catch (err) {
+    return json({ status: "partial", source: "error", asOf: nowIso(), freshness: "unknown", message: String(err?.message || err), data: { value: null, label: null } });
+  }
 }
 
 async function handleTrending() {
-  return getCachedOrFetch("trending_coins", TTL.trending, async () => {
-    try {
-      const res = await fetch("https://api.coingecko.com/api/v3/search/trending", {
-        headers: { "Accept": "application/json" },
-        cf: { cacheTtl: 300 }
-      });
-      if (!res.ok) throw new Error(`coingecko_http_${res.status}`);
-      const body = await res.json();
-      const coins = Array.isArray(body?.coins) ? body.coins.slice(0, 7) : [];
-      const data = coins.map(c => {
-        const item = c?.item || {};
-        const pct24h = item?.data?.price_change_percentage_24h?.usd ?? null;
-        return {
-          id: item.id || null,
-          symbol: (item.symbol || "").toUpperCase(),
-          name: item.name || null,
-          rank: item.market_cap_rank || null,
-          pct24h: typeof pct24h === "number" ? Math.round(pct24h * 100) / 100 : null
-        };
-      });
-      return ok(data, "coingecko", nowIso(), "fresh");
-    } catch (err) {
-      return partial([], "error", nowIso(), "unknown", String(err?.message || err));
-    }
-  });
+  const cached = getMemoryCache("trending_coins");
+  if (cached) return json(cached);
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/search/trending", { headers: { "Accept": "application/json" } });
+    if (!res.ok) throw new Error(`coingecko_http_${res.status}`);
+    const body = await res.json();
+    const coins = Array.isArray(body?.coins) ? body.coins.slice(0, 7) : [];
+    const data = coins.map(c => {
+      const item = c?.item || {};
+      const pct24h = item?.data?.price_change_percentage_24h?.usd ?? null;
+      return {
+        id: item.id || null,
+        symbol: (item.symbol || "").toUpperCase(),
+        name: item.name || null,
+        rank: item.market_cap_rank || null,
+        pct24h: typeof pct24h === "number" ? Math.round(pct24h * 100) / 100 : null
+      };
+    });
+    const payload = { status: "ok", source: "coingecko", asOf: nowIso(), freshness: "fresh", data };
+    setMemoryCache("trending_coins", TTL.trending, payload);
+    return json(payload);
+  } catch (err) {
+    return json({ status: "partial", source: "error", asOf: nowIso(), freshness: "unknown", message: String(err?.message || err), data: [] });
+  }
 }
 async function handleEconomicCalendar() { return json({ status:"not_configured",source:null,asOf:null,freshness:"unknown",message:"Economic calendar not configured",data:[] }); }
 async function handlePortfolioSummary() { return json({ status:"not_configured",source:null,asOf:null,freshness:"unknown",message:"No real portfolio source configured",data:{totalEquity:null,availableCash:null,totalPnl:null,totalPnlPct:null} }); }
