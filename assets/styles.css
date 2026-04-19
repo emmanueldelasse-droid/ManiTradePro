@@ -1134,5 +1134,158 @@ html.theme-light-root :root{
   .screen{padding-left:calc(14px + var(--safe-left));padding-right:calc(14px + var(--safe-right))}
 }
 
+/* =====================================================
+   BENTO DASHBOARD
+   ===================================================== */
+:root{--font-data:'Fira Code','Space Mono',ui-monospace,monospace}
+
+.db-refresh-notice{
+  padding:10px 16px;border-radius:12px;margin-bottom:14px;
+  font-size:.82rem;color:var(--text-secondary);
+  background:rgba(255,255,255,.04);border:1px solid var(--border-subtle);
+}
+
+/* Stat tiles row */
+.db-stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}
+.db-stat-tile{
+  padding:18px 16px 16px;border-radius:20px;
+  border:1px solid rgba(255,255,255,.07);
+  background:linear-gradient(145deg,rgba(20,27,45,.92),rgba(11,16,30,.92));
+  display:flex;flex-direction:column;gap:8px;
+  cursor:default;position:relative;overflow:hidden;
+  transition:transform 150ms ease,box-shadow 150ms ease;
+}
+.db-stat-tile:hover{transform:translateY(-2px);box-shadow:0 14px 36px rgba(0,0,0,.3)}
+.db-stat-tile::after{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(120deg,rgba(255,255,255,.04),transparent 40%);
+}
+.db-stat-icon{width:18px;height:18px;opacity:.65}
+.db-stat-icon svg{width:18px;height:18px;display:block}
+.db-stat-value{font-family:var(--font-data);font-size:2rem;font-weight:700;line-height:1}
+.db-stat-label{font-size:.68rem;letter-spacing:.1em;text-transform:uppercase;color:var(--text-muted)}
+
+.db-stat-portfolio{border-color:rgba(99,102,241,.18)}
+.db-stat-portfolio .db-stat-value{color:#818cf8}
+.db-stat-portfolio .db-stat-icon{color:#818cf8}
+
+.db-stat-scan{border-color:rgba(34,211,238,.18)}
+.db-stat-scan .db-stat-value{color:#22d3ee}
+.db-stat-scan .db-stat-icon{color:#22d3ee}
+
+.db-stat-bull{border-color:rgba(34,197,94,.18)}
+.db-stat-bull .db-stat-value{color:#22c55e}
+.db-stat-bull .db-stat-icon{color:#22c55e}
+
+.db-stat-bear{border-color:rgba(239,68,68,.18)}
+.db-stat-bear .db-stat-value{color:#ef4444}
+.db-stat-bear .db-stat-icon{color:#ef4444}
+
+/* Bento grid */
+.db-bento{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+
+.db-bento-signal{
+  grid-column:span 2;
+  background:
+    radial-gradient(circle at top right,rgba(0,229,160,.13),transparent 30%),
+    radial-gradient(circle at bottom left,rgba(82,146,255,.10),transparent 34%),
+    linear-gradient(145deg,rgba(20,27,45,.98),rgba(11,16,30,.98));
+  border-color:rgba(125,170,255,.12);
+  transition:box-shadow 200ms ease;
+}
+.db-bento-signal:hover{box-shadow:0 22px 60px rgba(0,0,0,.38)}
+
+.db-bento-algo{
+  grid-column:span 1;
+  background:
+    radial-gradient(circle at top left,rgba(110,132,255,.14),transparent 28%),
+    linear-gradient(155deg,rgba(19,25,43,.98),rgba(12,17,31,.98));
+  border-color:rgba(131,146,255,.12);
+}
+
+/* Signal leader body */
+.db-signal-body{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start}
+.db-signal-kicker{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:rgba(150,176,226,.65);margin-bottom:10px}
+.db-signal-symbol{font-family:var(--font-data);font-size:1.7rem;font-weight:700;line-height:1;margin-bottom:6px}
+.db-signal-name{font-size:.95rem;color:var(--text-primary);margin-bottom:10px;line-height:1.35}
+.db-signal-summary{font-size:.82rem;color:var(--text-secondary);line-height:1.5;max-width:32ch}
+.db-signal-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+
+.db-signal-right{display:flex;flex-direction:column;gap:12px}
+.db-signal-score-wrap{
+  display:flex;gap:14px;align-items:center;
+  padding:14px 16px;border-radius:16px;
+  background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.02));
+  border:1px solid rgba(255,255,255,.07);
+}
+.db-signal-decision-label{font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);margin-bottom:6px}
+.db-signal-decision-title{font-size:1rem;font-weight:800;color:var(--text-primary);line-height:1.25}
+.db-signal-decision-text{font-size:.78rem;color:var(--text-secondary);line-height:1.4;margin-top:5px;max-width:22ch}
+
+.db-signal-metrics{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.db-signal-metrics .top-pick-line{border-radius:14px}
+
+.db-open-btn{
+  background:linear-gradient(135deg,rgba(0,229,160,.18),rgba(82,146,255,.14));
+  border-color:rgba(0,229,160,.22);color:var(--text-primary);
+  width:100%;font-weight:600;letter-spacing:.02em;
+  transition:background 200ms,border-color 200ms,transform 100ms;
+  cursor:pointer;
+}
+.db-open-btn:hover{
+  background:linear-gradient(135deg,rgba(0,229,160,.28),rgba(82,146,255,.22));
+  border-color:rgba(0,229,160,.38);transform:translateY(-1px);
+}
+.db-open-btn:active{transform:scale(.98)}
+
+/* Algo stack */
+.db-algo-stack{display:flex;flex-direction:column;gap:10px}
+.db-algo-card{
+  padding:12px 14px;border-radius:14px;
+  border:1px solid rgba(255,255,255,.06);
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.015));
+  transition:background 150ms;
+}
+.db-algo-card:hover{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.03))}
+.db-algo-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.db-algo-symbol{font-family:var(--font-data);font-size:.95rem;font-weight:700}
+.db-algo-date{font-size:.7rem;color:var(--text-muted);margin-bottom:4px}
+.db-algo-reason{font-size:.78rem;color:var(--text-secondary);line-height:1.4}
+
+/* List card */
+.db-list-card{margin-bottom:0}
+
+/* Light theme overrides */
+.app-shell.theme-light .db-stat-tile{
+  background:rgba(255,255,255,.85);border-color:rgba(0,0,0,.07);
+}
+.app-shell.theme-light .db-bento-signal{
+  background:linear-gradient(145deg,rgba(240,248,255,.95),rgba(230,244,255,.95));
+  border-color:rgba(99,160,255,.18);
+}
+.app-shell.theme-light .db-bento-algo{
+  background:linear-gradient(155deg,rgba(242,240,255,.95),rgba(235,235,255,.95));
+  border-color:rgba(130,100,255,.15);
+}
+.app-shell.theme-light .db-signal-score-wrap{
+  background:rgba(255,255,255,.7);border-color:rgba(0,0,0,.07);
+}
+.app-shell.theme-light .db-algo-card{
+  background:rgba(255,255,255,.6);border-color:rgba(0,0,0,.06);
+}
+.app-shell.theme-light .db-signal-symbol,
+.app-shell.theme-light .db-algo-symbol{color:#0f172a}
+.app-shell.theme-light .db-signal-decision-title{color:#0f172a}
+
+/* Mobile responsive */
+@media (max-width:860px){
+  .db-stats-row{grid-template-columns:repeat(2,1fr);gap:10px}
+  .db-stat-value{font-size:1.6rem}
+  .db-bento{grid-template-columns:1fr}
+  .db-bento-signal{grid-column:span 1}
+  .db-signal-body{grid-template-columns:1fr}
+  .db-signal-metrics{grid-template-columns:1fr 1fr}
+}
+
 /* Empêche le rebond de scroll sur iOS au niveau du body */
 body{overscroll-behavior:none}
