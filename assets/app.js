@@ -25,6 +25,8 @@
 
   const defaultSettings = {
     autoRefreshOpportunities: true,
+    autoScanIntervalMin: 5,
+    algoSignalNotifs: false,
     showSourceBadges: true,
     showScoreBreakdown: true,
     compactCards: false,
@@ -103,7 +105,8 @@
     priceAlerts: [],
     alertModal: { open: false, symbol: null, name: null, currentPrice: null },
     alertToast: null,
-    chartTimeframe: "1d"
+    chartTimeframe: "1d",
+    algoSignalsPrev: null
   };
 
   const app = document.getElementById("app");
@@ -1419,6 +1422,33 @@ function confirmTradeFromModal() {
     return await Notification.requestPermission();
   }
 
+  function checkSignalAlerts() {
+    if (!state.settings.algoSignalNotifs) return;
+    const currentSignals = new Set(
+      state.opportunities
+        .filter(o => o.tradeNow === true || String(o.officialDecision || "").toLowerCase().includes("trade propose"))
+        .map(o => o.symbol)
+    );
+    if (state.algoSignalsPrev === null) {
+      state.algoSignalsPrev = currentSignals;
+      return;
+    }
+    if (Notification.permission === "granted") {
+      currentSignals.forEach(sym => {
+        if (!state.algoSignalsPrev.has(sym)) {
+          const o = state.opportunities.find(x => x.symbol === sym);
+          if (!o) return;
+          const scoreStr = o.officialScore != null ? ` · score ${o.officialScore}` : "";
+          const title = `Signal ◉ ${sym}`;
+          const body = `${o.name} — Trade propose${scoreStr}`;
+          try { new Notification(title, { body, icon: "/ManiTradePro/icons/icon-192.png" }); } catch (_) {}
+          showAlertToast(title, body);
+        }
+      });
+    }
+    state.algoSignalsPrev = currentSignals;
+  }
+
   function setOpportunities(rows) {
     const prepared = Array.isArray(rows) ? backfillOpportunities(rows).map(normalizeOpportunity) : [];
     state.opportunities = prepared;
@@ -1428,6 +1458,7 @@ function confirmTradeFromModal() {
     state.opportunitiesFetchedAt = Date.now();
     state.opportunitiesLastGoodAt = state.opportunitiesFetchedAt;
     checkPriceAlerts();
+    checkSignalAlerts();
   }
 
   // =========================
@@ -4685,6 +4716,27 @@ function openPositionsRiskView() {
 
             <label class="setting-row">
               <div>
+                <div class="setting-title">Scan auto — intervalle</div>
+                <div class="setting-desc">Frequence de relance automatique du scan des opportunites.</div>
+              </div>
+              <select class="setting-select" data-setting-select="autoScanIntervalMin">
+                <option value="3" ${Number(state.settings.autoScanIntervalMin) === 3 ? "selected" : ""}>3 min</option>
+                <option value="5" ${Number(state.settings.autoScanIntervalMin) === 5 || !state.settings.autoScanIntervalMin ? "selected" : ""}>5 min</option>
+                <option value="10" ${Number(state.settings.autoScanIntervalMin) === 10 ? "selected" : ""}>10 min</option>
+                <option value="15" ${Number(state.settings.autoScanIntervalMin) === 15 ? "selected" : ""}>15 min</option>
+              </select>
+            </label>
+
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Alertes signaux algo</div>
+                <div class="setting-desc">Notif push quand un actif passe en "Trade propose" apres un scan.</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="algoSignalNotifs" ${state.settings.algoSignalNotifs ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row">
+              <div>
                 <div class="setting-title">Afficher source et mise a jour</div>
                 <div class="setting-desc">Montre les badges fournisseur et fraicheur sur les cartes.</div>
               </div>
@@ -5028,9 +5080,12 @@ function renderMain() {
     });
 
     app.querySelectorAll("[data-setting-toggle]").forEach(el => {
-      el.addEventListener("change", () => {
+      el.addEventListener("change", async () => {
         const key = el.getAttribute("data-setting-toggle");
         state.settings[key] = el.checked;
+        if (key === "algoSignalNotifs" && el.checked) {
+          await requestNotificationsPermission();
+        }
         persistSettings();
         render();
       });
@@ -5199,6 +5254,12 @@ function renderMain() {
       if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio", "alerts"].includes(state.route)) {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
+        }
+        if (state.settings.autoRefreshOpportunities && !state.opportunitiesRefreshing) {
+          const intervalMs = Number(state.settings.autoScanIntervalMin || 5) * 60 * 1000;
+          if (Date.now() - (state.opportunitiesLastGoodAt || 0) >= intervalMs) {
+            loadOpportunities(false).catch(() => {});
+          }
         }
         render();
       }
