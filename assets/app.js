@@ -5382,13 +5382,6 @@ function renderMain() {
       });
     });
 
-    app.querySelectorAll("[data-add-trade]").forEach(el => {
-      el.addEventListener("click", (ev) => {
-        ev.stopPropagation();
-        openTradeConfirmModal("manual", el.getAttribute("data-add-trade"));
-      });
-    });
-
     app.querySelectorAll("[data-create-trade-plan]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
@@ -5487,19 +5480,6 @@ function renderMain() {
       });
     });
 
-    app.querySelectorAll("[data-setting-input]").forEach(el => {
-      el.addEventListener("input", () => {
-        const key = el.getAttribute("data-setting-input");
-        state.settings[key] = el.value;
-        persistSettings();
-      });
-      el.addEventListener("change", () => {
-        const key = el.getAttribute("data-setting-input");
-        state.settings[key] = el.value;
-        persistSettings();
-        render();
-      });
-    });
 
     // PIN modal
     app.querySelectorAll("[data-pin-cancel]").forEach(el => {

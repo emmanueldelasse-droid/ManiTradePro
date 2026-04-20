@@ -1,12 +1,15 @@
 # SESSION – ManiTradePro
 > **Fichier de continuité de session — à lire en PREMIER à chaque nouvelle session IA**
 
+> ⚠️ **RÈGLE IMPÉRATIVE** : Mettre à jour ce fichier **après chaque évolution**, pas en fin de session.
+> Chaque commit = une mise à jour SESSION.md. Ne pas attendre la "fin" pour documenter.
+
 ---
 
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-19 (session 6) |
+| **Dernière mise à jour** | 2026-04-20 (session 7) |
 | **IA utilisée** | Claude (claude-sonnet-4-6) |
 | **Branche active** | `main` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -93,6 +96,15 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 - [x] Statut de marché temps réel sur cartes (badge coloré + heures Paris)
 - [x] Thème sombre + thème clair
 - [x] Skill ui-ux-pro-max installé dans `.claude/skills/`
+- [x] **SVG icons** — icônes Unicode remplacées par SVG inline (sidebar + bottom nav)
+- [x] **Touch targets 44px** — `.chart-tf-btn`, `.alert-remove-btn`, `.chip` corrigés
+- [x] **Focus-visible** — styles `:focus-visible` sur tous les éléments interactifs
+- [x] **prefers-reduced-motion** — media query respectée (animations désactivées)
+- [x] **Fix light theme bottom nav** — sélecteur `.bottom-nav-item` → `.bnav-item` corrigé
+- [x] **Fix bouton "Ouvrir la fiche"** — `data-open-detail` n'avait aucun event listener
+- [x] **Fix trending pills** — même cause que ci-dessus, maintenant fonctionnels
+- [x] **Fix grille métriques dashboard** — `display:grid` manquant sur `.dashboard-signal-metrics`
+- [x] **Audit complet** — 31 attributs `data-*` vérifiés, 2 listeners morts identifiés (non bloquants)
 
 ### Ce qui est cassé / en cours
 - [ ] Rapports PDF hebdomadaires (non implémentés)
@@ -101,7 +113,33 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
-## Dernière session (session 6)
+## Dernière session (session 7)
+
+**Date** : 2026-04-20
+**IA** : Claude (claude-sonnet-4-6) — session `016LshGrx2qNfVfgyR5r6DsK`
+
+### Tâches accomplies
+1. **SVG icons** — icônes Unicode (⌂◎◉◫◈◦) → SVG inline Lucide dans sidebar + bottom nav
+2. **Fix light theme bottom nav** — sélecteur `.bottom-nav-item` inexistant → `.bnav-item`
+3. **Touch targets 44px** — `.chart-tf-btn` (32→44px), `.alert-remove-btn`, `.chip`
+4. **Accessibilité** — `:focus-visible`, `prefers-reduced-motion`, `line-height:1.6`, `scroll-behavior:smooth`
+5. **Modal iPhone** — `padding` avec `safe-area-inset` pour notch/Dynamic Island
+6. **Fix `data-open-detail`** — event listener manquant → bouton "Ouvrir la fiche" + trending pills non fonctionnels
+7. **Fix `.dashboard-signal-metrics`** — `display:grid` manquant → KPI restaient en colonne
+8. **Audit complet** — 31 attributs `data-*` vérifiés sur toute l'app, 2 listeners morts identifiés (non bloquants)
+9. **Nettoyage PRs** — PR #39 mergée, PR #35/#21/#17/#2 fermées (conflits irréparables)
+10. **SESSION.md** — règle de mise à jour continue ajoutée
+
+### Fichiers modifiés (session 7)
+| Fichier | Changement |
+|---------|------------|
+| `assets/app.js` | SVG icons dans navItems, event listener `data-open-detail` |
+| `assets/styles.css` | Touch targets, focus-visible, prefers-reduced-motion, display:grid metrics, light theme fix |
+| `SESSION.md` | Mise à jour session 7 + règle mise à jour continue |
+
+---
+
+## Session précédente (session 6)
 
 **Date** : 2026-04-19
 **IA** : Claude (claude-sonnet-4-6) — session `01Ri7NPjeWGz87NGGBTKcCzG`
@@ -130,9 +168,11 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Prochaine étape prioritaire
 
-> **TODO #1** : Tester sur iPhone — Fear & Greed, Trending, page Performance, Export CSV
+> **TODO #1** : Supprimer les 2 listeners morts (`data-add-trade`, `data-setting-input`) dans `bindEvents()`
 
-> **TODO #2** : Si worker modifié → `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
+> **TODO #2** : Tester sur iPhone — SVG icons, bouton "Ouvrir la fiche", trending pills, thème clair bottom nav
+
+> **TODO #3** : Si worker modifié → `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
 > Puis `git pull origin main` avant deploy pour avoir les derniers changements
 
 **Fonctionnalités backlog**
@@ -182,3 +222,4 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 | 2026-04-19 | Claude sonnet-4-6 | Chandeliers + pos-card + historique algo/manuel + fixes Supabase (PR #28+29) |
 | 2026-04-19 | Claude sonnet-4-6 | Refonte Mes Trades + IA journal/priorité + auto-scan + sizing |
 | 2026-04-19 | Claude sonnet-4-6 | Fix wipe historique + Fear&Greed + Trending + CSV + Performance + notifs enrichies |
+| 2026-04-20 | Claude sonnet-4-6 | UI/UX iPhone/web — SVG icons, touch targets, a11y, fix data-open-detail, fix grid metrics |
