@@ -2970,7 +2970,7 @@ function renderTradePlanHero(detail, plan) {
   ].filter(Boolean);
 
   return `
-    <div class="plan-card" style="border:1px solid rgba(255,255,255,.10);background:linear-gradient(135deg, rgba(21,31,58,.96), rgba(10,16,32,.96));padding:18px">
+    <div class="plan-card" style="padding:18px">
       <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
         <div style="min-width:0;flex:1;">
           <div class="muted" style="text-transform:uppercase;letter-spacing:.08em;font-size:12px">Plan de trade</div>
