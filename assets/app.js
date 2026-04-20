@@ -5375,6 +5375,13 @@ function renderMain() {
       el.addEventListener("click", () => navigate("asset-detail", el.getAttribute("data-symbol")));
     });
 
+    app.querySelectorAll("[data-open-detail]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        navigate("asset-detail", el.getAttribute("data-open-detail"));
+      });
+    });
+
     app.querySelectorAll("[data-add-trade]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
