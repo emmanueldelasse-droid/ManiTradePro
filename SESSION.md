@@ -129,7 +129,15 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
    - `8802c1e` clavier virtuel via visualViewport + scrollIntoView
    - `0023410` back-swipe iOS via history API (pushState drill-down, replaceState tabs, popstate listener)
    - `381e218` pull-to-refresh dashboard/opportunités/portfolio/alerts avec haptique
-7. **SESSION.md** — plan de refonte iPhone + Sprint 1 coché.
+7. **Sprint 2 iPhone livré (P1.5, P1.6, P1.7, P1.10)** :
+   - `6131bf7` bottom-nav 5 items + menu Plus
+   - `e1d1d8d` sticky filter bar opportunités + scroll horizontal chips
+   - `35fa4ec` chart plein écran avec back-swipe iOS
+   - `020015c` audit overflow 320-390px (regime-banner, grids mobile, ellipsis bnav)
+8. **Auto-update SW (`176524d`)** — assets en network-first, `updateViaCache:"none"`, controllerchange reload auto, check update 5 min + visibilitychange.
+9. **Agent Claude Code bug-hunter (`4a82219`)** — 6 classes de bugs UI récurrentes documentées.
+10. **CLAUDE.md (`8935ec9`)** — règle workflow git permanente.
+11. **SESSION.md** — plan de refonte iPhone + Sprints 1 et 2 cochés.
 
 ### Fichiers modifiés (session 8)
 | Fichier | Changement |
@@ -203,13 +211,13 @@ Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commi
 - [x] **P0.3** Pull-to-refresh sur dashboard/opportunités/portfolio/alerts — indicateur `.ptr-indicator` animé via `--ptr-pull`, seuil 60 px, vibration 10 ms.
 - [x] **P0.4** Body scroll lock (`html.has-modal`) + scroll interne `.modal-box` (max-height respectant safe-area) + tap backdrop ferme modal Alerte/PIN.
 
-### Sprint 2 — Navigation & contenu (P1, ~7-10 h)
-- [ ] **P1.5** Bottom nav → 5 items (Accueil · Opportunités · Alertes · Trades · Plus). "Plus" regroupe Performance + Réglages via bottom sheet. ~1 h
-- [ ] **P1.7** Sticky filter bar sur Opportunités (chips + bouton Rafraîchir). ~1 h
-- [ ] **P1.6** Chart TradingView — bouton plein écran, height responsive, tooltip touch. ~2-3 h
-- [ ] **P1.8** Swipe actions — positions ouvertes (Clôturer/50%), alertes (Supprimer), trades (Détail). Style iOS Mail. ~3-4 h
-- [ ] **P1.9** Bouton "Retour" fiche actif — sticky top-left ou géré par P0.2. ~30 min
-- [ ] **P1.10** Audit overflow 320-375 px (valeurs longues, grilles). ~1-2 h
+### Sprint 2 — Navigation & contenu (P1) — ✅ LIVRÉ session 8 (sauf P1.8 déféré)
+- [x] **P1.5** Bottom-nav 5 items — 4 principaux + bouton "Plus" ouvrant menu flottant avec Performance + Réglages. Sidebar desktop inchangée.
+- [x] **P1.7** Sticky filter bar opportunités — position:sticky top:0 avec backdrop blur, chips en scroll horizontal au lieu de wrap.
+- [x] **P1.6** Chart plein écran — bouton ⛶ ouvre overlay plein écran avec × et back-swipe iOS pour fermer. initCandlestickChart utilise clientHeight dynamique.
+- [x] **P1.10** Audit overflow 320-390 px — fix regime-banner (même bug que plan-card), grids 4→2 cols sous 520px, ellipsis sur labels bottom-nav.
+- [~] **P1.9** Bouton retour fiche actif — géré par P0.2 back-swipe iOS. Bouton `← Retour` existant reste en place en fallback.
+- [ ] **P1.8** Swipe actions positions/alertes — **DÉFÉRÉ** (polish, 3-4h de JS tactile complexe, faible valeur vs autres items livrés).
 
 ### Sprint 3 — Polish natif iPhone (P2, ~4-5 h)
 - [ ] **P2.11** Haptique `navigator.vibrate([10])` sur toggles, confirmations, destructives. ~1 h
