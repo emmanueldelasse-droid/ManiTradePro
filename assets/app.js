@@ -5338,6 +5338,7 @@ function renderMain() {
         ${renderPinModal()}
         ${renderAlertModal()}
         ${renderAlertToast()}
+        <div class="ptr-indicator" id="ptr-indicator"><div class="ptr-spinner"></div></div>
       </div>
     `;
     applyThemeMode();
@@ -5698,6 +5699,83 @@ function renderMain() {
     setTimeout(() => {
       try { target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
     }, 250);
+  });
+
+  // Pull-to-refresh (iPhone) — tire vers le bas en haut de page pour rafraîchir
+  let ptrStartY = null;
+  let ptrStartX = null;
+  let ptrPull = 0;
+  let ptrActive = false;
+  let ptrRefreshing = false;
+  const PTR_THRESHOLD = 60;
+  const PTR_MAX = 120;
+
+  function setPtrPull(px) {
+    document.documentElement.style.setProperty("--ptr-pull", px + "px");
+    const ind = document.getElementById("ptr-indicator");
+    if (!ind) return;
+    ind.classList.toggle("visible", px > 0);
+    ind.classList.toggle("pulling", ptrActive);
+  }
+
+  function currentRoutePtrAction() {
+    if (ptrRefreshing) return null;
+    switch (state.route) {
+      case "dashboard": return () => loadDashboard();
+      case "opportunities": return () => loadOpportunities(true);
+      case "portfolio": return () => refreshOpenTradesLive(true);
+      case "alerts": return () => loadDashboard();
+      default: return null;
+    }
+  }
+
+  function scrollerAtTop() {
+    const sc = document.querySelector(".main-content");
+    if (!sc) return false;
+    return sc.scrollTop <= 0;
+  }
+
+  document.addEventListener("touchstart", (ev) => {
+    if (ptrRefreshing) return;
+    if (!scrollerAtTop()) return;
+    if (!currentRoutePtrAction()) return;
+    if (ev.target.closest && ev.target.closest(".modal-overlay, .modal-backdrop, #lw-chart-container")) return;
+    ptrStartY = ev.touches[0].clientY;
+    ptrStartX = ev.touches[0].clientX;
+    ptrActive = true;
+    ptrPull = 0;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (ev) => {
+    if (!ptrActive || ptrStartY == null) return;
+    if (!scrollerAtTop()) { ptrActive = false; setPtrPull(0); return; }
+    const dy = ev.touches[0].clientY - ptrStartY;
+    const dx = Math.abs(ev.touches[0].clientX - ptrStartX);
+    if (dx > Math.abs(dy) && dx > 10) { ptrActive = false; setPtrPull(0); return; }
+    if (dy <= 0) { ptrPull = 0; setPtrPull(0); return; }
+    ptrPull = Math.min(Math.pow(dy, 0.85), PTR_MAX);
+    setPtrPull(ptrPull);
+    if (dy > 10 && ev.cancelable) ev.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("touchend", async () => {
+    if (!ptrActive) return;
+    ptrActive = false;
+    const refresh = currentRoutePtrAction();
+    if (ptrPull >= PTR_THRESHOLD && refresh) {
+      ptrRefreshing = true;
+      setPtrPull(44);
+      const ind = document.getElementById("ptr-indicator");
+      if (ind) ind.classList.add("refreshing");
+      try { await refresh(); } catch {}
+      try { navigator.vibrate && navigator.vibrate(10); } catch {}
+      if (ind) ind.classList.remove("refreshing");
+      ptrRefreshing = false;
+    }
+    setPtrPull(0);
+    ptrStartY = null;
+    ptrStartX = null;
+    ptrPull = 0;
   });
 
   // Back-swipe iOS : écoute popstate pour revenir à la route précédente

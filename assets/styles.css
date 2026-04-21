@@ -1110,6 +1110,37 @@ html.has-modal .main-content{overflow:hidden}
 @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 /* ===========================
+   Pull-to-refresh indicator (iPhone)
+   =========================== */
+.ptr-indicator{
+  position:fixed;
+  top:var(--safe-top);
+  left:0;right:0;
+  height:44px;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+  opacity:0;
+  transform:translateY(calc(-100% + var(--ptr-pull, 0px)));
+  transition:transform .2s ease, opacity .15s ease;
+  z-index:5;
+}
+.ptr-indicator.visible{opacity:1}
+.ptr-indicator.pulling{transition:none}
+.ptr-spinner{
+  width:22px;height:22px;
+  border:2.5px solid var(--border-medium);
+  border-top-color:var(--accent);
+  border-radius:50%;
+}
+.ptr-indicator.refreshing .ptr-spinner{
+  animation:ptr-spin .8s linear infinite;
+}
+@keyframes ptr-spin{to{transform:rotate(360deg)}}
+@media (min-width:861px){
+  .ptr-indicator{display:none}
+}
+
+/* ===========================
    iPhone / iOS adaptations
    =========================== */
 
