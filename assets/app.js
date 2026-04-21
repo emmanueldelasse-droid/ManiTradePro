@@ -2130,6 +2130,14 @@ function applyFilter() {
   // =========================
   // navigation
   // =========================
+  // Wrapper pour transitions d'écrans via View Transitions API (Safari 18+/Chrome 111+)
+  function transitionalRender() {
+    if (document.startViewTransition) {
+      try { document.startViewTransition(() => render()); return; } catch {}
+    }
+    render();
+  }
+
   function navigate(route, symbol = null, opts = {}) {
     const skipHistory = opts.skipHistory === true;
     const forceOppReload = opts.forceOppReload === true;
@@ -2157,13 +2165,13 @@ function applyFilter() {
     if (route === "opportunities") {
       state.error = null;
       state.aiReview = null;
-      render();
+      transitionalRender();
       if (forceOppReload) loadOpportunities(true);
     } else if (route === "asset-detail" && symbol) {
       state.aiReview = null;
       loadDetail(symbol);
     } else {
-      render();
+      transitionalRender();
     }
   }
 
