@@ -593,7 +593,7 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .ai-insight-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:4px}
 .ai-stat{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:10px;padding:10px 6px;text-align:center}
 .ai-stat-val{font-size:1rem;font-weight:700;font-family:'Space Mono',monospace;color:var(--text-primary)}
-.ai-stat-lbl{font-size:.68rem;color:var(--text-secondary);margin-top:3px}
+.ai-stat-lbl{font-size:.72rem;color:var(--text-secondary);margin-top:3px;line-height:1.25}
 .ai-priority-row{display:grid;grid-template-columns:20px 70px 60px 1fr;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border-subtle)}
 .ai-priority-row:last-child{border-bottom:none}
 .ai-priority-rank{font-size:.8rem;font-weight:700;color:var(--text-secondary);text-align:center}
@@ -991,6 +991,8 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .app-shell.theme-light .setting-row{
   border-bottom:1px solid rgba(15,23,42,.06);
 }
+.setting-row--disabled{opacity:.55}
+.setting-row--disabled input[type="checkbox"]{pointer-events:none}
 .app-shell.theme-light .setting-row:last-child{
   border-bottom:none;
 }
@@ -1173,6 +1175,34 @@ html.has-modal .main-content{overflow:hidden}
 @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 /* ===========================
+   A2HS banner (iOS Add to Home Screen)
+   =========================== */
+.a2hs-banner{
+  position:fixed;
+  left:calc(10px + var(--safe-left));
+  right:calc(10px + var(--safe-right));
+  bottom:calc(var(--bottomnav-height) + var(--safe-bottom) + 10px);
+  background:var(--bg-card);
+  border:1px solid var(--accent-glow);
+  border-radius:14px;
+  padding:12px 14px;
+  display:flex;align-items:center;gap:12px;
+  z-index:9;
+  box-shadow:0 8px 28px rgba(0,0,0,.28);
+  font-size:.86rem;
+  color:var(--text-primary);
+  animation:a2hs-in .28s ease;
+}
+@keyframes a2hs-in{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.a2hs-icon{color:var(--accent);flex-shrink:0;display:flex;align-items:center}
+.a2hs-text{flex:1;line-height:1.35}
+.a2hs-text strong{color:var(--accent)}
+.a2hs-close{width:34px;height:34px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-subtle);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--text-secondary);padding:0}
+.a2hs-close:active{transform:scale(.9)}
+@media (min-width:861px){.a2hs-banner{display:none}}
+.app-shell.theme-light .a2hs-banner{background:#ffffff;border-color:rgba(0,163,108,.3);box-shadow:0 6px 20px rgba(15,23,42,.12)}
+
+/* ===========================
    Pull-to-refresh indicator (iPhone)
    =========================== */
 .ptr-indicator{
@@ -1328,6 +1358,36 @@ body{overscroll-behavior:none}
 button:focus-visible,a:focus-visible,.btn:focus-visible,.nav-item:focus-visible,.bnav-item:focus-visible,.chip:focus-visible,.opp-row:focus-visible,.ai-card:focus-visible,.trending-pill:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 /* =====================================================
+   View Transitions API — cross-fade entre écrans (Safari 18+/Chrome 111+)
+   ===================================================== */
+::view-transition-old(root),
+::view-transition-new(root){
+  animation-duration:.22s;
+  animation-timing-function:cubic-bezier(.4,0,.2,1);
+}
+@media (prefers-reduced-motion:reduce){
+  ::view-transition-old(root),
+  ::view-transition-new(root){animation:none}
+}
+
+/* =====================================================
+   :active tap feedback — style iOS natif
+   ===================================================== */
+.btn:active,.chip:active,.bnav-item:active,.nav-item:active,.chart-tf-btn:active,.trending-pill:active,.more-menu-item:active,.opp-row:active,.alert-row:active,.trade-card-row:active,.dashboard-feature-card.is-clickable:active{
+  transform:scale(.97);
+  transition:transform .08s ease;
+}
+
+/* =====================================================
+   user-select:none — évite sélection texte au long-press iOS
+   sur les éléments actionnables
+   ===================================================== */
+.btn,.chip,.nav-item,.bnav-item,.chart-tf-btn,.trending-pill,.more-menu-item,.section-title{
+  -webkit-user-select:none;
+  user-select:none;
+}
+
+/* =====================================================
    REDUCED MOTION — respect system preference
    ===================================================== */
 @media (prefers-reduced-motion:reduce){
@@ -1337,6 +1397,7 @@ button:focus-visible,a:focus-visible,.btn:focus-visible,.nav-item:focus-visible,
     transition-duration:.01ms !important;
     scroll-behavior:auto !important;
   }
+  .btn:active,.chip:active,.bnav-item:active,.nav-item:active,.chart-tf-btn:active,.trending-pill:active,.more-menu-item:active,.opp-row:active,.alert-row:active,.trade-card-row:active,.dashboard-feature-card.is-clickable:active{transform:none}
   .app-shell:not(.theme-light)::before,
   .app-shell:not(.theme-light)::after{display:none}
 }

@@ -30,6 +30,7 @@
     showSourceBadges: true,
     showScoreBreakdown: true,
     compactCards: false,
+    autoTheme: false,
     lightTheme: false,
     displayCurrency: "EUR_PLUS_USD",
     workerAdminToken: "",
@@ -730,6 +731,22 @@
   // =========================
   function safeText(v) {
     return String(v ?? "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+  }
+
+  // Haptique léger pour iOS/Android via vibrate API (pas d'effet desktop)
+  function haptic(pattern = 8) {
+    try { navigator.vibrate && navigator.vibrate(pattern); } catch {}
+  }
+
+  // A2HS (Add to Home Screen) — iOS n'a pas beforeinstallprompt
+  const A2HS_DISMISSED_KEY = "mtp_a2hs_dismissed_v1";
+  function shouldShowA2HSBanner() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (!isIOS) return false;
+    const isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+    if (isStandalone) return false;
+    try { if (localStorage.getItem(A2HS_DISMISSED_KEY) === "1") return false; } catch {}
+    return true;
   }
 
   function money(v, currency = "USD") {
@@ -2113,6 +2130,14 @@ function applyFilter() {
   // =========================
   // navigation
   // =========================
+  // Wrapper pour transitions d'écrans via View Transitions API (Safari 18+/Chrome 111+)
+  function transitionalRender() {
+    if (document.startViewTransition) {
+      try { document.startViewTransition(() => render()); return; } catch {}
+    }
+    render();
+  }
+
   function navigate(route, symbol = null, opts = {}) {
     const skipHistory = opts.skipHistory === true;
     const forceOppReload = opts.forceOppReload === true;
@@ -2140,13 +2165,13 @@ function applyFilter() {
     if (route === "opportunities") {
       state.error = null;
       state.aiReview = null;
-      render();
+      transitionalRender();
       if (forceOppReload) loadOpportunities(true);
     } else if (route === "asset-detail" && symbol) {
       state.aiReview = null;
       loadDetail(symbol);
     } else {
-      render();
+      transitionalRender();
     }
   }
 
@@ -3329,7 +3354,7 @@ function renderDashboard() {
     const d = state.detail;
     if (!d || !Array.isArray(d.candles) || !d.candles.length) return;
 
-    const isLight = !!state.settings.lightTheme;
+    const isLight = effectiveLightTheme();
     const textColor  = isLight ? "#555" : "#8899aa";
     const gridColor  = isLight ? "#ebebeb" : "#141928";
     const borderColor = isLight ? "#d0d0d0" : "#1e2435";
@@ -5113,7 +5138,7 @@ function openPositionsRiskView() {
             <option value="above">Au-dessus de</option>
             <option value="below">En-dessous de</option>
           </select>
-          <input class="setting-input pin-input" type="number" id="alert-target-price" placeholder="Prix cible (USD)" step="any" ${currentPrice != null ? `value="${currentPrice}"` : ""}>
+          <input class="setting-input pin-input" type="number" inputmode="decimal" id="alert-target-price" placeholder="Prix cible (USD)" step="any" ${currentPrice != null ? `value="${currentPrice}"` : ""}>
           <div class="modal-actions">
             <button class="btn btn-secondary" data-alert-cancel>Annuler</button>
             <button class="btn btn-primary" data-alert-submit>Creer l'alerte</button>
@@ -5196,10 +5221,18 @@ function openPositionsRiskView() {
 
             <label class="setting-row">
               <div>
-                <div class="setting-title">Activer le theme clair</div>
-                <div class="setting-desc">Passe l'app sur un rendu clair, plus doux en journee.</div>
+                <div class="setting-title">Suivre le theme systeme</div>
+                <div class="setting-desc">L'app bascule automatiquement clair/sombre selon ton iPhone.</div>
               </div>
-              <input type="checkbox" data-setting-toggle="lightTheme" ${state.settings.lightTheme ? "checked" : ""}>
+              <input type="checkbox" data-setting-toggle="autoTheme" ${state.settings.autoTheme ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row ${state.settings.autoTheme ? "setting-row--disabled" : ""}">
+              <div>
+                <div class="setting-title">Activer le theme clair</div>
+                <div class="setting-desc">${state.settings.autoTheme ? "Suivi systeme actif — ce reglage est ignore." : "Passe l'app sur un rendu clair, plus doux en journee."}</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="lightTheme" ${state.settings.autoTheme ? "disabled" : ""} ${state.settings.lightTheme ? "checked" : ""}>
             </label>
 
             <label class="setting-row">
@@ -5274,9 +5307,22 @@ function renderMain() {
     }
   }
 
+  function prefersSystemLight() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
+  }
+
+  function effectiveLightTheme() {
+    if (state.settings.autoTheme) return prefersSystemLight();
+    return !!state.settings.lightTheme;
+  }
+
   function applyThemeMode() {
-    document.documentElement.classList.toggle("theme-light-root", !!state.settings.lightTheme);
-    document.body.classList.toggle("theme-light-root", !!state.settings.lightTheme);
+    const isLight = effectiveLightTheme();
+    document.documentElement.classList.toggle("theme-light-root", isLight);
+    document.body.classList.toggle("theme-light-root", isLight);
+    // P2.15: theme-color meta dynamique → status bar iOS suit le thème
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", isLight ? "#f4f7fb" : "#0a0e1a");
   }
 
   function syncOpportunityScoreDisplay() {
@@ -5346,7 +5392,7 @@ function renderMain() {
           <div class="modal-title">Connexion Worker</div>
           <div class="modal-desc">Entre ton PIN Cloudflare pour activer l'acces aux routes proteges (trades, IA).</div>
           ${err}
-          <input class="setting-input pin-input" type="password" id="pin-input" placeholder="PIN" autocomplete="current-password" ${loading ? "disabled" : ""}>
+          <input class="setting-input pin-input" type="password" inputmode="numeric" pattern="[0-9]*" id="pin-input" placeholder="PIN" autocomplete="current-password" ${loading ? "disabled" : ""}>
           <div class="modal-actions">
             <button class="btn btn-secondary" data-pin-cancel>Annuler</button>
             <button class="btn btn-primary" data-pin-submit ${loading ? "disabled" : ""}>${loading ? "Connexion..." : "Se connecter"}</button>
@@ -5388,7 +5434,7 @@ function renderMain() {
 
   function render() {
     app.innerHTML = `
-      <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${state.settings.lightTheme ? "theme-light" : ""}">
+      <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${effectiveLightTheme() ? "theme-light" : ""}">
         ${renderSidebar()}
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
@@ -5397,6 +5443,16 @@ function renderMain() {
         ${renderPinModal()}
         ${renderAlertModal()}
         ${renderAlertToast()}
+        ${shouldShowA2HSBanner() ? `
+          <div class="a2hs-banner" role="note">
+            <div class="a2hs-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </div>
+            <div class="a2hs-text">Installe ManiTrade : <strong>Partager</strong> puis <strong>Ajouter à l'écran d'accueil</strong>.</div>
+            <button class="a2hs-close" data-a2hs-dismiss aria-label="Fermer la bannière">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>` : ""}
         <div class="ptr-indicator" id="ptr-indicator"><div class="ptr-spinner"></div></div>
       </div>
     `;
@@ -5412,6 +5468,7 @@ function renderMain() {
     app.querySelectorAll("[data-route]").forEach(el => {
       el.addEventListener("click", () => {
         const route = el.getAttribute("data-route");
+        haptic(5);
         state.moreMenuOpen = false;
         const forceOppReload = route === "opportunities" && state.settings.autoRefreshOpportunities;
         navigate(route, null, { forceOppReload });
@@ -5510,16 +5567,17 @@ function renderMain() {
     app.querySelectorAll("[data-confirm-open-trade]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
+        haptic([15, 20, 15]);
         confirmTradeFromModal();
       });
     });
 
     app.querySelectorAll("[data-close-trade]").forEach(el => {
-      el.addEventListener("click", () => closeTrainingTrade(el.getAttribute("data-close-trade")));
+      el.addEventListener("click", () => { haptic([20, 40, 20]); closeTrainingTrade(el.getAttribute("data-close-trade")); });
     });
 
     app.querySelectorAll("[data-close-half]").forEach(el => {
-      el.addEventListener("click", () => partialClosePosition(el.getAttribute("data-close-half"), 50));
+      el.addEventListener("click", () => { haptic([15, 30, 15]); partialClosePosition(el.getAttribute("data-close-half"), 50); });
     });
 
     app.querySelectorAll("[data-clear-history]").forEach(el => {
@@ -5527,6 +5585,7 @@ function renderMain() {
         const src = el.getAttribute("data-clear-history");
         const label = src === "algo" ? "algo" : "manuel";
         if (!confirm(`Supprimer tout l'historique ${label} ? Cette action est irréversible.`)) return;
+        haptic([30, 60, 30]);
         state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
@@ -5537,6 +5596,7 @@ function renderMain() {
     app.querySelectorAll("[data-clear-all-history]").forEach(el => {
       el.addEventListener("click", () => {
         if (!confirm("Supprimer tout l'historique ? Cette action est irréversible.")) return;
+        haptic([30, 60, 30]);
         state.trades.history = [];
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
@@ -5573,6 +5633,7 @@ function renderMain() {
     app.querySelectorAll("[data-setting-toggle]").forEach(el => {
       el.addEventListener("change", async () => {
         const key = el.getAttribute("data-setting-toggle");
+        haptic(8);
         state.settings[key] = el.checked;
         if (key === "algoSignalNotifs" && el.checked) {
           await requestNotificationsPermission();
@@ -5693,6 +5754,7 @@ function renderMain() {
     app.querySelectorAll("[data-remove-alert]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
+        haptic(15);
         const id = parseFloat(el.getAttribute("data-remove-alert"));
         removePriceAlert(id);
         render();
@@ -5711,6 +5773,13 @@ function renderMain() {
     app.querySelectorAll("[data-request-notif-perm]").forEach(el => {
       el.addEventListener("click", async () => {
         await requestNotificationsPermission();
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-a2hs-dismiss]").forEach(el => {
+      el.addEventListener("click", () => {
+        try { localStorage.setItem(A2HS_DISMISSED_KEY, "1"); } catch {}
         render();
       });
     });
@@ -5800,6 +5869,14 @@ function renderMain() {
     syncVisualViewport();
   }
 
+  // Auto-thème : re-render quand le système change clair/sombre (si autoTheme actif)
+  if (window.matchMedia) {
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = () => { if (state.settings.autoTheme) render(); };
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
+  }
+
   // Scroll l'input focus au centre de son modal (iOS clavier)
   document.addEventListener("focusin", (ev) => {
     const target = ev.target;
@@ -5878,7 +5955,7 @@ function renderMain() {
       const ind = document.getElementById("ptr-indicator");
       if (ind) ind.classList.add("refreshing");
       try { await refresh(); } catch {}
-      try { navigator.vibrate && navigator.vibrate(10); } catch {}
+      haptic(10);
       if (ind) ind.classList.remove("refreshing");
       ptrRefreshing = false;
     }

@@ -219,16 +219,16 @@ Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commi
 - [~] **P1.9** Bouton retour fiche actif — géré par P0.2 back-swipe iOS. Bouton `← Retour` existant reste en place en fallback.
 - [ ] **P1.8** Swipe actions positions/alertes — **DÉFÉRÉ** (polish, 3-4h de JS tactile complexe, faible valeur vs autres items livrés).
 
-### Sprint 3 — Polish natif iPhone (P2, ~4-5 h)
-- [ ] **P2.11** Haptique `navigator.vibrate([10])` sur toggles, confirmations, destructives. ~1 h
-- [ ] **P2.12** Transitions slide iOS entre écrans (View Transitions API ou CSS keyframes). ~2 h
-- [ ] **P2.13** Auto-thème via `prefers-color-scheme` (override settings). ~30 min
-- [ ] **P2.14** `transform:scale(.98)` sur `.btn:active`. ~15 min
-- [ ] **P2.15** `status-bar-style` dynamique via `theme-color` meta (suivi du thème). ~30 min
-- [ ] **P2.16** `inputmode="decimal"` sur alerte prix, `inputmode="numeric"` sur PIN. ~15 min
-- [ ] **P2.17** `user-select:none` sur rows/btn/chips. ~15 min
-- [ ] **P2.18** Bannière "Ajouter à l'écran d'accueil" (iOS n'a pas `beforeinstallprompt`). ~1 h
-- [ ] **P2.20** Audit fonts : min 13 px partout (`.bnav-item` actuellement 9 px à 390). ~30 min
+### Sprint 3 — Polish natif iPhone (P2) — ✅ LIVRÉ session 8
+- [x] **P2.11** Haptique `navigator.vibrate` sur navigation (5 ms), toggles (8), P2R (10), suppr alerte (15), clôture 50% / confirm trade ([15,*,15]), clôture trade ([20,40,20]), clear historique ([30,60,30]).
+- [x] **P2.12** Transitions écrans via View Transitions API (Safari 18+ / Chrome 111+). `transitionalRender()` wrappe `render()` dans `document.startViewTransition`. Fallback = render direct. CSS ::view-transition root 220 ms easing iOS, désactivé en reduced-motion.
+- [x] **P2.13** Auto-thème `prefers-color-scheme` — toggle "Suivre le thème système" dans Réglages. `effectiveLightTheme()` lit matchMedia si autoTheme actif. Re-render sur changement système. Le toggle light est disabled quand auto est on.
+- [x] **P2.14** `transform:scale(.97)` + transition .08s sur `.btn:active`, `.chip:active`, `.bnav-item:active`, `.nav-item:active`, `.chart-tf-btn:active`, `.trending-pill:active`, `.more-menu-item:active`, `.opp-row:active`, `.alert-row:active`, `.trade-card-row:active`, `.dashboard-feature-card.is-clickable:active`.
+- [x] **P2.15** `<meta theme-color>` dynamique via `applyThemeMode` — `#0a0e1a` en dark, `#f4f7fb` en light, suit aussi l'auto-thème.
+- [x] **P2.16** `inputmode="decimal"` sur alerte prix, `inputmode="numeric" pattern="[0-9]*"` sur PIN.
+- [x] **P2.17** `-webkit-user-select:none` + `user-select:none` sur `.btn`, `.chip`, `.nav-item`, `.bnav-item`, `.chart-tf-btn`, `.trending-pill`, `.more-menu-item`, `.section-title`.
+- [x] **P2.18** Bannière "Ajouter à l'écran d'accueil" iOS — détection UA iPhone + !standalone + !dismissed. Bouton ✕ persiste via `mtp_a2hs_dismissed_v1`. Masquée >860px.
+- [x] **P2.20** Audit fonts — bump `.ai-stat-lbl` 0.68→0.72 rem. Kicker labels uppercase restent à 0.65-0.68 (style iOS section header standard). `.bnav-item 0.55rem` documenté intentionnel (fit iPhone SE).
 
 ### Backlog (pas dans les sprints)
 - [ ] **P2.19** Offline complet — cache SW (déjà dans le backlog historique, P2 mais lourd)
