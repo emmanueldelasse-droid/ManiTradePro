@@ -5673,7 +5673,25 @@ function renderMain() {
   }
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // Force le navigateur à vérifier sw.js à chaque chargement (pas de cache HTTP)
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        // Check update toutes les 5 min tant que l'app reste ouverte
+        setInterval(() => { reg.update().catch(() => {}); }, 5 * 60 * 1000);
+        // Check aussi au retour de focus (app rouverte depuis l'arrière-plan)
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") reg.update().catch(() => {});
+        });
+      })
+      .catch(() => {});
+
+    // Recharge une fois quand un nouveau SW prend le contrôle
+    let reloadingForSwUpdate = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloadingForSwUpdate) return;
+      reloadingForSwUpdate = true;
+      location.reload();
+    });
   }
 
   // iOS keyboard handling — synchronise visualViewport avec CSS vars
