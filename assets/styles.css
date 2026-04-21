@@ -991,6 +991,8 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .app-shell.theme-light .setting-row{
   border-bottom:1px solid rgba(15,23,42,.06);
 }
+.setting-row--disabled{opacity:.55}
+.setting-row--disabled input[type="checkbox"]{pointer-events:none}
 .app-shell.theme-light .setting-row:last-child{
   border-bottom:none;
 }

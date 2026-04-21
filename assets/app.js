@@ -30,6 +30,7 @@
     showSourceBadges: true,
     showScoreBreakdown: true,
     compactCards: false,
+    autoTheme: false,
     lightTheme: false,
     displayCurrency: "EUR_PLUS_USD",
     workerAdminToken: "",
@@ -3334,7 +3335,7 @@ function renderDashboard() {
     const d = state.detail;
     if (!d || !Array.isArray(d.candles) || !d.candles.length) return;
 
-    const isLight = !!state.settings.lightTheme;
+    const isLight = effectiveLightTheme();
     const textColor  = isLight ? "#555" : "#8899aa";
     const gridColor  = isLight ? "#ebebeb" : "#141928";
     const borderColor = isLight ? "#d0d0d0" : "#1e2435";
@@ -5201,10 +5202,18 @@ function openPositionsRiskView() {
 
             <label class="setting-row">
               <div>
-                <div class="setting-title">Activer le theme clair</div>
-                <div class="setting-desc">Passe l'app sur un rendu clair, plus doux en journee.</div>
+                <div class="setting-title">Suivre le theme systeme</div>
+                <div class="setting-desc">L'app bascule automatiquement clair/sombre selon ton iPhone.</div>
               </div>
-              <input type="checkbox" data-setting-toggle="lightTheme" ${state.settings.lightTheme ? "checked" : ""}>
+              <input type="checkbox" data-setting-toggle="autoTheme" ${state.settings.autoTheme ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row ${state.settings.autoTheme ? "setting-row--disabled" : ""}">
+              <div>
+                <div class="setting-title">Activer le theme clair</div>
+                <div class="setting-desc">${state.settings.autoTheme ? "Suivi systeme actif — ce reglage est ignore." : "Passe l'app sur un rendu clair, plus doux en journee."}</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="lightTheme" ${state.settings.autoTheme ? "disabled" : ""} ${state.settings.lightTheme ? "checked" : ""}>
             </label>
 
             <label class="setting-row">
@@ -5279,9 +5288,22 @@ function renderMain() {
     }
   }
 
+  function prefersSystemLight() {
+    return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches);
+  }
+
+  function effectiveLightTheme() {
+    if (state.settings.autoTheme) return prefersSystemLight();
+    return !!state.settings.lightTheme;
+  }
+
   function applyThemeMode() {
-    document.documentElement.classList.toggle("theme-light-root", !!state.settings.lightTheme);
-    document.body.classList.toggle("theme-light-root", !!state.settings.lightTheme);
+    const isLight = effectiveLightTheme();
+    document.documentElement.classList.toggle("theme-light-root", isLight);
+    document.body.classList.toggle("theme-light-root", isLight);
+    // P2.15: theme-color meta dynamique → status bar iOS suit le thème
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", isLight ? "#f4f7fb" : "#0a0e1a");
   }
 
   function syncOpportunityScoreDisplay() {
@@ -5393,7 +5415,7 @@ function renderMain() {
 
   function render() {
     app.innerHTML = `
-      <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${state.settings.lightTheme ? "theme-light" : ""}">
+      <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${effectiveLightTheme() ? "theme-light" : ""}">
         ${renderSidebar()}
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
@@ -5809,6 +5831,14 @@ function renderMain() {
     window.visualViewport.addEventListener("resize", syncVisualViewport);
     window.visualViewport.addEventListener("scroll", syncVisualViewport);
     syncVisualViewport();
+  }
+
+  // Auto-thème : re-render quand le système change clair/sombre (si autoTheme actif)
+  if (window.matchMedia) {
+    const mq = window.matchMedia("(prefers-color-scheme: light)");
+    const onChange = () => { if (state.settings.autoTheme) render(); };
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else if (mq.addListener) mq.addListener(onChange);
   }
 
   // Scroll l'input focus au centre de son modal (iOS clavier)
