@@ -41,6 +41,7 @@
 
   const state = {
     route: "dashboard",
+    moreMenuOpen: false,
     opportunities: [],
     filteredOpportunities: [],
     opportunityFilter: "all",
@@ -122,6 +123,11 @@
     ["performance", "Performance", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
+
+  // Mobile bottom-nav : 4 items principaux + "Plus" (Performance + Réglages)
+  const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
+  const MORE_NAV_ROUTES = ["performance", "settings"];
+  const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
   // storage
@@ -2165,12 +2171,28 @@ function applyFilter() {
   }
 
   function renderBottomNav() {
+    const primary = navItems.filter(([route]) => PRIMARY_NAV_ROUTES.includes(route));
+    const more = navItems.filter(([route]) => MORE_NAV_ROUTES.includes(route));
+    const moreActive = MORE_NAV_ROUTES.includes(state.route) || state.moreMenuOpen;
     return `<nav class="bottom-nav"><div class="bottom-wrap">
-      ${navItems.map(([route, label, icon]) => `
+      ${primary.map(([route, label, icon]) => `
         <button class="bnav-item ${state.route === route ? "active" : ""}" data-route="${route}">
           <span>${icon}</span><span>${label}</span>
         </button>`).join("")}
-    </div></nav>`;
+      <button class="bnav-item ${moreActive ? "active" : ""}" data-more-menu aria-expanded="${state.moreMenuOpen}">
+        <span>${MORE_ICON}</span><span>Plus</span>
+      </button>
+    </div>
+    ${state.moreMenuOpen ? `
+      <div class="more-menu-backdrop" data-close-more-menu></div>
+      <div class="more-menu-sheet" role="menu">
+        ${more.map(([route, label, icon]) => `
+          <button class="more-menu-item ${state.route === route ? "active" : ""}" data-route="${route}" role="menuitem">
+            <span>${icon}</span><span>${label}</span>
+          </button>`).join("")}
+      </div>
+    ` : ""}
+    </nav>`;
   }
 
   
@@ -5353,8 +5375,24 @@ function renderMain() {
     app.querySelectorAll("[data-route]").forEach(el => {
       el.addEventListener("click", () => {
         const route = el.getAttribute("data-route");
+        state.moreMenuOpen = false;
         const forceOppReload = route === "opportunities" && state.settings.autoRefreshOpportunities;
         navigate(route, null, { forceOppReload });
+      });
+    });
+
+    app.querySelectorAll("[data-more-menu]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        state.moreMenuOpen = !state.moreMenuOpen;
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-close-more-menu]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.moreMenuOpen = false;
+        render();
       });
     });
 
@@ -5802,6 +5840,7 @@ function renderMain() {
     if (state.tradeConfirm?.open) state.tradeConfirm = { open: false, mode: null, side: null };
     if (state.session?.pinOpen) { state.session.pinOpen = false; state.session.pinError = null; }
     if (state.alertModal?.open) state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+    if (state.moreMenuOpen) state.moreMenuOpen = false;
 
     const s = ev.state;
     if (!s || !s.route) {
