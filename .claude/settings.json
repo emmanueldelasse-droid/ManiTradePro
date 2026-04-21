@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -c 'if (.tool_input.file_path // \"\" | test(\"(assets/(app\\\\.js|styles\\\\.css)|cloudflare-worker/worker\\\\.js)$\")) then {hookSpecificOutput:{hookEventName:\"PostToolUse\",additionalContext:\"MONOLITHIC FILE EDITED — launch bug-hunter in background (Agent tool, subagent_type=bug-hunter, run_in_background=true) to scan for regressions of the 6 documented patterns in .claude/agents/bug-hunter.md. Do this in parallel with current work, do NOT wait.\"}} else empty end' 2>/dev/null || true",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}
