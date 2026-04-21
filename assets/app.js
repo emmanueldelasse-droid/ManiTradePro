@@ -113,7 +113,11 @@
     journalAnalysis: null,
     loadingJournalAnalysis: false,
     portfolioPriority: null,
-    loadingPortfolioPriority: false
+    loadingPortfolioPriority: false,
+    userAssets: [],
+    userAssetsLoading: false,
+    userAssetsError: null,
+    addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null }
   };
 
   const app = document.getElementById("app");
@@ -1552,6 +1556,37 @@ function confirmTradeFromModal() {
     return data;
   }
 
+  async function apiDelete(path) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "DELETE",
+      headers: { ...workerAdminHeaders() }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+    return data;
+  }
+
+  async function apiPatch(path, payload) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...workerAdminHeaders() },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+    return data;
+  }
+
+  async function apiGetAuth(path) {
+    const res = await fetch(`${API_BASE}${path}`, {
+      cache: "no-store",
+      headers: { ...workerAdminHeaders() }
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
+    return data;
+  }
+
   async function loadAiReview(detail, localPlan) {
     if (!detail) return null;
     const aiMeta = aiDisplayState(localPlan || {});
@@ -1633,6 +1668,73 @@ function confirmTradeFromModal() {
     } finally {
       state.loadingJournalAnalysis = false;
       render();
+    }
+  }
+
+  // ============================================================
+  // USER ASSETS (actifs personnalisés)
+  // ============================================================
+  async function loadUserAssets() {
+    state.userAssetsLoading = true;
+    state.userAssetsError = null;
+    render();
+    try {
+      const result = await apiGetAuth("/api/user-assets");
+      state.userAssets = Array.isArray(result?.data?.assets) ? result.data.assets : [];
+    } catch (e) {
+      state.userAssetsError = e.message || "Erreur de chargement";
+      state.userAssets = [];
+    } finally {
+      state.userAssetsLoading = false;
+      render();
+    }
+  }
+
+  async function addUserAsset() {
+    const f = state.addAssetForm;
+    const symbol = String(f.symbol || "").trim().toUpperCase();
+    if (!symbol) { state.addAssetForm.error = "Saisis un symbole."; render(); return; }
+    state.addAssetForm.loading = true;
+    state.addAssetForm.error = null;
+    render();
+    try {
+      const payload = { symbol, name: String(f.name || "").trim() || symbol, asset_class: f.assetClass };
+      const result = await apiPost("/api/user-assets", payload);
+      haptic([15, 20, 15]);
+      state.addAssetForm = { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null };
+      if (result?.data) state.userAssets = [result.data, ...state.userAssets];
+      render();
+      await loadUserAssets();
+    } catch (e) {
+      state.addAssetForm.loading = false;
+      state.addAssetForm.error = e.message || "Erreur d'ajout";
+      render();
+    }
+  }
+
+  async function deleteUserAsset(symbol) {
+    if (!confirm(`Supprimer "${symbol}" de ta liste ?`)) return;
+    haptic([20, 40, 20]);
+    try {
+      await apiDelete(`/api/user-assets/${encodeURIComponent(symbol)}`);
+      state.userAssets = state.userAssets.filter(a => String(a.symbol).toUpperCase() !== symbol.toUpperCase());
+      render();
+    } catch (e) {
+      alert(`Erreur : ${e.message || "suppression impossible"}`);
+    }
+  }
+
+  async function toggleUserAsset(symbol, enabled) {
+    haptic(8);
+    try {
+      await apiPatch(`/api/user-assets/${encodeURIComponent(symbol)}`, { enabled });
+      state.userAssets = state.userAssets.map(a =>
+        String(a.symbol).toUpperCase() === symbol.toUpperCase() ? { ...a, enabled } : a
+      );
+      render();
+    } catch (e) {
+      alert(`Erreur : ${e.message || "mise à jour impossible"}`);
+      await loadUserAssets();
     }
   }
 
@@ -2172,6 +2274,9 @@ function applyFilter() {
       loadDetail(symbol);
     } else {
       transitionalRender();
+      if (route === "settings" && isSessionValid()) {
+        loadUserAssets().catch(() => {});
+      }
     }
   }
 
@@ -5156,6 +5261,52 @@ function openPositionsRiskView() {
       </div>`;
   }
 
+  function renderUserAssetRow(a) {
+    const sym = safeText(a.symbol || "");
+    const name = safeText(a.name || sym);
+    const cls = safeText(a.asset_class || "");
+    const provider = safeText(a.provider_used || "");
+    const enabled = a.enabled !== false;
+    return `
+      <div class="user-asset-row ${enabled ? "" : "is-disabled"}">
+        <div class="user-asset-main">
+          <div class="user-asset-sym">${sym}</div>
+          <div class="user-asset-meta">${name} · ${cls}${provider ? ` · ${provider}` : ""}</div>
+        </div>
+        <div class="user-asset-actions">
+          <label class="user-asset-toggle">
+            <input type="checkbox" ${enabled ? "checked" : ""} data-toggle-user-asset="${sym}">
+          </label>
+          <button class="btn btn-secondary user-asset-delete" data-delete-user-asset="${sym}" aria-label="Supprimer ${sym}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+      </div>`;
+  }
+
+  function renderAddAssetForm() {
+    const f = state.addAssetForm;
+    return `
+      <div class="add-asset-form" style="margin-top:12px">
+        <div class="add-asset-grid">
+          <input class="input" type="text" placeholder="Symbole (ex. XRP)" data-asset-symbol value="${safeText(f.symbol)}" maxlength="20" autocapitalize="characters" autocomplete="off" spellcheck="false">
+          <select class="select" data-asset-class>
+            <option value="crypto" ${f.assetClass === "crypto" ? "selected" : ""}>Crypto</option>
+            <option value="stock" ${f.assetClass === "stock" ? "selected" : ""}>Action</option>
+            <option value="etf" ${f.assetClass === "etf" ? "selected" : ""}>ETF</option>
+            <option value="forex" ${f.assetClass === "forex" ? "selected" : ""}>Forex</option>
+            <option value="commodity" ${f.assetClass === "commodity" ? "selected" : ""}>Matière première</option>
+          </select>
+        </div>
+        <input class="input" type="text" placeholder="Nom (optionnel, ex. XRP Ledger)" data-asset-name value="${safeText(f.name)}" maxlength="100" style="margin-top:8px;width:100%">
+        ${f.error ? `<div class="error-box" style="margin-top:8px">${safeText(f.error)}</div>` : ""}
+        <div class="add-asset-actions" style="margin-top:10px">
+          <button class="btn" data-cancel-add-asset ${f.loading ? "disabled" : ""}>Annuler</button>
+          <button class="btn btn-primary" data-submit-add-asset ${f.loading ? "disabled" : ""}>${f.loading ? "Validation…" : "Ajouter"}</button>
+        </div>
+      </div>`;
+  }
+
   function renderSettings() {
     return `
       <div class="screen">
@@ -5255,6 +5406,29 @@ function openPositionsRiskView() {
               </select>
             </label>
           </div>
+        </div>
+
+        <div class="card" style="margin-top:16px">
+          <div class="section-title"><span>Actifs surveillés</span><span>${state.userAssets.length}/50 custom</span></div>
+          <div class="setting-desc" style="margin-bottom:12px">
+            Ajoute tes propres actifs (crypto, actions, ETF…) au scan du bot. Les 35 actifs de base restent toujours inclus.
+          </div>
+          ${!isSessionValid() ? `
+            <div class="info-box">Connecte-toi avec ton PIN pour gérer les actifs personnalisés.</div>
+          ` : `
+            ${state.userAssetsError ? `<div class="error-box" style="margin-bottom:10px">${safeText(state.userAssetsError)}</div>` : ""}
+            ${state.userAssetsLoading ? `<div class="muted">Chargement…</div>` : ""}
+            ${state.userAssets.length ? `
+              <div class="user-assets-list">
+                ${state.userAssets.map(a => renderUserAssetRow(a)).join("")}
+              </div>
+            ` : !state.userAssetsLoading && !state.userAssetsError ? `<div class="empty-state" style="padding:18px">Aucun actif personnalisé. Clique sur "Ajouter" ci-dessous.</div>` : ""}
+            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+              ${state.addAssetForm.open ? "" : `<button class="btn btn-primary" data-open-add-asset>+ Ajouter un actif</button>`}
+              <button class="btn btn-secondary" data-load-user-assets>Recharger</button>
+            </div>
+            ${state.addAssetForm.open ? renderAddAssetForm() : ""}
+          `}
         </div>
 
         <div class="card" style="margin-top:16px">
@@ -5782,6 +5956,47 @@ function renderMain() {
         try { localStorage.setItem(A2HS_DISMISSED_KEY, "1"); } catch {}
         render();
       });
+    });
+
+    // User assets
+    app.querySelectorAll("[data-open-add-asset]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.addAssetForm = { open: true, symbol: "", name: "", assetClass: "crypto", loading: false, error: null };
+        render();
+      });
+    });
+    app.querySelectorAll("[data-cancel-add-asset]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.addAssetForm = { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null };
+        render();
+      });
+    });
+    app.querySelectorAll("[data-submit-add-asset]").forEach(el => {
+      el.addEventListener("click", () => { addUserAsset(); });
+    });
+    app.querySelectorAll("[data-asset-symbol]").forEach(el => {
+      el.addEventListener("input", () => { state.addAssetForm.symbol = el.value.toUpperCase(); });
+    });
+    app.querySelectorAll("[data-asset-class]").forEach(el => {
+      el.addEventListener("change", () => { state.addAssetForm.assetClass = el.value; });
+    });
+    app.querySelectorAll("[data-asset-name]").forEach(el => {
+      el.addEventListener("input", () => { state.addAssetForm.name = el.value; });
+    });
+    app.querySelectorAll("[data-toggle-user-asset]").forEach(el => {
+      el.addEventListener("change", () => {
+        const sym = el.getAttribute("data-toggle-user-asset");
+        toggleUserAsset(sym, el.checked);
+      });
+    });
+    app.querySelectorAll("[data-delete-user-asset]").forEach(el => {
+      el.addEventListener("click", () => {
+        const sym = el.getAttribute("data-delete-user-asset");
+        deleteUserAsset(sym);
+      });
+    });
+    app.querySelectorAll("[data-load-user-assets]").forEach(el => {
+      el.addEventListener("click", () => { loadUserAssets(); });
     });
 
     // Fermeture modal au tap backdrop (uniquement clic direct, pas bubble)
