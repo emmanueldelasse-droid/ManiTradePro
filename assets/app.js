@@ -2990,14 +2990,14 @@ function renderTradePlanHero(detail, plan) {
   ].filter(Boolean);
 
   return `
-    <div class="plan-card" style="border:1px solid rgba(255,255,255,.10);background:linear-gradient(135deg, rgba(21,31,58,.96), rgba(10,16,32,.96));padding:18px">
-      <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
-        <div style="min-width:0;flex:1;">
-          <div class="muted" style="text-transform:uppercase;letter-spacing:.08em;font-size:12px">Plan de trade</div>
-          <div style="font-size:1.35rem;font-weight:800;margin-top:6px">${safeText(simpleDecisionTitle(plan))}</div>
-          <div class="muted" style="margin-top:8px">${safeText(reason)}</div>
+    <div class="plan-card plan-card-hero">
+      <div class="plan-card-head">
+        <div class="plan-card-head-main">
+          <div class="plan-card-eyebrow">Plan de trade</div>
+          <div class="plan-card-title">${safeText(simpleDecisionTitle(plan))}</div>
+          <div class="muted plan-card-reason">${safeText(reason)}</div>
         </div>
-        <div class="legend" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+        <div class="legend plan-card-head-badges">
           ${badge(plan?.decision || "Pas de trade", statusToneFromDecision(plan?.decision))}
           ${badge(setupLabel)}
           ${badge(regimeVm.label, regimeVm.tone)}
@@ -3091,7 +3091,7 @@ function renderDashboard() {
         </div>
 
         <div class="dashboard-grid" style="${mobile ? "display:block;" : ""}">
-          <div class="card dashboard-feature-card" style="${mobile ? "margin-bottom:14px;" : ""}">
+          <div class="card dashboard-feature-card ${topVm ? "is-clickable" : ""}" ${topVm ? `data-open-detail="${safeText(topVm.item.symbol)}"` : ""} style="${mobile ? "margin-bottom:14px;" : ""}">
             <div class="section-title"><span>Priorite du moment</span><span>${topVm ? safeText(topVm.item.symbol) : "—"}</span></div>
             ${topVm ? `
               <div class="top-pick-box dashboard-signal-shell">
@@ -5673,7 +5673,25 @@ function renderMain() {
   }
 
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("sw.js").catch(() => {});
+    // Force le navigateur à vérifier sw.js à chaque chargement (pas de cache HTTP)
+    navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+      .then((reg) => {
+        // Check update toutes les 5 min tant que l'app reste ouverte
+        setInterval(() => { reg.update().catch(() => {}); }, 5 * 60 * 1000);
+        // Check aussi au retour de focus (app rouverte depuis l'arrière-plan)
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") reg.update().catch(() => {});
+        });
+      })
+      .catch(() => {});
+
+    // Recharge une fois quand un nouveau SW prend le contrôle
+    let reloadingForSwUpdate = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (reloadingForSwUpdate) return;
+      reloadingForSwUpdate = true;
+      location.reload();
+    });
   }
 
   // iOS keyboard handling — synchronise visualViewport avec CSS vars
