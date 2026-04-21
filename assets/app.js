@@ -6148,7 +6148,7 @@ function renderMain() {
     ptrStartX = ev.touches[0].clientX;
     ptrActive = true;
     ptrPull = 0;
-  }, { passive: false });
+  }, { capture: true, passive: false });
 
   document.addEventListener("touchmove", (ev) => {
     if (!ptrActive || ptrStartY == null) return;
@@ -6160,7 +6160,7 @@ function renderMain() {
     ptrPull = Math.min(Math.pow(dy, 0.85), PTR_MAX);
     setPtrPull(ptrPull);
     if (dy > 10 && ev.cancelable) ev.preventDefault();
-  }, { passive: false });
+  }, { capture: true, passive: false });
 
   document.addEventListener("touchend", async () => {
     if (!ptrActive) return;
@@ -6180,7 +6180,7 @@ function renderMain() {
     ptrStartY = null;
     ptrStartX = null;
     ptrPull = 0;
-  });
+  }, { capture: true });
 
   // Back-swipe iOS : écoute popstate pour revenir à la route précédente
   window.addEventListener("popstate", (ev) => {
