@@ -7,7 +7,7 @@
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+  "Access-Control-Allow-Methods": "GET,POST,DELETE,PATCH,OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization, apikey, X-Admin-Token",
 };
 
@@ -104,6 +104,52 @@ const NAME_MAP = {
 };
 
 // ============================================================
+// USER ASSETS — actifs personnalisés stockés en Supabase
+// ============================================================
+const USER_ASSETS_TABLE = "mtp_user_assets";
+const USER_ASSETS_MAX = 50;
+let _userAssetsCache = { at: 0, data: [] };
+const USER_ASSETS_CACHE_MS = 60 * 1000;
+
+async function getUserAssetsCached(env) {
+  const now = Date.now();
+  if (now - _userAssetsCache.at < USER_ASSETS_CACHE_MS) return _userAssetsCache.data;
+  if (!supabaseConfigured(env)) { _userAssetsCache = { at: now, data: [] }; return []; }
+  try {
+    const rows = await supabaseFetch(env, `${USER_ASSETS_TABLE}?select=symbol,name,asset_class,enabled,provider_used&order=created_at.desc`);
+    const data = Array.isArray(rows) ? rows : [];
+    _userAssetsCache = { at: now, data };
+    return data;
+  } catch {
+    _userAssetsCache = { at: now, data: [] };
+    return [];
+  }
+}
+
+function invalidateUserAssetsCache() { _userAssetsCache = { at: 0, data: [] }; }
+
+async function getDynamicSymbols(env) {
+  const custom = await getUserAssetsCached(env);
+  const enabled = custom.filter(a => a.enabled !== false).map(a => String(a.symbol || "").toUpperCase()).filter(Boolean);
+  return [...new Set([...LIGHT_SYMBOLS, ...enabled])];
+}
+
+async function getDynamicCryptoSet(env) {
+  const custom = await getUserAssetsCached(env);
+  const extra = custom.filter(a => a.enabled !== false && a.asset_class === "crypto").map(a => String(a.symbol || "").toUpperCase());
+  return new Set([...CRYPTO_SYMBOLS, ...extra]);
+}
+
+async function getDynamicNameMap(env) {
+  const custom = await getUserAssetsCached(env);
+  const extra = {};
+  for (const a of custom) {
+    if (a.symbol && a.name) extra[String(a.symbol).toUpperCase()] = String(a.name);
+  }
+  return { ...NAME_MAP, ...extra };
+}
+
+// ============================================================
 // CIRCUIT BREAKERS — cooldown adaptatif
 // ============================================================
 const circuitBreakers = {
@@ -184,10 +230,31 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function nowIso() { return new Date().toISOString(); }
 function nowMs() { return Date.now(); }
 function parseSymbol(raw) { return String(raw || "").trim().toUpperCase(); }
+const FOREX_SYMBOLS_SET = new Set(["EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD"]);
+const COMMODITY_SYMBOLS_SET = new Set(["GOLD","SILVER","OIL"]);
+const ETF_SYMBOLS_SET = new Set(["SPY","QQQ","GLD","TLT"]);
+
 function isCrypto(symbol) { return CRYPTO_SYMBOLS.has(symbol); }
-function isForex(symbol) { return ["EURUSD","GBPUSD","USDJPY","USDCHF","AUDUSD"].includes(symbol); }
-function isCommodity(symbol) { return ["GOLD","SILVER","OIL"].includes(symbol); }
-function isEtf(symbol) { return ["SPY","QQQ","GLD","TLT"].includes(symbol); }
+function isForex(symbol) { return FOREX_SYMBOLS_SET.has(symbol); }
+function isCommodity(symbol) { return COMMODITY_SYMBOLS_SET.has(symbol); }
+function isEtf(symbol) { return ETF_SYMBOLS_SET.has(symbol); }
+
+// Enrichit les sets avec les user assets stockés en Supabase
+async function refreshDynamicAssetSets(env) {
+  try {
+    const custom = await getUserAssetsCached(env);
+    for (const a of custom) {
+      if (a.enabled === false) continue;
+      const s = String(a.symbol || "").toUpperCase();
+      if (!s) continue;
+      if (a.asset_class === "crypto") CRYPTO_SYMBOLS.add(s);
+      else if (a.asset_class === "forex") FOREX_SYMBOLS_SET.add(s);
+      else if (a.asset_class === "commodity") COMMODITY_SYMBOLS_SET.add(s);
+      else if (a.asset_class === "etf") ETF_SYMBOLS_SET.add(s);
+      if (a.name) NAME_MAP[s] = String(a.name);
+    }
+  } catch {}
+}
 function getAssetClass(symbol) {
   if (isCrypto(symbol)) return "crypto";
   if (isForex(symbol)) return "forex";
@@ -2515,6 +2582,10 @@ function riskStateBlockerMessage(flag) {
 // HANDLE OPPORTUNITIES — avec régime global
 // ============================================================
 async function handleOpportunities(_url, env) {
+  // Enrichit les sets (CRYPTO_SYMBOLS, NAME_MAP, etc.) avec les actifs Supabase
+  await refreshDynamicAssetSets(env);
+  const allSymbols = await getDynamicSymbols(env);
+
   // Cache memoire valide ?
   const cachedRows = getMemoryCache("route:opportunities:data");
   if (cachedRows) {
@@ -2534,8 +2605,8 @@ async function handleOpportunities(_url, env) {
   // PHASE 1 — 1 seul appel TwelveData batch pour toutes les quotes non-crypto
   // Réduit de ~25 subrequetes à 1 seule pour les quotes
   // ============================================================
-  const nonCryptoSymbols = LIGHT_SYMBOLS.filter(s => !isCrypto(s));
-  const cryptoSymbols = LIGHT_SYMBOLS.filter(s => isCrypto(s));
+  const nonCryptoSymbols = allSymbols.filter(s => !isCrypto(s));
+  const cryptoSymbols = allSymbols.filter(s => isCrypto(s));
   const quotesMap = {};
   const quoteErrors = {};
   let nonCryptoBatchError = "Batch TwelveData indisponible";
@@ -2609,7 +2680,7 @@ async function handleOpportunities(_url, env) {
   // Chaque actif ne fait que 1 appel : bougies (ou 0 si KV valide)
   // ============================================================
   const rows = [];
-  for (const symbol of LIGHT_SYMBOLS) {
+  for (const symbol of allSymbols) {
     let quote = quotesMap[symbol] || getMemoryCache(`market:snapshot:${symbol}`);
     try {
       if (!isCrypto(symbol) && !quote) {
@@ -4164,6 +4235,33 @@ async function handleRequest(request, env) {
       if (denied) return denied;
       return safeRoute(() => handleTrainingAutoCycle(env));
     }
+    if (url.pathname === "/api/user-assets") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleUserAssetsAdd(request, env));
+    }
+    return fail("Method not allowed", "error", 405);
+  }
+
+  // DELETE routes
+  if (request.method === "DELETE") {
+    if (url.pathname.startsWith("/api/user-assets/")) {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      const sym = decodeURIComponent(url.pathname.replace("/api/user-assets/", ""));
+      return safeRoute(() => handleUserAssetDelete(sym, env));
+    }
+    return fail("Method not allowed", "error", 405);
+  }
+
+  // PATCH routes
+  if (request.method === "PATCH") {
+    if (url.pathname.startsWith("/api/user-assets/")) {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      const sym = decodeURIComponent(url.pathname.replace("/api/user-assets/", ""));
+      return safeRoute(() => handleUserAssetPatch(sym, request, env));
+    }
     return fail("Method not allowed", "error", 405);
   }
 
@@ -4207,6 +4305,11 @@ async function handleRequest(request, env) {
       if (denied) return denied;
       return safeRoute(() => handleTrainingSettingsGet(env));
     }
+    if (url.pathname === "/api/user-assets") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleUserAssetsList(env));
+    }
     // Route de debug état des circuits
     if (url.pathname === "/api/debug/circuits") {
       const denied = await requireAdminAccess(request, env);
@@ -4220,6 +4323,132 @@ async function handleRequest(request, env) {
   }
 
   return fail("Method not allowed", "error", 405);
+}
+
+// ============================================================
+// USER ASSETS — handlers CRUD
+// ============================================================
+async function validateSymbolOnProviders(symbol, assetClass, env, ctx) {
+  const sym = String(symbol || "").toUpperCase();
+  if (!sym) return { ok: false, error: "Symbole vide" };
+  try {
+    if (assetClass === "crypto") {
+      const q = await getCryptoQuote(sym);
+      if (q && q.price != null) return { ok: true, provider: "binance" };
+      return { ok: false, error: `Symbole "${sym}" introuvable sur Binance. Vérifie la paire (ex. TON → TONUSDT).` };
+    }
+    const qt = await getTwelveQuote(sym, env, ctx).catch(() => null);
+    if (qt && qt.price != null) return { ok: true, provider: "twelvedata" };
+    const qy = await getYahooQuote(sym).catch(() => null);
+    if (qy && qy.price != null) return { ok: true, provider: "yahoo" };
+    return { ok: false, error: `Symbole "${sym}" introuvable sur les providers (TwelveData, Yahoo).` };
+  } catch (e) {
+    return { ok: false, error: `Erreur validation : ${e.message || "provider indisponible"}` };
+  }
+}
+
+async function handleUserAssetsList(env) {
+  if (!supabaseConfigured(env)) {
+    return ok({ assets: [], supabaseConfigured: false }, "worker", nowIso(), "unknown", "Supabase non configuré — impossible de charger la liste.");
+  }
+  try {
+    const rows = await supabaseFetch(env, `${USER_ASSETS_TABLE}?select=symbol,name,asset_class,enabled,provider_used,created_at&order=created_at.desc`);
+    return ok({ assets: Array.isArray(rows) ? rows : [], supabaseConfigured: true }, "supabase", nowIso(), "recent");
+  } catch (e) {
+    return fail(`Erreur chargement : ${e.message || "supabase indisponible"}`, "error", 500);
+  }
+}
+
+async function handleUserAssetsAdd(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré.", "error", 503);
+  let body;
+  try { body = await request.json(); } catch { return fail("JSON invalide", "bad_request", 400); }
+
+  const symbol = String(body?.symbol || "").trim().toUpperCase();
+  const name = String(body?.name || "").trim() || symbol;
+  const assetClass = String(body?.asset_class || "").trim().toLowerCase();
+
+  if (!/^[A-Z0-9.=/-]{1,20}$/.test(symbol)) {
+    return fail("Symbole invalide (lettres, chiffres, . = / - uniquement, max 20 caractères).", "bad_request", 400);
+  }
+  if (!["crypto","stock","etf","forex","commodity"].includes(assetClass)) {
+    return fail("Classe d'actif invalide. Choisir parmi : crypto, stock, etf, forex, commodity.", "bad_request", 400);
+  }
+
+  // Limite 50 actifs custom
+  try {
+    const existing = await supabaseFetch(env, `${USER_ASSETS_TABLE}?select=symbol`);
+    if (Array.isArray(existing) && existing.length >= USER_ASSETS_MAX) {
+      return fail(`Limite de ${USER_ASSETS_MAX} actifs personnalisés atteinte.`, "bad_request", 400);
+    }
+    if (Array.isArray(existing) && existing.some(a => String(a.symbol).toUpperCase() === symbol)) {
+      return fail(`Le symbole ${symbol} existe déjà dans ta liste.`, "bad_request", 409);
+    }
+  } catch {}
+
+  // Protection : ne pas dupliquer un actif core
+  if (LIGHT_SYMBOLS.includes(symbol)) {
+    return fail(`${symbol} fait déjà partie des actifs de base.`, "bad_request", 400);
+  }
+
+  // Validation provider
+  const ctx = createBudgetContext("user_asset_add");
+  const v = await validateSymbolOnProviders(symbol, assetClass, env, ctx);
+  if (!v.ok) return fail(v.error, "bad_request", 400);
+
+  try {
+    await supabaseFetch(env, USER_ASSETS_TABLE, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ symbol, name, asset_class: assetClass, enabled: true, provider_used: v.provider })
+    });
+    invalidateUserAssetsCache();
+    // Invalide aussi le cache opportunités pour que le prochain scan inclue le nouvel actif
+    try { memoryCache.delete("route:opportunities:data"); } catch {}
+    return ok({ symbol, name, asset_class: assetClass, enabled: true, provider_used: v.provider }, "supabase", nowIso(), "recent");
+  } catch (e) {
+    const msg = String(e.message || "");
+    if (msg.includes("409") || msg.includes("23505")) return fail(`Le symbole ${symbol} existe déjà.`, "bad_request", 409);
+    return fail(`Erreur Supabase : ${msg}`, "error", 500);
+  }
+}
+
+async function handleUserAssetDelete(symbol, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré.", "error", 503);
+  const sym = String(symbol || "").trim().toUpperCase();
+  if (!sym) return fail("Symbole manquant.", "bad_request", 400);
+  try {
+    await supabaseFetch(env, `${USER_ASSETS_TABLE}?symbol=eq.${encodeURIComponent(sym)}`, { method: "DELETE" });
+    invalidateUserAssetsCache();
+    try { memoryCache.delete("route:opportunities:data"); } catch {}
+    return ok({ deleted: sym }, "supabase", nowIso(), "recent");
+  } catch (e) {
+    return fail(`Erreur suppression : ${e.message || "supabase"}`, "error", 500);
+  }
+}
+
+async function handleUserAssetPatch(symbol, request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré.", "error", 503);
+  const sym = String(symbol || "").trim().toUpperCase();
+  if (!sym) return fail("Symbole manquant.", "bad_request", 400);
+  let body;
+  try { body = await request.json(); } catch { return fail("JSON invalide", "bad_request", 400); }
+  const patch = {};
+  if (typeof body?.enabled === "boolean") patch.enabled = body.enabled;
+  if (typeof body?.name === "string") patch.name = body.name.trim().slice(0, 100);
+  if (Object.keys(patch).length === 0) return fail("Aucun champ modifiable fourni (enabled, name).", "bad_request", 400);
+  try {
+    await supabaseFetch(env, `${USER_ASSETS_TABLE}?symbol=eq.${encodeURIComponent(sym)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify(patch)
+    });
+    invalidateUserAssetsCache();
+    try { memoryCache.delete("route:opportunities:data"); } catch {}
+    return ok({ symbol: sym, ...patch }, "supabase", nowIso(), "recent");
+  } catch (e) {
+    return fail(`Erreur mise à jour : ${e.message || "supabase"}`, "error", 500);
+  }
 }
 
 // ============================================================
