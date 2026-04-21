@@ -2106,15 +2106,35 @@ function applyFilter() {
   // =========================
   // navigation
   // =========================
-  function navigate(route, symbol = null) {
+  function navigate(route, symbol = null, opts = {}) {
+    const skipHistory = opts.skipHistory === true;
+    const forceOppReload = opts.forceOppReload === true;
+    const prevRoute = state.route;
+    const prevSymbol = state.selectedSymbol;
     state.route = route;
     if (symbol) state.selectedSymbol = symbol;
+
+    if (!skipHistory) {
+      const changed = prevRoute !== route || (route === "asset-detail" && prevSymbol !== symbol);
+      if (changed) {
+        try {
+          const hist = { route, symbol: symbol || null };
+          // asset-detail = drill-down, pushState pour back-swipe
+          // autres routes = tabs top-level, replaceState pour ne pas gonfler l'historique
+          if (route === "asset-detail" && prevRoute !== "asset-detail") {
+            history.pushState(hist, "", "");
+          } else {
+            history.replaceState(hist, "", "");
+          }
+        } catch {}
+      }
+    }
 
     if (route === "opportunities") {
       state.error = null;
       state.aiReview = null;
       render();
-      loadOpportunities(true);
+      if (forceOppReload) loadOpportunities(true);
     } else if (route === "asset-detail" && symbol) {
       state.aiReview = null;
       loadDetail(symbol);
@@ -5332,12 +5352,8 @@ function renderMain() {
     app.querySelectorAll("[data-route]").forEach(el => {
       el.addEventListener("click", () => {
         const route = el.getAttribute("data-route");
-        if (route === "opportunities" && state.settings.autoRefreshOpportunities) {
-          navigate("opportunities");
-        } else {
-          state.route = route;
-          render();
-        }
+        const forceOppReload = route === "opportunities" && state.settings.autoRefreshOpportunities;
+        navigate(route, null, { forceOppReload });
       });
     });
 
@@ -5625,6 +5641,9 @@ function renderMain() {
   }
 
   async function boot() {
+    try {
+      history.replaceState({ route: state.route, symbol: state.selectedSymbol || null }, "", "");
+    } catch {}
     state.priceAlerts = loadPriceAlerts();
     await loadTradesState();
     if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
@@ -5679,6 +5698,21 @@ function renderMain() {
     setTimeout(() => {
       try { target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
     }, 250);
+  });
+
+  // Back-swipe iOS : écoute popstate pour revenir à la route précédente
+  window.addEventListener("popstate", (ev) => {
+    // Ferme tous les modals ouverts (évite un état incohérent)
+    if (state.tradeConfirm?.open) state.tradeConfirm = { open: false, mode: null, side: null };
+    if (state.session?.pinOpen) { state.session.pinOpen = false; state.session.pinError = null; }
+    if (state.alertModal?.open) state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+
+    const s = ev.state;
+    if (!s || !s.route) {
+      navigate("dashboard", null, { skipHistory: true });
+    } else {
+      navigate(s.route, s.symbol || null, { skipHistory: true });
+    }
   });
 
   boot();
