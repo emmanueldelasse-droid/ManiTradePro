@@ -2938,28 +2938,20 @@ function renderTrendingStrip(trending) {
 
 function renderMarketRegimeBanner(regime = state.market?.regime) {
   const vm = marketRegimeViewModel(regime);
-  const borderColor = vm.tone === "positive"
-    ? "rgba(16,185,129,.30)"
-    : vm.tone === "negative"
-      ? "rgba(239,68,68,.28)"
-      : "rgba(245,158,11,.24)";
-  const background = vm.tone === "positive"
-    ? "linear-gradient(135deg, rgba(16,185,129,.14), rgba(15,23,42,.95))"
-    : vm.tone === "negative"
-      ? "linear-gradient(135deg, rgba(239,68,68,.12), rgba(15,23,42,.95))"
-      : "linear-gradient(135deg, rgba(245,158,11,.10), rgba(15,23,42,.95))";
-
+  const toneClass = vm.tone === "positive" ? "regime-banner--positive"
+    : vm.tone === "negative" ? "regime-banner--negative"
+    : "regime-banner--neutral";
   return `
-    <div class="card" style="margin-bottom:18px;border:1px solid ${borderColor};background:${background}">
+    <div class="card regime-banner ${toneClass}">
       <div class="section-title"><span>Regime global</span><span>${badge(vm.label, vm.tone)}</span></div>
-      <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
-        <div style="min-width:0;flex:1;">
-          <div style="font-size:1.08rem;font-weight:800;">${safeText(vm.title)}</div>
+      <div class="plan-card-head">
+        <div class="plan-card-head-main">
+          <div class="regime-banner-title">${safeText(vm.title)}</div>
           <div class="muted" style="margin-top:6px">${safeText(vm.reason)}</div>
           <div class="muted" style="margin-top:8px">${safeText(vm.updatedLabel)}</div>
           ${vm.panelMessage ? `<div class="muted" style="margin-top:8px">Panel : ${safeText(vm.panelMessage)}</div>` : ""}
         </div>
-        <div class="legend" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+        <div class="legend plan-card-head-badges">
           ${vm.signals.map((label) => badge(label)).join("")}
         </div>
       </div>
