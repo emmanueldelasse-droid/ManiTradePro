@@ -2106,15 +2106,35 @@ function applyFilter() {
   // =========================
   // navigation
   // =========================
-  function navigate(route, symbol = null) {
+  function navigate(route, symbol = null, opts = {}) {
+    const skipHistory = opts.skipHistory === true;
+    const forceOppReload = opts.forceOppReload === true;
+    const prevRoute = state.route;
+    const prevSymbol = state.selectedSymbol;
     state.route = route;
     if (symbol) state.selectedSymbol = symbol;
+
+    if (!skipHistory) {
+      const changed = prevRoute !== route || (route === "asset-detail" && prevSymbol !== symbol);
+      if (changed) {
+        try {
+          const hist = { route, symbol: symbol || null };
+          // asset-detail = drill-down, pushState pour back-swipe
+          // autres routes = tabs top-level, replaceState pour ne pas gonfler l'historique
+          if (route === "asset-detail" && prevRoute !== "asset-detail") {
+            history.pushState(hist, "", "");
+          } else {
+            history.replaceState(hist, "", "");
+          }
+        } catch {}
+      }
+    }
 
     if (route === "opportunities") {
       state.error = null;
       state.aiReview = null;
       render();
-      loadOpportunities(true);
+      if (forceOppReload) loadOpportunities(true);
     } else if (route === "asset-detail" && symbol) {
       state.aiReview = null;
       loadDetail(symbol);
@@ -3159,7 +3179,7 @@ function renderDashboard() {
                 ${f === "all" ? "all" : f}
               </button>
             `).join("")}
-            <button class="chip" data-refresh="opps">Rafraichir</button>
+            <button class="chip" data-refresh="opportunities">Rafraichir</button>
           </div>
         </div>
 
@@ -5027,7 +5047,7 @@ function openPositionsRiskView() {
     if (!state.alertModal.open) return "";
     const { symbol, name, currentPrice } = state.alertModal;
     return `
-      <div class="modal-overlay" id="alert-modal-overlay">
+      <div class="modal-overlay" id="alert-modal-overlay" data-close-modal="alert">
         <div class="modal-box pin-modal">
           <div class="modal-title">Alerte prix — ${safeText(symbol)}</div>
           <div class="modal-desc">${safeText(name)}${currentPrice != null ? ` · Prix actuel\u00a0: ${priceDisplay(currentPrice)}` : ""}</div>
@@ -5263,7 +5283,7 @@ function renderMain() {
     const err = state.session.pinError ? `<div class="pin-error">${safeText(state.session.pinError)}</div>` : "";
     const loading = state.session.pinLoading;
     return `
-      <div class="modal-overlay" id="pin-overlay">
+      <div class="modal-overlay" id="pin-overlay" data-close-modal="pin">
         <div class="modal-box pin-modal">
           <div class="modal-title">Connexion Worker</div>
           <div class="modal-desc">Entre ton PIN Cloudflare pour activer l'acces aux routes proteges (trades, IA).</div>
@@ -5318,11 +5338,14 @@ function renderMain() {
         ${renderPinModal()}
         ${renderAlertModal()}
         ${renderAlertToast()}
+        <div class="ptr-indicator" id="ptr-indicator"><div class="ptr-spinner"></div></div>
       </div>
     `;
     applyThemeMode();
     bindEvents();
     syncDisplayedScores();
+    const modalOpen = !!(state.tradeConfirm?.open || state.session?.pinOpen || state.alertModal?.open);
+    document.documentElement.classList.toggle("has-modal", modalOpen);
     if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
   }
 
@@ -5330,12 +5353,8 @@ function renderMain() {
     app.querySelectorAll("[data-route]").forEach(el => {
       el.addEventListener("click", () => {
         const route = el.getAttribute("data-route");
-        if (route === "opportunities" && state.settings.autoRefreshOpportunities) {
-          navigate("opportunities");
-        } else {
-          state.route = route;
-          render();
-        }
+        const forceOppReload = route === "opportunities" && state.settings.autoRefreshOpportunities;
+        navigate(route, null, { forceOppReload });
       });
     });
 
@@ -5371,7 +5390,7 @@ function renderMain() {
       });
     });
 
-    app.querySelectorAll(".opp-row[data-symbol], .ai-card[data-symbol]").forEach(el => {
+    app.querySelectorAll(".opp-row[data-symbol]").forEach(el => {
       el.addEventListener("click", () => navigate("asset-detail", el.getAttribute("data-symbol")));
     });
 
@@ -5604,9 +5623,28 @@ function renderMain() {
       });
     });
 
+    // Fermeture modal au tap backdrop (uniquement clic direct, pas bubble)
+    app.querySelectorAll("[data-close-modal]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        if (ev.target !== el) return;
+        const kind = el.getAttribute("data-close-modal");
+        if (kind === "alert") {
+          state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+          render();
+        } else if (kind === "pin") {
+          state.session.pinOpen = false;
+          state.session.pinError = null;
+          render();
+        }
+      });
+    });
+
   }
 
   async function boot() {
+    try {
+      history.replaceState({ route: state.route, symbol: state.selectedSymbol || null }, "", "");
+    } catch {}
     state.priceAlerts = loadPriceAlerts();
     await loadTradesState();
     if (Array.isArray(state.opportunitiesSnapshot) && state.opportunitiesSnapshot.length) {
@@ -5637,6 +5675,123 @@ function renderMain() {
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
+
+  // iOS keyboard handling — synchronise visualViewport avec CSS vars
+  // Permet aux modals de rester visibles au-dessus du clavier virtuel
+  function syncVisualViewport() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    document.documentElement.style.setProperty("--vv-height", vv.height + "px");
+    document.documentElement.style.setProperty("--vv-offset-top", vv.offsetTop + "px");
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncVisualViewport);
+    window.visualViewport.addEventListener("scroll", syncVisualViewport);
+    syncVisualViewport();
+  }
+
+  // Scroll l'input focus au centre de son modal (iOS clavier)
+  document.addEventListener("focusin", (ev) => {
+    const target = ev.target;
+    if (!target || !target.closest) return;
+    const inModal = target.closest(".modal-box, .modal-backdrop .card");
+    if (!inModal) return;
+    setTimeout(() => {
+      try { target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+    }, 250);
+  });
+
+  // Pull-to-refresh (iPhone) — tire vers le bas en haut de page pour rafraîchir
+  let ptrStartY = null;
+  let ptrStartX = null;
+  let ptrPull = 0;
+  let ptrActive = false;
+  let ptrRefreshing = false;
+  const PTR_THRESHOLD = 60;
+  const PTR_MAX = 120;
+
+  function setPtrPull(px) {
+    document.documentElement.style.setProperty("--ptr-pull", px + "px");
+    const ind = document.getElementById("ptr-indicator");
+    if (!ind) return;
+    ind.classList.toggle("visible", px > 0);
+    ind.classList.toggle("pulling", ptrActive);
+  }
+
+  function currentRoutePtrAction() {
+    if (ptrRefreshing) return null;
+    switch (state.route) {
+      case "dashboard": return () => loadDashboard();
+      case "opportunities": return () => loadOpportunities(true);
+      case "portfolio": return () => refreshOpenTradesLive(true);
+      case "alerts": return () => loadDashboard();
+      default: return null;
+    }
+  }
+
+  function scrollerAtTop() {
+    const sc = document.querySelector(".main-content");
+    if (!sc) return false;
+    return sc.scrollTop <= 0;
+  }
+
+  document.addEventListener("touchstart", (ev) => {
+    if (ptrRefreshing) return;
+    if (!scrollerAtTop()) return;
+    if (!currentRoutePtrAction()) return;
+    if (ev.target.closest && ev.target.closest(".modal-overlay, .modal-backdrop, #lw-chart-container")) return;
+    ptrStartY = ev.touches[0].clientY;
+    ptrStartX = ev.touches[0].clientX;
+    ptrActive = true;
+    ptrPull = 0;
+  }, { passive: true });
+
+  document.addEventListener("touchmove", (ev) => {
+    if (!ptrActive || ptrStartY == null) return;
+    if (!scrollerAtTop()) { ptrActive = false; setPtrPull(0); return; }
+    const dy = ev.touches[0].clientY - ptrStartY;
+    const dx = Math.abs(ev.touches[0].clientX - ptrStartX);
+    if (dx > Math.abs(dy) && dx > 10) { ptrActive = false; setPtrPull(0); return; }
+    if (dy <= 0) { ptrPull = 0; setPtrPull(0); return; }
+    ptrPull = Math.min(Math.pow(dy, 0.85), PTR_MAX);
+    setPtrPull(ptrPull);
+    if (dy > 10 && ev.cancelable) ev.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener("touchend", async () => {
+    if (!ptrActive) return;
+    ptrActive = false;
+    const refresh = currentRoutePtrAction();
+    if (ptrPull >= PTR_THRESHOLD && refresh) {
+      ptrRefreshing = true;
+      setPtrPull(44);
+      const ind = document.getElementById("ptr-indicator");
+      if (ind) ind.classList.add("refreshing");
+      try { await refresh(); } catch {}
+      try { navigator.vibrate && navigator.vibrate(10); } catch {}
+      if (ind) ind.classList.remove("refreshing");
+      ptrRefreshing = false;
+    }
+    setPtrPull(0);
+    ptrStartY = null;
+    ptrStartX = null;
+    ptrPull = 0;
+  });
+
+  // Back-swipe iOS : écoute popstate pour revenir à la route précédente
+  window.addEventListener("popstate", (ev) => {
+    // Ferme tous les modals ouverts (évite un état incohérent)
+    if (state.tradeConfirm?.open) state.tradeConfirm = { open: false, mode: null, side: null };
+    if (state.session?.pinOpen) { state.session.pinOpen = false; state.session.pinError = null; }
+    if (state.alertModal?.open) state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+
+    const s = ev.state;
+    if (!s || !s.route) {
+      navigate("dashboard", null, { skipHistory: true });
+    } else {
+      navigate(s.route, s.symbol || null, { skipHistory: true });
+    }
+  });
 
   boot();
 })();

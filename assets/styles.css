@@ -1077,8 +1077,12 @@ html.theme-light-root :root{
 }
 
 /* PIN / session modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(3,8,20,.78);display:flex;align-items:center;justify-content:center;z-index:9999;padding:calc(20px + var(--safe-top)) calc(20px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left))}
-.modal-box{background:var(--bg-card);border:1px solid var(--border-medium);border-radius:18px;padding:24px 22px 20px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px}
+.modal-overlay{position:fixed;top:var(--vv-offset-top,0);left:0;right:0;height:var(--vv-height,100dvh);background:rgba(3,8,20,.78);display:flex;align-items:center;justify-content:center;z-index:9999;padding:calc(20px + var(--safe-top)) calc(20px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left));overscroll-behavior:contain}
+.modal-box{background:var(--bg-card);border:1px solid var(--border-medium);border-radius:18px;padding:24px 22px 20px;width:min(380px,100%);max-height:calc(var(--vv-height,100dvh) - var(--safe-top) - var(--safe-bottom) - 40px);display:flex;flex-direction:column;gap:12px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+/* Scroll lock body quand modal ouvert (iOS PWA safe) */
+html.has-modal,html.has-modal body{overflow:hidden}
+html.has-modal .main-content{overflow:hidden}
 .modal-title{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
 .modal-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.4}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
@@ -1104,6 +1108,37 @@ html.theme-light-root :root{
 .alert-toast-title{font-weight:700;font-size:.88rem;color:var(--accent);margin-bottom:2px}
 .alert-toast-body{font-size:.80rem;color:var(--text-secondary)}
 @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* ===========================
+   Pull-to-refresh indicator (iPhone)
+   =========================== */
+.ptr-indicator{
+  position:fixed;
+  top:var(--safe-top);
+  left:0;right:0;
+  height:44px;
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:none;
+  opacity:0;
+  transform:translateY(calc(-100% + var(--ptr-pull, 0px)));
+  transition:transform .2s ease, opacity .15s ease;
+  z-index:5;
+}
+.ptr-indicator.visible{opacity:1}
+.ptr-indicator.pulling{transition:none}
+.ptr-spinner{
+  width:22px;height:22px;
+  border:2.5px solid var(--border-medium);
+  border-top-color:var(--accent);
+  border-radius:50%;
+}
+.ptr-indicator.refreshing .ptr-spinner{
+  animation:ptr-spin .8s linear infinite;
+}
+@keyframes ptr-spin{to{transform:rotate(360deg)}}
+@media (min-width:861px){
+  .ptr-indicator{display:none}
+}
 
 /* ===========================
    iPhone / iOS adaptations
