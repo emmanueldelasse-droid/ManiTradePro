@@ -738,6 +738,17 @@
     try { navigator.vibrate && navigator.vibrate(pattern); } catch {}
   }
 
+  // A2HS (Add to Home Screen) — iOS n'a pas beforeinstallprompt
+  const A2HS_DISMISSED_KEY = "mtp_a2hs_dismissed_v1";
+  function shouldShowA2HSBanner() {
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    if (!isIOS) return false;
+    const isStandalone = (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true;
+    if (isStandalone) return false;
+    try { if (localStorage.getItem(A2HS_DISMISSED_KEY) === "1") return false; } catch {}
+    return true;
+  }
+
   function money(v, currency = "USD") {
     if (v == null || Number.isNaN(v)) return "Donnee indisponible";
     return new Intl.NumberFormat("fr-FR", {
@@ -5424,6 +5435,16 @@ function renderMain() {
         ${renderPinModal()}
         ${renderAlertModal()}
         ${renderAlertToast()}
+        ${shouldShowA2HSBanner() ? `
+          <div class="a2hs-banner" role="note">
+            <div class="a2hs-icon">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+            </div>
+            <div class="a2hs-text">Installe ManiTrade : <strong>Partager</strong> puis <strong>Ajouter à l'écran d'accueil</strong>.</div>
+            <button class="a2hs-close" data-a2hs-dismiss aria-label="Fermer la bannière">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>` : ""}
         <div class="ptr-indicator" id="ptr-indicator"><div class="ptr-spinner"></div></div>
       </div>
     `;
@@ -5744,6 +5765,13 @@ function renderMain() {
     app.querySelectorAll("[data-request-notif-perm]").forEach(el => {
       el.addEventListener("click", async () => {
         await requestNotificationsPermission();
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-a2hs-dismiss]").forEach(el => {
+      el.addEventListener("click", () => {
+        try { localStorage.setItem(A2HS_DISMISSED_KEY, "1"); } catch {}
         render();
       });
     });

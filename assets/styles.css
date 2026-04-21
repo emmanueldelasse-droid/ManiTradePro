@@ -1175,6 +1175,34 @@ html.has-modal .main-content{overflow:hidden}
 @keyframes toast-in{from{opacity:0;transform:translateX(-50%) translateY(10px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
 /* ===========================
+   A2HS banner (iOS Add to Home Screen)
+   =========================== */
+.a2hs-banner{
+  position:fixed;
+  left:calc(10px + var(--safe-left));
+  right:calc(10px + var(--safe-right));
+  bottom:calc(var(--bottomnav-height) + var(--safe-bottom) + 10px);
+  background:var(--bg-card);
+  border:1px solid var(--accent-glow);
+  border-radius:14px;
+  padding:12px 14px;
+  display:flex;align-items:center;gap:12px;
+  z-index:9;
+  box-shadow:0 8px 28px rgba(0,0,0,.28);
+  font-size:.86rem;
+  color:var(--text-primary);
+  animation:a2hs-in .28s ease;
+}
+@keyframes a2hs-in{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+.a2hs-icon{color:var(--accent);flex-shrink:0;display:flex;align-items:center}
+.a2hs-text{flex:1;line-height:1.35}
+.a2hs-text strong{color:var(--accent)}
+.a2hs-close{width:34px;height:34px;border-radius:50%;background:var(--bg-elevated);border:1px solid var(--border-subtle);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--text-secondary);padding:0}
+.a2hs-close:active{transform:scale(.9)}
+@media (min-width:861px){.a2hs-banner{display:none}}
+.app-shell.theme-light .a2hs-banner{background:#ffffff;border-color:rgba(0,163,108,.3);box-shadow:0 6px 20px rgba(15,23,42,.12)}
+
+/* ===========================
    Pull-to-refresh indicator (iPhone)
    =========================== */
 .ptr-indicator{
