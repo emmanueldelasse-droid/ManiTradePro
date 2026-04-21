@@ -41,6 +41,7 @@
 
   const state = {
     route: "dashboard",
+    moreMenuOpen: false,
     opportunities: [],
     filteredOpportunities: [],
     opportunityFilter: "all",
@@ -106,6 +107,7 @@
     alertModal: { open: false, symbol: null, name: null, currentPrice: null },
     alertToast: null,
     chartTimeframe: "1d",
+    chartFullscreen: false,
     algoSignalsPrev: null,
     journalAnalysis: null,
     loadingJournalAnalysis: false,
@@ -122,6 +124,11 @@
     ["performance", "Performance", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
+
+  // Mobile bottom-nav : 4 items principaux + "Plus" (Performance + Réglages)
+  const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
+  const MORE_NAV_ROUTES = ["performance", "settings"];
+  const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
   // storage
@@ -2165,12 +2172,28 @@ function applyFilter() {
   }
 
   function renderBottomNav() {
+    const primary = navItems.filter(([route]) => PRIMARY_NAV_ROUTES.includes(route));
+    const more = navItems.filter(([route]) => MORE_NAV_ROUTES.includes(route));
+    const moreActive = MORE_NAV_ROUTES.includes(state.route) || state.moreMenuOpen;
     return `<nav class="bottom-nav"><div class="bottom-wrap">
-      ${navItems.map(([route, label, icon]) => `
+      ${primary.map(([route, label, icon]) => `
         <button class="bnav-item ${state.route === route ? "active" : ""}" data-route="${route}">
           <span>${icon}</span><span>${label}</span>
         </button>`).join("")}
-    </div></nav>`;
+      <button class="bnav-item ${moreActive ? "active" : ""}" data-more-menu aria-expanded="${state.moreMenuOpen}">
+        <span>${MORE_ICON}</span><span>Plus</span>
+      </button>
+    </div>
+    ${state.moreMenuOpen ? `
+      <div class="more-menu-backdrop" data-close-more-menu></div>
+      <div class="more-menu-sheet" role="menu">
+        ${more.map(([route, label, icon]) => `
+          <button class="more-menu-item ${state.route === route ? "active" : ""}" data-route="${route}" role="menuitem">
+            <span>${icon}</span><span>${label}</span>
+          </button>`).join("")}
+      </div>
+    ` : ""}
+    </nav>`;
   }
 
   
@@ -2915,28 +2938,20 @@ function renderTrendingStrip(trending) {
 
 function renderMarketRegimeBanner(regime = state.market?.regime) {
   const vm = marketRegimeViewModel(regime);
-  const borderColor = vm.tone === "positive"
-    ? "rgba(16,185,129,.30)"
-    : vm.tone === "negative"
-      ? "rgba(239,68,68,.28)"
-      : "rgba(245,158,11,.24)";
-  const background = vm.tone === "positive"
-    ? "linear-gradient(135deg, rgba(16,185,129,.14), rgba(15,23,42,.95))"
-    : vm.tone === "negative"
-      ? "linear-gradient(135deg, rgba(239,68,68,.12), rgba(15,23,42,.95))"
-      : "linear-gradient(135deg, rgba(245,158,11,.10), rgba(15,23,42,.95))";
-
+  const toneClass = vm.tone === "positive" ? "regime-banner--positive"
+    : vm.tone === "negative" ? "regime-banner--negative"
+    : "regime-banner--neutral";
   return `
-    <div class="card" style="margin-bottom:18px;border:1px solid ${borderColor};background:${background}">
+    <div class="card regime-banner ${toneClass}">
       <div class="section-title"><span>Regime global</span><span>${badge(vm.label, vm.tone)}</span></div>
-      <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
-        <div style="min-width:0;flex:1;">
-          <div style="font-size:1.08rem;font-weight:800;">${safeText(vm.title)}</div>
+      <div class="plan-card-head">
+        <div class="plan-card-head-main">
+          <div class="regime-banner-title">${safeText(vm.title)}</div>
           <div class="muted" style="margin-top:6px">${safeText(vm.reason)}</div>
           <div class="muted" style="margin-top:8px">${safeText(vm.updatedLabel)}</div>
           ${vm.panelMessage ? `<div class="muted" style="margin-top:8px">Panel : ${safeText(vm.panelMessage)}</div>` : ""}
         </div>
-        <div class="legend" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+        <div class="legend plan-card-head-badges">
           ${vm.signals.map((label) => badge(label)).join("")}
         </div>
       </div>
@@ -3255,13 +3270,56 @@ function renderDashboard() {
     const tfs = isCrypto
       ? [["1d","1J"],["4h","4H"],["1h","1H"]]
       : [["1d","1J"]];
+    const fsBtn = `<button class="chart-tf-btn chart-fs-btn" data-chart-fullscreen="open" aria-label="Plein écran" title="Plein écran"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>`;
+    if (state.chartFullscreen) {
+      return `
+        <div class="chart-wrap">
+          <div class="chart-tf-row">
+            ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+            <span class="chart-count">${candles.length} bougies</span>
+          </div>
+          <div class="chart-fs-placeholder">Chart ouvert en plein écran</div>
+        </div>`;
+    }
     return `
       <div class="chart-wrap">
         <div class="chart-tf-row">
           ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+          ${fsBtn}
           <span class="chart-count">${candles.length} bougies</span>
         </div>
         <div id="lw-chart-container" data-symbol="${safeText(sym)}" style="width:100%;height:260px;position:relative;"></div>
+      </div>`;
+  }
+
+  function renderChartFullscreen() {
+    if (!state.chartFullscreen) return "";
+    const d = state.detail;
+    if (!d) return "";
+    const sym = d.symbol || "";
+    const name = d.name || "";
+    const candles = Array.isArray(d.candles) ? d.candles : [];
+    const tf = state.chartTimeframe || "1d";
+    const isCrypto = isCryptoSymbol(sym);
+    const tfs = isCrypto ? [["1d","1J"],["4h","4H"],["1h","1H"]] : [["1d","1J"]];
+    return `
+      <div class="chart-fullscreen-overlay" role="dialog" aria-modal="true">
+        <div class="chart-fullscreen-header">
+          <div class="chart-fullscreen-title">
+            <div class="trade-symbol">${safeText(sym)}</div>
+            <div class="muted" style="font-size:.82rem;margin-top:2px">${safeText(name)}</div>
+          </div>
+          <button class="btn btn-secondary chart-fullscreen-close" data-chart-fullscreen="close" aria-label="Fermer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="chart-fullscreen-tfs">
+          ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+          <span class="chart-count">${candles.length} bougies</span>
+        </div>
+        <div class="chart-fullscreen-body">
+          <div id="lw-chart-container" data-symbol="${safeText(sym)}" style="width:100%;height:100%;position:relative;"></div>
+        </div>
       </div>`;
   }
 
@@ -3280,7 +3338,7 @@ function renderDashboard() {
 
     const chart = LightweightCharts.createChart(container, {
       width: container.clientWidth,
-      height: 260,
+      height: container.clientHeight || 260,
       layout: { background: { type: "solid", color: "transparent" }, textColor, fontSize: 11 },
       grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
       crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
@@ -5334,6 +5392,7 @@ function renderMain() {
         ${renderSidebar()}
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
+        ${renderChartFullscreen()}
         ${renderTradeConfirmModal()}
         ${renderPinModal()}
         ${renderAlertModal()}
@@ -5344,7 +5403,7 @@ function renderMain() {
     applyThemeMode();
     bindEvents();
     syncDisplayedScores();
-    const modalOpen = !!(state.tradeConfirm?.open || state.session?.pinOpen || state.alertModal?.open);
+    const modalOpen = !!(state.tradeConfirm?.open || state.session?.pinOpen || state.alertModal?.open || state.chartFullscreen);
     document.documentElement.classList.toggle("has-modal", modalOpen);
     if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
   }
@@ -5353,8 +5412,24 @@ function renderMain() {
     app.querySelectorAll("[data-route]").forEach(el => {
       el.addEventListener("click", () => {
         const route = el.getAttribute("data-route");
+        state.moreMenuOpen = false;
         const forceOppReload = route === "opportunities" && state.settings.autoRefreshOpportunities;
         navigate(route, null, { forceOppReload });
+      });
+    });
+
+    app.querySelectorAll("[data-more-menu]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        state.moreMenuOpen = !state.moreMenuOpen;
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-close-more-menu]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.moreMenuOpen = false;
+        render();
       });
     });
 
@@ -5368,6 +5443,23 @@ function renderMain() {
 
     app.querySelectorAll("[data-refresh='opportunities']").forEach(el => {
       el.addEventListener("click", () => loadOpportunities(true));
+    });
+
+    app.querySelectorAll("[data-chart-fullscreen]").forEach(el => {
+      el.addEventListener("click", () => {
+        const mode = el.getAttribute("data-chart-fullscreen");
+        if (mode === "open" && !state.chartFullscreen) {
+          state.chartFullscreen = true;
+          try { history.pushState({ route: state.route, symbol: state.selectedSymbol || null, chartFullscreen: true }, "", ""); } catch {}
+          render();
+          requestAnimationFrame(initCandlestickChart);
+        } else if (mode === "close" && state.chartFullscreen) {
+          if (history.state?.chartFullscreen) { history.back(); return; }
+          state.chartFullscreen = false;
+          render();
+          requestAnimationFrame(initCandlestickChart);
+        }
+      });
     });
 
     app.querySelectorAll("[data-chart-tf]").forEach(btn => {
@@ -5798,10 +5890,19 @@ function renderMain() {
 
   // Back-swipe iOS : écoute popstate pour revenir à la route précédente
   window.addEventListener("popstate", (ev) => {
+    // Si on était en plein écran et que le nouvel état ne l'est plus → sortir du plein écran sans changer de route
+    if (state.chartFullscreen && !ev.state?.chartFullscreen) {
+      state.chartFullscreen = false;
+      render();
+      requestAnimationFrame(initCandlestickChart);
+      return;
+    }
+
     // Ferme tous les modals ouverts (évite un état incohérent)
     if (state.tradeConfirm?.open) state.tradeConfirm = { open: false, mode: null, side: null };
     if (state.session?.pinOpen) { state.session.pinOpen = false; state.session.pinError = null; }
     if (state.alertModal?.open) state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+    if (state.moreMenuOpen) state.moreMenuOpen = false;
 
     const s = ev.state;
     if (!s || !s.route) {
