@@ -124,13 +124,19 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 3. **Nettoyage sélecteur mort `.ai-card[data-symbol]`** — classe `.ai-card` inexistante dans les templates JS (seulement dans le CSS). Sélecteur simplifié à `.opp-row[data-symbol]` seul.
 4. **Vérification TODO #1 session 7** — `data-add-trade` et `data-setting-input` n'existent pas (déjà nettoyés ou nom erroné). TODO clos.
 5. **Audit iPhone exhaustif** — 20 problèmes identifiés, classés P0/P1/P2 avec effort estimé. Plan de refonte en 3 sprints intégré dans "Prochaine étape prioritaire".
-6. **SESSION.md** — plan de refonte iPhone + nouveaux TODOs.
+6. **Sprint 1 iPhone livré (P0.1 → P0.4)** — 4 commits :
+   - `0bd0c34` scroll lock + modal scroll + backdrop tap close
+   - `8802c1e` clavier virtuel via visualViewport + scrollIntoView
+   - `0023410` back-swipe iOS via history API (pushState drill-down, replaceState tabs, popstate listener)
+   - `381e218` pull-to-refresh dashboard/opportunités/portfolio/alerts avec haptique
+7. **SESSION.md** — plan de refonte iPhone + Sprint 1 coché.
 
 ### Fichiers modifiés (session 8)
 | Fichier | Changement |
 |---------|------------|
-| `assets/app.js` | Fix `data-refresh` alignement + suppression sélecteur mort `.ai-card[data-symbol]` |
-| `SESSION.md` | Mise à jour session 8 + nouveaux TODOs |
+| `assets/app.js` | Fix `data-refresh` + suppression `.ai-card` + `navigate()` avec history API + popstate + `visualViewport` + pull-to-refresh + focusin scrollIntoView + backdrop modal close + toggle `html.has-modal` |
+| `assets/styles.css` | `.ptr-indicator` (spinner + anim), `.modal-overlay` utilise `--vv-height`/`--vv-offset-top`, `.modal-box` max-height respectant safe-area + scroll interne, `html.has-modal` scroll lock |
+| `SESSION.md` | Session 8 + Sprint 1 livré, checkboxes P0 cochées |
 
 ---
 
@@ -191,11 +197,11 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commit par item, validation device à chaque écran.
 
-### Sprint 1 — Fondations iPhone (P0, ~6 h)
-- [ ] **P0.1** Clavier virtuel iOS — `visualViewport.resize` + `scrollIntoView` sur focus dans modals (Alert prix, PIN). ~1 h
-- [ ] **P0.2** Back-swipe iOS — `history.pushState` + `popstate` listener dans `navigate()`. Geste swipe-bord-gauche revient à l'écran précédent au lieu de fermer la PWA. ~2 h
-- [ ] **P0.3** Pull-to-refresh sur dashboard/opportunités/trades — listener `touchstart/touchmove/touchend`, seuil 80 px, haptique au release. ~2 h
-- [ ] **P0.4** Body scroll lock quand modal ouvert + scroll interne `.modal-box` (max-height + overflow-y). ~1 h
+### Sprint 1 — Fondations iPhone (P0) — ✅ LIVRÉ session 8
+- [x] **P0.1** Clavier virtuel iOS — CSS vars `--vv-height`/`--vv-offset-top` via `visualViewport.resize` + `scrollIntoView` sur focus dans modals.
+- [x] **P0.2** Back-swipe iOS — `history.pushState` (asset-detail) / `replaceState` (tabs) + `popstate` listener. Ferme aussi les modals ouverts.
+- [x] **P0.3** Pull-to-refresh sur dashboard/opportunités/portfolio/alerts — indicateur `.ptr-indicator` animé via `--ptr-pull`, seuil 60 px, vibration 10 ms.
+- [x] **P0.4** Body scroll lock (`html.has-modal`) + scroll interne `.modal-box` (max-height respectant safe-area) + tap backdrop ferme modal Alerte/PIN.
 
 ### Sprint 2 — Navigation & contenu (P1, ~7-10 h)
 - [ ] **P1.5** Bottom nav → 5 items (Accueil · Opportunités · Alertes · Trades · Plus). "Plus" regroupe Performance + Réglages via bottom sheet. ~1 h
