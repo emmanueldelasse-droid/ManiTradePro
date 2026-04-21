@@ -3091,7 +3091,7 @@ function renderDashboard() {
         </div>
 
         <div class="dashboard-grid" style="${mobile ? "display:block;" : ""}">
-          <div class="card dashboard-feature-card" style="${mobile ? "margin-bottom:14px;" : ""}">
+          <div class="card dashboard-feature-card ${topVm ? "is-clickable" : ""}" ${topVm ? `data-open-detail="${safeText(topVm.item.symbol)}"` : ""} style="${mobile ? "margin-bottom:14px;" : ""}">
             <div class="section-title"><span>Priorite du moment</span><span>${topVm ? safeText(topVm.item.symbol) : "—"}</span></div>
             ${topVm ? `
               <div class="top-pick-box dashboard-signal-shell">
