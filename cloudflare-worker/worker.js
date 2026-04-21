@@ -4331,17 +4331,41 @@ async function handleRequest(request, env) {
 async function validateSymbolOnProviders(symbol, assetClass, env, ctx) {
   const sym = String(symbol || "").toUpperCase();
   if (!sym) return { ok: false, error: "Symbole vide" };
+
+  async function tryNonCrypto(s) {
+    try {
+      const qt = await getTwelveQuote(s, env, ctx).catch(() => null);
+      if (qt && qt.price != null) return { provider: "twelvedata" };
+    } catch {}
+    try {
+      const qy = await getYahooQuote(s).catch(() => null);
+      if (qy && qy.price != null) return { provider: "yahoo" };
+    } catch {}
+    return null;
+  }
+
   try {
     if (assetClass === "crypto") {
       const q = await getCryptoQuote(sym);
-      if (q && q.price != null) return { ok: true, provider: "binance" };
+      if (q && q.price != null) return { ok: true, provider: "binance", resolvedSymbol: sym };
       return { ok: false, error: `Symbole "${sym}" introuvable sur Binance. Vérifie la paire (ex. TON → TONUSDT).` };
     }
-    const qt = await getTwelveQuote(sym, env, ctx).catch(() => null);
-    if (qt && qt.price != null) return { ok: true, provider: "twelvedata" };
-    const qy = await getYahooQuote(sym).catch(() => null);
-    if (qy && qy.price != null) return { ok: true, provider: "yahoo" };
-    return { ok: false, error: `Symbole "${sym}" introuvable sur les providers (TwelveData, Yahoo).` };
+
+    // 1) Essai tel quel
+    let found = await tryNonCrypto(sym);
+    if (found) return { ok: true, provider: found.provider, resolvedSymbol: sym };
+
+    // 2) Auto-retry avec suffixes de bourses si pas de suffixe déjà présent
+    if (!sym.includes(".") && !sym.includes("=") && !sym.includes("/")) {
+      const suffixes = [".PA", ".DE", ".L", ".MI", ".AS", ".MC", ".SW", ".BR", ".LS", ".ST", ".HE", ".OL", ".CO", ".VI"];
+      for (const suffix of suffixes) {
+        const variant = sym + suffix;
+        found = await tryNonCrypto(variant);
+        if (found) return { ok: true, provider: found.provider, resolvedSymbol: variant };
+      }
+    }
+
+    return { ok: false, error: `Symbole "${sym}" introuvable. Pour une action européenne, essaie avec le suffixe de bourse (ex. RMS.PA pour Paris, SAP.DE pour Francfort, RACE.MI pour Milan).` };
   } catch (e) {
     return { ok: false, error: `Erreur validation : ${e.message || "provider indisponible"}` };
   }
@@ -4396,16 +4420,38 @@ async function handleUserAssetsAdd(request, env) {
   const v = await validateSymbolOnProviders(symbol, assetClass, env, ctx);
   if (!v.ok) return fail(v.error, "bad_request", 400);
 
+  // Si auto-retry a résolu vers une variante (ex. RMS → RMS.PA), stocker la variante
+  const finalSymbol = v.resolvedSymbol || symbol;
+
+  // Re-vérifier que la variante résolue n'entre pas en collision avec un core ou existant
+  if (LIGHT_SYMBOLS.includes(finalSymbol)) {
+    return fail(`${finalSymbol} fait déjà partie des actifs de base.`, "bad_request", 400);
+  }
+  try {
+    const existing2 = await supabaseFetch(env, `${USER_ASSETS_TABLE}?select=symbol`);
+    if (Array.isArray(existing2) && existing2.some(a => String(a.symbol).toUpperCase() === finalSymbol)) {
+      return fail(`Le symbole ${finalSymbol} existe déjà dans ta liste.`, "bad_request", 409);
+    }
+  } catch {}
+
   try {
     await supabaseFetch(env, USER_ASSETS_TABLE, {
       method: "POST",
       headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ symbol, name, asset_class: assetClass, enabled: true, provider_used: v.provider })
+      body: JSON.stringify({ symbol: finalSymbol, name, asset_class: assetClass, enabled: true, provider_used: v.provider })
     });
     invalidateUserAssetsCache();
     // Invalide aussi le cache opportunités pour que le prochain scan inclue le nouvel actif
     try { memoryCache.delete("route:opportunities:data"); } catch {}
-    return ok({ symbol, name, asset_class: assetClass, enabled: true, provider_used: v.provider }, "supabase", nowIso(), "recent");
+    const resolved = finalSymbol !== symbol;
+    return ok({
+      symbol: finalSymbol,
+      name,
+      asset_class: assetClass,
+      enabled: true,
+      provider_used: v.provider,
+      resolved_from: resolved ? symbol : null
+    }, "supabase", nowIso(), "recent", resolved ? `Résolu vers ${finalSymbol} sur ${v.provider}.` : null);
   } catch (e) {
     const msg = String(e.message || "");
     if (msg.includes("409") || msg.includes("23505")) return fail(`Le symbole ${symbol} existe déjà.`, "bad_request", 409);
