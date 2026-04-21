@@ -2990,14 +2990,14 @@ function renderTradePlanHero(detail, plan) {
   ].filter(Boolean);
 
   return `
-    <div class="plan-card" style="border:1px solid rgba(255,255,255,.10);background:linear-gradient(135deg, rgba(21,31,58,.96), rgba(10,16,32,.96));padding:18px">
-      <div style="display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:flex-start;">
-        <div style="min-width:0;flex:1;">
-          <div class="muted" style="text-transform:uppercase;letter-spacing:.08em;font-size:12px">Plan de trade</div>
-          <div style="font-size:1.35rem;font-weight:800;margin-top:6px">${safeText(simpleDecisionTitle(plan))}</div>
-          <div class="muted" style="margin-top:8px">${safeText(reason)}</div>
+    <div class="plan-card plan-card-hero">
+      <div class="plan-card-head">
+        <div class="plan-card-head-main">
+          <div class="plan-card-eyebrow">Plan de trade</div>
+          <div class="plan-card-title">${safeText(simpleDecisionTitle(plan))}</div>
+          <div class="muted plan-card-reason">${safeText(reason)}</div>
         </div>
-        <div class="legend" style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end;">
+        <div class="legend plan-card-head-badges">
           ${badge(plan?.decision || "Pas de trade", statusToneFromDecision(plan?.decision))}
           ${badge(setupLabel)}
           ${badge(regimeVm.label, regimeVm.tone)}
