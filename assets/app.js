@@ -107,6 +107,7 @@
     alertModal: { open: false, symbol: null, name: null, currentPrice: null },
     alertToast: null,
     chartTimeframe: "1d",
+    chartFullscreen: false,
     algoSignalsPrev: null,
     journalAnalysis: null,
     loadingJournalAnalysis: false,
@@ -3277,13 +3278,56 @@ function renderDashboard() {
     const tfs = isCrypto
       ? [["1d","1J"],["4h","4H"],["1h","1H"]]
       : [["1d","1J"]];
+    const fsBtn = `<button class="chart-tf-btn chart-fs-btn" data-chart-fullscreen="open" aria-label="Plein écran" title="Plein écran"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/></svg></button>`;
+    if (state.chartFullscreen) {
+      return `
+        <div class="chart-wrap">
+          <div class="chart-tf-row">
+            ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+            <span class="chart-count">${candles.length} bougies</span>
+          </div>
+          <div class="chart-fs-placeholder">Chart ouvert en plein écran</div>
+        </div>`;
+    }
     return `
       <div class="chart-wrap">
         <div class="chart-tf-row">
           ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+          ${fsBtn}
           <span class="chart-count">${candles.length} bougies</span>
         </div>
         <div id="lw-chart-container" data-symbol="${safeText(sym)}" style="width:100%;height:260px;position:relative;"></div>
+      </div>`;
+  }
+
+  function renderChartFullscreen() {
+    if (!state.chartFullscreen) return "";
+    const d = state.detail;
+    if (!d) return "";
+    const sym = d.symbol || "";
+    const name = d.name || "";
+    const candles = Array.isArray(d.candles) ? d.candles : [];
+    const tf = state.chartTimeframe || "1d";
+    const isCrypto = isCryptoSymbol(sym);
+    const tfs = isCrypto ? [["1d","1J"],["4h","4H"],["1h","1H"]] : [["1d","1J"]];
+    return `
+      <div class="chart-fullscreen-overlay" role="dialog" aria-modal="true">
+        <div class="chart-fullscreen-header">
+          <div class="chart-fullscreen-title">
+            <div class="trade-symbol">${safeText(sym)}</div>
+            <div class="muted" style="font-size:.82rem;margin-top:2px">${safeText(name)}</div>
+          </div>
+          <button class="btn btn-secondary chart-fullscreen-close" data-chart-fullscreen="close" aria-label="Fermer">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+        <div class="chart-fullscreen-tfs">
+          ${tfs.map(([v,lbl]) => `<button class="chart-tf-btn${tf===v?" active":""}" data-chart-tf="${v}">${lbl}</button>`).join("")}
+          <span class="chart-count">${candles.length} bougies</span>
+        </div>
+        <div class="chart-fullscreen-body">
+          <div id="lw-chart-container" data-symbol="${safeText(sym)}" style="width:100%;height:100%;position:relative;"></div>
+        </div>
       </div>`;
   }
 
@@ -3302,7 +3346,7 @@ function renderDashboard() {
 
     const chart = LightweightCharts.createChart(container, {
       width: container.clientWidth,
-      height: 260,
+      height: container.clientHeight || 260,
       layout: { background: { type: "solid", color: "transparent" }, textColor, fontSize: 11 },
       grid: { vertLines: { color: gridColor }, horzLines: { color: gridColor } },
       crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
@@ -5356,6 +5400,7 @@ function renderMain() {
         ${renderSidebar()}
         <main class="main-content">${renderMain()}</main>
         ${renderBottomNav()}
+        ${renderChartFullscreen()}
         ${renderTradeConfirmModal()}
         ${renderPinModal()}
         ${renderAlertModal()}
@@ -5366,7 +5411,7 @@ function renderMain() {
     applyThemeMode();
     bindEvents();
     syncDisplayedScores();
-    const modalOpen = !!(state.tradeConfirm?.open || state.session?.pinOpen || state.alertModal?.open);
+    const modalOpen = !!(state.tradeConfirm?.open || state.session?.pinOpen || state.alertModal?.open || state.chartFullscreen);
     document.documentElement.classList.toggle("has-modal", modalOpen);
     if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
   }
@@ -5406,6 +5451,23 @@ function renderMain() {
 
     app.querySelectorAll("[data-refresh='opportunities']").forEach(el => {
       el.addEventListener("click", () => loadOpportunities(true));
+    });
+
+    app.querySelectorAll("[data-chart-fullscreen]").forEach(el => {
+      el.addEventListener("click", () => {
+        const mode = el.getAttribute("data-chart-fullscreen");
+        if (mode === "open" && !state.chartFullscreen) {
+          state.chartFullscreen = true;
+          try { history.pushState({ route: state.route, symbol: state.selectedSymbol || null, chartFullscreen: true }, "", ""); } catch {}
+          render();
+          requestAnimationFrame(initCandlestickChart);
+        } else if (mode === "close" && state.chartFullscreen) {
+          if (history.state?.chartFullscreen) { history.back(); return; }
+          state.chartFullscreen = false;
+          render();
+          requestAnimationFrame(initCandlestickChart);
+        }
+      });
     });
 
     app.querySelectorAll("[data-chart-tf]").forEach(btn => {
@@ -5836,6 +5898,14 @@ function renderMain() {
 
   // Back-swipe iOS : écoute popstate pour revenir à la route précédente
   window.addEventListener("popstate", (ev) => {
+    // Si on était en plein écran et que le nouvel état ne l'est plus → sortir du plein écran sans changer de route
+    if (state.chartFullscreen && !ev.state?.chartFullscreen) {
+      state.chartFullscreen = false;
+      render();
+      requestAnimationFrame(initCandlestickChart);
+      return;
+    }
+
     // Ferme tous les modals ouverts (évite un état incohérent)
     if (state.tradeConfirm?.open) state.tradeConfirm = { open: false, mode: null, side: null };
     if (state.session?.pinOpen) { state.session.pinOpen = false; state.session.pinError = null; }
