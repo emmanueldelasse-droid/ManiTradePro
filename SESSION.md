@@ -137,9 +137,30 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 8. **Auto-update SW (`176524d`)** — assets en network-first, `updateViaCache:"none"`, controllerchange reload auto, check update 5 min + visibilitychange.
 9. **Agent Claude Code bug-hunter (`4a82219`)** — 6 classes de bugs UI récurrentes documentées.
 10. **CLAUDE.md (`8935ec9`)** — règle workflow git permanente.
-11. **SESSION.md** — plan de refonte iPhone + Sprints 1 et 2 cochés.
+11. **Actifs personnalisables livrés (`de28c91`, PR #46)** — user peut ajouter ses propres symboles (crypto, actions, ETF, forex, matière première) au scan via Réglages → "Actifs surveillés". Table Supabase `mtp_user_assets`, limite 50 customs, validation provider à l'ajout, 35 core protégés. Migration SQL dans `cloudflare-worker/migrations/001_mtp_user_assets.sql`.
+12. **Fix pull-to-refresh iPhone PWA (PR #47)** — le geste ne fonctionnait plus. Diagnostic par l'agent bug-hunter : deux causes cumulées.
+    - `1fb88f6` : l'indicateur `.ptr-indicator` (position:fixed) était clippé car rendu dans `.app-shell` qui a `overflow:hidden + isolation:isolate`. Sur iOS Safari, ces propriétés sur un ancêtre créent un containing block qui clippe même les fixed descendants. → Injection une seule fois dans `#app` via `insertAdjacentHTML`. Corrigé aussi `touchstart` qui était `passive:true` (iOS ignorait alors le `preventDefault` du touchmove).
+    - `10dbbec` : avec `overscroll-behavior-y:contain` sur `.main-content`, iOS marque les `touchmove` comme non-cancelable AVANT la phase bubble sur document. Les 3 listeners (touchstart/touchmove/touchend) passent en `{capture:true, passive:false}` pour précéder le scroll engine.
+13. **Hook proactif bug-hunter (`f8fcb17`, PR #47)** — `.claude/settings.json` avec `PostToolUse` qui se déclenche uniquement sur `Edit|Write` de `assets/app.js`, `assets/styles.css` ou `cloudflare-worker/worker.js`. Injecte un system-reminder qui pousse Claude à lancer `bug-hunter` en arrière-plan après chaque édition dans les 3 fichiers monolithiques. Silencieux sur les autres fichiers. Activation session actuelle via `/hooks` menu ; sessions futures : auto.
+14. **SESSION.md** — plan de refonte iPhone + Sprints 1/2/3 cochés + actifs custom + PTR fix + hook documentés.
 
-### Fichiers modifiés (session 8)
+## Boucle de chasse aux bugs automatique
+
+**Principe.** Chaque édition dans les 3 fichiers monolithiques (`assets/app.js`, `assets/styles.css`, `cloudflare-worker/worker.js`) déclenche automatiquement l'agent `bug-hunter` en arrière-plan. Il scanne les 6 classes de bugs UI récurrentes documentées dans `.claude/agents/bug-hunter.md` et corrige ce qu'il trouve.
+
+**Comment ça marche :**
+- **Hook PostToolUse** dans `.claude/settings.json` filtre les Edit/Write par regex sur file_path.
+- **Match** → émet un `hookSpecificOutput.additionalContext` qui nudge Claude à lancer `Agent(subagent_type="bug-hunter", run_in_background=true)`.
+- **No match** (ex. SESSION.md, CLAUDE.md, migration SQL) → silencieux.
+- L'agent rapporte son diagnostic + fix appliqué quand il termine.
+
+**Déjà utilisé avec succès** : diagnostic + fix du PTR iPhone en 4 min (voir commits `1fb88f6` + `10dbbec` dans l'historique session 8).
+
+**Limite honnête** : "en permanence" = à chaque édition dans une session Claude Code active, pas 24/7. Un deploy en prod sans Claude Code ne déclenche rien.
+
+---
+
+## Fichiers modifiés (session 8)
 | Fichier | Changement |
 |---------|------------|
 | `assets/app.js` | Fix `data-refresh` + suppression `.ai-card` + `navigate()` avec history API + popstate + `visualViewport` + pull-to-refresh + focusin scrollIntoView + backdrop modal close + toggle `html.has-modal` |

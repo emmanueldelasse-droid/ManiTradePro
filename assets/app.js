@@ -5627,9 +5627,11 @@ function renderMain() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             </button>
           </div>` : ""}
-        <div class="ptr-indicator" id="ptr-indicator"><div class="ptr-spinner"></div></div>
       </div>
     `;
+    if (!document.getElementById("ptr-indicator")) {
+      app.insertAdjacentHTML("beforeend", '<div class="ptr-indicator" id="ptr-indicator"><div class="ptr-spinner"></div></div>');
+    }
     applyThemeMode();
     bindEvents();
     syncDisplayedScores();
@@ -6146,7 +6148,7 @@ function renderMain() {
     ptrStartX = ev.touches[0].clientX;
     ptrActive = true;
     ptrPull = 0;
-  }, { passive: true });
+  }, { capture: true, passive: false });
 
   document.addEventListener("touchmove", (ev) => {
     if (!ptrActive || ptrStartY == null) return;
@@ -6158,7 +6160,7 @@ function renderMain() {
     ptrPull = Math.min(Math.pow(dy, 0.85), PTR_MAX);
     setPtrPull(ptrPull);
     if (dy > 10 && ev.cancelable) ev.preventDefault();
-  }, { passive: false });
+  }, { capture: true, passive: false });
 
   document.addEventListener("touchend", async () => {
     if (!ptrActive) return;
@@ -6178,7 +6180,7 @@ function renderMain() {
     ptrStartY = null;
     ptrStartX = null;
     ptrPull = 0;
-  });
+  }, { capture: true });
 
   // Back-swipe iOS : écoute popstate pour revenir à la route précédente
   window.addEventListener("popstate", (ev) => {
