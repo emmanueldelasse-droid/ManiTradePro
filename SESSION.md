@@ -9,7 +9,7 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-20 (session 7) |
+| **Dernière mise à jour** | 2026-04-21 (session 8) |
 | **IA utilisée** | Claude (claude-sonnet-4-6) |
 | **Branche active** | `main` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -113,7 +113,27 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
-## Dernière session (session 7)
+## Dernière session (session 8)
+
+**Date** : 2026-04-21
+**IA** : Claude (claude-opus-4-7) — branche `claude/next-task-Tirv5`
+
+### Tâches accomplies
+1. **Audit complet des attributs `data-*`** — recensement de tous les sélecteurs dans `bindEvents()` vs templates émetteurs.
+2. **Fix bouton Rafraîchir opportunités** — template émettait `data-refresh="opps"` mais le listener cherchait `data-refresh="opportunities"` (mismatch). Aligné sur `"opportunities"`. Le bouton était non fonctionnel.
+3. **Nettoyage sélecteur mort `.ai-card[data-symbol]`** — classe `.ai-card` inexistante dans les templates JS (seulement dans le CSS). Sélecteur simplifié à `.opp-row[data-symbol]` seul.
+4. **Vérification TODO #1 session 7** — `data-add-trade` et `data-setting-input` n'existent pas (déjà nettoyés ou nom erroné). TODO clos.
+5. **SESSION.md** — mis à jour avec nouveaux TODOs (test iPhone, worker deploy, nettoyage CSS optionnel).
+
+### Fichiers modifiés (session 8)
+| Fichier | Changement |
+|---------|------------|
+| `assets/app.js` | Fix `data-refresh` alignement + suppression sélecteur mort `.ai-card[data-symbol]` |
+| `SESSION.md` | Mise à jour session 8 + nouveaux TODOs |
+
+---
+
+## Session précédente (session 7)
 
 **Date** : 2026-04-20
 **IA** : Claude (claude-sonnet-4-6) — session `016LshGrx2qNfVfgyR5r6DsK`
@@ -168,12 +188,12 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Prochaine étape prioritaire
 
-> **TODO #1** : Supprimer les 2 listeners morts (`data-add-trade`, `data-setting-input`) dans `bindEvents()`
+> **TODO #1** : Tester sur iPhone — SVG icons, bouton "Ouvrir la fiche", trending pills, thème clair bottom nav, bouton Rafraîchir opportunités
 
-> **TODO #2** : Tester sur iPhone — SVG icons, bouton "Ouvrir la fiche", trending pills, thème clair bottom nav
-
-> **TODO #3** : Si worker modifié → `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
+> **TODO #2** : Si worker modifié → `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
 > Puis `git pull origin main` avant deploy pour avoir les derniers changements
+
+> **TODO #3** : Nettoyage CSS optionnel — règles `.ai-card` dans `styles.css` (l. 135, 162, 239, 449, 450, 1230) : la classe n'est plus émise par aucun template. À supprimer si confirmé inutilisé.
 
 **Fonctionnalités backlog**
 - [ ] Rapports PDF hebdomadaires
@@ -223,3 +243,4 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 | 2026-04-19 | Claude sonnet-4-6 | Refonte Mes Trades + IA journal/priorité + auto-scan + sizing |
 | 2026-04-19 | Claude sonnet-4-6 | Fix wipe historique + Fear&Greed + Trending + CSV + Performance + notifs enrichies |
 | 2026-04-20 | Claude sonnet-4-6 | UI/UX iPhone/web — SVG icons, touch targets, a11y, fix data-open-detail, fix grid metrics |
+| 2026-04-21 | Claude opus-4-7 | Audit data-* — fix bouton Rafraîchir opportunités, nettoyage sélecteur mort `.ai-card` |

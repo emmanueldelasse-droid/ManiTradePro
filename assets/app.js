@@ -3159,7 +3159,7 @@ function renderDashboard() {
                 ${f === "all" ? "all" : f}
               </button>
             `).join("")}
-            <button class="chip" data-refresh="opps">Rafraichir</button>
+            <button class="chip" data-refresh="opportunities">Rafraichir</button>
           </div>
         </div>
 
@@ -5371,7 +5371,7 @@ function renderMain() {
       });
     });
 
-    app.querySelectorAll(".opp-row[data-symbol], .ai-card[data-symbol]").forEach(el => {
+    app.querySelectorAll(".opp-row[data-symbol]").forEach(el => {
       el.addEventListener("click", () => navigate("asset-detail", el.getAttribute("data-symbol")));
     });
 
