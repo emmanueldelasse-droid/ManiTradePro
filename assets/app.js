@@ -5656,5 +5656,30 @@ function renderMain() {
     navigator.serviceWorker.register("sw.js").catch(() => {});
   }
 
+  // iOS keyboard handling — synchronise visualViewport avec CSS vars
+  // Permet aux modals de rester visibles au-dessus du clavier virtuel
+  function syncVisualViewport() {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    document.documentElement.style.setProperty("--vv-height", vv.height + "px");
+    document.documentElement.style.setProperty("--vv-offset-top", vv.offsetTop + "px");
+  }
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", syncVisualViewport);
+    window.visualViewport.addEventListener("scroll", syncVisualViewport);
+    syncVisualViewport();
+  }
+
+  // Scroll l'input focus au centre de son modal (iOS clavier)
+  document.addEventListener("focusin", (ev) => {
+    const target = ev.target;
+    if (!target || !target.closest) return;
+    const inModal = target.closest(".modal-box, .modal-backdrop .card");
+    if (!inModal) return;
+    setTimeout(() => {
+      try { target.scrollIntoView({ block: "center", behavior: "smooth" }); } catch {}
+    }, 250);
+  });
+
   boot();
 })();
