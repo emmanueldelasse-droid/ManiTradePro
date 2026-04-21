@@ -1247,6 +1247,11 @@ html.has-modal .main-content{overflow:hidden}
   animation:ptr-spin .8s linear infinite;
 }
 @keyframes ptr-spin{to{transform:rotate(360deg)}}
+/* ptr-indicator est hors de .app-shell → les vars thème ne lui parviennent pas par héritage */
+html.theme-light-root .ptr-spinner{
+  border-color:rgba(15,23,42,.14);
+  border-top-color:#00a36c;
+}
 @media (min-width:861px){
   .ptr-indicator{display:none}
 }
