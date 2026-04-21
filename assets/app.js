@@ -5027,7 +5027,7 @@ function openPositionsRiskView() {
     if (!state.alertModal.open) return "";
     const { symbol, name, currentPrice } = state.alertModal;
     return `
-      <div class="modal-overlay" id="alert-modal-overlay">
+      <div class="modal-overlay" id="alert-modal-overlay" data-close-modal="alert">
         <div class="modal-box pin-modal">
           <div class="modal-title">Alerte prix — ${safeText(symbol)}</div>
           <div class="modal-desc">${safeText(name)}${currentPrice != null ? ` · Prix actuel\u00a0: ${priceDisplay(currentPrice)}` : ""}</div>
@@ -5263,7 +5263,7 @@ function renderMain() {
     const err = state.session.pinError ? `<div class="pin-error">${safeText(state.session.pinError)}</div>` : "";
     const loading = state.session.pinLoading;
     return `
-      <div class="modal-overlay" id="pin-overlay">
+      <div class="modal-overlay" id="pin-overlay" data-close-modal="pin">
         <div class="modal-box pin-modal">
           <div class="modal-title">Connexion Worker</div>
           <div class="modal-desc">Entre ton PIN Cloudflare pour activer l'acces aux routes proteges (trades, IA).</div>
@@ -5323,6 +5323,8 @@ function renderMain() {
     applyThemeMode();
     bindEvents();
     syncDisplayedScores();
+    const modalOpen = !!(state.tradeConfirm?.open || state.session?.pinOpen || state.alertModal?.open);
+    document.documentElement.classList.toggle("has-modal", modalOpen);
     if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
   }
 
@@ -5601,6 +5603,22 @@ function renderMain() {
       el.addEventListener("click", async () => {
         await requestNotificationsPermission();
         render();
+      });
+    });
+
+    // Fermeture modal au tap backdrop (uniquement clic direct, pas bubble)
+    app.querySelectorAll("[data-close-modal]").forEach(el => {
+      el.addEventListener("click", (ev) => {
+        if (ev.target !== el) return;
+        const kind = el.getAttribute("data-close-modal");
+        if (kind === "alert") {
+          state.alertModal = { open: false, symbol: null, name: null, currentPrice: null };
+          render();
+        } else if (kind === "pin") {
+          state.session.pinOpen = false;
+          state.session.pinError = null;
+          render();
+        }
       });
     });
 

@@ -1077,8 +1077,12 @@ html.theme-light-root :root{
 }
 
 /* PIN / session modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(3,8,20,.78);display:flex;align-items:center;justify-content:center;z-index:9999;padding:calc(20px + var(--safe-top)) calc(20px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left))}
-.modal-box{background:var(--bg-card);border:1px solid var(--border-medium);border-radius:18px;padding:24px 22px 20px;width:min(380px,100%);display:flex;flex-direction:column;gap:12px}
+.modal-overlay{position:fixed;inset:0;background:rgba(3,8,20,.78);display:flex;align-items:center;justify-content:center;z-index:9999;padding:calc(20px + var(--safe-top)) calc(20px + var(--safe-right)) calc(20px + var(--safe-bottom)) calc(20px + var(--safe-left));overscroll-behavior:contain}
+.modal-box{background:var(--bg-card);border:1px solid var(--border-medium);border-radius:18px;padding:24px 22px 20px;width:min(380px,100%);max-height:calc(100dvh - var(--safe-top) - var(--safe-bottom) - 40px);display:flex;flex-direction:column;gap:12px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+
+/* Scroll lock body quand modal ouvert (iOS PWA safe) */
+html.has-modal,html.has-modal body{overflow:hidden}
+html.has-modal .main-content{overflow:hidden}
 .modal-title{font-size:1.05rem;font-weight:700;color:var(--text-primary)}
 .modal-desc{font-size:.85rem;color:var(--text-secondary);line-height:1.4}
 .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:4px}
