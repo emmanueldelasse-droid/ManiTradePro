@@ -5113,7 +5113,7 @@ function openPositionsRiskView() {
             <option value="above">Au-dessus de</option>
             <option value="below">En-dessous de</option>
           </select>
-          <input class="setting-input pin-input" type="number" id="alert-target-price" placeholder="Prix cible (USD)" step="any" ${currentPrice != null ? `value="${currentPrice}"` : ""}>
+          <input class="setting-input pin-input" type="number" inputmode="decimal" id="alert-target-price" placeholder="Prix cible (USD)" step="any" ${currentPrice != null ? `value="${currentPrice}"` : ""}>
           <div class="modal-actions">
             <button class="btn btn-secondary" data-alert-cancel>Annuler</button>
             <button class="btn btn-primary" data-alert-submit>Creer l'alerte</button>
@@ -5346,7 +5346,7 @@ function renderMain() {
           <div class="modal-title">Connexion Worker</div>
           <div class="modal-desc">Entre ton PIN Cloudflare pour activer l'acces aux routes proteges (trades, IA).</div>
           ${err}
-          <input class="setting-input pin-input" type="password" id="pin-input" placeholder="PIN" autocomplete="current-password" ${loading ? "disabled" : ""}>
+          <input class="setting-input pin-input" type="password" inputmode="numeric" pattern="[0-9]*" id="pin-input" placeholder="PIN" autocomplete="current-password" ${loading ? "disabled" : ""}>
           <div class="modal-actions">
             <button class="btn btn-secondary" data-pin-cancel>Annuler</button>
             <button class="btn btn-primary" data-pin-submit ${loading ? "disabled" : ""}>${loading ? "Connexion..." : "Se connecter"}</button>
