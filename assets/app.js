@@ -732,6 +732,11 @@
     return String(v ?? "").replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
   }
 
+  // Haptique léger pour iOS/Android via vibrate API (pas d'effet desktop)
+  function haptic(pattern = 8) {
+    try { navigator.vibrate && navigator.vibrate(pattern); } catch {}
+  }
+
   function money(v, currency = "USD") {
     if (v == null || Number.isNaN(v)) return "Donnee indisponible";
     return new Intl.NumberFormat("fr-FR", {
@@ -5412,6 +5417,7 @@ function renderMain() {
     app.querySelectorAll("[data-route]").forEach(el => {
       el.addEventListener("click", () => {
         const route = el.getAttribute("data-route");
+        haptic(5);
         state.moreMenuOpen = false;
         const forceOppReload = route === "opportunities" && state.settings.autoRefreshOpportunities;
         navigate(route, null, { forceOppReload });
@@ -5510,16 +5516,17 @@ function renderMain() {
     app.querySelectorAll("[data-confirm-open-trade]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
+        haptic([15, 20, 15]);
         confirmTradeFromModal();
       });
     });
 
     app.querySelectorAll("[data-close-trade]").forEach(el => {
-      el.addEventListener("click", () => closeTrainingTrade(el.getAttribute("data-close-trade")));
+      el.addEventListener("click", () => { haptic([20, 40, 20]); closeTrainingTrade(el.getAttribute("data-close-trade")); });
     });
 
     app.querySelectorAll("[data-close-half]").forEach(el => {
-      el.addEventListener("click", () => partialClosePosition(el.getAttribute("data-close-half"), 50));
+      el.addEventListener("click", () => { haptic([15, 30, 15]); partialClosePosition(el.getAttribute("data-close-half"), 50); });
     });
 
     app.querySelectorAll("[data-clear-history]").forEach(el => {
@@ -5527,6 +5534,7 @@ function renderMain() {
         const src = el.getAttribute("data-clear-history");
         const label = src === "algo" ? "algo" : "manuel";
         if (!confirm(`Supprimer tout l'historique ${label} ? Cette action est irréversible.`)) return;
+        haptic([30, 60, 30]);
         state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
@@ -5537,6 +5545,7 @@ function renderMain() {
     app.querySelectorAll("[data-clear-all-history]").forEach(el => {
       el.addEventListener("click", () => {
         if (!confirm("Supprimer tout l'historique ? Cette action est irréversible.")) return;
+        haptic([30, 60, 30]);
         state.trades.history = [];
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
@@ -5573,6 +5582,7 @@ function renderMain() {
     app.querySelectorAll("[data-setting-toggle]").forEach(el => {
       el.addEventListener("change", async () => {
         const key = el.getAttribute("data-setting-toggle");
+        haptic(8);
         state.settings[key] = el.checked;
         if (key === "algoSignalNotifs" && el.checked) {
           await requestNotificationsPermission();
@@ -5693,6 +5703,7 @@ function renderMain() {
     app.querySelectorAll("[data-remove-alert]").forEach(el => {
       el.addEventListener("click", (ev) => {
         ev.stopPropagation();
+        haptic(15);
         const id = parseFloat(el.getAttribute("data-remove-alert"));
         removePriceAlert(id);
         render();
@@ -5878,7 +5889,7 @@ function renderMain() {
       const ind = document.getElementById("ptr-indicator");
       if (ind) ind.classList.add("refreshing");
       try { await refresh(); } catch {}
-      try { navigator.vibrate && navigator.vibrate(10); } catch {}
+      haptic(10);
       if (ind) ind.classList.remove("refreshing");
       ptrRefreshing = false;
     }
