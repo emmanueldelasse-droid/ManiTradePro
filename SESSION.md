@@ -123,7 +123,8 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 2. **Fix bouton Rafraîchir opportunités** — template émettait `data-refresh="opps"` mais le listener cherchait `data-refresh="opportunities"` (mismatch). Aligné sur `"opportunities"`. Le bouton était non fonctionnel.
 3. **Nettoyage sélecteur mort `.ai-card[data-symbol]`** — classe `.ai-card` inexistante dans les templates JS (seulement dans le CSS). Sélecteur simplifié à `.opp-row[data-symbol]` seul.
 4. **Vérification TODO #1 session 7** — `data-add-trade` et `data-setting-input` n'existent pas (déjà nettoyés ou nom erroné). TODO clos.
-5. **SESSION.md** — mis à jour avec nouveaux TODOs (test iPhone, worker deploy, nettoyage CSS optionnel).
+5. **Audit iPhone exhaustif** — 20 problèmes identifiés, classés P0/P1/P2 avec effort estimé. Plan de refonte en 3 sprints intégré dans "Prochaine étape prioritaire".
+6. **SESSION.md** — plan de refonte iPhone + nouveaux TODOs.
 
 ### Fichiers modifiés (session 8)
 | Fichier | Changement |
@@ -186,14 +187,53 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
-## Prochaine étape prioritaire
+## Prochaine étape prioritaire — Refonte iPhone (Phase 2)
 
-> **TODO #1** : Tester sur iPhone — SVG icons, bouton "Ouvrir la fiche", trending pills, thème clair bottom nav, bouton Rafraîchir opportunités
+Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commit par item, validation device à chaque écran.
 
-> **TODO #2** : Si worker modifié → `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
-> Puis `git pull origin main` avant deploy pour avoir les derniers changements
+### Sprint 1 — Fondations iPhone (P0, ~6 h)
+- [ ] **P0.1** Clavier virtuel iOS — `visualViewport.resize` + `scrollIntoView` sur focus dans modals (Alert prix, PIN). ~1 h
+- [ ] **P0.2** Back-swipe iOS — `history.pushState` + `popstate` listener dans `navigate()`. Geste swipe-bord-gauche revient à l'écran précédent au lieu de fermer la PWA. ~2 h
+- [ ] **P0.3** Pull-to-refresh sur dashboard/opportunités/trades — listener `touchstart/touchmove/touchend`, seuil 80 px, haptique au release. ~2 h
+- [ ] **P0.4** Body scroll lock quand modal ouvert + scroll interne `.modal-box` (max-height + overflow-y). ~1 h
 
-> **TODO #3** : Nettoyage CSS optionnel — règles `.ai-card` dans `styles.css` (l. 135, 162, 239, 449, 450, 1230) : la classe n'est plus émise par aucun template. À supprimer si confirmé inutilisé.
+### Sprint 2 — Navigation & contenu (P1, ~7-10 h)
+- [ ] **P1.5** Bottom nav → 5 items (Accueil · Opportunités · Alertes · Trades · Plus). "Plus" regroupe Performance + Réglages via bottom sheet. ~1 h
+- [ ] **P1.7** Sticky filter bar sur Opportunités (chips + bouton Rafraîchir). ~1 h
+- [ ] **P1.6** Chart TradingView — bouton plein écran, height responsive, tooltip touch. ~2-3 h
+- [ ] **P1.8** Swipe actions — positions ouvertes (Clôturer/50%), alertes (Supprimer), trades (Détail). Style iOS Mail. ~3-4 h
+- [ ] **P1.9** Bouton "Retour" fiche actif — sticky top-left ou géré par P0.2. ~30 min
+- [ ] **P1.10** Audit overflow 320-375 px (valeurs longues, grilles). ~1-2 h
+
+### Sprint 3 — Polish natif iPhone (P2, ~4-5 h)
+- [ ] **P2.11** Haptique `navigator.vibrate([10])` sur toggles, confirmations, destructives. ~1 h
+- [ ] **P2.12** Transitions slide iOS entre écrans (View Transitions API ou CSS keyframes). ~2 h
+- [ ] **P2.13** Auto-thème via `prefers-color-scheme` (override settings). ~30 min
+- [ ] **P2.14** `transform:scale(.98)` sur `.btn:active`. ~15 min
+- [ ] **P2.15** `status-bar-style` dynamique via `theme-color` meta (suivi du thème). ~30 min
+- [ ] **P2.16** `inputmode="decimal"` sur alerte prix, `inputmode="numeric"` sur PIN. ~15 min
+- [ ] **P2.17** `user-select:none` sur rows/btn/chips. ~15 min
+- [ ] **P2.18** Bannière "Ajouter à l'écran d'accueil" (iOS n'a pas `beforeinstallprompt`). ~1 h
+- [ ] **P2.20** Audit fonts : min 13 px partout (`.bnav-item` actuellement 9 px à 390). ~30 min
+
+### Backlog (pas dans les sprints)
+- [ ] **P2.19** Offline complet — cache SW (déjà dans le backlog historique, P2 mais lourd)
+- [ ] Rapports PDF hebdomadaires
+- [ ] Web Push VAPID (notifications app fermée)
+- [ ] Actifs personnalisables (priorité #1 produit selon section "manques")
+
+### Vérifs device physique (à faire par l'utilisateur)
+- Tap status-bar = scroll-to-top ?
+- `.modal-overlay` bien positionné avec notch / Dynamic Island ?
+- `safe-area-inset-top` non utilisé dans les écrans — vérifier que le header ne passe pas sous la barre d'état
+- Focus sur `pin-input` et `alert-target-price` remonte-t-il la vue ?
+
+### Contraintes de déploiement
+- Frontend : push sur `main` → GitHub Pages (2-5 min, Ctrl+Shift+R)
+- Worker : `wrangler deploy` dans `cloudflare-worker/` (`git pull origin main` avant)
+
+### TODOs non iPhone (conservés)
+- Nettoyage CSS `.ai-card` (lignes 135, 162, 239, 449, 450, 1230) — classe non émise par aucun template
 
 **Fonctionnalités backlog**
 - [ ] Rapports PDF hebdomadaires
