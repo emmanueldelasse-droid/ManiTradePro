@@ -521,13 +521,26 @@ Chaque PR est indépendante, mergeable seule, validée 3-5 jours en paper avant 
   3. Vérifier `wrangler secret list` post-deploy
 - **Validation paper** : 48 h sans ouvrir l'app, events `scheduled_cycle_*` toutes les 15 min en heures actives dans Supabase, pilule UI met à jour au retour sur l'app.
 
-#### PR #2 — Symétrisation long/short + Fear & Greed/VIX filtre (~4 jours)
-- `buildPlanFromConfiguration` respecte la `direction` détectée (plus de `side: "long"` en dur)
-- 4 setups miroir : PULLBACK short, BREAKDOWN, CONTINUATION short, MEAN_REVERSION short
-- Intégration F&G (crypto) + VIX (actions) dans le scoring comme modulateur régime (±5 pts)
-- Activation `allow_short: true` en settings training
-- UI : badge long/short sur chaque opportunité, filtre par direction
-- **Validation** : génération de plans short en paper sur actifs downtrend, historique trades dans les 2 directions
+#### PR #2 — Symétrisation long/short + Fear & Greed/VIX filtre — ✅ LIVRÉE session 9 (branche `claude/phase1-pr2-long-short-regime`)
+- [x] `detectConfiguration` : 3 configurations miroir short ajoutées (PULLBACK_SHORT, BREAKDOWN, CONTINUATION_SHORT) avec conditions inversées ema20<ema50, RSI calibré, chg5/chg20 symétriques. Nouveaux niveaux calculés : `swingLow20`, `swingHigh10`, `high5j`.
+- [x] `validateConfiguration` : matrix étendue aux 3 shorts, régimes inversés (valides en RISK_OFF). Exception crypto maintenue.
+- [x] `buildPlanFromConfiguration` : branches short avec calculs stop/TP miroirs, cohérence direction-dépendante (`entry>sl, tp>entry` pour long, inverse pour short), RR minimum 1.6 identique, `side` dynamique (plus de `"long"` hard-codé).
+- [x] `allowed_setups` défaut étendu aux 7 setups (3 long + 3 short + mean_reversion) côté worker ET côté UI Réglages Bot. Toggles individuels visibles.
+- [x] `calcDetailScore` : 5e param `regimeIndicators`, modulateur ±5 pts selon :
+  - Crypto : F&G ≤ 25 → short +5/long -5 ; F&G ≥ 75 → long +5/short -5
+  - Actions : VIX > 25 → short +5/long -5 ; VIX < 12 → long -3 seulement
+  - Traçabilité via `regimeBonus` + `regimeBonusReason` dans le breakdown
+- [x] `configBonus` étendu aux 3 setups short (mêmes poids que miroirs long).
+- [x] Nouveau helper `fetchRegimeIndicators(env)` : F&G via alternative.me + VIX via Yahoo `^VIX`, cache mémoire 5 min, best-effort.
+- [x] Nouvel endpoint `/api/regime-indicators` pour exposition frontend.
+- [x] Callers de `calcDetailScore` : pré-fetch des indicators avant appel (une fois avant la boucle pour le scan opportunités → 0 coût supplémentaire).
+- [x] `setupTypeLabel` (UI) étendu avec libellés explicites : "pullback short", "breakdown", "continuation short".
+- [x] UI Opportunités : nouveau groupe de chips filtre direction (tous / ▲ long / ▼ short), état `state.opportunityDirection`, filtre dans `applyFilter()`, handler `data-direction-filter`.
+- **Déploiement requis côté utilisateur** :
+  1. `wrangler deploy` depuis la machine Windows
+  2. Vérifier `wrangler secret list` post-deploy
+  3. Pas de migration SQL (aucune modification de schéma)
+- **Validation paper 48h** : vérifier dans Supabase `mtp_positions` la présence de lignes `side = "short"` après que le bot a tourné. Tester le filtre UI "▼ short" sur la page Opportunités. Vérifier `regime_indicators` accessible via `/api/regime-indicators`.
 
 #### PR #3 — News garde-fou niveau 1 (~3 jours)
 - Fetch Forex Factory RSS 1×/nuit (cache KV 24h)

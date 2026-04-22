@@ -1655,12 +1655,17 @@ function detectConfiguration(candles, quote) {
   const recent5  = candles.slice(-5);
   const swingHigh20 = Math.max(...recent20.map(c => Number(c.high)).filter(Number.isFinite));
   const swingLow10  = Math.min(...recent10.map(c => Number(c.low)).filter(Number.isFinite));
+  const swingLow20  = Math.min(...recent20.map(c => Number(c.low)).filter(Number.isFinite));
+  const swingHigh10 = Math.max(...recent10.map(c => Number(c.high)).filter(Number.isFinite));
   const low5j       = Math.min(...recent5.map(c => Number(c.low)).filter(Number.isFinite));
+  const high5j      = Math.max(...recent5.map(c => Number(c.high)).filter(Number.isFinite));
   const avgVol20    = recent20.reduce((s, c) => s + (Number(c.volume) || 0), 0) / 20;
   const lastVol     = Number(candles[candles.length - 1]?.volume || 0);
   const atr         = averageRange(candles, 14);
 
-  const levels = { ema20, ema50, swingHigh20, swingLow10, low5j, atr, distEma20 };
+  const levels = { ema20, ema50, swingHigh20, swingLow10, swingLow20, swingHigh10, low5j, high5j, atr, distEma20 };
+
+  // ==== LONG SETUPS ====
 
   // PULLBACK — repli sur EMA20 dans tendance haussière
   if (
@@ -1686,6 +1691,33 @@ function detectConfiguration(candles, quote) {
     rsi14 != null && rsi14 >= 52 && rsi14 <= 65 &&
     chg5 != null && chg5 > 0
   ) return { config: "CONTINUATION", reason: "Tendance propre, prix en zone de continuation", levels };
+
+  // ==== SHORT SETUPS (miroirs exacts) ====
+
+  // PULLBACK_SHORT — rebond sur EMA20 dans tendance baissière
+  if (
+    ema20 < ema50 &&
+    distEma20 != null && distEma20 >= -2 && distEma20 <= 1 &&
+    rsi14 != null && rsi14 >= 42 && rsi14 <= 58 &&
+    chg5 != null && chg5 > 0 &&
+    chg20 != null && chg20 < 0
+  ) return { config: "PULLBACK_SHORT", reason: "Rebond sur EMA20 dans tendance baissière", levels };
+
+  // BREAKDOWN — cassure support avec volume (miroir BREAKOUT)
+  if (
+    Number.isFinite(swingLow20) && last < swingLow20 * 0.995 &&
+    (avgVol20 === 0 || lastVol > avgVol20 * 1.2) &&
+    rsi14 != null && rsi14 >= 28 && rsi14 <= 48 &&
+    ema20 < ema50
+  ) return { config: "BREAKDOWN", reason: "Cassure support 20j avec volume", levels };
+
+  // CONTINUATION_SHORT — tendance baissière propre, zone de continuation
+  if (
+    ema20 < ema50 &&
+    distEma20 != null && distEma20 >= -6 && distEma20 <= -2 &&
+    rsi14 != null && rsi14 >= 35 && rsi14 <= 48 &&
+    chg5 != null && chg5 < 0
+  ) return { config: "CONTINUATION_SHORT", reason: "Tendance baissière propre, prix en zone de continuation", levels };
 
   // MEAN REVERSION — détectée mais bloquée jusqu'à calibration
   if (
@@ -1719,6 +1751,7 @@ function validateConfiguration(detected, regime, assetClass) {
   const isCryptoAsset = assetClass === "crypto";
 
   const matrix = {
+    // ==== LONG ====
     PULLBACK: {
       RISK_ON:  { valid: true,  scoreMalus: 0,  reason: "Pullback validé en Risk-On" },
       RANGE:    { valid: true,  scoreMalus: 8,  reason: "Pullback en marché range — prudence" },
@@ -1733,6 +1766,22 @@ function validateConfiguration(detected, regime, assetClass) {
       RISK_ON:  { valid: true,  scoreMalus: 4,  reason: "Continuation — entrée moins propre qu'un pullback" },
       RANGE:    { valid: false, scoreMalus: 0,  reason: "Continuation bloquée en range" },
       RISK_OFF: { valid: false, scoreMalus: 0,  reason: "Continuation bloquée en Risk-Off" }
+    },
+    // ==== SHORT (miroirs — régimes inversés) ====
+    PULLBACK_SHORT: {
+      RISK_ON:  { valid: isCryptoAsset, scoreMalus: 0, reason: isCryptoAsset ? "Crypto analysée indépendamment" : "Pullback short bloqué en Risk-On" },
+      RANGE:    { valid: true,  scoreMalus: 8,  reason: "Pullback short en marché range — prudence" },
+      RISK_OFF: { valid: true,  scoreMalus: 0,  reason: "Pullback short validé en Risk-Off" }
+    },
+    BREAKDOWN: {
+      RISK_ON:  { valid: false, scoreMalus: 0,  reason: "Breakdown bloqué en Risk-On" },
+      RANGE:    { valid: false, scoreMalus: 0,  reason: "Breakdown en range — faux signal probable" },
+      RISK_OFF: { valid: true,  scoreMalus: 0,  reason: "Breakdown validé en Risk-Off" }
+    },
+    CONTINUATION_SHORT: {
+      RISK_ON:  { valid: false, scoreMalus: 0,  reason: "Continuation short bloquée en Risk-On" },
+      RANGE:    { valid: false, scoreMalus: 0,  reason: "Continuation short bloquée en range" },
+      RISK_OFF: { valid: true,  scoreMalus: 4,  reason: "Continuation short — entrée moins propre qu'un pullback" }
     }
   };
 
@@ -1746,13 +1795,13 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
   if (!validation.valid) return null;
 
   const { config, levels } = detected;
-  const { ema20, swingHigh20, swingLow10, low5j, atr } = levels;
+  const { ema20, swingHigh20, swingLow10, swingLow20, swingHigh10, atr } = levels;
   const price = Number(quote?.price);
 
   if (!Number.isFinite(price) || price <= 0) return null;
   if (!Number.isFinite(ema20)) return null;
 
-  let entry, sl, tp, horizon, setupType;
+  let entry, sl, tp, horizon, setupType, side;
 
   if (config === "PULLBACK") {
     entry     = ema20;
@@ -1760,33 +1809,70 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
     tp        = Number.isFinite(swingHigh20) ? swingHigh20 : price * 1.07;
     horizon   = "5-10 jours";
     setupType = "pullback";
+    side      = "long";
   } else if (config === "BREAKOUT") {
     entry     = price;
     sl        = Number.isFinite(swingHigh20) ? swingHigh20 * 0.998 : price * 0.96;
     tp        = entry + (entry - sl) * 2.0;
     horizon   = "3-7 jours";
     setupType = "breakout";
+    side      = "long";
   } else if (config === "CONTINUATION") {
     entry     = price;
     sl        = ema20 * 0.99;
     tp        = entry + (entry - sl) * 2.2;
     horizon   = "7-14 jours";
     setupType = "continuation";
+    side      = "long";
+  } else if (config === "PULLBACK_SHORT") {
+    // Miroir de PULLBACK : on vend le rebond sur EMA20 dans un downtrend.
+    entry     = ema20;
+    sl        = Number.isFinite(swingHigh10) ? swingHigh10 + (atr ? atr * 0.1 : price * 0.005) : price * 1.05;
+    tp        = Number.isFinite(swingLow20) ? swingLow20 : price * 0.93;
+    horizon   = "5-10 jours";
+    setupType = "pullback_short";
+    side      = "short";
+  } else if (config === "BREAKDOWN") {
+    // Miroir de BREAKOUT : cassure support avec volume, on shorte.
+    entry     = price;
+    sl        = Number.isFinite(swingLow20) ? swingLow20 * 1.002 : price * 1.04;
+    tp        = entry - (sl - entry) * 2.0;
+    horizon   = "3-7 jours";
+    setupType = "breakdown";
+    side      = "short";
+  } else if (config === "CONTINUATION_SHORT") {
+    // Miroir de CONTINUATION : tendance baissière propre, on shorte la continuation.
+    entry     = price;
+    sl        = ema20 * 1.01;
+    tp        = entry - (sl - entry) * 2.2;
+    horizon   = "7-14 jours";
+    setupType = "continuation_short";
+    side      = "short";
   } else {
     return null;
   }
 
-  // Vérifications de cohérence
+  // Vérifications de cohérence (le sens des inégalités dépend de la direction).
   if (!Number.isFinite(entry) || !Number.isFinite(sl) || !Number.isFinite(tp)) return null;
   if (sl <= 0 || tp <= 0 || entry <= 0) return null;
-  if (entry <= sl) return null;
-  if (tp <= entry) return null;
 
-  const rr = (tp - entry) / (entry - sl);
-  if (rr < 1.6) return null; // ratio minimum strict
+  let rr, slPct, tpPct;
 
-  const slPct = ((entry - sl) / entry) * 100;
-  const tpPct = ((tp - entry) / entry) * 100;
+  if (side === "long") {
+    if (entry <= sl) return null;   // stop doit être sous l'entrée
+    if (tp <= entry) return null;   // objectif doit être au-dessus
+    rr    = (tp - entry) / (entry - sl);
+    slPct = ((entry - sl) / entry) * 100;
+    tpPct = ((tp - entry) / entry) * 100;
+  } else {
+    if (sl <= entry) return null;   // stop doit être au-dessus de l'entrée (short)
+    if (entry <= tp) return null;   // objectif doit être en-dessous (short)
+    rr    = (entry - tp) / (sl - entry);
+    slPct = ((sl - entry) / entry) * 100;
+    tpPct = ((entry - tp) / entry) * 100;
+  }
+
+  if (rr < 1.6) return null; // ratio minimum strict, identique long/short
 
   return {
     setupType,
@@ -1797,7 +1883,7 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
     slPct:      Math.round(slPct * 100) / 100,
     tpPct:      Math.round(tpPct * 100) / 100,
     horizon,
-    side:       "long",
+    side,
     reason:     detected.reason,
     regimeValidation: validation.reason,
     tradeNow:   true,
@@ -1808,7 +1894,7 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
 // ============================================================
 // SCORE ENGINE V2
 // ============================================================
-function calcDetailScore(quote, candles, regime = null, env = null) {
+function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
 
   if (closes.length < 30 || quote.price == null) {
@@ -1934,13 +2020,39 @@ function calcDetailScore(quote, candles, regime = null, env = null) {
     else regimeMalus = validation.scoreMalus;
   }
 
-  const score = clamp(Math.round(raw) - regimeMalus, 0, 100);
+  // Modulateur régime via Fear & Greed (crypto) ou VIX (actions) — PR #2 Phase 1.
+  // Bonus shorts en peur/stress extrême, bonus longs en euphorie. Cap ±5 pts.
+  let regimeBonus = 0;
+  let regimeBonusReason = null;
+  if (regimeIndicators) {
+    const isCrypto = quote.assetClass === "crypto";
+    if (isCrypto && Number.isFinite(regimeIndicators.fearGreed)) {
+      const fg = regimeIndicators.fearGreed;
+      if (fg <= 25) {
+        if (direction === "short") { regimeBonus = 5; regimeBonusReason = `F&G ${fg} (peur extrême) — short favorisé`; }
+        else if (direction === "long") { regimeBonus = -5; regimeBonusReason = `F&G ${fg} (peur extrême) — long risqué`; }
+      } else if (fg >= 75) {
+        if (direction === "long") { regimeBonus = 5; regimeBonusReason = `F&G ${fg} (euphorie) — long favorisé`; }
+        else if (direction === "short") { regimeBonus = -5; regimeBonusReason = `F&G ${fg} (euphorie) — short risqué`; }
+      }
+    } else if (!isCrypto && Number.isFinite(regimeIndicators.vix)) {
+      const vix = regimeIndicators.vix;
+      if (vix > 25) {
+        if (direction === "short") { regimeBonus = 5; regimeBonusReason = `VIX ${vix.toFixed(1)} (stress) — short favorisé`; }
+        else if (direction === "long") { regimeBonus = -5; regimeBonusReason = `VIX ${vix.toFixed(1)} (stress) — long risqué`; }
+      } else if (vix < 12) {
+        if (direction === "long") { regimeBonus = -3; regimeBonusReason = `VIX ${vix.toFixed(1)} (complacence) — prudence long`; }
+      }
+    }
+  }
 
-  // Bonus de configuration détectée
+  const score = clamp(Math.round(raw) - regimeMalus + regimeBonus, 0, 100);
+
+  // Bonus de configuration détectée (long + miroirs short)
   let configBonus = 0;
-  if (detectedConfig.config === "PULLBACK") configBonus = 6;
-  if (detectedConfig.config === "BREAKOUT") configBonus = 8;
-  if (detectedConfig.config === "CONTINUATION") configBonus = 3;
+  if (detectedConfig.config === "PULLBACK" || detectedConfig.config === "PULLBACK_SHORT") configBonus = 6;
+  if (detectedConfig.config === "BREAKOUT" || detectedConfig.config === "BREAKDOWN") configBonus = 8;
+  if (detectedConfig.config === "CONTINUATION" || detectedConfig.config === "CONTINUATION_SHORT") configBonus = 3;
 
   let setupType = detectedConfig.config !== "AUCUNE" ? detectedConfig.config.toLowerCase() : "aucun";
 
@@ -1970,6 +2082,8 @@ function calcDetailScore(quote, candles, regime = null, env = null) {
     avgRange: avgRangeValue,
     hardFilters: { passed: hardPassed, flags: hardFlags },
     configuration: detectedConfig,
+    regimeBonus,
+    regimeBonusReason,
     breakdown: {
       regime: context, trend: structure, momentum,
       entryQuality: timing, risk, participation, context, dataQuality
@@ -2397,7 +2511,8 @@ async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true,
     // SEQUENTIEL — evite de depasser la limite 50 subrequetes Cloudflare
     quote = await resolveUnifiedMarketQuote(clean, env, ctx, options);
     const candles = includeCandles ? await getCandlesBySymbol(clean, "1d", 90, env, ctx) : [];
-    const scored = calcDetailScore(quote, candles || [], regime, env);
+    const regimeIndicators = await fetchRegimeIndicators(env);
+    const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators);
     return buildStablePayload(clean, quote, candles || [], scored, regime);
   } catch (e) {
     if (quote && Number.isFinite(Number(quote.price))) {
@@ -2679,6 +2794,9 @@ async function handleOpportunities(_url, env) {
   // Les quotes sont déjà en cache memoire — 0 subrequete supplémentaire
   // Chaque actif ne fait que 1 appel : bougies (ou 0 si KV valide)
   // ============================================================
+  // Pré-fetch des indicateurs régime (F&G + VIX) — cache mémoire 5 min,
+  // donc 0 coût pour les appels suivants dans la boucle.
+  const regimeIndicators = await fetchRegimeIndicators(env);
   const rows = [];
   for (const symbol of allSymbols) {
     let quote = quotesMap[symbol] || getMemoryCache(`market:snapshot:${symbol}`);
@@ -2699,7 +2817,7 @@ async function handleOpportunities(_url, env) {
       quote = quote || await resolveUnifiedMarketQuote(symbol, env, ctx, { allowAlphaFallback: false });
       // Bougies depuis KV si disponibles
       const candles = await getCandlesBySymbol(symbol, "1d", 90, env, ctx);
-      const scored = calcDetailScore(quote, candles || [], regime, env);
+      const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators);
       const payload = buildStablePayload(symbol, quote, candles || [], scored, regime);
       rows.push(toOpportunityRow(payload));
     } catch (e) {
@@ -2845,7 +2963,7 @@ function getTrainingDefaults() {
     allocation_per_trade_pct: 0.08,  // 8% par trade (avec plus de positions)
     max_holding_hours: 240,
     allowed_symbols: [],
-    allowed_setups: ["pullback", "breakout", "continuation", "mean_reversion"],
+    allowed_setups: ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"],
     mean_reversion_enabled: true,    // setup activé en entraînement
     max_daily_loss_pct: 0.30,        // garde-fou jour uniquement (30%)
     max_weekly_loss_pct: 1.0,        // désactivé (100%)
@@ -4212,6 +4330,44 @@ async function handleFearGreed() {
   }
 }
 
+// Fetch simultané de F&G (crypto) et VIX (actions) — modulateur de régime PR #2.
+// Cache mémoire 5 min pour éviter les hits répétés dans les boucles de scan.
+// Best-effort : si une source échoue, l'autre est renvoyée quand même.
+async function fetchRegimeIndicators(env) {
+  const cached = getMemoryCache("regime_indicators");
+  if (cached) return cached;
+
+  const result = { fearGreed: null, vix: null, asOf: nowIso() };
+
+  try {
+    const res = await fetch("https://api.alternative.me/fng/?limit=1");
+    if (res.ok) {
+      const body = await res.json();
+      const entry = Array.isArray(body?.data) ? body.data[0] : null;
+      const value = entry ? parseInt(entry.value, 10) : null;
+      if (Number.isFinite(value)) result.fearGreed = value;
+    }
+  } catch { /* best-effort */ }
+
+  try {
+    const res = await fetch("https://query1.finance.yahoo.com/v7/finance/quote?symbols=%5EVIX");
+    if (res.ok) {
+      const body = await res.json();
+      const q = body?.quoteResponse?.result?.[0];
+      const value = Number(q?.regularMarketPrice);
+      if (Number.isFinite(value) && value > 0) result.vix = value;
+    }
+  } catch { /* best-effort */ }
+
+  setMemoryCache("regime_indicators", TTL.fearGreed, result);
+  return result;
+}
+
+async function handleRegimeIndicators(env) {
+  const data = await fetchRegimeIndicators(env);
+  return json({ status: "ok", asOf: data.asOf, data });
+}
+
 async function handleTrending() {
   const cached = getMemoryCache("trending_coins");
   if (cached) return json(cached);
@@ -4498,6 +4654,7 @@ async function handleRequest(request, env) {
     if (url.pathname === "/api/opportunities") return safeRoute(() => handleOpportunities(url, env));
     if (url.pathname.startsWith("/api/opportunity-detail/")) return safeRoute(() => handleOpportunityDetail(decodeURIComponent(url.pathname.replace("/api/opportunity-detail/","")), env));
     if (url.pathname === "/api/fear-greed") return safeRoute(() => handleFearGreed());
+    if (url.pathname === "/api/regime-indicators") return safeRoute(() => handleRegimeIndicators(env));
     if (url.pathname === "/api/trending") return safeRoute(() => handleTrending());
     if (url.pathname === "/api/news") return safeRoute(() => handleNews(env));
     if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar());

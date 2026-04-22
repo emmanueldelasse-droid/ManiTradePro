@@ -46,6 +46,7 @@
     opportunities: [],
     filteredOpportunities: [],
     opportunityFilter: "all",
+    opportunityDirection: "all",
     selectedSymbol: null,
     detail: null,
     aiReview: null,
@@ -1873,7 +1874,7 @@ function confirmTradeFromModal() {
       min_actionability_score: 60,
       min_dossier_score: 60,
       allocation_per_trade_pct: 0.08,
-      allowed_setups: ["pullback", "breakout", "continuation", "mean_reversion"],
+      allowed_setups: ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"],
       mean_reversion_enabled: true,
       max_daily_loss_pct: 0.30,
       max_weekly_loss_pct: 1.0,
@@ -2442,7 +2443,12 @@ function renderOpportunitySection(title, subtitle, rows, baseRank = 1, emptyText
 
 function applyFilter() {
     const f = state.opportunityFilter;
-    state.filteredOpportunities = state.opportunities.filter(item => f === "all" ? true : item.assetClass === f);
+    const d = state.opportunityDirection;
+    state.filteredOpportunities = state.opportunities.filter(item => {
+      if (f !== "all" && item.assetClass !== f) return false;
+      if (d !== "all" && String(item.direction || "neutral").toLowerCase() !== d) return false;
+      return true;
+    });
   }
 
   // =========================
@@ -2595,7 +2601,10 @@ function priorityClass(priority) {
     if (!raw) return "setup";
     if (raw === "breakout") return "breakout";
     if (raw === "pullback") return "pullback";
-    if (raw === "trend_continuation") return "trend continuation";
+    if (raw === "continuation" || raw === "trend_continuation") return "continuation";
+    if (raw === "pullback_short") return "pullback short";
+    if (raw === "breakdown") return "breakdown";
+    if (raw === "continuation_short") return "continuation short";
     if (raw === "reversal") return "reversal";
     if (raw === "mean_reversion") return "mean reversion";
     return raw.replaceAll("_", " ");
@@ -3544,6 +3553,17 @@ function renderDashboard() {
               </button>
             `).join("")}
             <button class="chip" data-refresh="opportunities">Rafraichir</button>
+          </div>
+          <div class="filter-group">
+            ${[
+              { key: "all",   label: "tous" },
+              { key: "long",  label: "▲ long" },
+              { key: "short", label: "▼ short" }
+            ].map((d) => `
+              <button class="chip ${state.opportunityDirection === d.key ? "active" : ""}" data-direction-filter="${d.key}">
+                ${d.label}
+              </button>
+            `).join("")}
           </div>
         </div>
 
@@ -5803,8 +5823,8 @@ function openPositionsRiskView() {
 
   function renderBotParamsForm() {
     const d = state.bot.editDraft || {};
-    const allowedSetupsAll = ["pullback", "breakout", "continuation", "mean_reversion"];
-    const currentSetups = Array.isArray(d.allowed_setups) ? d.allowed_setups : ["pullback", "breakout", "continuation"];
+    const allowedSetupsAll = ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"];
+    const currentSetups = Array.isArray(d.allowed_setups) ? d.allowed_setups : ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short"];
     return `
       <div class="bot-params-form" style="margin-top:8px">
         <div class="bot-field-grid">
@@ -6204,6 +6224,14 @@ function renderMain() {
     app.querySelectorAll("[data-filter]").forEach(el => {
       el.addEventListener("click", () => {
         state.opportunityFilter = el.getAttribute("data-filter");
+        applyFilter();
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-direction-filter]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.opportunityDirection = el.getAttribute("data-direction-filter");
         applyFilter();
         render();
       });
