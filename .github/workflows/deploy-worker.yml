@@ -16,9 +16,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Debug — token presence (NE PAS afficher la valeur)
+        env:
+          TOKEN_SET: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+          TOKEN_LEN: ${{ secrets.CLOUDFLARE_API_TOKEN != '' && '>=1' || '0' }}
+        run: |
+          echo "CLOUDFLARE_API_TOKEN défini : $TOKEN_SET"
+          echo "Longueur approximative : $TOKEN_LEN"
+
       - name: Deploy via Wrangler
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: cloudflare-worker
           command: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
