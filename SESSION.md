@@ -9,7 +9,7 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-21 (session 8) |
+| **Dernière mise à jour** | 2026-04-22 (audit bot + règles objectif final) |
 | **IA utilisée** | Claude (claude-sonnet-4-6) |
 | **Branche active** | `main` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -295,6 +295,61 @@ Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commi
 ### Infrastructure
 8. **Web Push VAPID** — notifications quand l'app est fermée (nécessite VAPID key pair + Supabase pour stocker les subscriptions)
 9. **Rapports PDF hebdomadaires**
+
+---
+
+## Objectif final — Bot de trading autonome long/short
+
+> **Règle permanente — direction produit.** ManiTradePro doit évoluer vers un bot **autonome** qui prend des positions **long et short**, apprend de chaque trade clos, et valide ses règles sur de la donnée historique. Toute nouvelle feature doit être évaluée contre cet objectif : est-ce qu'elle rapproche l'app de cet état cible ?
+
+### Analogie pour cadrer les décisions
+- **Aujourd'hui** : l'app est un **prof** qui regarde le marché et propose des trades. L'utilisateur décide et exécute.
+- **Demain** : l'app doit devenir un **élève** qui joue seul, revoit ses matchs, corrige ses erreurs, et sait attaquer à la hausse comme à la baisse.
+
+### Les 4 règles du bot
+
+#### Règle #1 — Apprendre de chaque trade clos
+Chaque clôture doit produire **une donnée exploitable**, pas juste un P/L. À implémenter :
+- Table `mtp_trade_feedback` : `trade_id`, `exit_reason` ∈ {SL, TP, manual, timeout}, `mae_pct` (max drawdown intra-trade), `mfe_pct` (max profit intra-trade).
+- Le MAE/MFE est essentiel : il dit si le stop était trop serré ou le TP trop gourmand.
+- Agrégation toutes les 10–20 clôtures : `win_rate × expectancy` par bucket `setup × direction × régime`. Si un bucket a une expectancy négative sur 30+ trades, on relève son seuil ou on le désactive.
+- Retrain hebdo des poids des 6 composantes du score via régression logistique (outcome binaire win/loss sur l'historique cumulé).
+- **Seuil anti-bruit** : minimum 30 trades par bucket avant tout ajustement. Jamais ajuster sur 3 ou 5 trades — c'est du hasard.
+
+#### Règle #2 — Savoir choisir long ou short
+Aujourd'hui le moteur détecte `direction: "short"` mais `buildPlanFromConfiguration` retourne toujours `side: "long"`. À faire :
+- **Symétriser les 4 setups** : PULLBACK short (rebond EMA20 en downtrend), BREAKDOWN short (cassure support 20j), CONTINUATION short (trend down propre), MEAN_REVERSION déjà bi-directionnel.
+- **Filtre régime via Fear & Greed** (déjà affiché en widget, jamais utilisé dans le scoring) :
+  - FG < 25 ou VIX > 25 → bonus +5 aux shorts, malus -5 aux longs
+  - FG > 75 → l'inverse
+  - Zone neutre → inchangé
+- **Arbitrage long/short** sur même actif : prendre le plus gros RR, pas le plus gros score.
+- Activer `allow_short: true` en production (flag existe dans `mtp_training_settings`, jamais testée en réel).
+
+#### Règle #3 — Valider sur l'historique avant le réel (backtest)
+3 mois de data = juger un joueur sur 3 matchs. Insuffisant.
+- **Cache KV** des bougies 1D sur 5 ans par symbole (clé `candles:SYMBOL:1D:v1`, ~10 Mo pour 100 symboles, coût négligeable).
+- **Backtest engine** dans le Worker : `backtest(symbol, from, to, rules)` qui replay bougie par bougie, retourne win rate / expectancy / max DD / Sharpe.
+- **Parallélisation** : les Workers Cloudflare gèrent 50 fetch simultanés → 50 backtests en 2–5 s.
+- **Walk-forward obligatoire** : entraîne sur 2020–2023, valide sur 2024, produis sur 2025. Jamais ajuster les règles pour coller au passé (curve-fitting = la mort du bot).
+
+#### Règle #4 — Être autonome du frontend
+Le bot actuel ne tourne que si le frontend est ouvert. Inacceptable pour de l'autonomie.
+- **Scheduled Worker Cloudflare** : handler `handleScheduledTraining(env)` déclenché par cron (30 min en heures de trading, 2h hors-marché).
+- Idempotence via `lastCycleAt` dans Supabase.
+- Le scan + auto-open + auto-close + vérif SL/TP doit pouvoir tourner même app fermée.
+
+### Feuille de route recommandée (dans l'ordre)
+
+| Phase | Durée | Contenu | Pourquoi en premier |
+|-------|-------|---------|---------------------|
+| **1. Autonomie + short** | 2–3 sem | Cron Worker, symétriser les 4 setups, injecter Fear & Greed, activer `allow_short` en prod | Sans cron autonome et sans short, le bot est structurellement incomplet. Les autres phases ont besoin de volume de trades dans les 2 sens pour avoir quelque chose à apprendre. |
+| **2. Apprentissage** | 3–4 sem | Table `mtp_trade_feedback` + MAE/MFE, agrégation par bucket, auto-ajustement seuils, dashboard patterns gagnants/perdants | Sans feedback-loop, le bot ne s'améliore pas. C'est ce qui différencie un vrai bot d'un script. |
+| **3. Backtest & validation** | 3–4 sem | Cache KV 5 ans, moteur backtest + walk-forward, UI onglet Backtest, retrain hebdo des poids | Permet de valider les évolutions sans risquer du vrai argent. |
+| **4. Exécution réelle** | Plus tard | Lecture broker (Binance API read-only), puis ordres avec limites strictes | Ne surtout pas court-circuiter les phases 1-3. |
+
+### Règle de garde — ne pas ajouter de feature qui n'avance pas ces 4 règles
+Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'apprentissage, ni la validation, ni l'exécution long/short → le reporter. L'app a déjà trop de features d'assistant ; il en faut moins mais qui servent le bot.
 
 ---
 
