@@ -1655,12 +1655,17 @@ function detectConfiguration(candles, quote) {
   const recent5  = candles.slice(-5);
   const swingHigh20 = Math.max(...recent20.map(c => Number(c.high)).filter(Number.isFinite));
   const swingLow10  = Math.min(...recent10.map(c => Number(c.low)).filter(Number.isFinite));
+  const swingLow20  = Math.min(...recent20.map(c => Number(c.low)).filter(Number.isFinite));
+  const swingHigh10 = Math.max(...recent10.map(c => Number(c.high)).filter(Number.isFinite));
   const low5j       = Math.min(...recent5.map(c => Number(c.low)).filter(Number.isFinite));
+  const high5j      = Math.max(...recent5.map(c => Number(c.high)).filter(Number.isFinite));
   const avgVol20    = recent20.reduce((s, c) => s + (Number(c.volume) || 0), 0) / 20;
   const lastVol     = Number(candles[candles.length - 1]?.volume || 0);
   const atr         = averageRange(candles, 14);
 
-  const levels = { ema20, ema50, swingHigh20, swingLow10, low5j, atr, distEma20 };
+  const levels = { ema20, ema50, swingHigh20, swingLow10, swingLow20, swingHigh10, low5j, high5j, atr, distEma20 };
+
+  // ==== LONG SETUPS ====
 
   // PULLBACK — repli sur EMA20 dans tendance haussière
   if (
@@ -1686,6 +1691,33 @@ function detectConfiguration(candles, quote) {
     rsi14 != null && rsi14 >= 52 && rsi14 <= 65 &&
     chg5 != null && chg5 > 0
   ) return { config: "CONTINUATION", reason: "Tendance propre, prix en zone de continuation", levels };
+
+  // ==== SHORT SETUPS (miroirs exacts) ====
+
+  // PULLBACK_SHORT — rebond sur EMA20 dans tendance baissière
+  if (
+    ema20 < ema50 &&
+    distEma20 != null && distEma20 >= -2 && distEma20 <= 1 &&
+    rsi14 != null && rsi14 >= 42 && rsi14 <= 58 &&
+    chg5 != null && chg5 > 0 &&
+    chg20 != null && chg20 < 0
+  ) return { config: "PULLBACK_SHORT", reason: "Rebond sur EMA20 dans tendance baissière", levels };
+
+  // BREAKDOWN — cassure support avec volume (miroir BREAKOUT)
+  if (
+    Number.isFinite(swingLow20) && last < swingLow20 * 0.995 &&
+    (avgVol20 === 0 || lastVol > avgVol20 * 1.2) &&
+    rsi14 != null && rsi14 >= 28 && rsi14 <= 48 &&
+    ema20 < ema50
+  ) return { config: "BREAKDOWN", reason: "Cassure support 20j avec volume", levels };
+
+  // CONTINUATION_SHORT — tendance baissière propre, zone de continuation
+  if (
+    ema20 < ema50 &&
+    distEma20 != null && distEma20 >= -6 && distEma20 <= -2 &&
+    rsi14 != null && rsi14 >= 35 && rsi14 <= 48 &&
+    chg5 != null && chg5 < 0
+  ) return { config: "CONTINUATION_SHORT", reason: "Tendance baissière propre, prix en zone de continuation", levels };
 
   // MEAN REVERSION — détectée mais bloquée jusqu'à calibration
   if (
@@ -1719,6 +1751,7 @@ function validateConfiguration(detected, regime, assetClass) {
   const isCryptoAsset = assetClass === "crypto";
 
   const matrix = {
+    // ==== LONG ====
     PULLBACK: {
       RISK_ON:  { valid: true,  scoreMalus: 0,  reason: "Pullback validé en Risk-On" },
       RANGE:    { valid: true,  scoreMalus: 8,  reason: "Pullback en marché range — prudence" },
@@ -1733,6 +1766,22 @@ function validateConfiguration(detected, regime, assetClass) {
       RISK_ON:  { valid: true,  scoreMalus: 4,  reason: "Continuation — entrée moins propre qu'un pullback" },
       RANGE:    { valid: false, scoreMalus: 0,  reason: "Continuation bloquée en range" },
       RISK_OFF: { valid: false, scoreMalus: 0,  reason: "Continuation bloquée en Risk-Off" }
+    },
+    // ==== SHORT (miroirs — régimes inversés) ====
+    PULLBACK_SHORT: {
+      RISK_ON:  { valid: isCryptoAsset, scoreMalus: 0, reason: isCryptoAsset ? "Crypto analysée indépendamment" : "Pullback short bloqué en Risk-On" },
+      RANGE:    { valid: true,  scoreMalus: 8,  reason: "Pullback short en marché range — prudence" },
+      RISK_OFF: { valid: true,  scoreMalus: 0,  reason: "Pullback short validé en Risk-Off" }
+    },
+    BREAKDOWN: {
+      RISK_ON:  { valid: false, scoreMalus: 0,  reason: "Breakdown bloqué en Risk-On" },
+      RANGE:    { valid: false, scoreMalus: 0,  reason: "Breakdown en range — faux signal probable" },
+      RISK_OFF: { valid: true,  scoreMalus: 0,  reason: "Breakdown validé en Risk-Off" }
+    },
+    CONTINUATION_SHORT: {
+      RISK_ON:  { valid: false, scoreMalus: 0,  reason: "Continuation short bloquée en Risk-On" },
+      RANGE:    { valid: false, scoreMalus: 0,  reason: "Continuation short bloquée en range" },
+      RISK_OFF: { valid: true,  scoreMalus: 4,  reason: "Continuation short — entrée moins propre qu'un pullback" }
     }
   };
 
@@ -1746,13 +1795,13 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
   if (!validation.valid) return null;
 
   const { config, levels } = detected;
-  const { ema20, swingHigh20, swingLow10, low5j, atr } = levels;
+  const { ema20, swingHigh20, swingLow10, swingLow20, swingHigh10, atr } = levels;
   const price = Number(quote?.price);
 
   if (!Number.isFinite(price) || price <= 0) return null;
   if (!Number.isFinite(ema20)) return null;
 
-  let entry, sl, tp, horizon, setupType;
+  let entry, sl, tp, horizon, setupType, side;
 
   if (config === "PULLBACK") {
     entry     = ema20;
@@ -1760,33 +1809,70 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
     tp        = Number.isFinite(swingHigh20) ? swingHigh20 : price * 1.07;
     horizon   = "5-10 jours";
     setupType = "pullback";
+    side      = "long";
   } else if (config === "BREAKOUT") {
     entry     = price;
     sl        = Number.isFinite(swingHigh20) ? swingHigh20 * 0.998 : price * 0.96;
     tp        = entry + (entry - sl) * 2.0;
     horizon   = "3-7 jours";
     setupType = "breakout";
+    side      = "long";
   } else if (config === "CONTINUATION") {
     entry     = price;
     sl        = ema20 * 0.99;
     tp        = entry + (entry - sl) * 2.2;
     horizon   = "7-14 jours";
     setupType = "continuation";
+    side      = "long";
+  } else if (config === "PULLBACK_SHORT") {
+    // Miroir de PULLBACK : on vend le rebond sur EMA20 dans un downtrend.
+    entry     = ema20;
+    sl        = Number.isFinite(swingHigh10) ? swingHigh10 + (atr ? atr * 0.1 : price * 0.005) : price * 1.05;
+    tp        = Number.isFinite(swingLow20) ? swingLow20 : price * 0.93;
+    horizon   = "5-10 jours";
+    setupType = "pullback_short";
+    side      = "short";
+  } else if (config === "BREAKDOWN") {
+    // Miroir de BREAKOUT : cassure support avec volume, on shorte.
+    entry     = price;
+    sl        = Number.isFinite(swingLow20) ? swingLow20 * 1.002 : price * 1.04;
+    tp        = entry - (sl - entry) * 2.0;
+    horizon   = "3-7 jours";
+    setupType = "breakdown";
+    side      = "short";
+  } else if (config === "CONTINUATION_SHORT") {
+    // Miroir de CONTINUATION : tendance baissière propre, on shorte la continuation.
+    entry     = price;
+    sl        = ema20 * 1.01;
+    tp        = entry - (sl - entry) * 2.2;
+    horizon   = "7-14 jours";
+    setupType = "continuation_short";
+    side      = "short";
   } else {
     return null;
   }
 
-  // Vérifications de cohérence
+  // Vérifications de cohérence (le sens des inégalités dépend de la direction).
   if (!Number.isFinite(entry) || !Number.isFinite(sl) || !Number.isFinite(tp)) return null;
   if (sl <= 0 || tp <= 0 || entry <= 0) return null;
-  if (entry <= sl) return null;
-  if (tp <= entry) return null;
 
-  const rr = (tp - entry) / (entry - sl);
-  if (rr < 1.6) return null; // ratio minimum strict
+  let rr, slPct, tpPct;
 
-  const slPct = ((entry - sl) / entry) * 100;
-  const tpPct = ((tp - entry) / entry) * 100;
+  if (side === "long") {
+    if (entry <= sl) return null;   // stop doit être sous l'entrée
+    if (tp <= entry) return null;   // objectif doit être au-dessus
+    rr    = (tp - entry) / (entry - sl);
+    slPct = ((entry - sl) / entry) * 100;
+    tpPct = ((tp - entry) / entry) * 100;
+  } else {
+    if (sl <= entry) return null;   // stop doit être au-dessus de l'entrée (short)
+    if (entry <= tp) return null;   // objectif doit être en-dessous (short)
+    rr    = (entry - tp) / (sl - entry);
+    slPct = ((sl - entry) / entry) * 100;
+    tpPct = ((entry - tp) / entry) * 100;
+  }
+
+  if (rr < 1.6) return null; // ratio minimum strict, identique long/short
 
   return {
     setupType,
@@ -1797,7 +1883,7 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
     slPct:      Math.round(slPct * 100) / 100,
     tpPct:      Math.round(tpPct * 100) / 100,
     horizon,
-    side:       "long",
+    side,
     reason:     detected.reason,
     regimeValidation: validation.reason,
     tradeNow:   true,
@@ -2845,7 +2931,7 @@ function getTrainingDefaults() {
     allocation_per_trade_pct: 0.08,  // 8% par trade (avec plus de positions)
     max_holding_hours: 240,
     allowed_symbols: [],
-    allowed_setups: ["pullback", "breakout", "continuation", "mean_reversion"],
+    allowed_setups: ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"],
     mean_reversion_enabled: true,    // setup activé en entraînement
     max_daily_loss_pct: 0.30,        // garde-fou jour uniquement (30%)
     max_weekly_loss_pct: 1.0,        // désactivé (100%)
