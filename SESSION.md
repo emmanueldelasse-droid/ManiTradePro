@@ -358,17 +358,54 @@ Le bot actuel ne tourne que si le frontend est ouvert. Inacceptable pour de l'au
 - Idempotence via `lastCycleAt` dans Supabase.
 - Le scan + auto-open + auto-close + vérif SL/TP doit pouvoir tourner même app fermée.
 
+#### Règle #5 — Intégrer le contexte fondamental (news & événements)
+
+> **Un bot qui ne regarde que les prix est aveugle à la moitié du signal.** Les marchés bougent aussi (souvent brutalement) à cause d'annonces : Fed, CPI, earnings, hacks crypto, régulation. Ignorer ça = se faire exploser par un événement que tout le monde a vu sauf le bot.
+
+**A. Les 4 types d'info à capter**
+
+| Type | Pour qui | Source gratuite | Rafraîchissement |
+|---|---|---|---|
+| Calendrier économique (Fed, BCE, NFP, CPI, PMI) | Tous actifs | Forex Factory RSS | 1×/jour |
+| Earnings calendar | Actions/ETF | Finnhub, Twelve Data (déjà dispos) | 1×/jour |
+| News crypto (régulation, hacks, listings majeurs) | Crypto | CryptoPanic API, Messari | 15 min |
+| News macro/sectorielles | Tous actifs | Alpha Vantage News (déjà dispo), NewsAPI | 1 h |
+
+**B. 3 niveaux d'utilisation dans le moteur**
+
+1. **Garde-fou (hard block)** : aucune nouvelle entrée dans la fenêtre **[-30 min ; +30 min]** autour d'un événement calendrier high-impact (FOMC, NFP, CPI, ECB meeting, earnings sur l'actif concerné). Ces moments = volatilité imprévisible = risque ruine. Positions ouvertes : stop suiveur serré automatiquement ou notification "événement imminent".
+
+2. **Modulateur de score (soft boost/malus)** :
+   - News positive vérifiée sur un secteur → +5 au score des actions/ETF de ce secteur pour 24 h
+   - News négative crypto (hack, régulation hostile, delisting majeur) → -10 à tous les cryptos pour 48 h
+   - Earnings surprise positive → +5 à l'action pour 5 jours de trading
+   - Régime macro (taux en hausse) → malus -3 sur actions growth, bonus +3 sur value
+
+3. **Signal directionnel via IA Claude** : pour une news majeure (haute importance), Claude résume et classe en {`long-positif`, `short-negatif`, `bruit-ignore`} avec niveau de confiance. Pondération dans le score final : haute confiance = ±8 points, moyenne = ±4, faible = 0.
+
+**C. Bouclage avec la Règle #1 (apprentissage)**
+
+- Chaque `analysisSnapshot` à l'ouverture stocke `newsContext: { top3, regime, pendingEvents24h }`.
+- À la clôture, la Règle #1 agrège : "trades avec news positive ont gagné X% vs Y% sans". Si delta significatif sur 50+ trades → le poids du modulateur news s'auto-ajuste à la hausse.
+- Alerte temps réel : si une news majeure apparaît pendant qu'une position est ouverte, notification push + proposition de clôture (ou clôture auto si delta défavorable > 3%).
+
+**Garde-fous**
+- **Qualité des sources** : uniquement Reuters, Bloomberg, SEC, Fed, BCE, sites officiels exchanges crypto (Binance Labs, Coinbase announcements), ou news taguées "verified" par CryptoPanic. Ignorer Twitter/X, blogs anonymes, chaînes Telegram.
+- **Fuseau horaire** : Fed = NY (EST/EDT), BCE = Francfort (CET/CEST), Tokyo/Sydney pour opens asiatiques. Normalisation UTC en base, affichage heure Paris côté UI.
+- **"Déjà pricé"** : une bonne news peut faire baisser le marché si elle était attendue. Le modulateur ne doit jamais être directionnel à 100% — toujours combiné avec le signal technique du moteur V2.
+- **Coût API** : NewsAPI free = 100 req/jour. Budget = 1 fetch/h × 24 h = 24 req → OK. Cache KV Cloudflare 1 h sur les résultats. Dégrader gracieusement si quota atteint (continuer avec la dernière photo).
+
 ### Feuille de route recommandée (dans l'ordre)
 
 | Phase | Durée | Contenu | Pourquoi en premier |
 |-------|-------|---------|---------------------|
-| **1. Autonomie + short** | 2–3 sem | Cron Worker, symétriser les 4 setups, injecter Fear & Greed, activer `allow_short` en prod | Sans cron autonome et sans short, le bot est structurellement incomplet. Les autres phases ont besoin de volume de trades dans les 2 sens pour avoir quelque chose à apprendre. |
-| **2. Apprentissage + correction** | 3–4 sem | Table `mtp_trade_feedback` + MAE/MFE, agrégation par bucket, **corrections automatiques du moteur** (seuils, stops, TP, taille de position, poids du score), table `mtp_engine_adjustments` pour auditer chaque ajustement, dashboard patterns gagnants/perdants | Observer ne suffit pas : sans corrections auto, le bot répète ses erreurs. C'est ce qui différencie un vrai bot d'un script. |
-| **3. Backtest & validation** | 3–4 sem | Cache KV 5 ans, moteur backtest + walk-forward, UI onglet Backtest, retrain hebdo des poids | Permet de valider les évolutions sans risquer du vrai argent. |
+| **1. Autonomie + short + garde-fou news** | 3–4 sem | Cron Worker, symétriser les 4 setups, injecter Fear & Greed, activer `allow_short` en prod, **calendrier économique + earnings calendar en blocage [-30 ; +30 min]** sur les événements haute importance | Sans cron autonome et sans short, le bot est structurellement incomplet. Le garde-fou news est en phase 1 car une FOMC mal timée peut ruiner toute la suite. |
+| **2. Apprentissage + correction + news modulateur** | 4–5 sem | Table `mtp_trade_feedback` + MAE/MFE, agrégation par bucket, **corrections automatiques du moteur** (seuils, stops, TP, taille de position, poids du score), table `mtp_engine_adjustments` pour auditer chaque ajustement, **modulateur de score via news sectorielles + IA Claude directionnelle sur news majeures**, stockage `newsContext` dans chaque snapshot | Observer ne suffit pas : sans corrections auto, le bot répète ses erreurs. Le modulateur news ajoute une dimension fondamentale au scoring technique. |
+| **3. Backtest & validation** | 3–4 sem | Cache KV 5 ans, moteur backtest + walk-forward, UI onglet Backtest, retrain hebdo des poids, **inclure l'historique news dans les backtests** (éviter les faux succès liés à des news qui n'existaient pas à l'époque) | Permet de valider les évolutions sans risquer du vrai argent. |
 | **4. Exécution réelle** | Plus tard | Lecture broker (Binance API read-only), puis ordres avec limites strictes | Ne surtout pas court-circuiter les phases 1-3. |
 
-### Règle de garde — ne pas ajouter de feature qui n'avance pas ces 4 règles
-Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'apprentissage, ni la validation, ni l'exécution long/short → le reporter. L'app a déjà trop de features d'assistant ; il en faut moins mais qui servent le bot.
+### Règle de garde — ne pas ajouter de feature qui n'avance pas ces 5 règles
+Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'apprentissage+correction, ni la validation, ni l'exécution long/short, ni l'intégration du contexte fondamental → le reporter. L'app a déjà trop de features d'assistant ; il en faut moins mais qui servent le bot.
 
 ---
 
