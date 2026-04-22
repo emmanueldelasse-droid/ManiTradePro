@@ -1063,6 +1063,18 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .bot-params .kv{grid-template-columns:1.4fr 1fr}
 @media (max-width:520px){.bot-params .kv{grid-template-columns:1fr auto}}
 
+/* Bot — formulaire d'édition */
+.bot-params-form{display:flex;flex-direction:column;gap:14px}
+.bot-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.bot-field-grid{grid-template-columns:1fr}}
+.bot-field{display:flex;flex-direction:column;gap:4px;font-size:.82rem}
+.bot-field > span{color:var(--text-secondary);font-size:.78rem;letter-spacing:.04em}
+.bot-field > input{background:var(--bg-elevated);border:1px solid var(--border-medium);border-radius:10px;padding:10px 12px;color:var(--text-primary);font-size:16px;min-height:44px;font-family:inherit;-webkit-appearance:none;appearance:none}
+.bot-field > input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.bot-field-toggles{display:flex;gap:14px;flex-wrap:wrap;padding-top:14px;border-top:1px dashed var(--border-subtle)}
+.bot-field-setups{padding-top:10px;border-top:1px dashed var(--border-subtle)}
+.bot-setups-row{display:flex;gap:14px;flex-wrap:wrap}
+
 /* Bot — ajustements thème clair */
 .app-shell.theme-light .bot-risk-warn{color:#a83030;background:rgba(224,90,90,.08);border-color:rgba(224,90,90,.22)}
 .app-shell.theme-light .bot-toggle-slider{background:#e5e7eb;border-color:rgba(15,23,42,.12)}

@@ -118,7 +118,7 @@
     userAssetsLoading: false,
     userAssetsError: null,
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
-    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false }
+    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false }
   };
 
   const app = document.getElementById("app");
@@ -1793,6 +1793,104 @@ function confirmTradeFromModal() {
       alert(`Erreur : ${e.message || "cycle impossible"}`);
     } finally {
       state.bot.forcingCycle = false;
+      render();
+    }
+  }
+
+  // Édition des paramètres
+  function openBotEdit() {
+    const src = state.bot.account?.settings || {};
+    state.bot.editDraft = JSON.parse(JSON.stringify(src));
+    render();
+  }
+  function cancelBotEdit() {
+    state.bot.editDraft = null;
+    state.bot.savingDraft = false;
+    render();
+  }
+  function updateBotDraftField(key, value) {
+    if (!state.bot.editDraft) return;
+    // Les "_display" en pourcentage sont convertis en ratio à la sauvegarde
+    state.bot.editDraft[key] = value;
+  }
+  function toggleBotDraftSetup(setup, enabled) {
+    if (!state.bot.editDraft) return;
+    const current = Array.isArray(state.bot.editDraft.allowed_setups) ? state.bot.editDraft.allowed_setups.slice() : [];
+    const idx = current.indexOf(setup);
+    if (enabled && idx === -1) current.push(setup);
+    else if (!enabled && idx !== -1) current.splice(idx, 1);
+    state.bot.editDraft.allowed_setups = current;
+  }
+  function normalizeBotDraftForSave(d) {
+    const out = { ...d };
+    const pctKeys = [
+      ["risk_per_trade_pct_display", "risk_per_trade_pct", 100],
+      ["allocation_per_trade_pct_display", "allocation_per_trade_pct", 100],
+      ["max_daily_loss_pct_display", "max_daily_loss_pct", 100],
+      ["max_weekly_loss_pct_display", "max_weekly_loss_pct", 100]
+    ];
+    for (const [src, dst, div] of pctKeys) {
+      if (out[src] != null && out[src] !== "") {
+        const v = Number(out[src]);
+        if (Number.isFinite(v)) out[dst] = v / div;
+      }
+      delete out[src];
+    }
+    const numericKeys = ["capital_base", "max_open_positions", "max_positions_per_symbol", "max_holding_hours", "min_actionability_score", "min_dossier_score", "max_consecutive_losses"];
+    for (const k of numericKeys) {
+      if (out[k] != null && out[k] !== "") out[k] = Number(out[k]);
+    }
+    // Booleans explicites
+    for (const k of ["allow_long", "allow_short", "mean_reversion_enabled"]) {
+      out[k] = !!out[k];
+    }
+    return out;
+  }
+  async function saveBotDraft() {
+    if (!state.bot.editDraft) return;
+    state.bot.savingDraft = true;
+    haptic([15, 20, 15]);
+    render();
+    try {
+      const payload = normalizeBotDraftForSave(state.bot.editDraft);
+      await apiPost("/api/training/settings", payload);
+      state.bot.editDraft = null;
+      await loadBot();
+    } catch (e) {
+      alert(`Erreur : ${e.message || "sauvegarde impossible"}`);
+    } finally {
+      state.bot.savingDraft = false;
+      render();
+    }
+  }
+  async function applyBotTrainingPreset() {
+    if (!confirm("Appliquer le mode entraînement permissif ?\n\nShort activé, seuils relâchés (60/60), max positions 15, mean reversion ON, weekly/consecutive loss désactivés.")) return;
+    const preset = {
+      allow_long: true,
+      allow_short: true,
+      max_open_positions: 15,
+      max_positions_per_symbol: 1,
+      min_actionability_score: 60,
+      min_dossier_score: 60,
+      allocation_per_trade_pct: 0.08,
+      allowed_setups: ["pullback", "breakout", "continuation", "mean_reversion"],
+      mean_reversion_enabled: true,
+      max_daily_loss_pct: 0.30,
+      max_weekly_loss_pct: 1.0,
+      max_consecutive_losses: 999
+    };
+    state.bot.savingDraft = true;
+    haptic([20, 40, 20]);
+    render();
+    try {
+      await apiPost("/api/training/settings", preset);
+      state.bot.editDraft = null;
+      await loadBot();
+      showAlertToast("Bot", "Mode entraînement permissif appliqué.");
+    } catch (e) {
+      alert(`Erreur : ${e.message || "preset impossible"}`);
+    } finally {
+      state.bot.savingDraft = false;
       render();
     }
   }
@@ -5642,28 +5740,77 @@ function openPositionsRiskView() {
           ${events.length ? `<div class="bot-timeline">${events.map(renderBotEventRow).join("")}</div>` : `<div class="empty-state">Aucun événement pour l'instant.</div>`}
         </div>
 
-        <!-- Paramètres avancés -->
-        <details class="card" style="margin-top:16px" ${state.bot.settingsOpen ? "open" : ""}>
-          <summary class="section-title"><span>Paramètres avancés</span><span class="muted">capital, seuils, risk limits</span></summary>
-          <div class="bot-params" style="margin-top:12px">
-            <div class="kv">
-              <div class="muted">Capital base</div><div>${priceDisplay(capitalBase)}</div>
-              <div class="muted">Risk par trade</div><div>${Math.round((settings.risk_per_trade_pct || 0) * 100)}%</div>
-              <div class="muted">Allocation par trade</div><div>${Math.round((settings.allocation_per_trade_pct || 0) * 100)}%</div>
-              <div class="muted">Max positions</div><div>${settings.max_open_positions || 10}</div>
-              <div class="muted">Max / symbole</div><div>${settings.max_positions_per_symbol || 1}</div>
-              <div class="muted">Horizon max</div><div>${settings.max_holding_hours || 240} h</div>
-              <div class="muted">Score actionabilité min</div><div>${settings.min_actionability_score || 72}</div>
-              <div class="muted">Score dossier min</div><div>${settings.min_dossier_score || 74}</div>
-              <div class="muted">Setups autorisés</div><div>${Array.isArray(settings.allowed_setups) ? settings.allowed_setups.join(", ") : "—"}</div>
-              <div class="muted">Long / Short</div><div>${settings.allow_long ? "Long" : "—"}${settings.allow_short ? " + Short" : ""}</div>
-              <div class="muted">Daily loss max</div><div>${Math.round((settings.max_daily_loss_pct || 0) * 100)}%</div>
-              <div class="muted">Weekly loss max</div><div>${Math.round((settings.max_weekly_loss_pct || 0) * 100)}%</div>
-              <div class="muted">Pertes conséc. max</div><div>${settings.max_consecutive_losses || 3}</div>
-            </div>
-            <div class="muted" style="margin-top:10px;font-size:.82rem">Édition des paramètres : pas encore dans l'UI. Pour changer, appel direct à l'endpoint POST /api/training/settings.</div>
+        <!-- Paramètres avancés — éditables -->
+        <div class="card" style="margin-top:16px">
+          <div class="section-title"><span>Paramètres du bot</span><span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span></div>
+          ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
+        </div>
+      </div>`;
+  }
+
+  function renderBotParamsReadonly(settings, capitalBase) {
+    return `
+      <div class="bot-params" style="margin-top:8px">
+        <div class="kv">
+          <div class="muted">Capital base</div><div>${priceDisplay(capitalBase)}</div>
+          <div class="muted">Risk par trade</div><div>${Math.round((settings.risk_per_trade_pct || 0) * 100)}%</div>
+          <div class="muted">Allocation par trade</div><div>${Math.round((settings.allocation_per_trade_pct || 0) * 100)}%</div>
+          <div class="muted">Max positions</div><div>${settings.max_open_positions || 10}</div>
+          <div class="muted">Max / symbole</div><div>${settings.max_positions_per_symbol || 1}</div>
+          <div class="muted">Horizon max</div><div>${settings.max_holding_hours || 240} h</div>
+          <div class="muted">Score actionabilité min</div><div>${settings.min_actionability_score ?? 60}</div>
+          <div class="muted">Score dossier min</div><div>${settings.min_dossier_score ?? 60}</div>
+          <div class="muted">Setups autorisés</div><div>${Array.isArray(settings.allowed_setups) ? settings.allowed_setups.join(", ") : "—"}</div>
+          <div class="muted">Long / Short</div><div>${settings.allow_long ? "Long" : ""}${settings.allow_long && settings.allow_short ? " + " : ""}${settings.allow_short ? "Short" : ""}${!settings.allow_long && !settings.allow_short ? "—" : ""}</div>
+          <div class="muted">Mean reversion</div><div>${settings.mean_reversion_enabled ? "Oui" : "Non"}</div>
+          <div class="muted">Daily loss max</div><div>${Math.round((settings.max_daily_loss_pct || 0) * 100)}%</div>
+          <div class="muted">Weekly loss max</div><div>${(settings.max_weekly_loss_pct || 0) >= 1 ? "désactivé" : Math.round((settings.max_weekly_loss_pct || 0) * 100) + "%"}</div>
+          <div class="muted">Pertes conséc. max</div><div>${(settings.max_consecutive_losses || 0) >= 100 ? "désactivé" : (settings.max_consecutive_losses || 3)}</div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-bot-edit-open>Éditer</button>
+          <button class="btn btn-secondary" data-bot-preset-training>Mode entraînement permissif</button>
+        </div>
+      </div>`;
+  }
+
+  function renderBotParamsForm() {
+    const d = state.bot.editDraft || {};
+    const allowedSetupsAll = ["pullback", "breakout", "continuation", "mean_reversion"];
+    const currentSetups = Array.isArray(d.allowed_setups) ? d.allowed_setups : ["pullback", "breakout", "continuation"];
+    return `
+      <div class="bot-params-form" style="margin-top:8px">
+        <div class="bot-field-grid">
+          <label class="bot-field"><span>Capital base ($)</span><input type="number" inputmode="decimal" min="100" step="100" data-bot-field="capital_base" value="${Number(d.capital_base || 10000)}"></label>
+          <label class="bot-field"><span>Risk / trade (%)</span><input type="number" inputmode="decimal" min="0.1" max="20" step="0.1" data-bot-field="risk_per_trade_pct_display" value="${(Number(d.risk_per_trade_pct || 0.02) * 100).toFixed(1)}"></label>
+          <label class="bot-field"><span>Allocation / trade (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="allocation_per_trade_pct_display" value="${Math.round(Number(d.allocation_per_trade_pct || 0.08) * 100)}"></label>
+          <label class="bot-field"><span>Max positions</span><input type="number" inputmode="numeric" min="1" max="50" step="1" data-bot-field="max_open_positions" value="${Number(d.max_open_positions || 15)}"></label>
+          <label class="bot-field"><span>Max / symbole</span><input type="number" inputmode="numeric" min="1" max="10" step="1" data-bot-field="max_positions_per_symbol" value="${Number(d.max_positions_per_symbol || 1)}"></label>
+          <label class="bot-field"><span>Horizon max (h)</span><input type="number" inputmode="numeric" min="1" max="1000" step="1" data-bot-field="max_holding_hours" value="${Number(d.max_holding_hours || 240)}"></label>
+          <label class="bot-field"><span>Score actionabilité min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_actionability_score" value="${Number(d.min_actionability_score ?? 60)}"></label>
+          <label class="bot-field"><span>Score dossier min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_dossier_score" value="${Number(d.min_dossier_score ?? 60)}"></label>
+          <label class="bot-field"><span>Daily loss max (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_daily_loss_pct_display" value="${Math.round(Number(d.max_daily_loss_pct || 0.30) * 100)}"></label>
+          <label class="bot-field"><span>Weekly loss max (%) — 100 = OFF</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_weekly_loss_pct_display" value="${Math.round(Number(d.max_weekly_loss_pct || 1.0) * 100)}"></label>
+          <label class="bot-field"><span>Pertes conséc. max — 999 = OFF</span><input type="number" inputmode="numeric" min="1" max="999" step="1" data-bot-field="max_consecutive_losses" value="${Number(d.max_consecutive_losses || 999)}"></label>
+        </div>
+        <div class="bot-field-toggles">
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="allow_long" ${d.allow_long ? "checked" : ""}><span>Long autorisé</span></label>
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="allow_short" ${d.allow_short ? "checked" : ""}><span>Short autorisé</span></label>
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="mean_reversion_enabled" ${d.mean_reversion_enabled ? "checked" : ""}><span>Mean reversion</span></label>
+        </div>
+        <div class="bot-field-setups">
+          <div class="muted" style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Setups autorisés</div>
+          <div class="bot-setups-row">
+            ${allowedSetupsAll.map(s => `
+              <label class="bot-sub-toggle"><input type="checkbox" data-bot-field-setup="${s}" ${currentSetups.includes(s) ? "checked" : ""}><span>${s}</span></label>
+            `).join("")}
           </div>
-        </details>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-bot-edit-save ${state.bot.savingDraft ? "disabled" : ""}>${state.bot.savingDraft ? "Enregistrement…" : "Enregistrer"}</button>
+          <button class="btn" data-bot-edit-cancel>Annuler</button>
+          <button class="btn btn-secondary" data-bot-preset-training>Mode entraînement permissif</button>
+        </div>
       </div>`;
   }
 
@@ -6374,6 +6521,31 @@ function renderMain() {
     });
     app.querySelectorAll("[data-bot-reload]").forEach(el => {
       el.addEventListener("click", () => { loadBot(); });
+    });
+    app.querySelectorAll("[data-bot-edit-open]").forEach(el => {
+      el.addEventListener("click", () => { openBotEdit(); });
+    });
+    app.querySelectorAll("[data-bot-edit-cancel]").forEach(el => {
+      el.addEventListener("click", () => { cancelBotEdit(); });
+    });
+    app.querySelectorAll("[data-bot-edit-save]").forEach(el => {
+      el.addEventListener("click", () => { saveBotDraft(); });
+    });
+    app.querySelectorAll("[data-bot-preset-training]").forEach(el => {
+      el.addEventListener("click", () => { applyBotTrainingPreset(); });
+    });
+    app.querySelectorAll("[data-bot-field]").forEach(el => {
+      const evt = el.type === "checkbox" ? "change" : "input";
+      el.addEventListener(evt, () => {
+        const key = el.getAttribute("data-bot-field");
+        const val = el.type === "checkbox" ? el.checked : el.value;
+        updateBotDraftField(key, val);
+      });
+    });
+    app.querySelectorAll("[data-bot-field-setup]").forEach(el => {
+      el.addEventListener("change", () => {
+        toggleBotDraftSetup(el.getAttribute("data-bot-field-setup"), el.checked);
+      });
     });
 
     // Fermeture modal au tap backdrop (uniquement clic direct, pas bubble)

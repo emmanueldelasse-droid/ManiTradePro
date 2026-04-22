@@ -2831,25 +2831,25 @@ async function handleOpportunityDetail(symbol, env) {
 function getTrainingDefaults() {
   return {
     mode: "training",
-    is_enabled: false,
+    is_enabled: false,               // master switch — user toggle
     auto_open_enabled: true,
     auto_close_enabled: true,
     allow_long: true,
-    allow_short: false,              // désactivé jusqu'à calibration
-    max_open_positions: 10,          // max positions simultanées
+    allow_short: true,               // mode permissif : short autorisé
+    max_open_positions: 15,          // plus large pour entraînement
     max_positions_per_symbol: 1,
-    min_actionability_score: 72,
-    min_dossier_score: 74,
+    min_actionability_score: 60,     // seuil relâché : plus de candidats
+    min_dossier_score: 60,           // idem
     capital_base: 10000,
     risk_per_trade_pct: 0.02,
-    allocation_per_trade_pct: 0.10,  // 10% du capital par trade
-    max_holding_hours: 240,          // 10 jours max
+    allocation_per_trade_pct: 0.08,  // 8% par trade (avec plus de positions)
+    max_holding_hours: 240,
     allowed_symbols: [],
-    allowed_setups: ["pullback", "breakout", "continuation"],
-    mean_reversion_enabled: false,   // désactivé jusqu'à 30 trades clôturés
-    max_daily_loss_pct: 0.03,
-    max_weekly_loss_pct: 0.06,
-    max_consecutive_losses: 3
+    allowed_setups: ["pullback", "breakout", "continuation", "mean_reversion"],
+    mean_reversion_enabled: true,    // setup activé en entraînement
+    max_daily_loss_pct: 0.30,        // garde-fou jour uniquement (30%)
+    max_weekly_loss_pct: 1.0,        // désactivé (100%)
+    max_consecutive_losses: 999      // désactivé
   };
 }
 
