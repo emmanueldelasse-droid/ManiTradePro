@@ -4414,7 +4414,10 @@ async function fetchEconomicCalendar(env) {
       await supabaseFetch(env, `mtp_economic_calendar?event_time=lt.${cutoff}`, { method: "DELETE" }).catch(() => {});
 
       const rows = events.map(e => ({
-        event_uid: `${e.country}|${e.title}|${e.event_time}`,
+        // event_uid stable sur la DATE (pas l'heure) : si Forex Factory reschedule
+        // un event dans la journée, l'upsert met à jour event_time au lieu de créer
+        // un doublon. Format YYYY-MM-DD extrait du timestamp UTC.
+        event_uid: `${e.country}|${e.title}|${String(e.event_time).slice(0, 10)}`,
         title: e.title,
         country: e.country,
         impact: e.impact,
