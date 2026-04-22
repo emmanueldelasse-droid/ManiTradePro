@@ -63,7 +63,8 @@
     dashboard: {
       fearGreed: null,
       trending: [],
-      portfolio: null
+      portfolio: null,
+      newsWindow: null
     },
     news: {
       items: [],
@@ -1980,15 +1981,17 @@ function confirmTradeFromModal() {
 
   async function loadDashboard() {
     try {
-      const [fg, trending, portfolio, news] = await Promise.all([
+      const [fg, trending, portfolio, news, newsWindow] = await Promise.all([
         api("/api/fear-greed").catch(() => null),
         api("/api/trending").catch(() => null),
         api("/api/portfolio/summary").catch(() => null),
-        api("/api/news").catch(() => null)
+        api("/api/news").catch(() => null),
+        api("/api/news-window").catch(() => null)
       ]);
       state.dashboard.fearGreed = fg?.data || null;
       state.dashboard.trending = trending?.data || [];
       state.dashboard.portfolio = portfolio?.data || null;
+      state.dashboard.newsWindow = newsWindow || null;
       state.news = {
         items: Array.isArray(news?.data?.items) ? news.data.items : [],
         overview: news?.data?.overview || null,
@@ -3261,6 +3264,32 @@ function marketRegimeViewModel(regime = state.market?.regime) {
   };
 }
 
+function renderNewsWindowWidget(nw) {
+  // PR #3 Phase 1 — widget "Prochain événement important"
+  if (!nw) return "";
+  const blocked = !!nw.blocked;
+  const ev = nw.event;
+  const minutes = Number(nw.minutesUntil);
+  const tone = blocked ? "blocked" : "clear";
+  const label = blocked
+    ? (Number.isFinite(minutes) && minutes < 0
+        ? `${ev?.country || ""} ${ev?.title || ""} · il y a ${-minutes} min`
+        : `${ev?.country || ""} ${ev?.title || ""} · dans ${Number.isFinite(minutes) ? minutes : "?"} min`)
+    : "Aucun événement macro dans ±30 min";
+  const icon = blocked ? "🔒" : "🟢";
+  const title = blocked
+    ? "Nouvelles entrées bloquées — événement macro imminent (impact high)"
+    : "Aucun événement macro high-impact dans la fenêtre ±30 min";
+  return `
+    <div class="news-window-widget ${tone}" title="${safeText(title)}">
+      <div class="nww-icon">${icon}</div>
+      <div class="nww-text">
+        <div class="nww-head">${blocked ? "Entrées bloquées" : "Fenêtre libre"}</div>
+        <div class="nww-sub">${safeText(label)}</div>
+      </div>
+    </div>`;
+}
+
 function renderFearGreedWidget(fg) {
   if (!fg || fg.value == null) return "";
   const v = fg.value;
@@ -3430,9 +3459,10 @@ function renderDashboard() {
 
         ${renderMarketRegimeBanner()}
 
-        ${(state.dashboard.fearGreed || (state.dashboard.trending || []).length) ? `
+        ${(state.dashboard.fearGreed || (state.dashboard.trending || []).length || state.dashboard.newsWindow) ? `
         <div class="card" style="margin-bottom:18px;padding:14px 18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
           ${renderFearGreedWidget(state.dashboard.fearGreed)}
+          ${renderNewsWindowWidget(state.dashboard.newsWindow)}
           ${renderTrendingStrip(state.dashboard.trending)}
         </div>` : ""}
 
