@@ -5605,6 +5605,23 @@ function openPositionsRiskView() {
     const stats = state.bot.stats;
     const events = state.bot.events || [];
 
+    // Dernier cycle scheduled (PR #1 Phase 1 — cron autonome Cloudflare)
+    const lastCycleAt = settings.last_cycle_at || null;
+    const lastCycleMode = settings.last_cycle_mode || null;
+    const lastCycleSummary = settings.last_cycle_summary || null;
+    const lastCycleMs = lastCycleAt ? new Date(lastCycleAt).getTime() : null;
+    const minutesSinceLastCycle = lastCycleMs ? Math.max(0, Math.round((Date.now() - lastCycleMs) / 60000)) : null;
+    const cycleFreshness = minutesSinceLastCycle == null
+      ? "none"
+      : (minutesSinceLastCycle <= 30 ? "fresh" : (minutesSinceLastCycle <= 120 ? "stale" : "cold"));
+    const cycleModeLabel = lastCycleMode === "crypto+actions" ? "crypto + actions"
+      : lastCycleMode === "crypto-only" ? "crypto only"
+      : lastCycleMode === "skipped-night" ? "pause nuit"
+      : lastCycleMode || "—";
+    const lastCycleText = lastCycleAt
+      ? `Dernier cycle ${minutesSinceLastCycle < 1 ? "à l'instant" : `il y a ${minutesSinceLastCycle} min`} · ${cycleModeLabel}`
+      : "Aucun cycle enregistré pour l'instant";
+
     const blockerText = riskBlocked && Array.isArray(riskState?.blockers)
       ? riskState.blockers.map(b => typeof b === "string" ? b : (b?.message || b?.code || "")).filter(Boolean).join(" · ")
       : "";
@@ -5625,8 +5642,9 @@ function openPositionsRiskView() {
             <div>
               <div class="bot-status-label">État du bot</div>
               <div class="bot-status-value ${enabled ? "on" : "off"}">
-                ${enabled ? "● Actif — tourne toutes les 30 min" : "○ Désactivé — aucun trade"}
+                ${enabled ? "● Actif — cycles 15 min" : "○ Désactivé — aucun trade"}
               </div>
+              <div class="bot-cycle-sub ${cycleFreshness}">${safeText(lastCycleText)}</div>
             </div>
             <label class="bot-toggle-big">
               <input type="checkbox" data-bot-toggle="is_enabled" ${enabled ? "checked" : ""}>
