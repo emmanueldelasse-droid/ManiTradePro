@@ -308,13 +308,32 @@ Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commi
 
 ### Les 4 règles du bot
 
-#### Règle #1 — Apprendre de chaque trade clos
-Chaque clôture doit produire **une donnée exploitable**, pas juste un P/L. À implémenter :
-- Table `mtp_trade_feedback` : `trade_id`, `exit_reason` ∈ {SL, TP, manual, timeout}, `mae_pct` (max drawdown intra-trade), `mfe_pct` (max profit intra-trade).
-- Le MAE/MFE est essentiel : il dit si le stop était trop serré ou le TP trop gourmand.
-- Agrégation toutes les 10–20 clôtures : `win_rate × expectancy` par bucket `setup × direction × régime`. Si un bucket a une expectancy négative sur 30+ trades, on relève son seuil ou on le désactive.
-- Retrain hebdo des poids des 6 composantes du score via régression logistique (outcome binaire win/loss sur l'historique cumulé).
-- **Seuil anti-bruit** : minimum 30 trades par bucket avant tout ajustement. Jamais ajuster sur 3 ou 5 trades — c'est du hasard.
+#### Règle #1 — Apprendre ET se corriger à chaque trade clos
+
+> **Apprendre sans se corriger = accumuler des stats inutiles.** Chaque enseignement doit déclencher **automatiquement une modification du moteur**, sans intervention humaine. Deux temps indissociables : observer, puis agir.
+
+**A. Observer — capturer ce qui s'est passé**
+- Table `mtp_trade_feedback` : `trade_id`, `exit_reason` ∈ {SL, TP, manual, timeout}, `mae_pct` (max drawdown intra-trade, en % de l'entrée), `mfe_pct` (max profit intra-trade), `holding_minutes`, `regime_at_close`.
+- Le MAE/MFE est essentiel : il dit si le stop était trop serré ou le TP trop gourmand, même sur un trade perdant.
+- Persistance Supabase + snapshot du contexte au moment de la sortie (prix, régime, opportunités concurrentes).
+
+**B. Corriger — le bot modifie son propre moteur**
+
+Pour chaque signal statistique significatif, une correction concrète est appliquée **sans intervention humaine** :
+
+| Signal observé | Correction automatique |
+|---|---|
+| Bucket (setup × direction × régime) avec expectancy négative sur **30+ trades** | Relever `min_dossier_score` de +5 pour ce bucket |
+| Même bucket toujours négatif après **50+ trades** | Désactiver le bucket (plus d'entrées) |
+| MAE moyen > 70% de la distance du stop sur un setup | Élargir le stop de +0.5×ATR pour ce setup (stop trop serré) |
+| MFE moyen > 1.5× la distance du TP atteint | Allonger le TP ou basculer en trailing stop pour ce setup |
+| 3 pertes consécutives | Réduire la taille de position à 50% jusqu'à un gain |
+| 3 gains confirmés avec expectancy positive | Taille normale, ou +20% si confiance élevée |
+| Cycle hebdomadaire sur 200+ trades historiques | Retrain des poids des 6 composantes du score via régression logistique (win/loss). Les poids 24/20/20/18/10/8 deviennent dynamiques. |
+
+**Garde-fou anti-bruit** : aucune correction sur moins de **30 trades** dans un bucket. En dessous, c'est du hasard statistique. Tout ajustement est loggé dans `mtp_engine_adjustments` avec date, signal déclencheur, ancienne/nouvelle valeur — rollback possible.
+
+**Principe fondateur** : à qualité de feedback égale, le bot qui se corrige battra toujours le bot qui observe seulement. Ne jamais livrer l'observation sans la correction qui va avec.
 
 #### Règle #2 — Savoir choisir long ou short
 Aujourd'hui le moteur détecte `direction: "short"` mais `buildPlanFromConfiguration` retourne toujours `side: "long"`. À faire :
@@ -344,7 +363,7 @@ Le bot actuel ne tourne que si le frontend est ouvert. Inacceptable pour de l'au
 | Phase | Durée | Contenu | Pourquoi en premier |
 |-------|-------|---------|---------------------|
 | **1. Autonomie + short** | 2–3 sem | Cron Worker, symétriser les 4 setups, injecter Fear & Greed, activer `allow_short` en prod | Sans cron autonome et sans short, le bot est structurellement incomplet. Les autres phases ont besoin de volume de trades dans les 2 sens pour avoir quelque chose à apprendre. |
-| **2. Apprentissage** | 3–4 sem | Table `mtp_trade_feedback` + MAE/MFE, agrégation par bucket, auto-ajustement seuils, dashboard patterns gagnants/perdants | Sans feedback-loop, le bot ne s'améliore pas. C'est ce qui différencie un vrai bot d'un script. |
+| **2. Apprentissage + correction** | 3–4 sem | Table `mtp_trade_feedback` + MAE/MFE, agrégation par bucket, **corrections automatiques du moteur** (seuils, stops, TP, taille de position, poids du score), table `mtp_engine_adjustments` pour auditer chaque ajustement, dashboard patterns gagnants/perdants | Observer ne suffit pas : sans corrections auto, le bot répète ses erreurs. C'est ce qui différencie un vrai bot d'un script. |
 | **3. Backtest & validation** | 3–4 sem | Cache KV 5 ans, moteur backtest + walk-forward, UI onglet Backtest, retrain hebdo des poids | Permet de valider les évolutions sans risquer du vrai argent. |
 | **4. Exécution réelle** | Plus tard | Lecture broker (Binance API read-only), puis ordres avec limites strictes | Ne surtout pas court-circuiter les phases 1-3. |
 
