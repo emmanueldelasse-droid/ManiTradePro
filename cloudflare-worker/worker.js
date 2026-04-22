@@ -2849,7 +2849,10 @@ function getTrainingDefaults() {
     mean_reversion_enabled: true,    // setup activé en entraînement
     max_daily_loss_pct: 0.30,        // garde-fou jour uniquement (30%)
     max_weekly_loss_pct: 1.0,        // désactivé (100%)
-    max_consecutive_losses: 999      // désactivé
+    max_consecutive_losses: 999,     // désactivé
+    last_cycle_at: null,             // PR #1 Phase 1 — traçabilité cron scheduled
+    last_cycle_mode: null,           // "crypto-only" | "crypto+actions" | "skipped-*"
+    last_cycle_summary: null         // {closed, opened, errors, duration_ms}
   };
 }
 
@@ -3017,22 +3020,127 @@ async function handleTrainingAutoCycle(env) {
 }
 
 // ============================================================
-// CRON HANDLER — ordre strict
+// CRON HANDLER — smart scheduling + idempotence + logs d'activité
 // ============================================================
+// Cron unique `*/15 * * * *` (wrangler.toml). Cette fonction fait le tri :
+//   - Crypto heures actives UTC (6h-22h)  : scan à chaque tick (15 min)
+//   - Crypto nuit UTC (22h-6h)            : scan uniquement minute 0 (~1 h)
+//   - Actions heures de bourse US         : scan à chaque tick (lun-ven 13h30-20h UTC)
+//   - Actions hors-bourse / weekend       : scan opportunities marche quand même
+//                                           mais les actions retourneront du stale
+//                                           (pas bloquant, évite de complexifier).
+// Idempotence : skip si dernier cycle terminé < 10 min (anti-doublon si 2 crons
+// se chevauchent côté Cloudflare).
 async function handleScheduledCycle(env) {
-  try {
-    // 1. Rafraîchir les opportunités (inclut le calcul du régime)
-    await withTimeout(handleOpportunities(null, env), 25000, "scheduled_opportunities");
-  } catch (e) {
-    // Log mais ne bloque pas le training
-    console.error("Scheduled opportunities error:", e.message);
+  const startedAt = Date.now();
+  const now = new Date();
+  const utcHour = now.getUTCHours();
+  const utcMinute = now.getUTCMinutes();
+  const utcDay = now.getUTCDay(); // 0 = dimanche, 6 = samedi
+
+  const isCryptoActive = utcHour >= 6 && utcHour < 22;
+  const isCryptoNight = !isCryptoActive;
+  // Bourse US ouverte approx 13h30-20h UTC (= 9h30-16h EST) — on simplifie en 13-20
+  const isUSMarketOpen = utcDay >= 1 && utcDay <= 5 && utcHour >= 13 && utcHour < 20;
+
+  // 1. Throttle nuit crypto : on ne garde qu'un cycle par heure (minute 0)
+  if (isCryptoNight && utcMinute !== 0) {
+    await logTrainingEvent(env, "scheduled_cycle_skipped", {
+      reason: "crypto_night_throttle",
+      utc_hour: utcHour,
+      utc_minute: utcMinute
+    }).catch(() => {});
+    await updateLastCycleMeta(env, "skipped-night", { skipped: true, reason: "crypto_night_throttle" }).catch(() => {});
+    return;
   }
 
+  // 2. Idempotence : skip si le dernier cycle est trop récent
+  let settings = null;
   try {
-    // 2. Cycle training sur données fraîches
-    await withTimeout(handleTrainingAutoCycle(env), 25000, "scheduled_training");
+    settings = await getTrainingSettings(env);
+    if (settings?.last_cycle_at) {
+      const lastMs = new Date(settings.last_cycle_at).getTime();
+      const elapsedMin = (Date.now() - lastMs) / 60000;
+      if (Number.isFinite(elapsedMin) && elapsedMin >= 0 && elapsedMin < 10) {
+        await logTrainingEvent(env, "scheduled_cycle_skipped", {
+          reason: "idempotence_lock",
+          last_cycle_at: settings.last_cycle_at,
+          elapsed_min: Number(elapsedMin.toFixed(2))
+        }).catch(() => {});
+        return;
+      }
+    }
   } catch (e) {
-    console.error("Scheduled training error:", e.message);
+    console.error("getTrainingSettings (idempotence check) failed:", e.message);
+  }
+
+  const cycleMode = isUSMarketOpen ? "crypto+actions" : "crypto-only";
+
+  // 3. Log début de cycle
+  await logTrainingEvent(env, "scheduled_cycle_start", {
+    mode: cycleMode,
+    utc_hour: utcHour,
+    utc_day: utcDay,
+    us_market_open: isUSMarketOpen
+  }).catch(() => {});
+
+  const summary = { closed: 0, opened: 0, skipped: 0, errors: 0, duration_ms: 0 };
+
+  try {
+    // 4. Rafraîchir les opportunités (inclut le calcul du régime)
+    try {
+      await withTimeout(handleOpportunities(null, env), 25000, "scheduled_opportunities");
+    } catch (e) {
+      console.error("Scheduled opportunities error:", e.message);
+      summary.errors++;
+    }
+
+    // 5. Cycle training sur données fraîches
+    try {
+      const resp = await withTimeout(handleTrainingAutoCycle(env), 25000, "scheduled_training");
+      // handleTrainingAutoCycle retourne un Response. On essaie d'en extraire les counts
+      // pour enrichir le summary, sans bloquer si l'extraction échoue.
+      try {
+        const body = await resp.clone().json();
+        const log = body?.data || body;
+        if (log && typeof log === "object") {
+          summary.closed = Array.isArray(log.closed) ? log.closed.length : 0;
+          summary.opened = Array.isArray(log.opened) ? log.opened.length : 0;
+          summary.skipped = Array.isArray(log.skipped) ? log.skipped.length : 0;
+          summary.errors += Array.isArray(log.errors) ? log.errors.length : 0;
+        }
+      } catch { /* extraction best-effort, ignore */ }
+    } catch (e) {
+      console.error("Scheduled training error:", e.message);
+      summary.errors++;
+    }
+  } finally {
+    summary.duration_ms = Date.now() - startedAt;
+    // 6. Persister le timestamp + résumé + log de fin (best-effort, ne bloque rien)
+    await updateLastCycleMeta(env, cycleMode, summary).catch(() => {});
+    await logTrainingEvent(env, "scheduled_cycle_end", {
+      mode: cycleMode,
+      summary
+    }).catch(() => {});
+  }
+}
+
+// Update minimaliste des 3 colonnes de trace sans passer par la normalisation
+// (pour ne pas toucher aux autres champs de settings).
+async function updateLastCycleMeta(env, mode, summary) {
+  if (!supabaseConfigured(env)) return;
+  try {
+    await supabaseFetch(env, `${TRAINING_SETTINGS_TABLE}?mode=eq.training`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        last_cycle_at: nowIso(),
+        last_cycle_mode: mode,
+        last_cycle_summary: summary || {},
+        updated_at: nowIso()
+      })
+    });
+  } catch (e) {
+    console.error("updateLastCycleMeta failed:", e.message);
   }
 }
 
@@ -3119,6 +3227,9 @@ function normalizeTrainingSettingsRow(row) {
     max_daily_loss_pct: clampFloat(safe.max_daily_loss_pct, 0.001, 1.0, base.max_daily_loss_pct),
     max_weekly_loss_pct: clampFloat(safe.max_weekly_loss_pct, 0.001, 1.0, base.max_weekly_loss_pct),
     max_consecutive_losses: clampInt(safe.max_consecutive_losses, 1, 9999, base.max_consecutive_losses),
+    last_cycle_at: safe.last_cycle_at || base.last_cycle_at,
+    last_cycle_mode: safe.last_cycle_mode || base.last_cycle_mode,
+    last_cycle_summary: (safe.last_cycle_summary && typeof safe.last_cycle_summary === "object") ? safe.last_cycle_summary : base.last_cycle_summary,
     updated_at: nowIso()
   };
 }
@@ -4330,6 +4441,9 @@ async function handleRequest(request, env) {
       return safeRoute(() => handleTrainingSettingsSave(request, env));
     }
     if (url.pathname === "/api/training/auto-cycle") {
+      // Force manuel (bouton UI Réglages) — volontairement HORS idempotence.
+      // Le cron scheduled applique son propre guard last_cycle_at < 10 min
+      // côté handleScheduledCycle, pas ici. L'utilisateur peut forcer à tout moment.
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingAutoCycle(env));

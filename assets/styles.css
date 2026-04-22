@@ -1022,6 +1022,10 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .bot-status-value{font-size:1.1rem;font-weight:700;margin-top:4px}
 .bot-status-value.on{color:var(--accent)}
 .bot-status-value.off{color:var(--text-secondary)}
+.bot-cycle-sub{font-size:.78rem;margin-top:6px;color:var(--text-muted);display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;border:1px solid var(--border-subtle);background:var(--bg-elevated)}
+.bot-cycle-sub.fresh{color:var(--accent);border-color:var(--accent-glow)}
+.bot-cycle-sub.stale{color:#f0a020;border-color:rgba(240,160,32,.3)}
+.bot-cycle-sub.cold,.bot-cycle-sub.none{color:var(--text-secondary)}
 .bot-toggle-big{position:relative;width:58px;height:32px;flex-shrink:0;cursor:pointer}
 .bot-toggle-big input{opacity:0;width:0;height:0}
 .bot-toggle-slider{position:absolute;inset:0;border-radius:999px;background:var(--bg-elevated);border:1px solid var(--border-medium);transition:background .2s}

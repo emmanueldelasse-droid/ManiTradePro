@@ -9,8 +9,12 @@ kv_namespaces = [
 ]
 
 [triggers]
+# Un seul cron toutes les 15 min, 24/7. Le handler `scheduled` dans worker.js
+# fait le tri selon l'heure UTC et le jour :
+#   - Crypto heures actives (6h-22h UTC)  : scan à chaque tick (15 min)
+#   - Crypto nuit (22h-6h UTC)            : scan 1 tick sur 4 (~1 h)
+#   - Actions heures de bourse US (lun-ven 13h30-20h UTC) : scan à chaque tick
+#   - Actions hors-bourse / weekend       : skip actions (crypto only)
 crons = [
-  "*/30 13-20 * * MON-FRI",
-  "0 */2 * * MON-FRI",
-  "0 */2 * * SAT,SUN"
+  "*/15 * * * *"
 ]
