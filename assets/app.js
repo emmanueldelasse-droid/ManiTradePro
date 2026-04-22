@@ -968,10 +968,10 @@
     return new Intl.NumberFormat("fr-FR", { maximumFractionDigits: digits }).format(v);
   }
 
-  function pct(v) {
+  function pct(v, digits = 2) {
     if (v == null || Number.isNaN(v)) return "—";
     const sign = v > 0 ? "+" : "";
-    return `${sign}${num(v, 2)}%`;
+    return `${sign}${num(v, digits)}%`;
   }
 
   function nowIso() {
@@ -4391,18 +4391,26 @@ function renderPositionRow(position) {
   const stopPrice  = Number(snap.stopLoss ?? p.stopLoss ?? 0);
   const tpPrice    = Number(snap.takeProfit ?? p.takeProfit ?? 0);
   const livePrice  = meta.livePrice ?? (Number.isFinite(entryPrice) ? entryPrice : null);
+  const quantity   = Number(exec.quantity ?? p.quantity);
 
   const hasEntry = Number.isFinite(entryPrice) && entryPrice > 0;
   const hasStop  = stopPrice > 0;
   const hasTP    = tpPrice > 0;
   const hasLive  = livePrice != null;
+  const hasQty   = Number.isFinite(quantity) && quantity > 0;
+  const isShort  = p.side === "short";
 
-  const pnlPct = live?.pnlPct ?? meta.pnlPctLive ?? null;
-  const pnlEur = live?.pnl != null ? live.pnl * fxRateUsdToEur() : null;
+  const pnlPct = (hasLive && hasEntry)
+    ? (((isShort ? entryPrice - livePrice : livePrice - entryPrice) / entryPrice) * 100)
+    : null;
+  const pnlUsd = (hasLive && hasEntry && hasQty)
+    ? ((isShort ? entryPrice - livePrice : livePrice - entryPrice) * quantity)
+    : null;
+  const pnlEur = pnlUsd != null ? pnlUsd * fxRateUsdToEur() : null;
   const pnlPositive = pnlPct != null && pnlPct >= 0;
 
-  const stopDistPct  = hasStop && hasLive ? ((p.side === "long" ? livePrice - stopPrice : stopPrice - livePrice) / livePrice * 100) : null;
-  const tpDistPct    = hasTP  && hasLive ? ((p.side === "long" ? tpPrice - livePrice : livePrice - tpPrice) / livePrice * 100) : null;
+  const stopDistPct  = hasStop && hasLive ? ((isShort ? livePrice - stopPrice : stopPrice - livePrice) / livePrice * 100) : null;
+  const tpDistPct    = hasTP  && hasLive ? ((isShort ? livePrice - tpPrice : tpPrice - livePrice) / livePrice * 100) : null;
   const ratio        = displayRatioValue(p);
 
   let progressPct = null;
@@ -4451,7 +4459,7 @@ function renderPositionRow(position) {
       <div class="pos-level">
         <span class="pos-level-label">Stop</span>
         <span class="pos-level-val">${hasStop ? priceDisplay(stopPrice) : "—"}</span>
-        ${stopDistPct != null ? `<span class="pos-level-dist ${stopDistPct < 2 ? "danger" : "warn"}">${num(stopDistPct, 1)}%</span>` : ""}
+        ${stopDistPct != null ? `<span class="pos-level-dist ${Math.abs(stopDistPct) < 2 ? "danger" : "warn"}">${pct(stopDistPct, 1)}</span>` : ""}
       </div>
       <div class="pos-level center">
         <span class="pos-level-label">Ratio</span>
@@ -4460,7 +4468,7 @@ function renderPositionRow(position) {
       <div class="pos-level right">
         <span class="pos-level-label">Objectif</span>
         <span class="pos-level-val">${hasTP ? priceDisplay(tpPrice) : "—"}</span>
-        ${tpDistPct != null ? `<span class="pos-level-dist green">+${num(tpDistPct, 1)}%</span>` : ""}
+        ${tpDistPct != null ? `<span class="pos-level-dist green">${pct(tpDistPct, 1)}</span>` : ""}
       </div>
     </div>
 
