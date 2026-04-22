@@ -542,14 +542,23 @@ Chaque PR est indépendante, mergeable seule, validée 3-5 jours en paper avant 
   3. Pas de migration SQL (aucune modification de schéma)
 - **Validation paper 48h** : vérifier dans Supabase `mtp_positions` la présence de lignes `side = "short"` après que le bot a tourné. Tester le filtre UI "▼ short" sur la page Opportunités. Vérifier `regime_indicators` accessible via `/api/regime-indicators`.
 
-#### PR #3 — News garde-fou niveau 1 (~3 jours)
-- Fetch Forex Factory RSS 1×/nuit (cache KV 24h)
-- Fetch earnings calendar via Finnhub 1×/jour
-- Table `mtp_economic_calendar` dans Supabase
-- Logique `isWithinEventWindow(symbol, now)` avant chaque décision d'entrée
-- **Option B activée** : resserrement auto du stop à -0.3% 10 min avant event high-impact
-- UI : widget "Prochain événement important" dashboard + icône verrou sur opportunités bloquées
-- **Validation** : simulation d'une FOMC prochaine, bot refuse les entrées dans la fenêtre
+#### PR #3 — News garde-fou niveau 1 — ✅ LIVRÉE session 9 (branche `claude/phase1-pr3-news-safeguard`)
+- [x] Migration SQL 004 : tables `mtp_economic_calendar` et `mtp_earnings_calendar` avec RLS + policies ouvertes (cohérent avec `mtp_user_assets`). Index partiel sur `impact = 'high'`.
+- [x] Fetch Forex Factory RSS via `fetchEconomicCalendar(env)` — URL `https://nfs.faireconomy.media/ff_calendar_thisweek.xml`, gratuit illimité, pas de clé. Cache mémoire 6h + persist Supabase avec upsert sur `event_uid` stable (country|title|YYYY-MM-DD, pas l'heure → support des reschedulings FF).
+- [x] Parsing XML via regex simples (CDATA + plaintext). Conversion Eastern Time → UTC avec DST approximative (mars-nov EDT UTC-4, autrement EST UTC-5). Précision ±1h tolérée par la fenêtre ±30 min.
+- [x] Helper `fetchHighImpactEventsInWindow(env, windowMs)` : lit Supabase avec cache mémoire 2 min, fallback direct FF si Supabase down.
+- [x] Helper `getNewsWindowForCycle(env)` : retourne `{blocked, reason, event, minutesUntil}` avec l'event le plus proche.
+- [x] Intégration dans `isTrainingCandidateAllowed` : 5e param `newsWindow`, rejet immédiat si blocked. Pré-fetch UNE FOIS dans `handleTrainingAutoCycle` avant la boucle (0 coût sur appels suivants grâce au cache).
+- [x] Event `news_window_block` loggé dans `mtp_training_events` avec reason + event details + minutes_until pour traçabilité.
+- [x] Nouveaux endpoints : `GET /api/economic-calendar` (semaine complète) + `GET /api/news-window` (état actuel).
+- [x] UI widget `renderNewsWindowWidget` dans le dashboard, à côté du Fear & Greed. États visuels : `.clear` (vert — fenêtre libre) / `.blocked` (rouge — entrées bloquées). Intégration dans `loadDashboard` via Promise.all.
+- [x] CSS `.news-window-widget` utilise uniquement `var(--bg-elevated)`, `var(--border-subtle)`, `var(--profit)`, `var(--loss)` → 100% compatible light/dark theme.
+- **Reporté à un commit ultérieur** : resserrement auto du stop à -0.3% 10 min avant event (option B). Garde-fou niveau 1 MVP priorise le blocage pur des entrées. Les positions ouvertes sont visibles via le widget "Entrées bloquées" pour action manuelle.
+- **Reporté à Phase 2** : fetch Finnhub earnings calendar (la table `mtp_earnings_calendar` existe en anticipation).
+- **Déploiement requis côté utilisateur** :
+  1. Exécuter `cloudflare-worker/migrations/004_news_calendar.sql` dans Supabase SQL Editor
+  2. `wrangler deploy` depuis la machine Windows
+- **Validation paper** : tester `GET /api/economic-calendar` → retourne la semaine. Tester `GET /api/news-window` → `blocked: false` en temps normal. Lors d'une prochaine FOMC/NFP, vérifier widget dashboard `🔒 Entrées bloquées` + events `news_window_block` dans `mtp_training_events`.
 
 #### PR #4 — Shadow mode + drift detection + table ajustements (~2 jours)
 - Table `mtp_engine_adjustments` (date, type, signal, ancienne/nouvelle valeur, status: `shadow` / `active` / `rollback`)
