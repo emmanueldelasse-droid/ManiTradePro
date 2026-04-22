@@ -504,13 +504,22 @@ Le bot **chasse les pépites** tout seul et **retire les actifs dormants**.
 
 Chaque PR est indépendante, mergeable seule, validée 3-5 jours en paper avant la suivante.
 
-#### PR #1 — Cron Cloudflare autonome (~3 jours)
-- Handler `scheduled` dans `worker.js` + cron triggers dans `wrangler.toml` (15 min heures actives / 1 h nuit crypto / skip actions off)
-- Factorisation de la logique scan/décision actuelle (frontend → Worker scheduled)
-- Idempotence via `lastCycleAt` dans Supabase
-- Log `scheduled_cycle` dans `mtp_training_events`
-- UI : badge "Bot autonome actif" + dernier cycle timestamp dans Réglages
-- **Validation** : bot tourne 48h sans ouverture app, events Supabase cohérents
+#### PR #1 — Cron Cloudflare autonome — ✅ LIVRÉE session 9 (branche `claude/phase1-pr1-cron-autonome`)
+- [x] Handler `scheduled` déjà présent dans `worker.js:4618` → `handleScheduledCycle` (réécrit)
+- [x] `wrangler.toml` : 1 seul cron `*/15 * * * *` 24/7 (remplace les 3 crons précédents)
+- [x] Smart scheduling dans `handleScheduledCycle` : throttle nuit crypto (22h-6h UTC = 1 cycle/h sur minute 0), mode `crypto+actions` en heures de bourse US, `crypto-only` sinon
+- [x] Idempotence via `last_cycle_at` : skip si dernier cycle < 10 min (anti-chevauchement de crons)
+- [x] Events Supabase : `scheduled_cycle_start` / `scheduled_cycle_end` / `scheduled_cycle_skipped` avec mode + summary {closed, opened, skipped, errors, duration_ms}
+- [x] Migration SQL `003_training_settings_last_cycle.sql` : colonnes `last_cycle_at` (timestamptz), `last_cycle_mode` (varchar), `last_cycle_summary` (jsonb)
+- [x] `normalizeTrainingSettingsRow` étendu pour préserver ces 3 champs en round-trip
+- [x] Endpoint `POST /api/training/auto-cycle` volontairement HORS idempotence (force manuel UI)
+- [x] UI : pilule `.bot-cycle-sub` dans la carte bot avec "Dernier cycle il y a X min · mode", variantes visuelles fresh/stale/cold selon ancienneté
+- [x] Label "Actif — cycles 15 min" (au lieu de "30 min")
+- **Déploiement requis côté utilisateur** :
+  1. Exécuter `cloudflare-worker/migrations/003_training_settings_last_cycle.sql` dans Supabase SQL Editor
+  2. `wrangler deploy` depuis la machine utilisateur (les secrets sont préservés)
+  3. Vérifier `wrangler secret list` post-deploy
+- **Validation paper** : 48 h sans ouvrir l'app, events `scheduled_cycle_*` toutes les 15 min en heures actives dans Supabase, pilule UI met à jour au retour sur l'app.
 
 #### PR #2 — Symétrisation long/short + Fear & Greed/VIX filtre (~4 jours)
 - `buildPlanFromConfiguration` respecte la `direction` détectée (plus de `side: "long"` en dur)

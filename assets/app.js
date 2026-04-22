@@ -5609,8 +5609,9 @@ function openPositionsRiskView() {
     const lastCycleAt = settings.last_cycle_at || null;
     const lastCycleMode = settings.last_cycle_mode || null;
     const lastCycleSummary = settings.last_cycle_summary || null;
-    const lastCycleMs = lastCycleAt ? new Date(lastCycleAt).getTime() : null;
-    const minutesSinceLastCycle = lastCycleMs ? Math.max(0, Math.round((Date.now() - lastCycleMs) / 60000)) : null;
+    const lastCycleMsRaw = lastCycleAt ? new Date(lastCycleAt).getTime() : null;
+    const lastCycleMs = Number.isFinite(lastCycleMsRaw) ? lastCycleMsRaw : null;
+    const minutesSinceLastCycle = lastCycleMs != null ? Math.max(0, Math.round((Date.now() - lastCycleMs) / 60000)) : null;
     const cycleFreshness = minutesSinceLastCycle == null
       ? "none"
       : (minutesSinceLastCycle <= 30 ? "fresh" : (minutesSinceLastCycle <= 120 ? "stale" : "cold"));
