@@ -3246,6 +3246,21 @@ async function handleScheduledCycle(env) {
       console.error("Scheduled training error:", e.message);
       summary.errors++;
     }
+
+    // 6. Drift detection — 1×/jour à 2h UTC (évite spam, suffisant pour audit trends)
+    if (utcHour === 2 && utcMinute < 15) {
+      try {
+        const drift = await withTimeout(detectDriftAlerts(env), 15000, "scheduled_drift");
+        if (drift?.detected > 0) {
+          await logTrainingEvent(env, "drift_detected", {
+            alerts_count: drift.detected,
+            alerts: drift.alerts.slice(0, 5)  // top 5 pour ne pas alourdir le payload
+          }).catch(() => {});
+        }
+      } catch (e) {
+        console.error("Scheduled drift detect error:", e.message);
+      }
+    }
   } finally {
     summary.duration_ms = Date.now() - startedAt;
     // 6. Persister le timestamp + résumé + log de fin (best-effort, ne bloque rien)
@@ -3313,6 +3328,7 @@ async function supabaseFetch(env, path, options = {}) {
 const TRADE_TABLES = { positions: "mtp_positions", trades: "mtp_trades" };
 const TRAINING_SETTINGS_TABLE = "mtp_training_settings";
 const TRAINING_EVENTS_TABLE = "mtp_training_events";
+const ENGINE_ADJUSTMENTS_TABLE = "mtp_engine_adjustments";
 const SIGNAL_TABLE = "mtp_signals";
 
 function coerceBoolean(value, fallback = false) {
@@ -4594,6 +4610,204 @@ async function handleNewsWindow(env) {
   return json({ status: "ok", asOf: nowIso(), ...window });
 }
 
+// ============================================================
+// SHADOW MODE + DRIFT DETECTION — PR #4 Phase 1
+// ============================================================
+// Infrastructure pour la Règle #1 (apprendre ET se corriger).
+// Chaque correction auto du moteur passe par la table mtp_engine_adjustments
+// avec workflow shadow → active → rollback. Les corrections concrètes (7
+// règles) seront branchées en Phase 2.
+
+async function createEngineAdjustment(env, {
+  adjustmentType, bucketKey = null, signalTrigger = {},
+  oldValue = null, newValue = null, severity = null, notes = null
+}) {
+  if (!supabaseConfigured(env)) return null;
+  const row = {
+    adjustment_type: String(adjustmentType || "unknown"),
+    bucket_key: bucketKey,
+    signal_trigger: signalTrigger || {},
+    old_value: oldValue,
+    new_value: newValue,
+    status: "shadow",
+    shadow_trades_observed: 0,
+    shadow_result_better: null,
+    severity: severity,
+    notes: notes,
+    created_at: nowIso(),
+    updated_at: nowIso()
+  };
+  try {
+    const res = await supabaseFetch(env, `${ENGINE_ADJUSTMENTS_TABLE}`, {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify([row])
+    });
+    return Array.isArray(res) ? res[0] : res;
+  } catch (e) {
+    console.error("createEngineAdjustment failed:", e.message);
+    return null;
+  }
+}
+
+async function updateEngineAdjustmentStatus(env, id, status, extra = {}) {
+  if (!supabaseConfigured(env)) return null;
+  const patch = { status, updated_at: nowIso(), ...extra };
+  if (status === "active") patch.activated_at = nowIso();
+  if (status === "rollback") patch.rollback_at = nowIso();
+  try {
+    const res = await supabaseFetch(env, `${ENGINE_ADJUSTMENTS_TABLE}?id=eq.${id}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(patch)
+    });
+    return Array.isArray(res) ? res[0] : res;
+  } catch (e) {
+    console.error("updateEngineAdjustmentStatus failed:", e.message);
+    return null;
+  }
+}
+
+async function listEngineAdjustments(env, { status = null, limit = 50 } = {}) {
+  if (!supabaseConfigured(env)) return [];
+  const params = [`order=created_at.desc`, `limit=${clampInt(limit, 1, 500, 50)}`];
+  if (status) params.push(`status=eq.${encodeURIComponent(status)}`);
+  try {
+    const rows = await supabaseFetch(env, `${ENGINE_ADJUSTMENTS_TABLE}?${params.join("&")}`);
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) {
+    console.error("listEngineAdjustments failed:", e.message);
+    return [];
+  }
+}
+
+// Agrège les trades clos par bucket (setup × direction) pour drift detection.
+// Retourne un map { bucketKey: { historical: {winRate, n}, recent30: {winRate, n} } }
+async function computeBucketStats(env) {
+  if (!supabaseConfigured(env)) return {};
+  try {
+    const rows = await supabaseFetch(env,
+      `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&order=closed_at.desc&limit=1000`
+    );
+    if (!Array.isArray(rows) || rows.length === 0) return {};
+
+    const buckets = {};
+    rows.forEach((trade, index) => {
+      const setup = String(trade?.analysis_snapshot?.setupType || trade?.setupType || "unknown").toLowerCase();
+      const side = String(trade?.side || trade?.analysis_snapshot?.direction || "long").toLowerCase();
+      const key = `${setup}|${side}`;
+      if (!buckets[key]) {
+        buckets[key] = {
+          bucketKey: key,
+          setup, side,
+          historical: { wins: 0, losses: 0, n: 0 },
+          recent30: { wins: 0, losses: 0, n: 0 }
+        };
+      }
+      const pnl = Number(trade?.pnl ?? trade?.pnl_pct ?? 0);
+      const isWin = pnl > 0;
+      buckets[key].historical.n++;
+      if (isWin) buckets[key].historical.wins++; else buckets[key].historical.losses++;
+      // Recent 30 : les 30 premiers (rows déjà triés desc)
+      if (index < 30 || buckets[key].recent30.n < 30) {
+        if (buckets[key].recent30.n < 30) {
+          buckets[key].recent30.n++;
+          if (isWin) buckets[key].recent30.wins++; else buckets[key].recent30.losses++;
+        }
+      }
+    });
+
+    // Calcul win rates finaux
+    Object.values(buckets).forEach(b => {
+      b.historical.winRate = b.historical.n > 0 ? b.historical.wins / b.historical.n : null;
+      b.recent30.winRate = b.recent30.n > 0 ? b.recent30.wins / b.recent30.n : null;
+    });
+
+    return buckets;
+  } catch (e) {
+    console.error("computeBucketStats failed:", e.message);
+    return {};
+  }
+}
+
+// Détecte les buckets en drift et logge des alertes dans mtp_engine_adjustments.
+// Seuils : chute relative 10-15% = light, 15-25% = moderate, > 25% = severe.
+async function detectDriftAlerts(env) {
+  const buckets = await computeBucketStats(env);
+  const alerts = [];
+
+  for (const key in buckets) {
+    const b = buckets[key];
+    // On exige au moins 20 trades historiques ET 10 récents pour avoir un signal exploitable
+    if (!b.historical.winRate || b.historical.n < 20) continue;
+    if (!b.recent30.winRate || b.recent30.n < 10) continue;
+
+    const drop = b.historical.winRate - b.recent30.winRate; // >0 = dégradation
+    if (drop < 0.10) continue;
+
+    let severity = "light";
+    if (drop >= 0.25) severity = "severe";
+    else if (drop >= 0.15) severity = "moderate";
+
+    alerts.push({
+      bucketKey: b.bucketKey,
+      setup: b.setup,
+      side: b.side,
+      historicalWinRate: b.historical.winRate,
+      recentWinRate: b.recent30.winRate,
+      drop,
+      severity,
+      trades: { historical: b.historical.n, recent: b.recent30.n }
+    });
+  }
+
+  // Persister comme ajustements type "drift_alert" (ne crée pas de doublon si
+  // une alerte active existe déjà pour ce bucket avec la même severity)
+  for (const alert of alerts) {
+    try {
+      const existing = await supabaseFetch(env,
+        `${ENGINE_ADJUSTMENTS_TABLE}?adjustment_type=eq.drift_alert&bucket_key=eq.${encodeURIComponent(alert.bucketKey)}&status=eq.shadow&severity=eq.${alert.severity}&limit=1`
+      ).catch(() => []);
+      if (Array.isArray(existing) && existing.length > 0) continue;
+
+      await createEngineAdjustment(env, {
+        adjustmentType: "drift_alert",
+        bucketKey: alert.bucketKey,
+        signalTrigger: {
+          historical_win_rate: alert.historicalWinRate,
+          recent_win_rate: alert.recentWinRate,
+          drop_pct: alert.drop,
+          trades_historical: alert.trades.historical,
+          trades_recent: alert.trades.recent
+        },
+        severity: alert.severity,
+        notes: `Drift détecté sur ${alert.bucketKey} : chute de ${(alert.drop * 100).toFixed(1)}% (${(alert.historicalWinRate * 100).toFixed(0)}% historique → ${(alert.recentWinRate * 100).toFixed(0)}% sur 30 derniers).`
+      });
+    } catch (e) {
+      console.error("detectDriftAlerts persist failed:", e.message);
+    }
+  }
+
+  return { detected: alerts.length, alerts };
+}
+
+async function handleEngineAdjustments(url, env) {
+  const status = url.searchParams.get("status");
+  const limit = parseInt(url.searchParams.get("limit") || "50", 10);
+  const rows = await listEngineAdjustments(env, { status, limit });
+  return json({ status: "ok", asOf: nowIso(), count: rows.length, data: rows });
+}
+
+async function handleDriftDetect(env) {
+  const result = await detectDriftAlerts(env);
+  return json({ status: "ok", asOf: nowIso(), ...result });
+}
+
+async function handleBucketStats(env) {
+  const buckets = await computeBucketStats(env);
+  return json({ status: "ok", asOf: nowIso(), data: Object.values(buckets) });
+}
+
 async function handleTrending() {
   const cached = getMemoryCache("trending_coins");
   if (cached) return json(cached);
@@ -4883,6 +5097,13 @@ async function handleRequest(request, env) {
     if (url.pathname === "/api/regime-indicators") return safeRoute(() => handleRegimeIndicators(env));
     if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar(env));
     if (url.pathname === "/api/news-window") return safeRoute(() => handleNewsWindow(env));
+    if (url.pathname === "/api/engine/adjustments") return safeRoute(() => handleEngineAdjustments(url, env));
+    if (url.pathname === "/api/engine/drift-detect") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleDriftDetect(env));
+    }
+    if (url.pathname === "/api/engine/bucket-stats") return safeRoute(() => handleBucketStats(env));
     if (url.pathname === "/api/trending") return safeRoute(() => handleTrending());
     if (url.pathname === "/api/news") return safeRoute(() => handleNews(env));
     if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar());

@@ -560,14 +560,34 @@ Chaque PR est indépendante, mergeable seule, validée 3-5 jours en paper avant 
   2. `wrangler deploy` depuis la machine Windows
 - **Validation paper** : tester `GET /api/economic-calendar` → retourne la semaine. Tester `GET /api/news-window` → `blocked: false` en temps normal. Lors d'une prochaine FOMC/NFP, vérifier widget dashboard `🔒 Entrées bloquées` + events `news_window_block` dans `mtp_training_events`.
 
-#### PR #4 — Shadow mode + drift detection + table ajustements (~2 jours)
-- Table `mtp_engine_adjustments` (date, type, signal, ancienne/nouvelle valeur, status: `shadow` / `active` / `rollback`)
-- Framework "shadow execution" : corrections loggées en shadow pendant 20 trades avant activation
-- Drift detection : calcul glissant 30 derniers trades vs moyenne historique, alertes graduées (léger/moyen/grave)
-- UI : onglet "Santé du bot" avec historique ajustements + alertes drift actives
-- **Validation** : forcer un drift simulé, vérifier alertes. Laisser correction en shadow, vérifier non-application avant N trades.
+#### PR #4 — Shadow mode + drift detection + table ajustements — ✅ LIVRÉE session 9 (branche `claude/phase1-pr4-shadow-drift`)
+- [x] Migration SQL 005 : table `mtp_engine_adjustments` avec colonnes `adjustment_type`, `bucket_key`, `signal_trigger` jsonb, `old_value`/`new_value` jsonb, `status` (shadow|active|rollback), `shadow_trades_observed`, `shadow_result_better`, `activated_at`, `rollback_at`, `rollback_reason`, `severity`, `notes`. RLS + policies ouvertes + 3 index (status+type, created_at desc, bucket_key partiel).
+- [x] Helpers CRUD : `createEngineAdjustment()` (status "shadow" par défaut), `updateEngineAdjustmentStatus()` (shadow→active ou →rollback avec timestamps auto), `listEngineAdjustments()` pour l'UI.
+- [x] `computeBucketStats(env)` : agrège les 1000 derniers trades clos par bucket (setup × direction), calcule win rate historique ET récent 30.
+- [x] `detectDriftAlerts(env)` : compare historique vs récent, seuils graduées :
+  - Drop 10-15% → `severity: light`
+  - Drop 15-25% → `severity: moderate`
+  - Drop > 25%  → `severity: severe`
+  Minimum 20 trades historiques + 10 récents. Déduplication (skip si alerte shadow existe déjà avec même severity). Persiste comme `adjustment_type: drift_alert`.
+- [x] Drift detection déclenchée automatiquement 1×/jour à 2h UTC depuis `handleScheduledCycle`. Event `drift_detected` loggé dans `mtp_training_events` avec top 5 alertes.
+- [x] 3 nouveaux endpoints :
+  - `GET /api/engine/adjustments?status=...&limit=...` : liste tous les ajustements
+  - `GET /api/engine/drift-detect` (admin) : force un run manuel
+  - `GET /api/engine/bucket-stats` : stats par bucket pour debug
+- [x] UI : nouvel onglet **"Santé bot"** accessible via menu Plus (sous le Bot). Route `/health`.
+  - 4 cards stats : alertes drift actives, ajustements en observation, actifs, annulés
+  - Liste des alertes drift actives avec severity colorée (rouge/orange/jaune)
+  - Historique des ajustements (30 derniers) avec type + bucket + notes + date
+  - Performance par bucket : win rate historique vs récent, delta coloré (rouge si < -15pts, orange < -5pts, vert sinon)
+- [x] CSS `.health-*` : 100% compatible light/dark via var() uniquement.
+- [x] Loader `loadHealth()` appelé au navigate + accessible via PTR sur l'onglet.
+- **Scope volontairement exclu** : aucune correction automatique branchée à ce stade. Les 7 règles de correction (Règle #1) restent en shadow uniquement — elles seront opérationnalisées en Phase 2 avec `activateEngineAdjustment` après observation de 20 trades.
+- **Déploiement requis côté utilisateur** :
+  1. Exécuter `cloudflare-worker/migrations/005_engine_adjustments.sql` dans Supabase SQL Editor
+  2. `wrangler deploy` depuis la machine Windows
+- **Validation paper** : naviguer dans l'app → Plus → Santé bot → page rendue sans crash même sans données. Tester `GET /api/engine/drift-detect` (nécessite token admin) → retourne `{detected, alerts}`. Après quelques trades clos, `GET /api/engine/bucket-stats` retourne les buckets agrégés.
 
-**Total Phase 1** : ~12 jours ouvrés (~3 semaines calendaires avec validations paper intercalées).
+**Total Phase 1** : ~12 jours ouvrés (~3 semaines calendaires avec validations paper intercalées). **4 PRs mergées : #55, #56, #57, et cette PR en attente de merge.**
 
 ### Règle de garde — ne pas ajouter de feature qui n'avance pas ces 5 règles
 Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'apprentissage+correction, ni la validation, ni l'exécution long/short, ni l'intégration du contexte fondamental → le reporter. L'app a déjà trop de features d'assistant ; il en faut moins mais qui servent le bot.

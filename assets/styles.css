@@ -1035,6 +1035,31 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .news-window-widget.clear{border-color:rgba(0,229,160,.25)}
 .news-window-widget.blocked .nww-head{color:var(--loss)}
 .news-window-widget.blocked{border-color:rgba(224,90,90,.3);background:rgba(224,90,90,.06)}
+
+/* Santé du bot — PR #4 Phase 1 */
+.health-adj-row{padding:12px 14px;border:1px solid var(--border-subtle);border-radius:10px;margin-bottom:8px;background:var(--bg-elevated)}
+.health-adj-row.status-rollback{opacity:.6}
+.health-adj-row.severe{border-color:rgba(224,90,90,.45)}
+.health-adj-row.moderate{border-color:rgba(240,160,32,.45)}
+.health-adj-row.light{border-color:rgba(251,191,36,.3)}
+.health-adj-head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:4px}
+.health-adj-type{font-weight:700}
+.health-adj-severity{font-size:.72rem;padding:2px 8px;border-radius:999px;border:1px solid var(--border-subtle);text-transform:uppercase;letter-spacing:.06em}
+.health-adj-severity.severe{color:var(--loss);border-color:rgba(224,90,90,.3);background:rgba(224,90,90,.1)}
+.health-adj-severity.moderate{color:#f0a020;border-color:rgba(240,160,32,.3);background:rgba(240,160,32,.1)}
+.health-adj-severity.light{color:#fbbf24;border-color:rgba(251,191,36,.3);background:rgba(251,191,36,.1)}
+.health-adj-status{font-size:.72rem;color:var(--text-secondary);margin-left:auto}
+.health-adj-bucket{font-family:var(--font-mono);font-size:.82rem;color:var(--text-secondary);margin-bottom:4px}
+.health-adj-notes{font-size:.88rem;margin-top:4px;line-height:1.5}
+.health-adj-date{font-size:.74rem;margin-top:6px}
+.health-bucket-row{display:flex;align-items:center;gap:14px;padding:10px 12px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap}
+.health-bucket-row:last-child{border-bottom:none}
+.health-bucket-key{font-family:var(--font-mono);font-size:.82rem;min-width:200px;flex-shrink:0}
+.health-bucket-stats{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;color:var(--text-secondary)}
+.health-bucket-delta{font-family:var(--font-mono);font-weight:700}
+.health-bucket-delta.negative{color:var(--loss)}
+.health-bucket-delta.warn{color:#f0a020}
+.health-bucket-delta.neutral{color:var(--profit)}
 .bot-toggle-big{position:relative;width:58px;height:32px;flex-shrink:0;cursor:pointer}
 .bot-toggle-big input{opacity:0;width:0;height:0}
 .bot-toggle-slider{position:absolute;inset:0;border-radius:999px;background:var(--bg-elevated);border:1px solid var(--border-medium);transition:background .2s}
