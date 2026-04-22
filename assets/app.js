@@ -46,6 +46,7 @@
     opportunities: [],
     filteredOpportunities: [],
     opportunityFilter: "all",
+    opportunityDirection: "all",
     selectedSymbol: null,
     detail: null,
     aiReview: null,
@@ -2442,7 +2443,12 @@ function renderOpportunitySection(title, subtitle, rows, baseRank = 1, emptyText
 
 function applyFilter() {
     const f = state.opportunityFilter;
-    state.filteredOpportunities = state.opportunities.filter(item => f === "all" ? true : item.assetClass === f);
+    const d = state.opportunityDirection;
+    state.filteredOpportunities = state.opportunities.filter(item => {
+      if (f !== "all" && item.assetClass !== f) return false;
+      if (d !== "all" && String(item.direction || "neutral").toLowerCase() !== d) return false;
+      return true;
+    });
   }
 
   // =========================
@@ -3547,6 +3553,17 @@ function renderDashboard() {
               </button>
             `).join("")}
             <button class="chip" data-refresh="opportunities">Rafraichir</button>
+          </div>
+          <div class="filter-group">
+            ${[
+              { key: "all",   label: "tous" },
+              { key: "long",  label: "▲ long" },
+              { key: "short", label: "▼ short" }
+            ].map((d) => `
+              <button class="chip ${state.opportunityDirection === d.key ? "active" : ""}" data-direction-filter="${d.key}">
+                ${d.label}
+              </button>
+            `).join("")}
           </div>
         </div>
 
@@ -6207,6 +6224,14 @@ function renderMain() {
     app.querySelectorAll("[data-filter]").forEach(el => {
       el.addEventListener("click", () => {
         state.opportunityFilter = el.getAttribute("data-filter");
+        applyFilter();
+        render();
+      });
+    });
+
+    app.querySelectorAll("[data-direction-filter]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.opportunityDirection = el.getAttribute("data-direction-filter");
         applyFilter();
         render();
       });
