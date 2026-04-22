@@ -3116,9 +3116,9 @@ function normalizeTrainingSettingsRow(row) {
     allowed_symbols: Array.isArray(safe.allowed_symbols) ? safe.allowed_symbols.map(x => parseSymbol(x)).filter(Boolean).slice(0, 100) : base.allowed_symbols,
     allowed_setups: Array.isArray(safe.allowed_setups) ? safe.allowed_setups : base.allowed_setups,
     mean_reversion_enabled: coerceBoolean(safe.mean_reversion_enabled, base.mean_reversion_enabled),
-    max_daily_loss_pct: clampFloat(safe.max_daily_loss_pct, 0.001, 0.5, base.max_daily_loss_pct),
-    max_weekly_loss_pct: clampFloat(safe.max_weekly_loss_pct, 0.001, 0.8, base.max_weekly_loss_pct),
-    max_consecutive_losses: clampInt(safe.max_consecutive_losses, 1, 20, base.max_consecutive_losses),
+    max_daily_loss_pct: clampFloat(safe.max_daily_loss_pct, 0.001, 1.0, base.max_daily_loss_pct),
+    max_weekly_loss_pct: clampFloat(safe.max_weekly_loss_pct, 0.001, 1.0, base.max_weekly_loss_pct),
+    max_consecutive_losses: clampInt(safe.max_consecutive_losses, 1, 9999, base.max_consecutive_losses),
     updated_at: nowIso()
   };
 }
