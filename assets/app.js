@@ -120,7 +120,8 @@
     userAssetsLoading: false,
     userAssetsError: null,
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
-    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false }
+    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false },
+    health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 }
   };
 
   const app = document.getElementById("app");
@@ -130,13 +131,14 @@
     ["alerts", "Alertes", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`],
     ["portfolio", "Mes trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
     ["bot", "Bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`],
+    ["health", "Sante bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`],
     ["performance", "Performance", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
 
-  // Mobile bottom-nav : 4 items principaux + "Plus" (Bot + Performance + Réglages)
+  // Mobile bottom-nav : 4 items principaux + "Plus" (Bot + Santé + Performance + Réglages)
   const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
-  const MORE_NAV_ROUTES = ["bot", "performance", "settings"];
+  const MORE_NAV_ROUTES = ["bot", "health", "performance", "settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
@@ -1768,6 +1770,28 @@ function confirmTradeFromModal() {
     }
   }
 
+  async function loadHealth() {
+    // PR #4 Phase 1 — onglet Santé du bot (ajustements + drift + bucket stats)
+    state.health.loading = true;
+    state.health.error = null;
+    render();
+    try {
+      const [adjustments, bucketStats] = await Promise.all([
+        api("/api/engine/adjustments?limit=100").catch(() => null),
+        api("/api/engine/bucket-stats").catch(() => null)
+      ]);
+      state.health.adjustments = Array.isArray(adjustments?.data) ? adjustments.data : [];
+      state.health.bucketStats = Array.isArray(bucketStats?.data) ? bucketStats.data : [];
+      state.health.lastLoadedAt = Date.now();
+      state.health.error = null;
+    } catch (e) {
+      state.health.error = e.message || "Erreur de chargement";
+    } finally {
+      state.health.loading = false;
+      render();
+    }
+  }
+
   async function toggleBotSetting(key, value) {
     haptic(8);
     if (state.bot.account?.settings) state.bot.account.settings[key] = value;
@@ -2504,6 +2528,9 @@ function applyFilter() {
       }
       if (route === "bot" && isSessionValid()) {
         loadBot().catch(() => {});
+      }
+      if (route === "health") {
+        loadHealth().catch(() => {});
       }
     }
   }
@@ -5627,6 +5654,108 @@ function openPositionsRiskView() {
       </div>`;
   }
 
+  function renderHealth() {
+    // PR #4 Phase 1 — onglet Santé du bot
+    const adjustments = state.health.adjustments || [];
+    const bucketStats = state.health.bucketStats || [];
+    const byStatus = {
+      shadow:   adjustments.filter(a => a.status === "shadow"),
+      active:   adjustments.filter(a => a.status === "active"),
+      rollback: adjustments.filter(a => a.status === "rollback")
+    };
+    const driftActive = byStatus.shadow.filter(a => a.adjustment_type === "drift_alert");
+
+    const severityLabel = (s) => s === "severe" ? "grave" : s === "moderate" ? "moyen" : s === "light" ? "léger" : "";
+    const statusLabel = (s) => s === "shadow" ? "en observation" : s === "active" ? "actif" : s === "rollback" ? "annulé" : s;
+    const typeLabel = (t) => ({
+      drift_alert: "drift detecté",
+      bucket_threshold_up: "seuil rehaussé",
+      bucket_disabled: "bucket désactivé",
+      stop_widen: "stop élargi",
+      tp_extend: "TP étendu",
+      position_halved: "taille /2",
+      position_normalized: "taille normale",
+      weights_retrain: "retrain poids"
+    })[t] || t;
+
+    const adjRow = (a) => `
+      <div class="health-adj-row ${a.severity || ""} status-${a.status}">
+        <div class="health-adj-head">
+          <span class="health-adj-type">${safeText(typeLabel(a.adjustment_type))}</span>
+          ${a.severity ? `<span class="health-adj-severity ${a.severity}">${safeText(severityLabel(a.severity))}</span>` : ""}
+          <span class="health-adj-status">${safeText(statusLabel(a.status))}</span>
+        </div>
+        ${a.bucket_key ? `<div class="health-adj-bucket">${safeText(a.bucket_key)}</div>` : ""}
+        ${a.notes ? `<div class="health-adj-notes">${safeText(a.notes)}</div>` : ""}
+        <div class="health-adj-date muted">${safeText(new Date(a.created_at).toLocaleString("fr-FR"))}</div>
+      </div>`;
+
+    const bucketRow = (b) => {
+      const hist = Number(b.historical?.winRate || 0);
+      const recent = Number(b.recent30?.winRate || 0);
+      const delta = recent - hist;
+      const deltaTone = delta < -0.15 ? "negative" : delta < -0.05 ? "warn" : "neutral";
+      return `
+        <div class="health-bucket-row ${deltaTone}">
+          <div class="health-bucket-key">${safeText(b.bucketKey)}</div>
+          <div class="health-bucket-stats">
+            <span>${b.historical?.n || 0} trades historiques · ${(hist * 100).toFixed(0)}%</span>
+            <span>${b.recent30?.n || 0} récents · ${(recent * 100).toFixed(0)}%</span>
+            <span class="health-bucket-delta ${deltaTone}">${delta > 0 ? "+" : ""}${(delta * 100).toFixed(1)} pts</span>
+          </div>
+        </div>`;
+    };
+
+    return `
+      <div class="screen">
+        <div class="screen-header">
+          <div class="screen-title">Santé du bot</div>
+          <div class="screen-subtitle">Ajustements automatiques, drift detection et stats par bucket. Les alertes restent en mode observation jusqu'à validation manuelle ou Phase 2.</div>
+        </div>
+
+        ${state.health.error ? `<div class="error-box" style="margin-bottom:14px">${safeText(state.health.error)}</div>` : ""}
+        ${state.health.loading && adjustments.length === 0 ? `<div class="loading-state">Chargement…</div>` : ""}
+
+        <div class="grid trades-stats" style="margin-bottom:18px">
+          <div class="stat-card">
+            <div class="stat-label">Alertes drift actives</div>
+            <div class="stat-value ${driftActive.length ? "negative" : ""}">${driftActive.length}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Ajustements en observation</div>
+            <div class="stat-value">${byStatus.shadow.length}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Ajustements actifs</div>
+            <div class="stat-value">${byStatus.active.length}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Annulés (rollback)</div>
+            <div class="stat-value">${byStatus.rollback.length}</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title"><span>Alertes drift actives</span><span>${driftActive.length}</span></div>
+          ${driftActive.length ? driftActive.map(adjRow).join("") : `<div class="muted">Aucune alerte drift. Les setups performent dans les normes historiques.</div>`}
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title"><span>Historique des ajustements</span><span>${adjustments.length}</span></div>
+          ${adjustments.length
+            ? adjustments.slice(0, 30).map(adjRow).join("")
+            : `<div class="muted">Aucun ajustement enregistré pour l'instant. Le bot applique encore sa configuration initiale.</div>`}
+        </div>
+
+        <div class="card">
+          <div class="section-title"><span>Performance par bucket</span><span>${bucketStats.length}</span></div>
+          ${bucketStats.length
+            ? bucketStats.sort((a, b) => (b.historical?.n || 0) - (a.historical?.n || 0)).map(bucketRow).join("")
+            : `<div class="muted">Pas encore de données. Le bot doit clôturer des trades pour alimenter les buckets.</div>`}
+        </div>
+      </div>`;
+  }
+
   function renderBot() {
     if (!isSessionValid()) {
       return `
@@ -6062,6 +6191,7 @@ function renderMain() {
       case "alerts": return renderAlerts();
       case "settings": return renderSettings();
       case "bot": return renderBot();
+      case "health": return renderHealth();
       default: return renderDashboard();
     }
   }
@@ -6761,6 +6891,8 @@ function renderMain() {
       case "opportunities": return () => loadOpportunities(true);
       case "portfolio": return () => refreshOpenTradesLive(true);
       case "alerts": return () => loadDashboard();
+      case "health": return () => loadHealth();
+      case "bot": return () => loadBot();
       default: return null;
     }
   }
