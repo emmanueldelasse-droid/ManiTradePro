@@ -1011,6 +1011,78 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .add-asset-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 @media (max-width:520px){.add-asset-grid{grid-template-columns:1fr}}
 .add-asset-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+
+/* ===========================
+   Bot d'entraînement
+   =========================== */
+.bot-control-card{border:1px solid var(--border-medium)}
+.bot-control-card.is-on{border-color:var(--accent-glow);box-shadow:0 0 0 1px var(--accent-glow) inset}
+.bot-status-row{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+.bot-status-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.bot-status-value{font-size:1.1rem;font-weight:700;margin-top:4px}
+.bot-status-value.on{color:var(--accent)}
+.bot-status-value.off{color:var(--text-secondary)}
+.bot-toggle-big{position:relative;width:58px;height:32px;flex-shrink:0;cursor:pointer}
+.bot-toggle-big input{opacity:0;width:0;height:0}
+.bot-toggle-slider{position:absolute;inset:0;border-radius:999px;background:var(--bg-elevated);border:1px solid var(--border-medium);transition:background .2s}
+.bot-toggle-slider:before{content:"";position:absolute;top:2px;left:2px;width:26px;height:26px;border-radius:50%;background:#fff;transition:transform .2s;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.bot-toggle-big input:checked + .bot-toggle-slider{background:var(--accent);border-color:var(--accent)}
+.bot-toggle-big input:checked + .bot-toggle-slider:before{transform:translateX(26px)}
+.bot-stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px}
+@media (max-width:520px){.bot-stats-row{grid-template-columns:repeat(2,1fr)}}
+.bot-stat{padding:10px 12px;border-radius:10px;background:var(--bg-elevated);border:1px solid var(--border-subtle)}
+.bot-stat .stat-label{font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-muted)}
+.bot-stat .stat-value{font-family:var(--font-mono);font-size:1rem;font-weight:700;margin-top:4px}
+.bot-stat .stat-value.positive{color:var(--profit)}
+.bot-stat .stat-value.negative{color:var(--loss)}
+.bot-risk-warn{margin-top:14px;padding:10px 14px;border-radius:10px;background:rgba(224,90,90,.1);border:1px solid rgba(224,90,90,.28);color:#f5c5c5;font-size:.88rem;line-height:1.4}
+.bot-sub-toggles{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px}
+.bot-sub-toggle{display:flex;align-items:center;gap:8px;font-size:.92rem;cursor:pointer}
+.bot-sub-toggle input{width:18px;height:18px}
+.bot-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.bot-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media (max-width:520px){.bot-kpi-grid{grid-template-columns:repeat(2,1fr)}}
+.bot-breakdown{display:flex;flex-direction:column;gap:6px}
+.bot-breakdown-row{display:grid;grid-template-columns:1.3fr .7fr .7fr 1fr;gap:10px;align-items:center;padding:8px 12px;border:1px solid var(--border-subtle);border-radius:10px;background:var(--bg-elevated);font-size:.9rem}
+.bot-breakdown-row.bot-breakdown-head{background:transparent;border:none;color:var(--text-muted);font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;padding:2px 12px}
+.bot-breakdown-label{font-family:var(--font-mono);font-weight:700}
+.bot-breakdown-count,.bot-breakdown-wr{color:var(--text-secondary);font-size:.85rem}
+.bot-breakdown-pnl{font-family:var(--font-mono);font-weight:700;text-align:right}
+.bot-breakdown-pnl.positive{color:var(--profit)}
+.bot-breakdown-pnl.negative{color:var(--loss)}
+.bot-timeline{display:flex;flex-direction:column;gap:8px}
+.bot-event-row{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid var(--border-subtle);border-radius:10px;background:var(--bg-elevated)}
+@media (max-width:520px){
+  .bot-event-row{grid-template-columns:1fr;gap:4px}
+  .bot-breakdown-row{grid-template-columns:1.2fr .6fr .6fr 1fr;gap:6px;font-size:.82rem;padding:8px 10px}
+}
+.bot-event-time{font-family:var(--font-mono);font-size:.78rem;color:var(--text-muted);white-space:nowrap}
+.bot-event-summary{font-size:.88rem;color:var(--text-primary);line-height:1.35}
+.bot-params summary{cursor:pointer;list-style:none}
+.bot-params summary::-webkit-details-marker{display:none}
+.bot-params .kv{grid-template-columns:1.4fr 1fr}
+@media (max-width:520px){.bot-params .kv{grid-template-columns:1fr auto}}
+
+/* Bot — formulaire d'édition */
+.bot-params-form{display:flex;flex-direction:column;gap:14px}
+.bot-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+@media (max-width:520px){.bot-field-grid{grid-template-columns:1fr}}
+.bot-field{display:flex;flex-direction:column;gap:4px;font-size:.82rem}
+.bot-field > span{color:var(--text-secondary);font-size:.78rem;letter-spacing:.04em}
+.bot-field > input{background:var(--bg-elevated);border:1px solid var(--border-medium);border-radius:10px;padding:10px 12px;color:var(--text-primary);font-size:16px;min-height:44px;font-family:inherit;-webkit-appearance:none;appearance:none}
+.bot-field > input:focus{outline:2px solid var(--accent);outline-offset:1px}
+.bot-field-toggles{display:flex;gap:14px;flex-wrap:wrap;padding-top:14px;border-top:1px dashed var(--border-subtle)}
+.bot-field-setups{padding-top:10px;border-top:1px dashed var(--border-subtle)}
+.bot-setups-row{display:flex;gap:14px;flex-wrap:wrap}
+
+/* Bot — ajustements thème clair */
+.app-shell.theme-light .bot-risk-warn{color:#a83030;background:rgba(224,90,90,.08);border-color:rgba(224,90,90,.22)}
+.app-shell.theme-light .bot-toggle-slider{background:#e5e7eb;border-color:rgba(15,23,42,.12)}
+.app-shell.theme-light .bot-toggle-slider:before{box-shadow:0 2px 4px rgba(15,23,42,.18)}
+.app-shell.theme-light .bot-stat,
+.app-shell.theme-light .bot-breakdown-row:not(.bot-breakdown-head),
+.app-shell.theme-light .bot-event-row{background:#ffffff;border-color:rgba(15,23,42,.08)}
+.app-shell.theme-light .bot-control-card.is-on{border-color:rgba(0,163,108,.35);box-shadow:0 0 0 1px rgba(0,163,108,.22) inset}
 .app-shell.theme-light .setting-row:last-child{
   border-bottom:none;
 }

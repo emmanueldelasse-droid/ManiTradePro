@@ -2831,25 +2831,25 @@ async function handleOpportunityDetail(symbol, env) {
 function getTrainingDefaults() {
   return {
     mode: "training",
-    is_enabled: false,
+    is_enabled: false,               // master switch — user toggle
     auto_open_enabled: true,
     auto_close_enabled: true,
     allow_long: true,
-    allow_short: false,              // désactivé jusqu'à calibration
-    max_open_positions: 10,          // max positions simultanées
+    allow_short: true,               // mode permissif : short autorisé
+    max_open_positions: 15,          // plus large pour entraînement
     max_positions_per_symbol: 1,
-    min_actionability_score: 72,
-    min_dossier_score: 74,
+    min_actionability_score: 60,     // seuil relâché : plus de candidats
+    min_dossier_score: 60,           // idem
     capital_base: 10000,
     risk_per_trade_pct: 0.02,
-    allocation_per_trade_pct: 0.10,  // 10% du capital par trade
-    max_holding_hours: 240,          // 10 jours max
+    allocation_per_trade_pct: 0.08,  // 8% par trade (avec plus de positions)
+    max_holding_hours: 240,
     allowed_symbols: [],
-    allowed_setups: ["pullback", "breakout", "continuation"],
-    mean_reversion_enabled: false,   // désactivé jusqu'à 30 trades clôturés
-    max_daily_loss_pct: 0.03,
-    max_weekly_loss_pct: 0.06,
-    max_consecutive_losses: 3
+    allowed_setups: ["pullback", "breakout", "continuation", "mean_reversion"],
+    mean_reversion_enabled: true,    // setup activé en entraînement
+    max_daily_loss_pct: 0.30,        // garde-fou jour uniquement (30%)
+    max_weekly_loss_pct: 1.0,        // désactivé (100%)
+    max_consecutive_losses: 999      // désactivé
   };
 }
 
@@ -3462,6 +3462,105 @@ async function handleTrainingSettingsSave(request, env) {
   const saved = await saveTrainingSettings(env, { ...current, ...(body || {}) });
   await logTrainingEvent(env, "settings_updated", { settings: saved });
   return ok(saved, "worker_training", nowIso(), "recent", "training_settings_saved");
+}
+
+async function handleTrainingEvents(url, env) {
+  if (!supabaseConfigured(env)) return ok({ configured: false, events: [] }, "worker_training", nowIso(), "recent", "Supabase non configure");
+  const limitRaw = Number(url?.searchParams?.get("limit"));
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 200) : 50;
+  try {
+    const rows = await supabaseFetch(env, `${TRAINING_EVENTS_TABLE}?select=id,created_at,event_type,symbol,trade_id,payload&order=created_at.desc&limit=${limit}`);
+    const events = Array.isArray(rows) ? rows.map(r => ({
+      id: r.id,
+      at: r.created_at,
+      type: r.event_type,
+      symbol: r.symbol || null,
+      tradeId: r.trade_id || null,
+      payload: r.payload || {}
+    })) : [];
+    return ok({ configured: true, events }, "supabase", nowIso(), "recent");
+  } catch (e) {
+    return fail(`Erreur events : ${e.message || "supabase"}`, "error", 500);
+  }
+}
+
+async function handleTrainingStats(env) {
+  if (!supabaseConfigured(env)) return ok({ configured: false, stats: null }, "worker_training", nowIso(), "recent", "Supabase non configure");
+  try {
+    const closedRows = normalizeTrainingTrades(await getClosedTrainingTradesRaw(env, 1000));
+    const openRows = normalizeTrainingPositions(await getOpenTrainingPositionsRaw(env));
+    const stats = computeTrainingStats(closedRows, openRows);
+    return ok({ configured: true, stats }, "supabase", nowIso(), "recent");
+  } catch (e) {
+    return fail(`Erreur stats : ${e.message || "supabase"}`, "error", 500);
+  }
+}
+
+function computeTrainingStats(closed, open) {
+  const trades = Array.isArray(closed) ? closed.filter(t => t && t.status === "closed") : [];
+  const totalCount = trades.length;
+  const wins = trades.filter(t => Number(t.pnl || 0) > 0);
+  const losses = trades.filter(t => Number(t.pnl || 0) < 0);
+  const winCount = wins.length;
+  const lossCount = losses.length;
+  const winRate = totalCount > 0 ? winCount / totalCount : null;
+  const totalPnl = trades.reduce((acc, t) => acc + (Number(t.pnl) || 0), 0);
+  const avgWin = wins.length ? wins.reduce((a, t) => a + Number(t.pnl || 0), 0) / wins.length : 0;
+  const avgLoss = losses.length ? Math.abs(losses.reduce((a, t) => a + Number(t.pnl || 0), 0) / losses.length) : 0;
+  const expectancy = totalCount > 0 && avgLoss > 0 ? (winRate * avgWin) - ((1 - winRate) * avgLoss) : null;
+  const rrActual = avgLoss > 0 ? avgWin / avgLoss : null;
+
+  // Breakdown par setup
+  const bySetupAgg = {};
+  for (const t of trades) {
+    const setup = String(t?.analysisSnapshot?.setupType || t?.analysis_snapshot?.setupType || t?.analysisSnapshot?.setup_type || "autre").toLowerCase();
+    if (!bySetupAgg[setup]) bySetupAgg[setup] = { setup, count: 0, wins: 0, pnl: 0 };
+    bySetupAgg[setup].count += 1;
+    bySetupAgg[setup].pnl += Number(t.pnl || 0);
+    if (Number(t.pnl || 0) > 0) bySetupAgg[setup].wins += 1;
+  }
+  const bySetup = Object.values(bySetupAgg).map(s => ({ ...s, winRate: s.count > 0 ? s.wins / s.count : null })).sort((a,b) => b.count - a.count);
+
+  // Breakdown par classe
+  const byClassAgg = {};
+  for (const t of trades) {
+    const cls = String(t?.assetClass || t?.asset_class || "stock").toLowerCase();
+    if (!byClassAgg[cls]) byClassAgg[cls] = { class: cls, count: 0, wins: 0, pnl: 0 };
+    byClassAgg[cls].count += 1;
+    byClassAgg[cls].pnl += Number(t.pnl || 0);
+    if (Number(t.pnl || 0) > 0) byClassAgg[cls].wins += 1;
+  }
+  const byClass = Object.values(byClassAgg).map(c => ({ ...c, winRate: c.count > 0 ? c.wins / c.count : null })).sort((a,b) => b.count - a.count);
+
+  // Top 5 actifs gagnants / perdants
+  const bySymbolAgg = {};
+  for (const t of trades) {
+    const sym = String(t.symbol || "").toUpperCase();
+    if (!sym) continue;
+    if (!bySymbolAgg[sym]) bySymbolAgg[sym] = { symbol: sym, count: 0, pnl: 0, wins: 0 };
+    bySymbolAgg[sym].count += 1;
+    bySymbolAgg[sym].pnl += Number(t.pnl || 0);
+    if (Number(t.pnl || 0) > 0) bySymbolAgg[sym].wins += 1;
+  }
+  const topSymbols = Object.values(bySymbolAgg).sort((a,b) => b.pnl - a.pnl).slice(0, 5);
+  const bottomSymbols = Object.values(bySymbolAgg).sort((a,b) => a.pnl - b.pnl).filter(s => s.pnl < 0).slice(0, 5);
+
+  return {
+    totalCount,
+    winCount,
+    lossCount,
+    winRate,
+    totalPnl,
+    avgWin,
+    avgLoss,
+    expectancy,
+    rrActual,
+    openCount: Array.isArray(open) ? open.length : 0,
+    bySetup,
+    byClass,
+    topSymbols,
+    bottomSymbols
+  };
 }
 
 // ============================================================
@@ -4304,6 +4403,16 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingSettingsGet(env));
+    }
+    if (url.pathname === "/api/training/events") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingEvents(url, env));
+    }
+    if (url.pathname === "/api/training/stats") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingStats(env));
     }
     if (url.pathname === "/api/user-assets") {
       const denied = await requireAdminAccess(request, env);

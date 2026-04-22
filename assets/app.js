@@ -117,7 +117,8 @@
     userAssets: [],
     userAssetsLoading: false,
     userAssetsError: null,
-    addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null }
+    addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
+    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false }
   };
 
   const app = document.getElementById("app");
@@ -126,13 +127,14 @@
     ["opportunities", "Opportunites", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`],
     ["alerts", "Alertes", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`],
     ["portfolio", "Mes trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
+    ["bot", "Bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`],
     ["performance", "Performance", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
 
-  // Mobile bottom-nav : 4 items principaux + "Plus" (Performance + Réglages)
+  // Mobile bottom-nav : 4 items principaux + "Plus" (Bot + Performance + Réglages)
   const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
-  const MORE_NAV_ROUTES = ["performance", "settings"];
+  const MORE_NAV_ROUTES = ["bot", "performance", "settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
@@ -1738,6 +1740,220 @@ function confirmTradeFromModal() {
     }
   }
 
+  // ============================================================
+  // BOT (training auto-cycle)
+  // ============================================================
+  async function loadBot() {
+    state.bot.loading = true;
+    state.bot.error = null;
+    render();
+    try {
+      const [account, events, stats] = await Promise.all([
+        apiGetAuth("/api/training/account").catch(e => ({ _err: e.message })),
+        apiGetAuth("/api/training/events?limit=30").catch(e => ({ _err: e.message })),
+        apiGetAuth("/api/training/stats").catch(e => ({ _err: e.message }))
+      ]);
+      if (account?._err) throw new Error(account._err);
+      state.bot.account = account?.data || null;
+      state.bot.events = events?.data?.events || [];
+      state.bot.stats = stats?.data?.stats || null;
+      state.bot.error = null;
+    } catch (e) {
+      state.bot.error = e.message || "Erreur de chargement";
+    } finally {
+      state.bot.loading = false;
+      render();
+    }
+  }
+
+  async function toggleBotSetting(key, value) {
+    haptic(8);
+    if (state.bot.account?.settings) state.bot.account.settings[key] = value;
+    render();
+    try {
+      const res = await apiPost("/api/training/settings", { [key]: value });
+      if (res?.data) state.bot.account = { ...(state.bot.account || {}), settings: res.data };
+      render();
+    } catch (e) {
+      alert(`Erreur : ${e.message || "sauvegarde impossible"}`);
+      await loadBot();
+    }
+  }
+
+  async function forceBotCycle() {
+    if (state.bot.forcingCycle) return;
+    state.bot.forcingCycle = true;
+    haptic([15, 20, 15]);
+    render();
+    try {
+      await apiPost("/api/training/auto-cycle", {});
+      showAlertToast("Bot", "Cycle lancé, résultat dans quelques secondes…");
+      setTimeout(() => loadBot().catch(() => {}), 3500);
+    } catch (e) {
+      alert(`Erreur : ${e.message || "cycle impossible"}`);
+    } finally {
+      state.bot.forcingCycle = false;
+      render();
+    }
+  }
+
+  // Édition des paramètres
+  function openBotEdit() {
+    const src = state.bot.account?.settings || {};
+    state.bot.editDraft = JSON.parse(JSON.stringify(src));
+    render();
+  }
+  function cancelBotEdit() {
+    state.bot.editDraft = null;
+    state.bot.savingDraft = false;
+    render();
+  }
+  function updateBotDraftField(key, value) {
+    if (!state.bot.editDraft) return;
+    // Les "_display" en pourcentage sont convertis en ratio à la sauvegarde
+    state.bot.editDraft[key] = value;
+  }
+  function toggleBotDraftSetup(setup, enabled) {
+    if (!state.bot.editDraft) return;
+    const current = Array.isArray(state.bot.editDraft.allowed_setups) ? state.bot.editDraft.allowed_setups.slice() : [];
+    const idx = current.indexOf(setup);
+    if (enabled && idx === -1) current.push(setup);
+    else if (!enabled && idx !== -1) current.splice(idx, 1);
+    state.bot.editDraft.allowed_setups = current;
+  }
+  function normalizeBotDraftForSave(d) {
+    const out = { ...d };
+    const pctKeys = [
+      ["risk_per_trade_pct_display", "risk_per_trade_pct", 100],
+      ["allocation_per_trade_pct_display", "allocation_per_trade_pct", 100],
+      ["max_daily_loss_pct_display", "max_daily_loss_pct", 100],
+      ["max_weekly_loss_pct_display", "max_weekly_loss_pct", 100]
+    ];
+    for (const [src, dst, div] of pctKeys) {
+      if (out[src] != null && out[src] !== "") {
+        const v = Number(out[src]);
+        if (Number.isFinite(v)) out[dst] = v / div;
+      }
+      delete out[src];
+    }
+    const numericKeys = ["capital_base", "max_open_positions", "max_positions_per_symbol", "max_holding_hours", "min_actionability_score", "min_dossier_score", "max_consecutive_losses"];
+    for (const k of numericKeys) {
+      if (out[k] != null && out[k] !== "") out[k] = Number(out[k]);
+    }
+    // Booleans explicites
+    for (const k of ["allow_long", "allow_short", "mean_reversion_enabled"]) {
+      out[k] = !!out[k];
+    }
+    return out;
+  }
+  async function saveBotDraft() {
+    if (!state.bot.editDraft) return;
+    state.bot.savingDraft = true;
+    haptic([15, 20, 15]);
+    render();
+    try {
+      const payload = normalizeBotDraftForSave(state.bot.editDraft);
+      await apiPost("/api/training/settings", payload);
+      state.bot.editDraft = null;
+      await loadBot();
+    } catch (e) {
+      alert(`Erreur : ${e.message || "sauvegarde impossible"}`);
+    } finally {
+      state.bot.savingDraft = false;
+      render();
+    }
+  }
+  async function applyBotTrainingPreset() {
+    if (!confirm("Appliquer le mode entraînement permissif ?\n\nShort activé, seuils relâchés (60/60), max positions 15, mean reversion ON, weekly/consecutive loss désactivés.")) return;
+    const preset = {
+      allow_long: true,
+      allow_short: true,
+      max_open_positions: 15,
+      max_positions_per_symbol: 1,
+      min_actionability_score: 60,
+      min_dossier_score: 60,
+      allocation_per_trade_pct: 0.08,
+      allowed_setups: ["pullback", "breakout", "continuation", "mean_reversion"],
+      mean_reversion_enabled: true,
+      max_daily_loss_pct: 0.30,
+      max_weekly_loss_pct: 1.0,
+      max_consecutive_losses: 999
+    };
+    state.bot.savingDraft = true;
+    haptic([20, 40, 20]);
+    render();
+    try {
+      await apiPost("/api/training/settings", preset);
+      state.bot.editDraft = null;
+      await loadBot();
+      showAlertToast("Bot", "Mode entraînement permissif appliqué.");
+    } catch (e) {
+      alert(`Erreur : ${e.message || "preset impossible"}`);
+    } finally {
+      state.bot.savingDraft = false;
+      render();
+    }
+  }
+
+  function renderBot() {
+    const { loading, error, account, events, stats } = state.bot;
+    if (loading) return `<div class="screen"><div class="empty-state">Chargement du bot…</div></div>`;
+    if (error) return `<div class="screen"><div class="error-box">${safeText(error)}</div></div>`;
+    if (!account) {
+      return `<div class="screen">
+        <div class="screen-header"><div class="screen-title">Bot d'entraînement</div></div>
+        <div class="empty-state" style="margin-top:24px">
+          <div style="margin-bottom:14px">Aucune donnée chargée.</div>
+          <button class="btn btn-primary" data-bot-refresh>Charger</button>
+        </div>
+        ${renderBottomNav()}
+      </div>`;
+    }
+    const cfg = account.settings || {};
+    const wr = stats?.winRate != null ? `${(stats.winRate * 100).toFixed(0)} %` : "—";
+    const pnl = stats?.totalPnl != null ? `${stats.totalPnl >= 0 ? "+" : ""}${stats.totalPnl.toFixed(2)} €` : "—";
+    const pnlClass = stats?.totalPnl != null ? (stats.totalPnl >= 0 ? "positive" : "negative") : "";
+    return `<div class="screen">
+      <div class="screen-header">
+        <div class="screen-title">Bot d'entraînement</div>
+        <div class="screen-subtitle">Simulation automatique${account.balance_eur != null ? ` — capital virtuel ${Number(account.balance_eur).toFixed(2)} €` : ""}</div>
+      </div>
+      <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px">
+        <div class="stat-card"><div class="stat-label">Trades</div><div class="stat-value">${stats?.totalCount ?? "—"}</div></div>
+        <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-value">${wr}</div></div>
+        <div class="stat-card"><div class="stat-label">PnL total</div><div class="stat-value ${pnlClass}">${pnl}</div></div>
+      </div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="section-title">Paramètres</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <label style="display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px">
+            <span>Bot actif</span>
+            <input type="checkbox" ${cfg.enabled ? "checked" : ""} data-bot-toggle="enabled">
+          </label>
+          <label style="display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px">
+            <span>Notifications cycle</span>
+            <input type="checkbox" ${cfg.notifyOnCycle ? "checked" : ""} data-bot-toggle="notifyOnCycle">
+          </label>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-bot-force-cycle ${state.bot.forcingCycle ? "disabled" : ""}>${state.bot.forcingCycle ? "En cours…" : "Forcer un cycle"}</button>
+          <button class="btn" data-bot-refresh>Actualiser</button>
+        </div>
+      </div>
+      ${events.length ? `<div class="card">
+        <div class="section-title">Derniers événements</div>
+        <div style="display:flex;flex-direction:column;gap:0">
+          ${events.slice(0, 20).map(ev => `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);font-size:.85rem">
+              <span class="muted" style="font-size:.75rem;white-space:nowrap;flex-shrink:0">${new Date(ev.at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
+              <span style="flex:1;min-width:0;overflow-wrap:break-word">${safeText(ev.type)}${ev.symbol ? ` — ${safeText(ev.symbol)}` : ""}</span>
+            </div>`).join("")}
+        </div>
+      </div>` : `<div class="empty-state" style="margin-top:8px">Aucun événement enregistré.</div>`}
+      ${renderBottomNav()}
+    </div>`;
+  }
+
   async function loadPortfolioPriority() {
     const opps = state.filteredOpportunities.length ? state.filteredOpportunities : state.opportunities;
     if (!opps.length) { showAlertToast("Priorite IA", "Lance d'abord un scan pour avoir des opportunites."); return; }
@@ -2276,6 +2492,9 @@ function applyFilter() {
       transitionalRender();
       if (route === "settings" && isSessionValid()) {
         loadUserAssets().catch(() => {});
+      }
+      if (route === "bot" && isSessionValid()) {
+        loadBot().catch(() => {});
       }
     }
   }
@@ -5307,6 +5526,294 @@ function openPositionsRiskView() {
       </div>`;
   }
 
+  function renderBotEventRow(ev) {
+    const t = new Date(ev.at || 0);
+    const time = isNaN(t.getTime()) ? "—" : t.toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+    const type = ev.type || "event";
+    const payload = ev.payload || {};
+    let summary = "";
+    let badgeClass = "neutral";
+    if (type === "cycle_completed") {
+      const o = payload.opened_count || 0, c = payload.closed_count || 0, s = payload.skipped_count || 0, er = payload.error_count || 0;
+      summary = `Cycle — ouvert ${o} · fermé ${c} · ignoré ${s}${er ? ` · erreurs ${er}` : ""}`;
+      badgeClass = o > 0 ? "positive" : c > 0 ? "neutral" : "neutral";
+    } else if (type === "trade_opened") {
+      summary = `Ouverture ${safeText(ev.symbol || "")} @ ${priceDisplay(payload.entry_price)} · stop ${priceDisplay(payload.stop_loss)} · cible ${priceDisplay(payload.take_profit)}`;
+      badgeClass = "long";
+    } else if (type === "trade_closed") {
+      const pnlPct = Number(payload.pnl_pct || 0);
+      summary = `Clôture ${safeText(ev.symbol || "")} — ${payload.close_type || "exit"} · P&L ${pct(pnlPct)}`;
+      badgeClass = pnlPct > 0 ? "positive" : pnlPct < 0 ? "negative" : "neutral";
+    } else if (type === "settings_updated") {
+      summary = "Paramètres modifiés";
+    } else {
+      summary = `${type}${ev.symbol ? ` · ${safeText(ev.symbol)}` : ""}`;
+    }
+    return `
+      <div class="bot-event-row">
+        <div class="bot-event-time">${safeText(time)}</div>
+        <div class="bot-event-summary">${summary}</div>
+        ${badge(type.replace(/_/g, " "), badgeClass)}
+      </div>`;
+  }
+
+  function renderBotBreakdownRow(label, wr, count, pnl) {
+    const wrText = wr == null ? "—" : `${Math.round(wr * 100)}%`;
+    const pnlCls = pnl > 0 ? "positive" : pnl < 0 ? "negative" : "";
+    return `
+      <div class="bot-breakdown-row">
+        <div class="bot-breakdown-label">${safeText(label)}</div>
+        <div class="bot-breakdown-count">${count} trades</div>
+        <div class="bot-breakdown-wr">${wrText}</div>
+        <div class="bot-breakdown-pnl ${pnlCls}">${priceDisplay(pnl)}</div>
+      </div>`;
+  }
+
+  function renderBot() {
+    if (!isSessionValid()) {
+      return `
+        <div class="screen">
+          <div class="screen-header">
+            <div class="screen-title">Bot d'entrainement</div>
+            <div class="screen-subtitle">Paper trading auto — le bot tente des positions sur capital virtuel pour collecter des données.</div>
+          </div>
+          <div class="info-box">Connecte-toi avec ton PIN pour accéder au bot.</div>
+        </div>`;
+    }
+
+    const acc = state.bot.account;
+    const settings = acc?.settings || {};
+    const enabled = !!settings.is_enabled;
+    const autoOpen = settings.auto_open_enabled !== false;
+    const autoClose = settings.auto_close_enabled !== false;
+    const openCount = Number(acc?.openCount || 0);
+    const maxOpen = Number(settings.max_open_positions || 10);
+    const capitalBase = Number(acc?.capitalBase || settings.capital_base || 0);
+    const available = Number(acc?.available || 0);
+    const realized = Number(acc?.realized || 0);
+    const equity = Number(acc?.equity || 0);
+    const riskState = acc?.riskState || null;
+    const riskBlocked = !!(riskState && riskState.tradingEnabled === false);
+    const stats = state.bot.stats;
+    const events = state.bot.events || [];
+
+    const blockerText = riskBlocked && Array.isArray(riskState?.blockers)
+      ? riskState.blockers.map(b => typeof b === "string" ? b : (b?.message || b?.code || "")).filter(Boolean).join(" · ")
+      : "";
+
+    return `
+      <div class="screen">
+        <div class="screen-header">
+          <div class="screen-title">Bot d'entrainement</div>
+          <div class="screen-subtitle">Paper trading auto — le bot tente des positions sur capital virtuel pour collecter des données et apprendre.</div>
+        </div>
+
+        ${state.bot.error ? `<div class="error-box" style="margin-bottom:14px">${safeText(state.bot.error)}</div>` : ""}
+        ${state.bot.loading && !acc ? `<div class="loading-state" style="margin-bottom:14px">Chargement du bot…</div>` : ""}
+
+        <!-- Carte contrôle -->
+        <div class="card bot-control-card ${enabled ? "is-on" : "is-off"}">
+          <div class="bot-status-row">
+            <div>
+              <div class="bot-status-label">État du bot</div>
+              <div class="bot-status-value ${enabled ? "on" : "off"}">
+                ${enabled ? "● Actif — tourne toutes les 30 min" : "○ Désactivé — aucun trade"}
+              </div>
+            </div>
+            <label class="bot-toggle-big">
+              <input type="checkbox" data-bot-toggle="is_enabled" ${enabled ? "checked" : ""}>
+              <span class="bot-toggle-slider"></span>
+            </label>
+          </div>
+
+          <div class="bot-stats-row">
+            <div class="bot-stat">
+              <div class="stat-label">Positions</div>
+              <div class="stat-value">${openCount}/${maxOpen}</div>
+            </div>
+            <div class="bot-stat">
+              <div class="stat-label">Capital dispo</div>
+              <div class="stat-value">${priceDisplay(available)}</div>
+            </div>
+            <div class="bot-stat">
+              <div class="stat-label">P&L réalisé</div>
+              <div class="stat-value ${realized > 0 ? "positive" : realized < 0 ? "negative" : ""}">${priceDisplay(realized)}</div>
+            </div>
+            <div class="bot-stat">
+              <div class="stat-label">Equity</div>
+              <div class="stat-value">${priceDisplay(equity)}</div>
+            </div>
+          </div>
+
+          ${riskBlocked ? `
+            <div class="bot-risk-warn">
+              Trading bloqué par risk state : ${safeText(blockerText || "limite dépassée")}.
+            </div>` : ""}
+
+          <div class="bot-sub-toggles">
+            <label class="bot-sub-toggle">
+              <input type="checkbox" data-bot-toggle="auto_open_enabled" ${autoOpen ? "checked" : ""}>
+              <span>Ouvertures auto</span>
+            </label>
+            <label class="bot-sub-toggle">
+              <input type="checkbox" data-bot-toggle="auto_close_enabled" ${autoClose ? "checked" : ""}>
+              <span>Fermetures auto</span>
+            </label>
+          </div>
+
+          <div class="bot-actions">
+            <button class="btn btn-primary" data-bot-force-cycle ${state.bot.forcingCycle ? "disabled" : ""}>
+              ${state.bot.forcingCycle ? "Cycle en cours…" : "Lancer un cycle maintenant"}
+            </button>
+            <button class="btn btn-secondary" data-bot-reload>Actualiser</button>
+          </div>
+        </div>
+
+        <!-- Apprentissage / Stats -->
+        ${stats && stats.totalCount > 0 ? `
+          <div class="card" style="margin-top:16px">
+            <div class="section-title"><span>Apprentissage</span><span>${stats.totalCount} trades clôturés</span></div>
+            <div class="bot-kpi-grid">
+              <div class="stat-card">
+                <div class="stat-label">Win rate</div>
+                <div class="stat-value">${stats.winRate == null ? "—" : Math.round(stats.winRate * 100) + "%"}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">P&L total</div>
+                <div class="stat-value ${stats.totalPnl > 0 ? "positive" : stats.totalPnl < 0 ? "negative" : ""}">${priceDisplay(stats.totalPnl)}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">Espérance</div>
+                <div class="stat-value ${stats.expectancy > 0 ? "positive" : stats.expectancy < 0 ? "negative" : ""}">${stats.expectancy == null ? "—" : priceDisplay(stats.expectancy)}</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-label">R:R réel</div>
+                <div class="stat-value">${stats.rrActual == null ? "—" : num(stats.rrActual, 2)}</div>
+              </div>
+            </div>
+
+            ${Array.isArray(stats.bySetup) && stats.bySetup.length ? `
+              <div class="section-title" style="margin-top:18px"><span>Par setup</span></div>
+              <div class="bot-breakdown">
+                <div class="bot-breakdown-row bot-breakdown-head">
+                  <div class="bot-breakdown-label">Setup</div>
+                  <div class="bot-breakdown-count">N</div>
+                  <div class="bot-breakdown-wr">WR</div>
+                  <div class="bot-breakdown-pnl">P&L</div>
+                </div>
+                ${stats.bySetup.map(s => renderBotBreakdownRow(s.setup || "autre", s.winRate, s.count, s.pnl)).join("")}
+              </div>
+            ` : ""}
+
+            ${Array.isArray(stats.byClass) && stats.byClass.length ? `
+              <div class="section-title" style="margin-top:18px"><span>Par classe d'actif</span></div>
+              <div class="bot-breakdown">
+                <div class="bot-breakdown-row bot-breakdown-head">
+                  <div class="bot-breakdown-label">Classe</div>
+                  <div class="bot-breakdown-count">N</div>
+                  <div class="bot-breakdown-wr">WR</div>
+                  <div class="bot-breakdown-pnl">P&L</div>
+                </div>
+                ${stats.byClass.map(c => renderBotBreakdownRow(c.class || "—", c.winRate, c.count, c.pnl)).join("")}
+              </div>
+            ` : ""}
+
+            ${Array.isArray(stats.topSymbols) && stats.topSymbols.length ? `
+              <div class="section-title" style="margin-top:18px"><span>Top 5 rentables</span></div>
+              <div class="bot-breakdown">
+                ${stats.topSymbols.map(s => renderBotBreakdownRow(s.symbol, s.count > 0 ? s.wins / s.count : null, s.count, s.pnl)).join("")}
+              </div>
+            ` : ""}
+
+            ${Array.isArray(stats.bottomSymbols) && stats.bottomSymbols.length ? `
+              <div class="section-title" style="margin-top:18px"><span>À surveiller (perdants)</span></div>
+              <div class="bot-breakdown">
+                ${stats.bottomSymbols.map(s => renderBotBreakdownRow(s.symbol, s.count > 0 ? s.wins / s.count : null, s.count, s.pnl)).join("")}
+              </div>
+            ` : ""}
+          </div>
+        ` : (acc ? `<div class="card" style="margin-top:16px"><div class="empty-state">Aucun trade clôturé. Active le bot et laisse tourner quelques cycles.</div></div>` : "")}
+
+        <!-- Timeline -->
+        <div class="card" style="margin-top:16px">
+          <div class="section-title"><span>Dernière activité</span><span>${events.length} événements</span></div>
+          ${events.length ? `<div class="bot-timeline">${events.map(renderBotEventRow).join("")}</div>` : `<div class="empty-state">Aucun événement pour l'instant.</div>`}
+        </div>
+
+        <!-- Paramètres avancés — éditables -->
+        <div class="card" style="margin-top:16px">
+          <div class="section-title"><span>Paramètres du bot</span><span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span></div>
+          ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
+        </div>
+      </div>`;
+  }
+
+  function renderBotParamsReadonly(settings, capitalBase) {
+    return `
+      <div class="bot-params" style="margin-top:8px">
+        <div class="kv">
+          <div class="muted">Capital base</div><div>${priceDisplay(capitalBase)}</div>
+          <div class="muted">Risk par trade</div><div>${Math.round((settings.risk_per_trade_pct || 0) * 100)}%</div>
+          <div class="muted">Allocation par trade</div><div>${Math.round((settings.allocation_per_trade_pct || 0) * 100)}%</div>
+          <div class="muted">Max positions</div><div>${settings.max_open_positions || 10}</div>
+          <div class="muted">Max / symbole</div><div>${settings.max_positions_per_symbol || 1}</div>
+          <div class="muted">Horizon max</div><div>${settings.max_holding_hours || 240} h</div>
+          <div class="muted">Score actionabilité min</div><div>${settings.min_actionability_score ?? 60}</div>
+          <div class="muted">Score dossier min</div><div>${settings.min_dossier_score ?? 60}</div>
+          <div class="muted">Setups autorisés</div><div>${Array.isArray(settings.allowed_setups) ? settings.allowed_setups.join(", ") : "—"}</div>
+          <div class="muted">Long / Short</div><div>${settings.allow_long ? "Long" : ""}${settings.allow_long && settings.allow_short ? " + " : ""}${settings.allow_short ? "Short" : ""}${!settings.allow_long && !settings.allow_short ? "—" : ""}</div>
+          <div class="muted">Mean reversion</div><div>${settings.mean_reversion_enabled ? "Oui" : "Non"}</div>
+          <div class="muted">Daily loss max</div><div>${Math.round((settings.max_daily_loss_pct || 0) * 100)}%</div>
+          <div class="muted">Weekly loss max</div><div>${(settings.max_weekly_loss_pct || 0) >= 1 ? "désactivé" : Math.round((settings.max_weekly_loss_pct || 0) * 100) + "%"}</div>
+          <div class="muted">Pertes conséc. max</div><div>${(settings.max_consecutive_losses || 0) >= 100 ? "désactivé" : (settings.max_consecutive_losses || 3)}</div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-bot-edit-open>Éditer</button>
+          <button class="btn btn-secondary" data-bot-preset-training>Mode entraînement permissif</button>
+        </div>
+      </div>`;
+  }
+
+  function renderBotParamsForm() {
+    const d = state.bot.editDraft || {};
+    const allowedSetupsAll = ["pullback", "breakout", "continuation", "mean_reversion"];
+    const currentSetups = Array.isArray(d.allowed_setups) ? d.allowed_setups : ["pullback", "breakout", "continuation"];
+    return `
+      <div class="bot-params-form" style="margin-top:8px">
+        <div class="bot-field-grid">
+          <label class="bot-field"><span>Capital base ($)</span><input type="number" inputmode="decimal" min="100" step="100" data-bot-field="capital_base" value="${Number(d.capital_base || 10000)}"></label>
+          <label class="bot-field"><span>Risk / trade (%)</span><input type="number" inputmode="decimal" min="0.1" max="20" step="0.1" data-bot-field="risk_per_trade_pct_display" value="${(Number(d.risk_per_trade_pct || 0.02) * 100).toFixed(1)}"></label>
+          <label class="bot-field"><span>Allocation / trade (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="allocation_per_trade_pct_display" value="${Math.round(Number(d.allocation_per_trade_pct || 0.08) * 100)}"></label>
+          <label class="bot-field"><span>Max positions</span><input type="number" inputmode="numeric" min="1" max="50" step="1" data-bot-field="max_open_positions" value="${Number(d.max_open_positions || 15)}"></label>
+          <label class="bot-field"><span>Max / symbole</span><input type="number" inputmode="numeric" min="1" max="10" step="1" data-bot-field="max_positions_per_symbol" value="${Number(d.max_positions_per_symbol || 1)}"></label>
+          <label class="bot-field"><span>Horizon max (h)</span><input type="number" inputmode="numeric" min="1" max="1000" step="1" data-bot-field="max_holding_hours" value="${Number(d.max_holding_hours || 240)}"></label>
+          <label class="bot-field"><span>Score actionabilité min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_actionability_score" value="${Number(d.min_actionability_score ?? 60)}"></label>
+          <label class="bot-field"><span>Score dossier min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_dossier_score" value="${Number(d.min_dossier_score ?? 60)}"></label>
+          <label class="bot-field"><span>Daily loss max (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_daily_loss_pct_display" value="${Math.round(Number(d.max_daily_loss_pct || 0.30) * 100)}"></label>
+          <label class="bot-field"><span>Weekly loss max (%) — 100 = OFF</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_weekly_loss_pct_display" value="${Math.round(Number(d.max_weekly_loss_pct || 1.0) * 100)}"></label>
+          <label class="bot-field"><span>Pertes conséc. max — 999 = OFF</span><input type="number" inputmode="numeric" min="1" max="999" step="1" data-bot-field="max_consecutive_losses" value="${Number(d.max_consecutive_losses || 999)}"></label>
+        </div>
+        <div class="bot-field-toggles">
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="allow_long" ${d.allow_long ? "checked" : ""}><span>Long autorisé</span></label>
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="allow_short" ${d.allow_short ? "checked" : ""}><span>Short autorisé</span></label>
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="mean_reversion_enabled" ${d.mean_reversion_enabled ? "checked" : ""}><span>Mean reversion</span></label>
+        </div>
+        <div class="bot-field-setups">
+          <div class="muted" style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Setups autorisés</div>
+          <div class="bot-setups-row">
+            ${allowedSetupsAll.map(s => `
+              <label class="bot-sub-toggle"><input type="checkbox" data-bot-field-setup="${s}" ${currentSetups.includes(s) ? "checked" : ""}><span>${s}</span></label>
+            `).join("")}
+          </div>
+        </div>
+        <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-bot-edit-save ${state.bot.savingDraft ? "disabled" : ""}>${state.bot.savingDraft ? "Enregistrement…" : "Enregistrer"}</button>
+          <button class="btn" data-bot-edit-cancel>Annuler</button>
+          <button class="btn btn-secondary" data-bot-preset-training>Mode entraînement permissif</button>
+        </div>
+      </div>`;
+  }
+
   function renderSettings() {
     return `
       <div class="screen">
@@ -5477,6 +5984,7 @@ function renderMain() {
       case "performance": return renderPerformance();
       case "alerts": return renderAlerts();
       case "settings": return renderSettings();
+      case "bot": return renderBot();
       default: return renderDashboard();
     }
   }
@@ -5999,6 +6507,45 @@ function renderMain() {
     });
     app.querySelectorAll("[data-load-user-assets]").forEach(el => {
       el.addEventListener("click", () => { loadUserAssets(); });
+    });
+
+    // Bot training
+    app.querySelectorAll("[data-bot-toggle]").forEach(el => {
+      el.addEventListener("change", () => {
+        const key = el.getAttribute("data-bot-toggle");
+        toggleBotSetting(key, el.checked);
+      });
+    });
+    app.querySelectorAll("[data-bot-force-cycle]").forEach(el => {
+      el.addEventListener("click", () => { forceBotCycle(); });
+    });
+    app.querySelectorAll("[data-bot-reload]").forEach(el => {
+      el.addEventListener("click", () => { loadBot(); });
+    });
+    app.querySelectorAll("[data-bot-edit-open]").forEach(el => {
+      el.addEventListener("click", () => { openBotEdit(); });
+    });
+    app.querySelectorAll("[data-bot-edit-cancel]").forEach(el => {
+      el.addEventListener("click", () => { cancelBotEdit(); });
+    });
+    app.querySelectorAll("[data-bot-edit-save]").forEach(el => {
+      el.addEventListener("click", () => { saveBotDraft(); });
+    });
+    app.querySelectorAll("[data-bot-preset-training]").forEach(el => {
+      el.addEventListener("click", () => { applyBotTrainingPreset(); });
+    });
+    app.querySelectorAll("[data-bot-field]").forEach(el => {
+      const evt = el.type === "checkbox" ? "change" : "input";
+      el.addEventListener(evt, () => {
+        const key = el.getAttribute("data-bot-field");
+        const val = el.type === "checkbox" ? el.checked : el.value;
+        updateBotDraftField(key, val);
+      });
+    });
+    app.querySelectorAll("[data-bot-field-setup]").forEach(el => {
+      el.addEventListener("change", () => {
+        toggleBotDraftSetup(el.getAttribute("data-bot-field-setup"), el.checked);
+      });
     });
 
     // Fermeture modal au tap backdrop (uniquement clic direct, pas bubble)
