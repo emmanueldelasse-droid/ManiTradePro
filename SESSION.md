@@ -306,14 +306,14 @@ Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commi
 - **Aujourd'hui** : l'app est un **prof** qui regarde le marché et propose des trades. L'utilisateur décide et exécute.
 - **Demain** : l'app doit devenir un **élève** qui joue seul, revoit ses matchs, corrige ses erreurs, et sait attaquer à la hausse comme à la baisse.
 
-### Les 4 règles du bot
+### Les 5 règles du bot
 
 #### Règle #1 — Apprendre ET se corriger à chaque trade clos
 
-> **Apprendre sans se corriger = accumuler des stats inutiles.** Chaque enseignement doit déclencher **automatiquement une modification du moteur**, sans intervention humaine. Deux temps indissociables : observer, puis agir.
+> **Apprendre sans se corriger = accumuler des stats inutiles.** Chaque enseignement doit déclencher **automatiquement une modification du moteur**, sans intervention humaine. Deux temps indissociables : observer, puis agir. **Toute correction passe par un shadow mode avant activation.**
 
 **A. Observer — capturer ce qui s'est passé**
-- Table `mtp_trade_feedback` : `trade_id`, `exit_reason` ∈ {SL, TP, manual, timeout}, `mae_pct` (max drawdown intra-trade, en % de l'entrée), `mfe_pct` (max profit intra-trade), `holding_minutes`, `regime_at_close`.
+- Table `mtp_trade_feedback` : `trade_id`, `exit_reason` ∈ {SL, TP, manual, timeout}, `mae_pct` (max drawdown intra-trade, en % de l'entrée), `mfe_pct` (max profit intra-trade), `holding_minutes`, `regime_at_close`, `news_context_at_open`, `news_context_at_close`.
 - Le MAE/MFE est essentiel : il dit si le stop était trop serré ou le TP trop gourmand, même sur un trade perdant.
 - Persistance Supabase + snapshot du contexte au moment de la sortie (prix, régime, opportunités concurrentes).
 
@@ -329,80 +329,214 @@ Pour chaque signal statistique significatif, une correction concrète est appliq
 | MFE moyen > 1.5× la distance du TP atteint | Allonger le TP ou basculer en trailing stop pour ce setup |
 | 3 pertes consécutives | Réduire la taille de position à 50% jusqu'à un gain |
 | 3 gains confirmés avec expectancy positive | Taille normale, ou +20% si confiance élevée |
-| Cycle hebdomadaire sur 200+ trades historiques | Retrain des poids des 6 composantes du score via régression logistique (win/loss). Les poids 24/20/20/18/10/8 deviennent dynamiques. |
+| **Cycle hebdomadaire sur 500+ trades** (pas 200+, surajustement sinon) | Retrain des poids des 6 composantes du score via régression logistique. Les poids 24/20/20/18/10/8 deviennent dynamiques. |
 
-**Garde-fou anti-bruit** : aucune correction sur moins de **30 trades** dans un bucket. En dessous, c'est du hasard statistique. Tout ajustement est loggé dans `mtp_engine_adjustments` avec date, signal déclencheur, ancienne/nouvelle valeur — rollback possible.
+**C. Shadow mode — filet de sécurité obligatoire (NON optionnel)**
+
+Toute nouvelle correction passe par un **mode fantôme pendant 20 trades** avant activation :
+- Le bot simule l'effet de la correction sans l'appliquer vraiment
+- Si les résultats confirment l'amélioration → activation réelle
+- Sinon → rollback, la correction est jetée
+
+Table `mtp_engine_adjustments` (date, type, signal_déclencheur, ancienne_valeur, nouvelle_valeur, status: `shadow` / `active` / `rollback`) pour auditer et rollback si besoin.
+
+**D. Décroissance temporelle des enseignements**
+
+Les stats vieillissent. Pondération exponentielle pour que le bot s'adapte aux changements de régime :
+- Trades des 30 derniers jours : poids 1.0
+- Trades de 31-90 jours : poids 0.5
+- Trades de 91-365 jours : poids 0.2
+- Trades > 1 an : poids 0.1
+
+Feature codée tôt mais s'active d'elle-même quand il y a assez d'historique (~6-12 mois).
+
+**E. Drift detection — alerte quand une stratégie décroche**
+
+Comparaison glissante 30 derniers trades vs moyenne historique par setup × direction :
+
+| Chute du win rate | Action |
+|---|---|
+| 10-15% | Notification info, aucune action auto |
+| 15-25% | Relève `min_dossier_score` du setup (plus sélectif) |
+| > 25% | Désactivation temporaire + 20 trades de validation en shadow avant réactivation |
+
+**F. Rapport hebdo généré par Claude (lundis matin)**
+
+Claude Sonnet résume automatiquement la semaine passée en français : trades gagnants/perdants, patterns détectés, corrections auto appliquées, recommandations. Coût ~$2/mois. Outil pédagogique + audit des ajustements.
+
+**Garde-fous**
+- Aucune correction sur < 30 trades dans un bucket (seuil anti-bruit).
+- Shadow mode obligatoire pour tout nouvel ajustement.
+- Retrain régression uniquement à partir de 500+ trades (vs 200+ initialement proposé, surajustement sinon).
+- Tout ajustement audité dans `mtp_engine_adjustments` avec rollback possible.
 
 **Principe fondateur** : à qualité de feedback égale, le bot qui se corrige battra toujours le bot qui observe seulement. Ne jamais livrer l'observation sans la correction qui va avec.
 
 #### Règle #2 — Savoir choisir long ou short
 Aujourd'hui le moteur détecte `direction: "short"` mais `buildPlanFromConfiguration` retourne toujours `side: "long"`. À faire :
 - **Symétriser les 4 setups** : PULLBACK short (rebond EMA20 en downtrend), BREAKDOWN short (cassure support 20j), CONTINUATION short (trend down propre), MEAN_REVERSION déjà bi-directionnel.
-- **Filtre régime via Fear & Greed** (déjà affiché en widget, jamais utilisé dans le scoring) :
-  - FG < 25 ou VIX > 25 → bonus +5 aux shorts, malus -5 aux longs
-  - FG > 75 → l'inverse
-  - Zone neutre → inchangé
+- **Filtre régime via Fear & Greed + VIX** (déjà affichés en widget, jamais utilisés dans le scoring) :
+  - Crypto : FG < 25 → bonus +5 aux shorts, malus -5 aux longs. FG > 75 → l'inverse.
+  - Actions : VIX > 25 → bonus +5 aux shorts, malus -5 aux longs. VIX < 12 → prudence longs (complacence).
+  - Zone neutre → inchangé.
 - **Arbitrage long/short** sur même actif : prendre le plus gros RR, pas le plus gros score.
 - Activer `allow_short: true` en production (flag existe dans `mtp_training_settings`, jamais testée en réel).
+- **Exécution réelle du short** : jamais avant 1 an de stabilité en paper. Binance spot ne permet pas le short → Margin ×2 max ou Futures plus tard, **uniquement après stabilité prouvée** (Règle #1 + backtest validés).
 
 #### Règle #3 — Valider sur l'historique avant le réel (backtest)
 3 mois de data = juger un joueur sur 3 matchs. Insuffisant.
-- **Cache KV** des bougies 1D sur 5 ans par symbole (clé `candles:SYMBOL:1D:v1`, ~10 Mo pour 100 symboles, coût négligeable).
+- **Cache KV** des bougies 1D par symbole (clé `candles:SYMBOL:1D:v1`, coût négligeable).
+- **Périodes retenues** : **crypto 2020-2025** (5 ans, bull+bear complets), **actions 2015-2025** (10 ans, plus stable). Avant 2020 crypto = marché trop différent, non pertinent.
 - **Backtest engine** dans le Worker : `backtest(symbol, from, to, rules)` qui replay bougie par bougie, retourne win rate / expectancy / max DD / Sharpe.
 - **Parallélisation** : les Workers Cloudflare gèrent 50 fetch simultanés → 50 backtests en 2–5 s.
-- **Walk-forward obligatoire** : entraîne sur 2020–2023, valide sur 2024, produis sur 2025. Jamais ajuster les règles pour coller au passé (curve-fitting = la mort du bot).
+- **Walk-forward obligatoire** : entraîne sur 2020-2023, valide sur 2024, produis sur 2025. Jamais ajuster les règles pour coller au passé (curve-fitting = la mort du bot).
+- **Pré-remplit la mémoire contextuelle fine** (Règle #1 étendue en Phase 3+) : les trades simulés du backtest alimentent les buckets (setup × direction × régime) pour démarrer avec du volume.
 
 #### Règle #4 — Être autonome du frontend
 Le bot actuel ne tourne que si le frontend est ouvert. Inacceptable pour de l'autonomie.
-- **Scheduled Worker Cloudflare** : handler `handleScheduledTraining(env)` déclenché par cron (30 min en heures de trading, 2h hors-marché).
-- Idempotence via `lastCycleAt` dans Supabase.
+- **Scheduled Worker Cloudflare** : handler `handleScheduledTraining(env)` déclenché par cron.
+- **Fréquence définitive** :
+  - Crypto en heures actives UTC (6h-22h) : **15 min**
+  - Crypto la nuit UTC (22h-6h) : **1 h**
+  - Actions en heures de bourse US (13h30-22h CEST lun-ven) : **15 min**
+  - Actions hors-bourse / weekend : **skip** (rien à scanner)
+  - Total : ~100 cycles/jour, ~800 requêtes Worker/jour (< 1% du free tier 100k/jour).
+- Idempotence via `lastCycleAt` dans Supabase pour éviter les doublons.
 - Le scan + auto-open + auto-close + vérif SL/TP doit pouvoir tourner même app fermée.
 
 #### Règle #5 — Intégrer le contexte fondamental (news & événements)
 
 > **Un bot qui ne regarde que les prix est aveugle à la moitié du signal.** Les marchés bougent aussi (souvent brutalement) à cause d'annonces : Fed, CPI, earnings, hacks crypto, régulation. Ignorer ça = se faire exploser par un événement que tout le monde a vu sauf le bot.
 
-**A. Les 4 types d'info à capter**
+**A. Les sources — tout en gratuit via multi-provider**
 
-| Type | Pour qui | Source gratuite | Rafraîchissement |
+| Type | Pour qui | Sources gratuites | Rafraîchissement |
 |---|---|---|---|
 | Calendrier économique (Fed, BCE, NFP, CPI, PMI) | Tous actifs | Forex Factory RSS | 1×/jour |
-| Earnings calendar | Actions/ETF | Finnhub, Twelve Data (déjà dispos) | 1×/jour |
-| News crypto (régulation, hacks, listings majeurs) | Crypto | CryptoPanic API, Messari | 15 min |
-| News macro/sectorielles | Tous actifs | Alpha Vantage News (déjà dispo), NewsAPI | 1 h |
+| Earnings calendar | Actions/ETF | Finnhub free + Twelve Data (déjà dispos) | 1×/jour |
+| News crypto | Crypto | CryptoPanic Free (200/j) + Binance Announcements RSS + CoinDesk RSS + CoinTelegraph RSS + Messari Free (1000/j) | 15 min |
+| News macro/sectorielles | Tous actifs | Alpha Vantage News (sentiment déjà taggé) + NewsAPI Free (100/j) | 1 h |
+
+**Pourquoi tout gratuit** : le volume de 96 req/jour sur CryptoPanic tient en free tier. La redondance (4 sources crypto RSS) remplace la Pro. Coverage ≥ CryptoPanic Pro $25/mois.
 
 **B. 3 niveaux d'utilisation dans le moteur**
 
-1. **Garde-fou (hard block)** : aucune nouvelle entrée dans la fenêtre **[-30 min ; +30 min]** autour d'un événement calendrier high-impact (FOMC, NFP, CPI, ECB meeting, earnings sur l'actif concerné). Ces moments = volatilité imprévisible = risque ruine. Positions ouvertes : stop suiveur serré automatiquement ou notification "événement imminent".
+1. **Garde-fou (hard block)** [Phase 1] : aucune nouvelle entrée dans la fenêtre **[-30 min ; +30 min]** autour d'un événement calendrier high-impact (FOMC, NFP, CPI, ECB meeting, earnings sur l'actif concerné). Ces moments = volatilité imprévisible = risque ruine. **Positions ouvertes** : stop resserré automatiquement à -0.3% sous le prix courant 10 min avant l'event (option B validée).
 
-2. **Modulateur de score (soft boost/malus)** :
+2. **Modulateur de score (soft boost/malus)** [Phase 2], **cap ±10 points max sur le score final** :
    - News positive vérifiée sur un secteur → +5 au score des actions/ETF de ce secteur pour 24 h
    - News négative crypto (hack, régulation hostile, delisting majeur) → -10 à tous les cryptos pour 48 h
    - Earnings surprise positive → +5 à l'action pour 5 jours de trading
    - Régime macro (taux en hausse) → malus -3 sur actions growth, bonus +3 sur value
+   - **Utiliser les sentiments gratuits taggés en priorité** (Alpha Vantage + CryptoPanic + Finnhub + Messari). Claude intervient uniquement sur les cas ambigus (~20% des news).
 
-3. **Signal directionnel via IA Claude** : pour une news majeure (haute importance), Claude résume et classe en {`long-positif`, `short-negatif`, `bruit-ignore`} avec niveau de confiance. Pondération dans le score final : haute confiance = ±8 points, moyenne = ±4, faible = 0.
+3. **Signal directionnel via Claude (niveau 3)** [Phase 2 fin, prudent] : pour une news majeure non classifiable par les sources gratuites, Claude Haiku classe en {`long-positif`, `short-negatif`, `bruit-ignore`} avec confiance. Pondération haute = ±8 points, moyenne = ±4, faible = 0 (ignorée). **Jamais décideur seul** — toujours 3ème vote après technique + modulateur.
 
-**C. Bouclage avec la Règle #1 (apprentissage)**
+   **Kill switch anti-hallucination** (mesure glissante sur 30 derniers trades à signal haute confiance Claude) :
+   
+   | Win rate observé | Action automatique | Notif |
+   |---|---|---|
+   | ≥ 55% | Poids maintenu à ±8 pts | Aucune |
+   | 45-55% | Dégradé à ±4 pts | Info |
+   | 35-45% | Dégradé à ±2 pts | Warn |
+   | < 35% | **Désactivation complète (mode silent)** | Critique + rapport Claude du pourquoi |
+   
+   **Reset** : automatique après 60 jours de désactivation (réactivation en mode test ±2 pts pour 20 trades). Ou manuel depuis Réglages.
 
-- Chaque `analysisSnapshot` à l'ouverture stocke `newsContext: { top3, regime, pendingEvents24h }`.
-- À la clôture, la Règle #1 agrège : "trades avec news positive ont gagné X% vs Y% sans". Si delta significatif sur 50+ trades → le poids du modulateur news s'auto-ajuste à la hausse.
+**C. Auto-watchlist (ajout/retrait intelligent)** [Phase 2]
+
+Le bot **chasse les pépites** tout seul et **retire les actifs dormants**.
+
+**Auto-ajout** si tous les critères réunis :
+- Absent de la watchlist actuelle
+- Apparait 3+ fois en trending sur 7 jours (CoinGecko) OU mentionné 10+ fois en news verified/48h avec sentiment positif
+- Market cap top 200 (crypto) ou volume daily > seuil (actions)
+- Data provider disponible (Binance pour crypto, Twelve Data pour actions)
+- Liquidité top 200 sur les 30 derniers jours (anti-wash trading)
+
+**Auto-retrait** si :
+- Dans la watchlist **ET pas dans les 35-40 core protégés**
+- Aucun signal généré depuis 90 jours (dormant)
+- Volume 24h chute de -70% vs moyenne 90j
+
+**Garde-fous** :
+- Max 20 auto-adds / mois
+- Core (35-40) toujours protégés, jamais auto-retirés
+- Épinglage manuel possible (jusqu'à 10 actifs "pinnés" insupprimables)
+- Override manuel à tout moment via Réglages
+- Historique visible : onglet "Watchlist dynamique" avec raisons des ajouts/retraits
+
+**D. Bouclage avec la Règle #1 (apprentissage)**
+
+- Chaque `analysisSnapshot` à l'ouverture stocke `newsContext: { top3, regime, pendingEvents24h, sentiment_aggregated }`.
+- À la clôture, la Règle #1 agrège : "trades avec news positive ont gagné X% vs Y% sans". Si delta significatif sur 50+ trades → le poids du modulateur news s'auto-ajuste à la hausse (ou baisse si peu d'impact réel).
 - Alerte temps réel : si une news majeure apparaît pendant qu'une position est ouverte, notification push + proposition de clôture (ou clôture auto si delta défavorable > 3%).
 
-**Garde-fous**
+**Garde-fous globaux**
 - **Qualité des sources** : uniquement Reuters, Bloomberg, SEC, Fed, BCE, sites officiels exchanges crypto (Binance Labs, Coinbase announcements), ou news taguées "verified" par CryptoPanic. Ignorer Twitter/X, blogs anonymes, chaînes Telegram.
 - **Fuseau horaire** : Fed = NY (EST/EDT), BCE = Francfort (CET/CEST), Tokyo/Sydney pour opens asiatiques. Normalisation UTC en base, affichage heure Paris côté UI.
 - **"Déjà pricé"** : une bonne news peut faire baisser le marché si elle était attendue. Le modulateur ne doit jamais être directionnel à 100% — toujours combiné avec le signal technique du moteur V2.
-- **Coût API** : NewsAPI free = 100 req/jour. Budget = 1 fetch/h × 24 h = 24 req → OK. Cache KV Cloudflare 1 h sur les résultats. Dégrader gracieusement si quota atteint (continuer avec la dernière photo).
+- **Dégradation gracieuse** : si un quota API est atteint, continuer avec la dernière photo cachée plutôt que de crasher.
+
+### Paramètres pratiques validés (session 9)
+
+| Paramètre | Valeur retenue | Justification |
+|---|---|---|
+| **Périmètre actifs** | 45-60 max : 35-40 core protégés + 15-20 auto-ajouts | Qualité > quantité. Ratio signal/bruit optimal. Limites CPU Worker. |
+| **Core Actions EU** | LVMH, ASML, TTE, SAP, NESN, **RMS.PA (Hermès)** | Hermès explicitement demandé par l'utilisateur |
+| **Fréquence cron** | 15 min en heures actives / 1 h nuit crypto / skip actions off-hours | Sweet spot swing trading. Tout en free tier Cloudflare. |
+| **Stack API** | **Fiable-v3 tout gratuit sauf Claude** : Twelve Data 4 clés + Finnhub fallback #1 + Alpha Vantage + CoinGecko + CryptoPanic Free + Messari Free + Binance + Forex Factory RSS + CoinDesk/CoinTelegraph RSS + NewsAPI Free | Redondance multi-provider = fiabilité. Yahoo abandonné (fragile). Claude optimisé Haiku/Sonnet = ~$3-5/mois. |
+| **Trading style** | **Swing trading uniquement** (pas de day-trading) | Cron 15 min + max_holding 240h + 95% des bots retail day-tradent perdants. Pas besoin de Twelve Data Pro. |
+| **Budget total** | ~$3-5/mois (consommation Claude réelle uniquement) | Multi-provider gratuit robuste. Cap à < 1% du capital sous gestion. |
+| **Broker Phase 4** | Binance crypto spot **long-only** | Actions paper-only indéfiniment (pas d'API broker FR exploitable). Short réel jamais avant 1 an de stabilité. |
 
 ### Feuille de route recommandée (dans l'ordre)
 
 | Phase | Durée | Contenu | Pourquoi en premier |
 |-------|-------|---------|---------------------|
-| **1. Autonomie + short + garde-fou news** | 3–4 sem | Cron Worker, symétriser les 4 setups, injecter Fear & Greed, activer `allow_short` en prod, **calendrier économique + earnings calendar en blocage [-30 ; +30 min]** sur les événements haute importance | Sans cron autonome et sans short, le bot est structurellement incomplet. Le garde-fou news est en phase 1 car une FOMC mal timée peut ruiner toute la suite. |
-| **2. Apprentissage + correction + news modulateur** | 4–5 sem | Table `mtp_trade_feedback` + MAE/MFE, agrégation par bucket, **corrections automatiques du moteur** (seuils, stops, TP, taille de position, poids du score), table `mtp_engine_adjustments` pour auditer chaque ajustement, **modulateur de score via news sectorielles + IA Claude directionnelle sur news majeures**, stockage `newsContext` dans chaque snapshot | Observer ne suffit pas : sans corrections auto, le bot répète ses erreurs. Le modulateur news ajoute une dimension fondamentale au scoring technique. |
-| **3. Backtest & validation** | 3–4 sem | Cache KV 5 ans, moteur backtest + walk-forward, UI onglet Backtest, retrain hebdo des poids, **inclure l'historique news dans les backtests** (éviter les faux succès liés à des news qui n'existaient pas à l'époque) | Permet de valider les évolutions sans risquer du vrai argent. |
-| **4. Exécution réelle** | Plus tard | Lecture broker (Binance API read-only), puis ordres avec limites strictes | Ne surtout pas court-circuiter les phases 1-3. |
+| **1. Autonomie + short + garde-fou news + shadow/drift** | 3–4 sem | 4 PRs : cron Worker, symétrisation long/short + F&G/VIX, news garde-fou niveau 1 + stop resserré pré-event, shadow mode + drift detection + table `mtp_engine_adjustments` | Sans cron autonome et sans short, le bot est structurellement incomplet. Le garde-fou news est en phase 1 car une FOMC mal timée peut ruiner la suite. Shadow + drift sont prêts pour Phase 2. |
+| **2. Apprentissage + correction + news avancé + auto-watchlist + rapport hebdo** | 4–5 sem | Table `mtp_trade_feedback` + MAE/MFE, agrégation par bucket, corrections automatiques (7 règles), news modulateur cap ±10 pts, Claude directionnel niveau 3 + kill switch gradué, auto-watchlist, rapport Claude hebdo lundi, décroissance temporelle | Observer ne suffit pas : sans corrections auto, le bot répète ses erreurs. Le modulateur news ajoute la dimension fondamentale. Auto-watchlist chasse les pépites. |
+| **3. Backtest & validation** | 3–4 sem | Cache KV 5 ans (crypto 2020-2025 / actions 2015-2025), moteur backtest + walk-forward, UI onglet Backtest, retrain hebdo des poids (500+ trades), pré-remplir mémoire contextuelle fine | Permet de valider les évolutions sans risquer du vrai argent. Déverrouille la mémoire contextuelle pour Phase 3+. |
+| **4. Exécution réelle** | Plus tard | Binance spot **long-only** petit capital, actions paper+notif manuelle (exécution utilisateur sur PEA), short réel différé | Ne surtout pas court-circuiter les phases 1-3. |
+| **5+. Long terme** | Roadmap | Mémoire contextuelle fine avancée, auto-découverte de patterns (reportée — risque surajustement), éventuel Interactive Brokers pour actions réelles | À ouvrir seulement après 1 an de bot stable. |
+
+### Phase 1 — Découpage détaillé en 4 PRs
+
+Chaque PR est indépendante, mergeable seule, validée 3-5 jours en paper avant la suivante.
+
+#### PR #1 — Cron Cloudflare autonome (~3 jours)
+- Handler `scheduled` dans `worker.js` + cron triggers dans `wrangler.toml` (15 min heures actives / 1 h nuit crypto / skip actions off)
+- Factorisation de la logique scan/décision actuelle (frontend → Worker scheduled)
+- Idempotence via `lastCycleAt` dans Supabase
+- Log `scheduled_cycle` dans `mtp_training_events`
+- UI : badge "Bot autonome actif" + dernier cycle timestamp dans Réglages
+- **Validation** : bot tourne 48h sans ouverture app, events Supabase cohérents
+
+#### PR #2 — Symétrisation long/short + Fear & Greed/VIX filtre (~4 jours)
+- `buildPlanFromConfiguration` respecte la `direction` détectée (plus de `side: "long"` en dur)
+- 4 setups miroir : PULLBACK short, BREAKDOWN, CONTINUATION short, MEAN_REVERSION short
+- Intégration F&G (crypto) + VIX (actions) dans le scoring comme modulateur régime (±5 pts)
+- Activation `allow_short: true` en settings training
+- UI : badge long/short sur chaque opportunité, filtre par direction
+- **Validation** : génération de plans short en paper sur actifs downtrend, historique trades dans les 2 directions
+
+#### PR #3 — News garde-fou niveau 1 (~3 jours)
+- Fetch Forex Factory RSS 1×/nuit (cache KV 24h)
+- Fetch earnings calendar via Finnhub 1×/jour
+- Table `mtp_economic_calendar` dans Supabase
+- Logique `isWithinEventWindow(symbol, now)` avant chaque décision d'entrée
+- **Option B activée** : resserrement auto du stop à -0.3% 10 min avant event high-impact
+- UI : widget "Prochain événement important" dashboard + icône verrou sur opportunités bloquées
+- **Validation** : simulation d'une FOMC prochaine, bot refuse les entrées dans la fenêtre
+
+#### PR #4 — Shadow mode + drift detection + table ajustements (~2 jours)
+- Table `mtp_engine_adjustments` (date, type, signal, ancienne/nouvelle valeur, status: `shadow` / `active` / `rollback`)
+- Framework "shadow execution" : corrections loggées en shadow pendant 20 trades avant activation
+- Drift detection : calcul glissant 30 derniers trades vs moyenne historique, alertes graduées (léger/moyen/grave)
+- UI : onglet "Santé du bot" avec historique ajustements + alertes drift actives
+- **Validation** : forcer un drift simulé, vérifier alertes. Laisser correction en shadow, vérifier non-application avant N trades.
+
+**Total Phase 1** : ~12 jours ouvrés (~3 semaines calendaires avec validations paper intercalées).
 
 ### Règle de garde — ne pas ajouter de feature qui n'avance pas ces 5 règles
 Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'apprentissage+correction, ni la validation, ni l'exécution long/short, ni l'intégration du contexte fondamental → le reporter. L'app a déjà trop de features d'assistant ; il en faut moins mais qui servent le bot.
