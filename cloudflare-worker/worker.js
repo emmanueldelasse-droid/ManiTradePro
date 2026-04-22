@@ -2974,11 +2974,15 @@ function getTrainingDefaults() {
   };
 }
 
-function isTrainingCandidateAllowed(row, settings, openRows, riskState = null) {
+function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, newsWindow = null) {
   if (!row || row.status !== "ok") return false;
   if (row.decision !== "Trade propose") return false;
   if (!row.plan?.tradeNow) return false;
   if (riskState && riskState.tradingEnabled === false) return false;
+
+  // News garde-fou (PR #3 Phase 1) : blocage dans la fenêtre ±30 min d'un event high-impact.
+  // Le newsWindow est pré-fetché en amont du cycle training pour éviter un appel par candidat.
+  if (newsWindow && newsWindow.blocked) return false;
 
   // Setup autorisé ?
   const setupType = String(row.plan?.setupType || row.setupType || "").toLowerCase();
@@ -3093,8 +3097,18 @@ async function handleTrainingAutoCycle(env) {
       if (riskState && !riskState.tradingEnabled) {
         log.skipped.push({ reason: riskState.blockers.map(riskStateBlockerMessage).join(" · ") || "Blocage risque actif" });
       } else {
+        // News garde-fou PR #3 : pré-fetch la fenêtre d'événements une seule fois.
+        const newsWindow = await getNewsWindowForCycle(env).catch(() => ({ blocked: false }));
+        if (newsWindow.blocked) {
+          log.skipped.push({ reason: `news_window: ${newsWindow.reason}` });
+          await logTrainingEvent(env, "news_window_block", {
+            reason: newsWindow.reason,
+            event: newsWindow.event,
+            minutes_until: newsWindow.minutesUntil
+          }).catch(() => {});
+        }
         const rows = await buildOpportunityRowsForTraining(env);
-        const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows, riskState));
+        const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows, riskState, newsWindow));
 
         let availableCash = Number(settings.capital_base || 0) - openRows.reduce((acc, row) => acc + (Number(row?.invested || row?.execution?.invested || 0) || 0), 0);
 
@@ -4368,6 +4382,215 @@ async function handleRegimeIndicators(env) {
   return json({ status: "ok", asOf: data.asOf, data });
 }
 
+// ============================================================
+// NEWS GARDE-FOU — PR #3 Phase 1
+// ============================================================
+// Calendrier économique via Forex Factory RSS (gratuit, illimité).
+// Cache mémoire 6 h + persist Supabase. Dégradation gracieuse si fetch échoue.
+
+async function fetchEconomicCalendar(env) {
+  const cacheKey = "economic_calendar_week";
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  let events = [];
+  try {
+    const res = await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.xml", {
+      headers: { "User-Agent": "Mozilla/5.0 ManiTradePro/1.0" }
+    });
+    if (!res.ok) throw new Error(`ff_http_${res.status}`);
+    const xml = await res.text();
+    events = parseForexFactoryXml(xml);
+  } catch (e) {
+    console.error("fetchEconomicCalendar failed:", e.message);
+  }
+
+  setMemoryCache(cacheKey, 6 * 60 * 60 * 1000, events);
+
+  // Persist dans Supabase (best-effort, nettoyage des vieux events > 30j)
+  if (events.length && supabaseConfigured(env)) {
+    try {
+      const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      await supabaseFetch(env, `mtp_economic_calendar?event_time=lt.${cutoff}`, { method: "DELETE" }).catch(() => {});
+
+      const rows = events.map(e => ({
+        event_uid: `${e.country}|${e.title}|${e.event_time}`,
+        title: e.title,
+        country: e.country,
+        impact: e.impact,
+        event_time: e.event_time,
+        forecast: e.forecast || null,
+        previous: e.previous || null,
+        source: "forex_factory",
+        fetched_at: nowIso()
+      }));
+      await supabaseFetch(env, `mtp_economic_calendar?on_conflict=event_uid`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates" },
+        body: JSON.stringify(rows)
+      }).catch(() => {});
+    } catch { /* best-effort */ }
+  }
+
+  return events;
+}
+
+function parseForexFactoryXml(xml) {
+  const events = [];
+  if (!xml || typeof xml !== "string") return events;
+
+  const eventRegex = /<event>([\s\S]*?)<\/event>/g;
+  const extractTag = (block, tag) => {
+    const cdataRe = new RegExp(`<${tag}><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>`);
+    const plainRe = new RegExp(`<${tag}>([\\s\\S]*?)<\\/${tag}>`);
+    const m = block.match(cdataRe) || block.match(plainRe);
+    return m ? (m[1] || "").trim() : "";
+  };
+
+  let match;
+  while ((match = eventRegex.exec(xml)) !== null) {
+    const block = match[1];
+    const title = extractTag(block, "title");
+    const country = extractTag(block, "country");
+    const date = extractTag(block, "date");
+    const time = extractTag(block, "time");
+    const impact = extractTag(block, "impact").toLowerCase();
+    const forecast = extractTag(block, "forecast");
+    const previous = extractTag(block, "previous");
+
+    if (!title || !country || !date) continue;
+
+    const eventTime = parseForexFactoryDateTime(date, time);
+    if (!eventTime) continue;
+
+    events.push({
+      title,
+      country,
+      impact: ["high", "medium", "low"].includes(impact) ? impact : "low",
+      event_time: eventTime,
+      forecast: forecast === "" ? null : forecast,
+      previous: previous === "" ? null : previous
+    });
+  }
+
+  return events;
+}
+
+// Forex Factory publie en Eastern Time (ET). Conversion en UTC avec DST approximative :
+// EDT (UTC-4) de mars à novembre, EST (UTC-5) autrement. Précision ±1h en hors-saison DST
+// — tolérée par la fenêtre ±30 min du garde-fou.
+function parseForexFactoryDateTime(dateStr, timeStr) {
+  if (!dateStr) return null;
+
+  const dateMatch = dateStr.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (!dateMatch) return null;
+  const [, m, d, y] = dateMatch;
+  const month = parseInt(m, 10);
+  const day = parseInt(d, 10);
+  const year = parseInt(y, 10);
+  if (!Number.isFinite(month) || !Number.isFinite(day) || !Number.isFinite(year)) return null;
+
+  let hour = 0;
+  let minute = 0;
+  const skipTimes = ["All Day", "Tentative", "", "Holiday", "Day 1", "Day 2"];
+  if (timeStr && !skipTimes.includes(timeStr)) {
+    const timeMatch = timeStr.match(/^(\d{1,2}):(\d{2})(am|pm)$/i);
+    if (timeMatch) {
+      hour = parseInt(timeMatch[1], 10);
+      minute = parseInt(timeMatch[2], 10);
+      const ampm = timeMatch[3].toLowerCase();
+      if (ampm === "pm" && hour !== 12) hour += 12;
+      if (ampm === "am" && hour === 12) hour = 0;
+    } else {
+      // Format inconnu — on place à midi ET par défaut (-0/+30min coverage en pire cas)
+      hour = 12;
+    }
+  }
+
+  // DST approximative (mars à novembre inclus → EDT UTC-4, sinon EST UTC-5)
+  const isDst = month >= 3 && month <= 11;
+  const etOffsetHours = isDst ? 4 : 5;
+
+  const utcDate = new Date(Date.UTC(year, month - 1, day, hour + etOffsetHours, minute, 0));
+  if (isNaN(utcDate.getTime())) return null;
+
+  return utcDate.toISOString();
+}
+
+// Retourne les events high-impact dans la fenêtre [-windowMs, +windowMs] de maintenant.
+// Lit depuis Supabase avec cache mémoire 2 min (appels répétés dans une boucle cycle = 1 seul fetch).
+async function fetchHighImpactEventsInWindow(env, windowMs = 30 * 60 * 1000) {
+  const cacheKey = `news_window:${Math.floor(windowMs / 60000)}`;
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  let events = [];
+
+  if (supabaseConfigured(env)) {
+    try {
+      const from = new Date(Date.now() - windowMs).toISOString();
+      const to = new Date(Date.now() + windowMs).toISOString();
+      const rows = await supabaseFetch(env,
+        `mtp_economic_calendar?impact=eq.high&event_time=gte.${from}&event_time=lte.${to}&order=event_time.asc`
+      );
+      events = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      console.error("fetchHighImpactEventsInWindow (supabase) failed:", e.message);
+    }
+  }
+
+  // Fallback : si pas de Supabase ou pas de rows, on fetch direct + filtre en mémoire
+  if (!events.length) {
+    const all = await fetchEconomicCalendar(env);
+    const now = Date.now();
+    events = all.filter(e =>
+      e.impact === "high" &&
+      Math.abs(new Date(e.event_time).getTime() - now) <= windowMs
+    );
+  }
+
+  setMemoryCache(cacheKey, 2 * 60 * 1000, events);
+  return events;
+}
+
+// Check si on doit bloquer une nouvelle entrée à cause d'un event macro imminent.
+// Retourne { blocked, reason?, event?, minutesUntil? }.
+// Appelée en amont du cycle training (pré-fetch dans handleTrainingAutoCycle).
+async function getNewsWindowForCycle(env) {
+  const events = await fetchHighImpactEventsInWindow(env, 30 * 60 * 1000);
+  if (!events.length) return { blocked: false };
+
+  const now = Date.now();
+  const sorted = events
+    .map(e => ({ ...e, delta: new Date(e.event_time).getTime() - now }))
+    .sort((a, b) => Math.abs(a.delta) - Math.abs(b.delta));
+
+  const ev = sorted[0];
+  const minutesUntil = Math.round(ev.delta / 60000);
+  return {
+    blocked: true,
+    reason: `Événement ${ev.country} "${ev.title}" ${minutesUntil >= 0 ? `dans ${minutesUntil} min` : `il y a ${-minutesUntil} min`} (impact high)`,
+    event: {
+      title: ev.title,
+      country: ev.country,
+      event_time: ev.event_time,
+      forecast: ev.forecast,
+      previous: ev.previous
+    },
+    minutesUntil
+  };
+}
+
+async function handleEconomicCalendar(env) {
+  const events = await fetchEconomicCalendar(env);
+  return json({ status: "ok", asOf: nowIso(), count: events.length, data: events });
+}
+
+async function handleNewsWindow(env) {
+  const window = await getNewsWindowForCycle(env);
+  return json({ status: "ok", asOf: nowIso(), ...window });
+}
+
 async function handleTrending() {
   const cached = getMemoryCache("trending_coins");
   if (cached) return json(cached);
@@ -4655,6 +4878,8 @@ async function handleRequest(request, env) {
     if (url.pathname.startsWith("/api/opportunity-detail/")) return safeRoute(() => handleOpportunityDetail(decodeURIComponent(url.pathname.replace("/api/opportunity-detail/","")), env));
     if (url.pathname === "/api/fear-greed") return safeRoute(() => handleFearGreed());
     if (url.pathname === "/api/regime-indicators") return safeRoute(() => handleRegimeIndicators(env));
+    if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar(env));
+    if (url.pathname === "/api/news-window") return safeRoute(() => handleNewsWindow(env));
     if (url.pathname === "/api/trending") return safeRoute(() => handleTrending());
     if (url.pathname === "/api/news") return safeRoute(() => handleNews(env));
     if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar());
