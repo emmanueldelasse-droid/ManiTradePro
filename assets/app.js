@@ -608,10 +608,24 @@
     state.detailCache[clean] = value;
     persistDetailCache();
 
+    // Fix : ne propage QUE des champs d'affichage cosmétiques vers
+    // state.opportunities. Le endpoint /api/opportunity-detail/<symbol>
+    // calcule un score plus riche (AI review + regimeIndicators + news
+    // context enrichi) que /api/opportunities batch. Écraser la row batch
+    // avec ce score enrichi ferait apparaître un actif non-actionable
+    // comme "Trade propose" juste pour avoir été consulté → incohérence
+    // visuelle Dashboard ↔ fiche. Le batch reste source de vérité pour
+    // la liste. Le détail enrichi vit dans state.detail uniquement.
     const currentList = (state.opportunitiesSnapshot || []).slice();
     const idx = currentList.findIndex(x => String(x.symbol || "").toUpperCase() === clean);
     if (idx >= 0) {
-      currentList[idx] = mergeOpportunityWithStored(currentList[idx], value);
+      const safeBackfill = {
+        name: value.name || currentList[idx].name,
+        assetClass: value.assetClass || currentList[idx].assetClass,
+        candles: Array.isArray(value.candles) && value.candles.length ? value.candles : currentList[idx].candles,
+        freshness: value.freshness || currentList[idx].freshness
+      };
+      currentList[idx] = normalizeOpportunity({ ...currentList[idx], ...safeBackfill });
       saveOpportunitiesSnapshot(currentList);
       state.opportunities = state.opportunities.map(item =>
         String(item.symbol || "").toUpperCase() === clean ? currentList[idx] : item
