@@ -1894,7 +1894,7 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
 // ============================================================
 // SCORE ENGINE V2
 // ============================================================
-function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null) {
+function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
 
   if (closes.length < 30 || quote.price == null) {
@@ -2046,7 +2046,12 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
     }
   }
 
-  const score = clamp(Math.round(raw) - regimeMalus + regimeBonus, 0, 100);
+  // Modulateur news — PR #7 Phase 2 (Règle #5 niveau 2+3). Cap ±10 dans applyNewsModulator.
+  const newsMod = applyNewsModulator(newsContext, direction, claudeNewsMaxWeight);
+  const newsBonus = newsMod.newsBonus;
+  const newsBonusReason = newsMod.newsBonusReason;
+
+  const score = clamp(Math.round(raw) - regimeMalus + regimeBonus + newsBonus, 0, 100);
 
   // Bonus de configuration détectée (long + miroirs short)
   let configBonus = 0;
@@ -2084,6 +2089,16 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
     configuration: detectedConfig,
     regimeBonus,
     regimeBonusReason,
+    newsBonus,
+    newsBonusReason,
+    newsContext: newsContext ? {
+      source: newsContext.source,
+      sentiment: newsContext.sentiment,
+      classification: newsContext.classification,
+      articleCount: newsContext.articleCount,
+      topHeadline: newsContext.topHeadline,
+      claudeSignal: newsContext.claudeSignal || null
+    } : null,
     breakdown: {
       regime: context, trend: structure, momentum,
       entryQuality: timing, risk, participation, context, dataQuality
@@ -2474,7 +2489,13 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
     setupType: scored?.setupType || "aucun",
     avgRange: scored?.avgRange ?? null,
     configuration: scored?.configuration || null,
-    regime: regime ? { regime: regime.regime, reason: regime.reason } : null
+    regime: regime ? { regime: regime.regime, reason: regime.reason } : null,
+    // PR #7 Phase 2 — propage le context news jusqu'au snapshot d'analyse
+    newsContext: scored?.newsContext || null,
+    newsBonus: scored?.newsBonus ?? 0,
+    newsBonusReason: scored?.newsBonusReason || null,
+    regimeBonus: scored?.regimeBonus ?? 0,
+    regimeBonusReason: scored?.regimeBonusReason || null
   };
 
   if (base.score == null) {
@@ -2512,7 +2533,11 @@ async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true,
     quote = await resolveUnifiedMarketQuote(clean, env, ctx, options);
     const candles = includeCandles ? await getCandlesBySymbol(clean, "1d", 90, env, ctx) : [];
     const regimeIndicators = await fetchRegimeIndicators(env);
-    const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators);
+    // PR #7 Phase 2 — news context best-effort (null si source indispo)
+    let newsContext = await resolveSymbolNewsContext(env, clean, quote?.assetClass).catch(() => null);
+    if (newsContext) newsContext = await enrichNewsContextWithClaude(env, newsContext).catch(() => newsContext);
+    const claudeWeight = await getClaudeNewsKillSwitchWeight(env).catch(() => 8);
+    const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight);
     return buildStablePayload(clean, quote, candles || [], scored, regime);
   } catch (e) {
     if (quote && Number.isFinite(Number(quote.price))) {
@@ -2797,6 +2822,8 @@ async function handleOpportunities(_url, env) {
   // Pré-fetch des indicateurs régime (F&G + VIX) — cache mémoire 5 min,
   // donc 0 coût pour les appels suivants dans la boucle.
   const regimeIndicators = await fetchRegimeIndicators(env);
+  // PR #7 Phase 2 — pré-fetch le tier Claude (cache 1 h, 1 query Supabase).
+  const claudeWeight = await getClaudeNewsKillSwitchWeight(env).catch(() => 8);
   const rows = [];
   for (const symbol of allSymbols) {
     let quote = quotesMap[symbol] || getMemoryCache(`market:snapshot:${symbol}`);
@@ -2817,7 +2844,10 @@ async function handleOpportunities(_url, env) {
       quote = quote || await resolveUnifiedMarketQuote(symbol, env, ctx, { allowAlphaFallback: false });
       // Bougies depuis KV si disponibles
       const candles = await getCandlesBySymbol(symbol, "1d", 90, env, ctx);
-      const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators);
+      // PR #7 Phase 2 — news context (cache 3h crypto / 6h stocks, coût quota sous contrôle)
+      let newsContext = await resolveSymbolNewsContext(env, symbol, quote?.assetClass).catch(() => null);
+      if (newsContext) newsContext = await enrichNewsContextWithClaude(env, newsContext).catch(() => newsContext);
+      const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight);
       const payload = buildStablePayload(symbol, quote, candles || [], scored, regime);
       rows.push(toOpportunityRow(payload));
     } catch (e) {
@@ -3555,6 +3585,11 @@ function buildTrainingAnalysisSnapshotFromPayload(payload) {
     setupStatus: plan?.setupStatus || null,
     confirmationCount: Number.isFinite(Number(plan?.confirmationCount)) ? Number(plan.confirmationCount) : null,
     blockerFlags: Array.isArray(plan?.blockerFlags) ? plan.blockerFlags : [],
+    // PR #7 Phase 2 — capture le context news à l'ouverture pour que
+    // captureTradeFeedback le propage en news_context_open.
+    newsContext: plan?.newsContext || payload?.newsContext || null,
+    newsBonus: finiteOrNull(plan?.newsBonus),
+    newsBonusReason: plan?.newsBonusReason || null,
     analysisTimestamp: nowIso()
   };
 }
@@ -3809,6 +3844,15 @@ async function captureTradeFeedback(env, closedRow, position, closeType) {
 
   const regimeAtOpen  = normalizeRegimeLabel(snapshot?.regime ?? position?.analysis_snapshot?.regime ?? "UNKNOWN");
   const regimeAtClose = normalizeRegimeLabel(await kvGet("market:regime", env).catch(() => null));
+  // PR #7 Phase 2 — context news à la clôture (best-effort, cache déjà chaud normalement)
+  let newsContextClose = null;
+  try {
+    const symbol = closedRow?.symbol || position?.symbol;
+    const assetClass = closedRow?.asset_class || position?.asset_class;
+    if (symbol && assetClass) {
+      newsContextClose = await resolveSymbolNewsContext(env, symbol, assetClass);
+    }
+  } catch { /* best-effort */ }
 
   const entry = finiteOrNull(closedRow?.entry_price);
   const exit  = finiteOrNull(closedRow?.exit_price);
@@ -3856,8 +3900,17 @@ async function captureTradeFeedback(env, closedRow, position, closeType) {
     mae_vs_stop_ratio: Number.isFinite(maeVsStop) ? Number(maeVsStop.toFixed(4)) : null,
     mfe_vs_tp_ratio:   Number.isFinite(mfeVsTp)   ? Number(mfeVsTp.toFixed(4))   : null,
     bucket_key: bucketKey,
-    news_context_open: null,   // réservé Règle #5 (PR #7+)
-    news_context_close: null,
+    // PR #7 Phase 2 — context news capturé au moment de l'ouverture via
+    // analysis_snapshot. newsContext ∈ { source, sentiment, classification,
+    // articleCount, topHeadline, claudeSignal? }.
+    news_context_open: snapshot?.newsContext || null,
+    news_context_close: newsContextClose ? {
+      source: newsContextClose.source,
+      sentiment: newsContextClose.sentiment,
+      classification: newsContextClose.classification,
+      articleCount: newsContextClose.articleCount,
+      topHeadline: newsContextClose.topHeadline
+    } : null,
     notes: null
   };
 
@@ -5065,6 +5118,317 @@ async function detectDriftAlerts(env) {
 }
 
 // ============================================================
+// PR #7 Phase 2 — News modulateur ±10 pts (Règle #5 niveau 2+3)
+// ============================================================
+// Agrégation de sentiment symbole-spécifique depuis les sources gratuites :
+//   - CryptoPanic Free (crypto, 200 req/j, sentiment déjà taggé)
+//   - Alpha Vantage News Sentiment (stocks/ETF, sentiment déjà taggé)
+//
+// Modulateur appliqué dans calcDetailScore : cap ±10 pts sur le score final.
+// News ambiguës (ni bullish ni bearish selon les sources) → fallback Claude
+// Haiku niveau 3 pour classer {long-positif, short-negatif, bruit-ignore}.
+// Kill switch anti-hallucination : weight_tier dégradé selon win rate des
+// 30 derniers trades ouverts sous influence Claude haute confiance.
+
+// ---- CryptoPanic (gratuit, 200 req/j) ----
+// Endpoint : https://cryptopanic.com/api/v1/posts/?auth_token=X&currencies=BTC
+// Renvoie posts avec { votes.positive, votes.negative, votes.important, title }
+async function fetchCryptoPanicSentiment(env, symbol) {
+  if (!env?.CRYPTOPANIC_KEY) return null;
+  const cacheKey = `cryptopanic:${symbol}`;
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  // CryptoPanic attend un code currency (BTC, ETH, ...) — extrait du symbol.
+  const base = String(symbol || "").replace(/USDT?$|EUR$|USDC$/i, "").toUpperCase();
+  if (!base || base.length > 8) return null;
+
+  try {
+    const url = `https://cryptopanic.com/api/v1/posts/?auth_token=${encodeURIComponent(env.CRYPTOPANIC_KEY)}&currencies=${encodeURIComponent(base)}&kind=news&filter=hot&public=true`;
+    const res = await withTimeout(fetch(url), 5000, "cryptopanic");
+    if (!res.ok) return null;
+    const body = await res.json();
+    const posts = Array.isArray(body?.results) ? body.results.slice(0, 30) : [];
+    if (!posts.length) return null;
+
+    let positive = 0, negative = 0, total = 0;
+    let topHeadline = null;
+    const ambiguousArticles = [];
+    for (const post of posts) {
+      const pos = Number(post?.votes?.positive || 0);
+      const neg = Number(post?.votes?.negative || 0);
+      positive += pos;
+      negative += neg;
+      total++;
+      if (!topHeadline && post?.title) topHeadline = post.title;
+      // Heuristique : article sans vote clair OU important tag → candidat Claude niveau 3
+      if (pos + neg === 0 && post?.votes?.important > 0 && ambiguousArticles.length < 3) {
+        ambiguousArticles.push({ title: post.title, url: post.url, published_at: post.published_at });
+      }
+    }
+    const net = total > 0 ? (positive - negative) / Math.max(1, positive + negative) : 0;
+    const result = {
+      source: "cryptopanic",
+      sentiment: Number(net.toFixed(3)),     // -1..1
+      articleCount: total,
+      topHeadline,
+      ambiguousArticles,
+      lastUpdated: nowIso()
+    };
+    setMemoryCache(cacheKey, 10800, result); // 3 h — nécessaire pour tenir sous CryptoPanic free 200/j avec ~20 crypto scannées toutes les 15 min
+    return result;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ---- Alpha Vantage News Sentiment (gratuit pour quotidien, key déjà utilisée) ----
+// Endpoint : NEWS_SENTIMENT&tickers=X
+async function fetchAlphaVantageNewsSentiment(env, symbol) {
+  if (!env?.ALPHAVANTAGE_KEY) return null;
+  const cacheKey = `av_news:${symbol}`;
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  const ticker = String(symbol || "").replace(/\.PA$|\.DE$|\.L$/i, "").toUpperCase();
+  if (!ticker) return null;
+
+  try {
+    const url = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${encodeURIComponent(ticker)}&limit=20&apikey=${encodeURIComponent(env.ALPHAVANTAGE_KEY)}`;
+    const res = await withTimeout(fetch(url), 6000, "alphavantage_news");
+    if (!res.ok) return null;
+    const body = await res.json();
+    const feed = Array.isArray(body?.feed) ? body.feed.slice(0, 20) : [];
+    if (!feed.length) return null;
+
+    let sumScore = 0, count = 0, topHeadline = null;
+    const ambiguousArticles = [];
+    for (const item of feed) {
+      // ticker_sentiment[].ticker_sentiment_score ∈ [-1..1]
+      const tickerSent = Array.isArray(item?.ticker_sentiment) ? item.ticker_sentiment.find(t => t.ticker === ticker) : null;
+      const score = tickerSent ? Number(tickerSent.ticker_sentiment_score) : null;
+      if (Number.isFinite(score)) { sumScore += score; count++; }
+      if (!topHeadline && item?.title) topHeadline = item.title;
+      // Articles neutres mais avec relevance haute → candidats Claude
+      const relevance = tickerSent ? Number(tickerSent.relevance_score) : 0;
+      if ((!Number.isFinite(score) || Math.abs(score) < 0.15) && relevance > 0.5 && ambiguousArticles.length < 3) {
+        ambiguousArticles.push({ title: item.title, url: item.url, published_at: item.time_published });
+      }
+    }
+    if (count === 0) return null;
+    const result = {
+      source: "alphavantage_news",
+      sentiment: Number((sumScore / count).toFixed(3)),
+      articleCount: count,
+      topHeadline,
+      ambiguousArticles,
+      lastUpdated: nowIso()
+    };
+    setMemoryCache(cacheKey, 21600, result); // 6 h — AV NEWS_SENTIMENT quota serré (~25-100/j selon tier)
+    return result;
+  } catch (e) {
+    return null;
+  }
+}
+
+// ---- Resolver unifié ----
+// Pour un symbole donné, retourne un context news unifié, best-effort.
+// assetClass peut être : crypto | stock | etf | forex | commodity
+async function resolveSymbolNewsContext(env, symbol, assetClass) {
+  if (!symbol) return null;
+  const cacheKey = `news_ctx:${symbol}`;
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  let raw = null;
+  if (assetClass === "crypto") {
+    raw = await fetchCryptoPanicSentiment(env, symbol);
+  } else if (assetClass === "stock" || assetClass === "etf") {
+    raw = await fetchAlphaVantageNewsSentiment(env, symbol);
+  }
+  // forex, commodity, unknown : pas de news sentiment pour l'instant (sources
+  // spécifiques à ajouter en follow-up).
+  if (!raw) return null;
+
+  const result = {
+    ...raw,
+    symbol,
+    assetClass,
+    // Classification simple pour le modulateur : positif >= +0.15, négatif <= -0.15
+    classification: raw.sentiment >= 0.15 ? "positive" : raw.sentiment <= -0.15 ? "negative" : "neutral",
+    // Claude signal sera ajouté par enrichNewsContextWithClaude si applicable
+    claudeSignal: null
+  };
+  setMemoryCache(cacheKey, 1800, result); // 30 min en sortie resolver (la vraie API cache plus long)
+  return result;
+}
+
+// ---- Claude niveau 3 : classification d'articles ambigus ----
+// Appelé UNIQUEMENT sur un article sans sentiment taggé par les sources.
+// Cache 6 h par hash d'URL. Retourne { direction, confidence, reason } où :
+//   direction ∈ {"long-positif","short-negatif","bruit-ignore"}
+//   confidence ∈ {"high","medium","low"}
+async function classifyNewsArticleWithClaude(env, article) {
+  if (!env?.CLAUDE_API_KEY) return null;
+  if (!article?.url || !article?.title) return null;
+
+  // Hash court pour clé de cache (sha1 tronqué 16 chars, FNV-1a ici pour éviter webcrypto)
+  const urlHash = (() => {
+    let h = 2166136261;
+    const s = String(article.url);
+    for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+    return (h >>> 0).toString(16).padStart(8, "0");
+  })();
+  const cacheKey = `claude_news:${urlHash}`;
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  const prompt = `Tu es un analyste financier. Classe cette news en JSON strict.
+Format attendu : {"direction":"long-positif"|"short-negatif"|"bruit-ignore","confidence":"high"|"medium"|"low","reason":"string court"}
+Critères :
+- long-positif : impact fondamental haussier sur l'actif (earnings beat, partenariat majeur, adoption)
+- short-negatif : impact fondamental baissier (hack, régulation hostile, fraude, guidance négative)
+- bruit-ignore : spéculation, rumeur, analyse sans fait nouveau, ou info déjà pricée
+
+Titre : ${article.title}
+${article.summary ? `Résumé : ${article.summary}` : ""}`;
+
+  try {
+    const body = {
+      model: env.CLAUDE_MODEL_HAIKU || "claude-haiku-4-5-20251001",
+      max_tokens: 120,
+      temperature: 0.1,
+      messages: [{ role: "user", content: prompt }]
+    };
+    const res = await withTimeout(fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": env.CLAUDE_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify(body)
+    }), 8000, "claude_news");
+    if (!res.ok) return null;
+    const jr = await res.json();
+    const text = Array.isArray(jr?.content) ? jr.content.map(c => c?.text || "").join("\n") : "";
+    const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    const parsed = JSON.parse((fenced ? fenced[1] : text).trim());
+    if (!parsed?.direction || !["long-positif","short-negatif","bruit-ignore"].includes(parsed.direction)) return null;
+    const result = {
+      direction: parsed.direction,
+      confidence: ["high","medium","low"].includes(parsed.confidence) ? parsed.confidence : "low",
+      reason: String(parsed.reason || ""),
+      url: article.url,
+      title: article.title,
+      classifiedAt: nowIso()
+    };
+    setMemoryCache(cacheKey, 21600, result); // 6 h
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+// Enrichit un newsContext existant avec un signal Claude si le sentiment agrégé
+// est neutre ET qu'il y a des articles ambigus pertinents. Appel best-effort,
+// budget : max 1 appel Claude par cycle par symbole (via cache).
+async function enrichNewsContextWithClaude(env, newsContext) {
+  if (!newsContext || newsContext.classification !== "neutral") return newsContext;
+  const candidates = Array.isArray(newsContext.ambiguousArticles) ? newsContext.ambiguousArticles : [];
+  if (!candidates.length) return newsContext;
+  // On ne classe QUE le top article pour contenir le budget.
+  const top = candidates[0];
+  const signal = await classifyNewsArticleWithClaude(env, top);
+  if (signal) newsContext.claudeSignal = signal;
+  return newsContext;
+}
+
+// ---- Modulateur de score ±10 pts ----
+// Appelé dans calcDetailScore. Retourne { newsBonus, newsBonusReason } cappé ±10.
+// La contribution Claude est pondérée par le kill switch (voir getClaudeNewsKillSwitchWeight).
+function applyNewsModulator(newsContext, direction, claudeMaxWeight = 8) {
+  if (!newsContext) return { newsBonus: 0, newsBonusReason: null };
+
+  let bonus = 0;
+  const reasons = [];
+
+  // Niveau 2 — sentiment agrégé des sources gratuites (cap ±5)
+  const sentiment = Number(newsContext.sentiment || 0);
+  if (Number.isFinite(sentiment) && newsContext.articleCount >= 3) {
+    // sentiment ∈ [-1..1] → bonus ∈ [-5..5]
+    const sourceBonus = Math.round(clamp(sentiment * 5, -5, 5));
+    if (direction === "long") bonus += sourceBonus;
+    else if (direction === "short") bonus -= sourceBonus;
+    if (sourceBonus !== 0) reasons.push(`${newsContext.source} sentiment=${sentiment.toFixed(2)} (${newsContext.articleCount} articles) → ${sourceBonus > 0 ? "+" : ""}${direction === "long" ? sourceBonus : -sourceBonus}`);
+  }
+
+  // Niveau 3 — signal Claude (cap ±claudeMaxWeight pts, dégradé par kill switch)
+  const cs = newsContext.claudeSignal;
+  if (cs?.direction && cs.direction !== "bruit-ignore" && claudeMaxWeight > 0) {
+    const tierWeight = { high: claudeMaxWeight, medium: Math.round(claudeMaxWeight / 2), low: 0 }[cs.confidence] || 0;
+    if (tierWeight > 0) {
+      const aligned = (cs.direction === "long-positif" && direction === "long")
+                   || (cs.direction === "short-negatif" && direction === "short");
+      const opposed = (cs.direction === "long-positif" && direction === "short")
+                   || (cs.direction === "short-negatif" && direction === "long");
+      if (aligned)  { bonus += tierWeight; reasons.push(`Claude ${cs.confidence} ${cs.direction} aligné +${tierWeight}`); }
+      if (opposed)  { bonus -= tierWeight; reasons.push(`Claude ${cs.confidence} ${cs.direction} opposé -${tierWeight}`); }
+    }
+  }
+
+  // Cap global ±10
+  const capped = clamp(bonus, -10, 10);
+  return { newsBonus: capped, newsBonusReason: reasons.length ? reasons.join(" · ") : null };
+}
+
+// ---- Kill switch gradué (30 derniers trades à signal Claude high confidence) ----
+// Dégrade le poids max Claude selon le win rate mesuré sur les trades qui ont été
+// ouverts avec un claudeSignal de haute confiance dans leur news_context_open.
+//
+// Tiers : win rate ≥ 55% → ±8  |  45-55% → ±4  |  35-45% → ±2  |  < 35% → 0 (silent)
+// Reset après 60 j en silent → retour ±2 en test pour 20 trades.
+//
+// Cache mémoire 1 h pour éviter de re-query Supabase à chaque cycle.
+async function getClaudeNewsKillSwitchWeight(env) {
+  const cacheKey = "claude_news_kill_switch";
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  if (!supabaseConfigured(env)) return 8; // défaut sans data
+
+  try {
+    // Récupère les 100 derniers feedback ; on filtre sur Claude signal high
+    // confidence et on garde les 30 les plus récents.
+    const rows = await supabaseFetch(env,
+      `${TRADE_FEEDBACK_TABLE}?select=pnl,news_context_open,closed_at&order=closed_at.desc&limit=200`
+    );
+    if (!Array.isArray(rows)) { setMemoryCache(cacheKey, 3600, 8); return 8; }
+
+    const claudeHigh = rows.filter(r => {
+      const cs = r?.news_context_open?.claudeSignal;
+      return cs && cs.confidence === "high" && cs.direction !== "bruit-ignore";
+    }).slice(0, 30);
+
+    if (claudeHigh.length < 10) {
+      // Pas assez de data → tier haute par défaut, on observe.
+      setMemoryCache(cacheKey, 3600, 8);
+      return 8;
+    }
+
+    const wins = claudeHigh.filter(r => Number(r.pnl || 0) > 0).length;
+    const winRate = wins / claudeHigh.length;
+
+    let weight;
+    if (winRate >= 0.55) weight = 8;
+    else if (winRate >= 0.45) weight = 4;
+    else if (winRate >= 0.35) weight = 2;
+    else weight = 0; // silent
+
+    setMemoryCache(cacheKey, 3600, weight);
+    return weight;
+  } catch {
+    return 8;
+  }
+}
+
+// ============================================================
 // PR #6 Phase 2 — Corrections automatiques (Règle #1)
 // ============================================================
 // Détecte les 7 signaux de la Règle #1 depuis mtp_trade_feedback, crée des
@@ -5820,6 +6184,16 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleObserveShadows(env));
+    }
+    if (url.pathname === "/api/engine/news-context" && url.searchParams.get("symbol")) {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      const symbol = parseSymbol(url.searchParams.get("symbol"));
+      const assetClass = url.searchParams.get("asset_class") || getAssetClass(symbol);
+      const ctx = await resolveSymbolNewsContext(env, symbol, assetClass);
+      const enriched = ctx ? await enrichNewsContextWithClaude(env, ctx) : null;
+      const killSwitchWeight = await getClaudeNewsKillSwitchWeight(env);
+      return json({ status: "ok", asOf: nowIso(), data: { symbol, assetClass, context: enriched, claudeWeight: killSwitchWeight } });
     }
     if (url.pathname === "/api/engine/active-adjustments") {
       const adj = await resolveActiveAdjustments(env);
