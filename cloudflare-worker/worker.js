@@ -4834,7 +4834,6 @@ async function handleTrending() {
     return json({ status: "partial", source: "error", asOf: nowIso(), freshness: "unknown", message: String(err?.message || err), data: [] });
   }
 }
-async function handleEconomicCalendar() { return json({ status:"not_configured",source:null,asOf:null,freshness:"unknown",message:"Economic calendar not configured",data:[] }); }
 async function handlePortfolioSummary() { return json({ status:"not_configured",source:null,asOf:null,freshness:"unknown",message:"No real portfolio source configured",data:{totalEquity:null,availableCash:null,totalPnl:null,totalPnlPct:null} }); }
 async function handlePortfolioPositions() { return json({ status:"not_configured",source:null,asOf:null,freshness:"unknown",message:"No real positions source configured",data:[] }); }
 
@@ -5106,7 +5105,6 @@ async function handleRequest(request, env) {
     if (url.pathname === "/api/engine/bucket-stats") return safeRoute(() => handleBucketStats(env));
     if (url.pathname === "/api/trending") return safeRoute(() => handleTrending());
     if (url.pathname === "/api/news") return safeRoute(() => handleNews(env));
-    if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar());
     if (url.pathname === "/api/portfolio/summary") return safeRoute(() => handlePortfolioSummary());
     if (url.pathname === "/api/portfolio/positions") return safeRoute(() => handlePortfolioPositions());
     if (url.pathname === "/api/training/account") {
