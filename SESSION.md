@@ -156,6 +156,24 @@ Audit des 21 trades clôturés en Supabase (du 2026-04-08 au 2026-04-23). **Pape
 - ❌ Refonte moteur — il détecte des trades, c'est la base. Le travail est sur la finesse des setups et la lecture des pertes, pas l'architecture.
 - ❌ Considérer une perte comme un échec — c'est un cas d'étude. Seul un trade dont on ne comprend pas la perte est un vrai échec.
 
+### Critère de passage en argent réel
+
+**Règle impérative** : rester en paper trading tant que le bot n'a pas un résultat positif mesurable. On passe en réel **uniquement** quand :
+
+1. **Expected value > 0** sur **au moins 50 trades** clôturés (échantillon minimum pour une stat fiable).
+2. **PnL cumulé paper net positif** sur la même fenêtre.
+3. **Aucun `pnl=0` cassé** dans le dataset (fix terminé et propre).
+4. **Au moins 5 post-mortem formalisés** avec cause identifiée → ça prouve qu'on sait lire les pertes, pas juste les subir.
+
+Tant que les 4 conditions ne sont pas réunies : **100 % paper**, on apprend.
+
+**Passage en réel progressif** (pas un switch brutal) :
+- Étape A : taille de position réduite (20-30 % de ce que calculerait l'engine en paper), pendant 20 trades réels.
+- Étape B : si Étape A confirme le comportement paper, taille normale.
+- Retour en paper **immédiat** si drawdown réel > 10 % du capital alloué.
+
+Ce critère est verrouillé ici pour que les prochaines sessions Claude ne poussent pas à un passage prématuré, et que l'utilisateur lui-même puisse s'y référer quand l'impatience se fait sentir.
+
 ### Clés d'accès au dataset
 - **Endpoint auth admin** : `GET /api/trades/state` avec `Authorization: Bearer <session_token>` (token dans `localStorage["mtp_session_v1"].token` après login PIN).
 - **Snippet console pour dumper** :
