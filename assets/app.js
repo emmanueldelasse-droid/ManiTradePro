@@ -1292,12 +1292,24 @@ function renderTradeConfirmModal() {
     ? (plan?.reason || "Le moteur propose ce setup.")
     : "Trade manuel d'entrainement depuis la fiche actif.";
   const contextLabel = isCrypto ? "Crypto · volatilite elevee · stop ~" + num(stopPct * 100, 1) + "%" : "Action/ETF · stop ~" + num(stopPct * 100, 1) + "%";
+  const nw = state.dashboard?.newsWindow;
+  const newsBlocked = !!(nw && nw.blocked);
+  const newsWarning = newsBlocked ? (() => {
+    const ev = nw.event || {};
+    const minutes = Number(nw.minutesUntil);
+    const when = Number.isFinite(minutes)
+      ? (minutes < 0 ? `il y a ${-minutes} min` : `dans ${minutes} min`)
+      : "imminent";
+    const label = `${ev.country || ""} ${ev.title || "Événement macro"}`.trim();
+    return `<div class="trade-news-warning" role="alert"><span class="nww-icon">⚠️</span><div><div class="nww-head">Événement macro high-impact ${safeText(when)}</div><div class="nww-sub">${safeText(label)} — l'auto-cycle bloque les entrées sur cette fenêtre (±30 min). Ouverture manuelle à tes risques.</div></div></div>`;
+  })() : "";
 
   return `
     <div class="modal-backdrop" data-cancel-trade-confirm style="position:fixed;inset:0;background:rgba(3,8,20,.72);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px">
       <div class="card" style="width:min(560px,100%);padding:18px 18px 16px;border:1px solid rgba(255,255,255,.12)" onclick="event.stopPropagation()">
         <div class="section-title"><span>${safeText(title)}</span><span>${safeText(d?.symbol || "—")}</span></div>
         <div class="trade-context-pill ${isCrypto ? "crypto" : "stock"}">${safeText(contextLabel)}</div>
+        ${newsWarning}
         <div class="kv" style="margin-top:10px">
           <div class="muted">Actif</div><div>${safeText(d?.symbol || "—")} · ${safeText(d?.name || "")}</div>
           <div class="muted">Sens</div><div>${safeText(simpleSideLabel(side || "long"))}</div>
@@ -1329,10 +1341,40 @@ function closeTradeConfirmModal() {
   render();
 }
 
-function confirmTradeFromModal() {
+async function refreshDetailForTrade(symbol) {
+  const cleanSymbol = String(symbol || "").toUpperCase();
+  if (!cleanSymbol) return false;
+  try {
+    const detail = await api(`/api/opportunity-detail/${encodeURIComponent(cleanSymbol)}?fresh=1`, 8000);
+    if (!detail?.data) return false;
+    const merged = normalizeOpportunity({
+      ...(detail.data || {}),
+      candles: Array.isArray(detail?.data?.candles) && detail.data.candles.length
+        ? detail.data.candles
+        : (state.detail?.candles || [])
+    });
+    state.detail = merged;
+    saveDetailCache(cleanSymbol, merged);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function confirmTradeFromModal() {
   const mode = state.tradeConfirm?.mode;
   const side = state.tradeConfirm?.side || null;
+  const symbol = state.detail?.symbol || null;
   state.tradeConfirm = { open: false, mode: null, side: null };
+  state.loadingDetail = true;
+  render();
+  const refreshed = symbol ? await refreshDetailForTrade(symbol) : false;
+  state.loadingDetail = false;
+  if (!refreshed) {
+    state.error = "Impossible d'actualiser le prix avant l'ouverture. Réessaie.";
+    render();
+    return;
+  }
   if (mode === "recommended") createRecommendedTrade();
   else if (mode === "manual" && side) addTrainingTradeFromDetail(side);
 }

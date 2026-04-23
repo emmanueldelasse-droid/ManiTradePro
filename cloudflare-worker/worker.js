@@ -2908,14 +2908,23 @@ function getOpportunityRowFromSnapshot(symbol) {
 // ============================================================
 // HANDLE OPPORTUNITY DETAIL
 // ============================================================
-async function handleOpportunityDetail(symbol, env) {
+async function handleOpportunityDetail(symbol, env, url = null) {
   const clean = parseSymbol(symbol);
   if (!clean) return fail("Invalid symbol", "error", 400);
 
   const detailTtl = isCrypto(clean) ? TTL.detailCrypto : TTL.detailNonCrypto;
   const cacheKey = `route:detail:data:${clean}`;
+  const forceFresh = url?.searchParams?.get("fresh") === "1";
 
-  const cachedPayload = getMemoryCache(cacheKey);
+  if (forceFresh) {
+    memoryCache.delete(cacheKey);
+    memoryCache.delete(`quote:binance:${clean}`);
+    memoryCache.delete(`quote:twelve:${clean}`);
+    memoryCache.delete(`quote:alpha:${clean}`);
+    memoryCache.delete(`market:snapshot:${clean}`);
+  }
+
+  const cachedPayload = forceFresh ? null : getMemoryCache(cacheKey);
   if (cachedPayload) {
     const payload = cloneJsonPayload(cachedPayload);
     const ctx = createBudgetContext("detail");
@@ -6709,7 +6718,7 @@ async function handleHealth(request, env) {
     engineRuleset: ENGINE_RULESET,
     liveDataOnly: true,
     panel: { symbols: LIGHT_SYMBOLS.length, proxyRegime: PROXY_REGIME_SYMBOLS },
-    strategies: { enabled: ["pullback","breakout","continuation"], disabled: ["mean_reversion"], shorts: false },
+    strategies: { enabled: ["pullback","breakout","continuation"], disabled: ["mean_reversion"], shorts: true },
     cron: { configured: true, schedule: "*/30 13-20 utc weekdays + 0 */2 off-hours" },
     adminProtectionEnabled: hasConfiguredAdminToken(env)
   };
@@ -6835,7 +6844,7 @@ async function handleRequest(request, env) {
     if (url.pathname.startsWith("/api/market-snapshot/")) return safeRoute(() => handleMarketSnapshot(decodeURIComponent(url.pathname.replace("/api/market-snapshot/","")), env));
     if (url.pathname.startsWith("/api/candles/")) return safeRoute(() => handleCandles(decodeURIComponent(url.pathname.replace("/api/candles/","")), url, env));
     if (url.pathname === "/api/opportunities") return safeRoute(() => handleOpportunities(url, env));
-    if (url.pathname.startsWith("/api/opportunity-detail/")) return safeRoute(() => handleOpportunityDetail(decodeURIComponent(url.pathname.replace("/api/opportunity-detail/","")), env));
+    if (url.pathname.startsWith("/api/opportunity-detail/")) return safeRoute(() => handleOpportunityDetail(decodeURIComponent(url.pathname.replace("/api/opportunity-detail/","")), env, url));
     if (url.pathname === "/api/fear-greed") return safeRoute(() => handleFearGreed());
     if (url.pathname === "/api/regime-indicators") return safeRoute(() => handleRegimeIndicators(env));
     if (url.pathname === "/api/economic-calendar") return safeRoute(() => handleEconomicCalendar(env));

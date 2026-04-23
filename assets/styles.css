@@ -1101,6 +1101,11 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .news-window-widget.clear{border-color:rgba(0,229,160,.25)}
 .news-window-widget.blocked .nww-head{color:var(--loss)}
 .news-window-widget.blocked{border-color:rgba(224,90,90,.3);background:rgba(224,90,90,.06)}
+.trade-news-warning{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:10px 12px;border-radius:10px;border:1px solid rgba(224,90,90,.35);background:rgba(224,90,90,.08)}
+.trade-news-warning .nww-icon{font-size:1.1rem;line-height:1;flex-shrink:0}
+.trade-news-warning > div{min-width:0;flex:1}
+.trade-news-warning .nww-head{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--loss)}
+.trade-news-warning .nww-sub{font-size:.8rem;color:var(--text-secondary);margin-top:2px;overflow-wrap:normal;word-break:normal}
 
 /* Santé du bot — PR #4 Phase 1 */
 .health-adj-row{padding:12px 14px;border:1px solid var(--border-subtle);border-radius:10px;margin-bottom:8px;background:var(--bg-elevated)}
