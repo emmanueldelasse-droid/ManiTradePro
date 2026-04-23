@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-23 (PR #9 Phase 2 — rapport hebdo + décroissance — fin Phase 2) |
+| **Dernière mise à jour** | 2026-04-23 (iPhone compactification fiche actif — post Phase 2) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/phase2-pr9-weekly-report` |
+| **Branche active** | `claude/iphone-compact-asset-detail` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -895,3 +895,4 @@ Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #8 : auto-watchlist trending CoinGecko + dormancy detector + pin/unpin + UI Réglages |
 | 2026-04-23 | Claude opus-4-7 | CI : auto-apply Supabase migrations via Management API |
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #9 : rapport Claude Sonnet hebdo + décroissance temporelle + UI onglet Rapports — **FIN PHASE 2** |
+| 2026-04-23 | Claude opus-4-7 | iPhone compactification fiche actif : breakdown 6 rangées denses + masquage news vide + media query < 430px |
