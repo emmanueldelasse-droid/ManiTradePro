@@ -1091,6 +1091,26 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .health-bucket-delta.negative{color:var(--loss)}
 .health-bucket-delta.warn{color:#f0a020}
 .health-bucket-delta.neutral{color:var(--profit)}
+
+/* PR #9 Phase 2 — rapports hebdomadaires */
+.reports-list{display:flex;flex-direction:column;gap:10px}
+.report-card{border:1px solid var(--border-subtle);border-radius:12px;background:var(--bg-elevated);cursor:pointer;transition:border-color .15s}
+.report-card:hover{border-color:var(--border-medium,var(--border-subtle))}
+.report-card.is-open{border-color:var(--accent,var(--profit))}
+.report-head{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;min-height:56px}
+.report-title{font-weight:700;font-size:.95rem;margin-bottom:4px}
+.report-meta{font-size:.8rem;color:var(--text-secondary);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.report-chev{color:var(--text-secondary);flex-shrink:0}
+.report-body{padding:0 16px 16px 16px;border-top:1px solid var(--border-subtle)}
+.report-markdown{font-size:.92rem;line-height:1.6;margin-top:10px}
+.report-markdown h2{font-size:1.05rem;margin:14px 0 6px;color:var(--text-primary)}
+.report-markdown h3{font-size:.95rem;margin:12px 0 4px;color:var(--text-primary);font-weight:700}
+.report-markdown h4{font-size:.88rem;margin:10px 0 4px;color:var(--text-primary);font-weight:700}
+.report-markdown ul{margin:6px 0;padding-left:22px}
+.report-markdown li{margin:3px 0}
+.report-markdown p{margin:6px 0}
+.report-markdown strong{color:var(--text-primary)}
+.report-footer{font-size:.72rem;margin-top:12px;padding-top:10px;border-top:1px solid var(--border-subtle);font-family:var(--font-mono)}
 .bot-toggle-big{position:relative;width:58px;height:32px;flex-shrink:0;cursor:pointer}
 .bot-toggle-big input{opacity:0;width:0;height:0}
 .bot-toggle-slider{position:absolute;inset:0;border-radius:999px;background:var(--bg-elevated);border:1px solid var(--border-medium);transition:background .2s}

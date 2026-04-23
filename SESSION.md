@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-23 (PR #8 Phase 2 — auto-watchlist) |
+| **Dernière mise à jour** | 2026-04-23 (PR #9 Phase 2 — rapport hebdo + décroissance — fin Phase 2) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/phase2-pr8-auto-watchlist` |
+| **Branche active** | `claude/phase2-pr9-weekly-report` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -806,8 +806,60 @@ Implémente la **Règle #5 C** : le bot ajoute automatiquement les cryptos trend
 - Après 90 j d'inactivité sur un symbole `source='auto'`, `auto_remove` apparaît.
 - Onglet **Réglages → Actifs surveillés** : badges `auto` sur les ajouts bot, bouton épingle opérationnel.
 
-#### PR #9 — Rapport Claude hebdo + décroissance temporelle — ⏳ À VENIR
-Rapport lundi matin via Claude Sonnet ($2/mois). Pondération exponentielle des trades anciens (30j=1.0, 90j=0.5, 365j=0.2, >1an=0.1) dans les agrégations de buckets.
+#### PR #9 — Rapport Claude hebdo + décroissance temporelle — ✅ EN COURS (branche `claude/phase2-pr9-weekly-report`)
+
+**Migration 008** `mtp_weekly_reports` : week_start/week_end, report_markdown, stats_snapshot jsonb, trades_analyzed, corrections_applied, claude_model + tokens_input/output + generation_duration_ms, status (generated|archived|failed) + error_message. UNIQUE(week_start) → dedup automatique.
+
+**Décroissance temporelle** (Règle #1 D de l'objectif final)
+- `computeTemporalWeight(closedAt)` : 0-30j → 1.0, 31-90j → 0.5, 91-365j → 0.2, > 1 an → 0.1.
+- `aggregateFeedbackBuckets` étendu : ajoute `totalWeight`, `weightedWins`, `weightedSumPnl`, `weightedSumPnlPct` par bucket. Expose `weightedWinRate`, `weightedExpectancy`, `weightedAvgPnlPct`.
+- `detectCorrectionSignals` (PR #6) priorise `weightedExpectancy` quand disponible → les détecteurs de correction (R1, R2) se basent sur les trades récents, s'adaptant aux régimes de marché.
+
+**Rapport hebdo Claude Sonnet** (Règle #1 F)
+- `getPreviousWeekRange(ref)` : calcule lundi→dimanche écoulé en UTC.
+- `collectWeeklyReportStats(env, weekStart, weekEnd)` agrège :
+  * `feedback` de la semaine (mtp_trade_feedback sur intervalle)
+  * wins/losses/winRate/totalPnl/avgWin/avgLoss/expectancy/rrEffective
+  * top 3 gains + top 3 pertes (symbol + setup + direction)
+  * leaderboard buckets (top 5 par pnl + bottom 3 négatifs)
+  * ajustements activés/rolled back dans la semaine
+- `generateWeeklyReport(env, {refDate, force})` : prompt Claude Sonnet structuré 5 sections markdown (Synthèse / Chiffres clés / Patterns / Corrections / Recommandations), max_tokens 800, temperature 0.4.
+- Semaine sans trade → persist quand même un rapport "Aucun trade clos".
+- Erreur Claude → persist `status='failed'` + `error_message` pour audit.
+- Coût estimé ~$0.03-0.05/rapport → **< $0.25/mois**.
+
+**Tick scheduled**
+- **Lundi 6h UTC** (= 7h CET hiver, 8h CEST été) dans `handleScheduledCycle`.
+- Dedup via unique(week_start) : re-run même lundi = skip.
+
+**Endpoints admin**
+- `POST /api/reports/weekly/generate` body `{force?, week_end?}` : génération manuelle. `week_end` permet de rattraper une semaine passée.
+- `GET /api/reports/weekly?limit=N` : liste les rapports récents.
+
+**UI onglet Rapports** (menu Plus, icône document)
+- `state.reports = { list, loading, error, openId, generating }`.
+- `loadReports()` + `generateReportNow()` (bouton « Forcer génération semaine dernière »).
+- `renderReports()` : liste de `.report-card` avec header (titre + meta winrate/pnl/corr + chevron) + body dépliable au clic.
+- `renderMarkdown(md)` helper minimaliste (headings h2/h3/h4, gras, italique, bullets → `<ul>`). **XSS-safe** : `safeText(md)` appelé EN PREMIER pour échapper, puis regex transforme uniquement les patterns markdown connus.
+- 3 listeners : `data-generate-report`, `data-reload-reports`, `data-report-toggle`.
+- Footer de chaque rapport : modèle Claude + tokens + durée ms (audit).
+
+**CSS `.report-*`**
+- 100% `var(--...)` + `var(--accent, var(--profit))` fallback.
+- `.report-card.is-open` : bordure accent. `.report-head` min-height 56px (touch cible large).
+- `.report-markdown` styles h2/h3/h4/ul/li/p/strong lisibles.
+
+**Déploiement requis côté utilisateur**
+1. Migration 008 auto-appliquée via workflow CI (PR #65) dès merge.
+2. `wrangler deploy` auto via GitHub Actions.
+3. Aucune nouvelle clé : utilise `CLAUDE_API_KEY` + `CLAUDE_MODEL_SONNET` (optionnel, défaut `claude-sonnet-4-6`).
+
+**Validation paper**
+- Lundi matin suivant : onglet **Plus → Rapports hebdo** → liste non vide avec rapport auto-généré.
+- Alternative rattrapage : bouton « Forcer génération semaine dernière » → génère immédiatement.
+- Vérifier coût Claude dans `mtp_training_events` event `weekly_report_generated` (payload contient `tokens_out`).
+
+**Phase 2 TERMINÉE** ✅ : 5 PRs livrées (#59 #62 #63 #64 + cette PR). Toutes les 5 règles de l'objectif final sont maintenant opérationnelles (autonomie cron PR #1, long/short + F&G/VIX PR #2, news garde-fou PR #3, shadow/drift PR #4, feedback MAE/MFE PR #5, corrections auto PR #6, news modulateur + Claude niveau 3 PR #7, auto-watchlist PR #8, rapport hebdo + décroissance PR #9).
 
 ### Règle de garde — ne pas ajouter de feature qui n'avance pas ces 5 règles
 Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'apprentissage+correction, ni la validation, ni l'exécution long/short, ni l'intégration du contexte fondamental → le reporter. L'app a déjà trop de features d'assistant ; il en faut moins mais qui servent le bot.
@@ -841,3 +893,5 @@ Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #6 : détection 6 règles corrections + shadow→active/rollback + apply moteur + UI Santé bot |
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #7 : news modulateur ±10 pts (CryptoPanic + Alpha Vantage) + Claude Haiku niveau 3 + kill switch gradué |
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #8 : auto-watchlist trending CoinGecko + dormancy detector + pin/unpin + UI Réglages |
+| 2026-04-23 | Claude opus-4-7 | CI : auto-apply Supabase migrations via Management API |
+| 2026-04-23 | Claude opus-4-7 | Phase 2 PR #9 : rapport Claude Sonnet hebdo + décroissance temporelle + UI onglet Rapports — **FIN PHASE 2** |

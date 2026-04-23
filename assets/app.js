@@ -122,6 +122,7 @@
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
     bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false },
     health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 },
+    reports: { list: [], loading: false, error: null, openId: null, generating: false },   // PR #9 Phase 2 — rapports hebdo
     tradeFeedback: {} // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
   };
 
@@ -133,13 +134,14 @@
     ["portfolio", "Mes trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
     ["bot", "Bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`],
     ["health", "Sante bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`],
+    ["reports", "Rapports hebdo", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`],
     ["performance", "Performance", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
 
-  // Mobile bottom-nav : 4 items principaux + "Plus" (Bot + Santé + Performance + Réglages)
+  // Mobile bottom-nav : 4 items principaux + "Plus" (Bot + Santé + Rapports + Performance + Réglages)
   const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
-  const MORE_NAV_ROUTES = ["bot", "health", "performance", "settings"];
+  const MORE_NAV_ROUTES = ["bot", "health", "reports", "performance", "settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
@@ -1814,6 +1816,46 @@ function confirmTradeFromModal() {
       state.tradeFeedback = map;
     } catch {
       // silencieux — l'UI garde le dernier snapshot
+    }
+  }
+
+  async function loadReports() {
+    // PR #9 Phase 2 — charge la liste des rapports hebdo
+    state.reports.loading = true;
+    state.reports.error = null;
+    render();
+    try {
+      const resp = await api("/api/reports/weekly?limit=20").catch(() => null);
+      const rows = Array.isArray(resp?.data) ? resp.data : [];
+      state.reports.list = rows;
+      state.reports.error = null;
+    } catch (e) {
+      state.reports.error = e.message || "Erreur de chargement";
+      state.reports.list = [];
+    } finally {
+      state.reports.loading = false;
+      render();
+    }
+  }
+
+  async function generateReportNow() {
+    if (state.reports.generating) return;
+    haptic([15, 20, 15]);
+    state.reports.generating = true;
+    render();
+    try {
+      const res = await apiPost("/api/reports/weekly/generate", { force: true });
+      if (res?.data?.ok === false) {
+        alert(`Erreur : ${res.data.reason || "impossible de générer"}`);
+      } else if (res?.data?.skipped) {
+        alert(`Déjà généré pour ${res.data.weekStart}. Coche "forcer" dans le body si tu veux régénérer.`);
+      }
+      await loadReports();
+    } catch (e) {
+      alert(`Erreur : ${e.message || "génération impossible"}`);
+    } finally {
+      state.reports.generating = false;
+      render();
     }
   }
 
@@ -5923,6 +5965,92 @@ function openPositionsRiskView() {
       </div>`;
   }
 
+  // PR #9 Phase 2 — rendu très léger du markdown (headings, bullets, gras).
+  // Volontairement minimaliste pour ne pas ajouter de lib ; Claude produit un
+  // markdown prévisible.
+  function renderMarkdown(md) {
+    if (!md) return "";
+    let html = safeText(md);
+    // Headings
+    html = html.replace(/^###\s+(.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^##\s+(.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^#\s+(.+)$/gm, '<h2>$1</h2>');
+    // Bold
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Italic (simple)
+    html = html.replace(/(^|\s)_(.+?)_(\s|$)/g, '$1<em>$2</em>$3');
+    // Bullets
+    html = html.replace(/^[-*]\s+(.+)$/gm, '<li>$1</li>');
+    // Wrap consecutive <li> in <ul>
+    html = html.replace(/(<li>[\s\S]+?<\/li>)(?!\s*<li>)/g, '<ul>$1</ul>');
+    html = html.replace(/<\/ul>\s*<ul>/g, "");
+    // Paragraphs : lignes restantes non-tagged
+    html = html.split(/\n{2,}/).map(chunk => {
+      if (/^\s*<(h2|h3|h4|ul|li)/i.test(chunk)) return chunk;
+      return chunk.trim() ? `<p>${chunk.replace(/\n/g, '<br>')}</p>` : "";
+    }).join("\n");
+    return html;
+  }
+
+  function renderReports() {
+    const reports = state.reports.list || [];
+    const openId = state.reports.openId;
+    const loading = state.reports.loading;
+    const err = state.reports.error;
+
+    const formatDate = (d) => d ? new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "short" }) : "—";
+    const reportCard = (r) => {
+      const isOpen = r.id === openId;
+      const stats = r.stats_snapshot?.trades || {};
+      const statusBadge = r.status === "failed"
+        ? `<span class="mod-chip negative">échec</span>`
+        : r.status === "archived"
+        ? `<span class="mod-chip neutral">archivé</span>`
+        : "";
+      const pnl = Number(stats.totalPnl || 0);
+      const pnlTone = pnl > 0 ? "positive" : pnl < 0 ? "negative" : "neutral";
+      return `
+        <div class="report-card ${isOpen ? "is-open" : ""}" data-report-toggle="${r.id}">
+          <div class="report-head">
+            <div>
+              <div class="report-title">Semaine ${formatDate(r.week_start)} → ${formatDate(r.week_end)}</div>
+              <div class="report-meta">${Number(stats.total) || 0} trades · ${stats.winRate != null ? Math.round(Number(stats.winRate) * 100) + "% win" : "—"} · <span class="${pnlTone}">${money(pnl, "USD")}</span>${r.corrections_applied ? ` · ${Number(r.corrections_applied) || 0} corr.` : ""} ${statusBadge}</div>
+            </div>
+            <svg class="report-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}"/></svg>
+          </div>
+          ${isOpen ? `
+            <div class="report-body">
+              ${r.status === "failed" ? `<div class="error-box">${safeText(r.error_message || "Échec de génération")}</div>` : ""}
+              <div class="report-markdown">${renderMarkdown(r.report_markdown || "")}</div>
+              ${r.claude_model ? `<div class="report-footer muted">${safeText(r.claude_model)} · ${Number(r.claude_tokens_output) || "?"} tokens · ${Number(r.generation_duration_ms) || "?"}ms</div>` : ""}
+            </div>
+          ` : ""}
+        </div>`;
+    };
+
+    return `
+      <div class="screen">
+        <div class="screen-header">
+          <div class="screen-title">Rapports hebdomadaires</div>
+          <div class="screen-subtitle">Analyse automatique par Claude Sonnet tous les lundis 6h UTC. Force une génération pour rattraper une semaine manquée.</div>
+        </div>
+        ${err ? `<div class="error-box" style="margin-bottom:14px">${safeText(err)}</div>` : ""}
+        <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-generate-report ${state.reports.generating ? "disabled" : ""}>
+            ${state.reports.generating ? "Génération en cours…" : "Forcer génération semaine dernière"}
+          </button>
+          <button class="btn btn-secondary" data-reload-reports ${loading ? "disabled" : ""}>
+            ${loading ? "Chargement…" : "Rafraîchir"}
+          </button>
+        </div>
+        ${loading && reports.length === 0 ? `<div class="loading-state">Chargement…</div>` : ""}
+        ${!loading && reports.length === 0 ? `<div class="empty-state" style="padding:24px">Aucun rapport généré pour l'instant. Le premier tombera lundi prochain à 6h UTC, ou force-le maintenant.</div>` : ""}
+        <div class="reports-list">
+          ${reports.map(reportCard).join("")}
+        </div>
+      </div>`;
+  }
+
   function renderBot() {
     if (!isSessionValid()) {
       return `
@@ -6359,6 +6487,7 @@ function renderMain() {
       case "settings": return renderSettings();
       case "bot": return renderBot();
       case "health": return renderHealth();
+      case "reports": return renderReports();
       default: return renderDashboard();
     }
   }
@@ -6894,6 +7023,23 @@ function renderMain() {
         togglePinUserAsset(sym, currentlyPinned);
       });
     });
+    // PR #9 Phase 2 — rapports hebdo
+    app.querySelectorAll("[data-generate-report]").forEach(el => {
+      el.addEventListener("click", () => { generateReportNow(); });
+    });
+    app.querySelectorAll("[data-reload-reports]").forEach(el => {
+      el.addEventListener("click", () => { loadReports(); });
+    });
+    app.querySelectorAll("[data-report-toggle]").forEach(el => {
+      el.addEventListener("click", (e) => {
+        // Ignore les clics sur des liens internes du markdown
+        if (e.target.closest("a")) return;
+        const id = Number(el.getAttribute("data-report-toggle"));
+        state.reports.openId = state.reports.openId === id ? null : id;
+        haptic(5);
+        render();
+      });
+    });
     app.querySelectorAll("[data-load-user-assets]").forEach(el => {
       el.addEventListener("click", () => { loadUserAssets(); });
     });
@@ -7066,6 +7212,7 @@ function renderMain() {
       case "portfolio": return () => refreshOpenTradesLive(true);
       case "alerts": return () => loadDashboard();
       case "health": return () => loadHealth();
+      case "reports": return () => loadReports();
       case "bot": return () => loadBot();
       default: return null;
     }
