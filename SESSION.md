@@ -174,6 +174,39 @@ Tant que les 4 conditions ne sont pas réunies : **100 % paper**, on apprend.
 
 Ce critère est verrouillé ici pour que les prochaines sessions Claude ne poussent pas à un passage prématuré, et que l'utilisateur lui-même puisse s'y référer quand l'impatience se fait sentir.
 
+### Architecture cible post-passage en réel (deux pistes en parallèle)
+
+Quand les 4 conditions ci-dessus sont réunies et qu'on passe en réel, le bot **ne devient pas** un auto-trader monolithique qui décide seul avec du vrai argent. Il se scinde en **deux pistes indépendantes** qui tournent en permanence :
+
+#### Piste 1 — « Learning bot » (paper, permanent)
+- Continue à tourner en paper trading **indéfiniment**, même après le go-live réel.
+- Explore, teste de nouveaux setups, valide de nouveaux patterns sans risque.
+- Source permanente de post-mortem et d'ajustements de règles.
+- L'auto-cycle existant devient ce learning bot.
+- Métriques trackées : EV, win rate, expected value par setup, par régime, par asset class.
+
+#### Piste 2 — « Real proposer » (human-in-the-loop)
+- **Ne prend pas de trades automatiquement** en réel.
+- Quand une opportunité passe les critères validés par la piste 1 (pattern confirmé statistiquement sur ≥ N trades paper), elle est proposée à l'utilisateur via notification.
+- L'utilisateur **confirme ou rejette** manuellement avant exécution (pas d'exécution sans validation).
+- Taille de position calibrée selon le stade (20-30 % puis normal, cf. transition progressive).
+- Retour immédiat en "paper-only" si drawdown > 10 %.
+
+#### Pourquoi deux pistes séparées
+- Les règles évoluent. Le learning bot valide les nouvelles avant qu'elles touchent du réel.
+- Le human-in-the-loop sur le réel force une double vérification (engine + utilisateur) — chaque passage en réel est un choix conscient.
+- On garde une trace claire : ce qui est "en expérimentation" (piste 1) vs "production" (piste 2).
+- Si la piste 2 sous-performe vs la piste 1, on sait que c'est la validation humaine qui coince (pas le moteur) — et inversement.
+
+#### Conséquence pour le code
+- Ne pas coder un simple switch `mode: "paper" | "real"`. Coder deux flux distincts :
+  - `training_auto_cycle` (existe déjà, devient la piste 1)
+  - `real_proposal_flow` (à créer, envoie notification + attend confirmation utilisateur)
+- Les deux partagent le même moteur de scoring, mais leurs **critères d'activation** sont différents : la piste 1 prend tout ce qui passe les seuils ; la piste 2 ne propose que ce qui est sur un pattern validé par stats paper.
+- Stockage Supabase séparé : `mtp_trades` (training) + `mtp_real_trades` (production). Analytics séparées.
+
+Cette architecture est un **objectif long terme**, à ne pas développer avant que les 4 conditions de passage en réel soient remplies. Mais elle est notée ici pour que tout développement intermédiaire reste **compatible** avec cette séparation (ex : ne pas verrouiller une architecture mono-flux qui empêcherait de scinder plus tard).
+
 ### Clés d'accès au dataset
 - **Endpoint auth admin** : `GET /api/trades/state` avec `Authorization: Bearer <session_token>` (token dans `localStorage["mtp_session_v1"].token` après login PIN).
 - **Snippet console pour dumper** :
