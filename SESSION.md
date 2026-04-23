@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-23 (PR #5 Phase 2 — feedback MAE/MFE) |
+| **Dernière mise à jour** | 2026-04-23 (PR #6 Phase 2 — corrections auto shadow→active) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/go-phase-2-E81c5` |
+| **Branche active** | `claude/phase2-pr6-auto-corrections` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -593,7 +593,7 @@ Chaque PR est indépendante, mergeable seule, validée 3-5 jours en paper avant 
 
 Chaque PR indépendante, mergeable seule. Objectif global : opérationnaliser la Règle #1 (apprendre ET se corriger), la Règle #5 niveau 2+3 (news modulateur + Claude directionnel), et l'auto-watchlist.
 
-#### PR #5 — Observation : `mtp_trade_feedback` + MAE/MFE à la clôture — ✅ EN COURS (branche `claude/go-phase-2-E81c5`)
+#### PR #5 — Observation : `mtp_trade_feedback` + MAE/MFE à la clôture — ✅ LIVRÉE & DÉPLOYÉE (PR #59, commit post-session-10)
 - [x] **Migration 006** : table `mtp_trade_feedback` avec trade_id unique, bucket_key 4-dim (`setup|direction|regime|asset_class`), mae_pct / mfe_pct, mae_vs_stop_ratio / mfe_vs_tp_ratio, stop_distance_pct / tp_distance_pct, holding_minutes, exit_reason, regime_at_open / regime_at_close, news_context_open / news_context_close (réservés PR #7+), RLS permissif, 4 index.
 - [x] **Tracking intra-trade** dans `handleTrainingAutoCycle` close phase :
   - `updatePositionIntraExcursion(position, livePrice)` met à jour `live.highSinceOpen` / `live.lowSinceOpen` en mémoire (baseline = entry pour ne jamais sous-estimer).
@@ -618,8 +618,65 @@ Chaque PR indépendante, mergeable seule. Objectif global : opérationnaliser la
   2. `wrangler deploy` depuis la machine Windows
 - **Validation paper** : après qu'un trade se ferme (auto ou manuel), `GET /api/training/feedback?limit=10` doit retourner une ligne avec bucket_key + MAE/MFE. Sur l'onglet Mes Trades, la ligne historique affiche les badges. Vérifier dans Supabase que `mtp_positions.live.highSinceOpen` / `lowSinceOpen` s'incrémentent cycle après cycle.
 
-#### PR #6 — Corrections automatiques (7 règles) + activation shadow→active — ⏳ À VENIR
-Opérationnalisation des ajustements shadow enregistrés en PR #4 + observation des 7 règles de la Règle #1 sur les données capturées par PR #5. Activation auto après 20 trades shadow favorables, rollback sinon.
+#### PR #6 — Corrections automatiques (6 règles) + activation shadow→active — ✅ EN COURS (branche `claude/phase2-pr6-auto-corrections`)
+
+Opérationnalisation de la Règle #1 (apprendre ET se corriger). Sans migration SQL (la table `mtp_engine_adjustments` de PR #4 suffit).
+
+**Détection quotidienne 2h UTC** (branchée dans `handleScheduledCycle` à côté du drift detect) :
+- `aggregateFeedbackBuckets(env)` : agrège `mtp_trade_feedback` par bucket 4-dim → expectancy, MAE/MFE moyens, ratios.
+- `computeGlobalStreaks(env)` : pertes/gains consécutifs sur 10 derniers trades.
+- `detectCorrectionSignals()` : dédup contre shadow/active existants pour `(type, bucket_key)`.
+- `runCorrectionDetection(env)` : orchestre, log event `corrections_detected`.
+
+**6 règles couvertes** (Règle 7 retrain logistique reportée — nécessite 500+ trades) :
+- **R1** `raise_min_score` (bucket, expectancy < 0 sur 30+ trades) → +5 aux seuils `min_dossier_score` + `min_actionability_score` du bucket.
+- **R2** `disable_bucket` (bucket, toujours négatif sur 50+ trades ET winRate < 45%) → reject complet du bucket.
+- **R3** `widen_stop` (setup, MAE moyen > 70% stop distance) → shadow only (non appliqué au `buildPlanFromConfiguration` dans PR #6 — réservé PR follow-up pour limiter le blast radius).
+- **R4** `extend_tp` (setup, MFE moyen > 1.5× TP distance) → shadow only (idem R3).
+- **R5** `reduce_size` (global, 3 pertes consécutives) → `sizeMultiplier = 0.5` dans `chooseTrainingExecution`.
+- **R6** `restore_size` (global, 3 gains consécutifs post-activation R5) → rollback auto du `reduce_size` actif avec `rollback_reason` explicite.
+
+**Observer quotidien 2h UTC** (`observeShadowAdjustments`) :
+- Compte les trades clos depuis `created_at` dans le scope (bucket / setup / global).
+- `reduce_size` s'active dès le 1er passage (seuil déjà confirmé à la création).
+- Les autres attendent 20 trades puis décident :
+  - R1/R2 : active si expectancy reste < 0 sur 20 trades, rollback sinon.
+  - R3 : active si avg MAE/stop ratio reste > 0.7, rollback sinon.
+  - R4 : active si avg MFE/TP ratio reste > 1.5, rollback sinon.
+- Invalide le cache `resolveActiveAdjustments` si activation/rollback → prochain cycle voit le changement.
+
+**Intégration moteur** (cycle d'ouverture `handleTrainingAutoCycle`) :
+- `resolveActiveAdjustments(env)` cache mémoire 2 min → `{ disabledBuckets: Set, minScoreBoosts: Map, sizeMultiplier, widenStopSetups, extendTpSetups }`.
+- `isTrainingCandidateAllowed(row, ..., activeAdjustments)` : reject si bucket désactivé, boost des seuils pour buckets R1.
+- `chooseTrainingExecution(payload, settings, cash, activeAdjustments)` : `allocatedCash *= sizeMultiplier` (applique R5).
+- `openTrainingPositionFromRow` forward le paramètre.
+
+**Endpoints admin** :
+- `GET /api/engine/corrections-detect` → force un passage (retourne signaux détectés + créés).
+- `GET /api/engine/observe-shadows` → force un passage de l'observer.
+- `GET /api/engine/active-adjustments` → dump compact (disabled buckets, boosts, sizeMultiplier, proposals).
+
+**UI Santé bot enrichie** :
+- Nouvelle carte « Règles actives qui impactent le moteur » — résume disabled + raises + reduce + proposals de façon lisible.
+- Badge `X/20` sur les ajustements en shadow (ou `X/1` pour `reduce_size`).
+- `typeLabel` étendu aux 6 nouvelles règles.
+- `rollback_reason` affichée explicitement sur les lignes rollback.
+- CSS `.health-adj-progress` + `.health-active-line` 100% `var(--...)`.
+
+**Déploiement requis côté utilisateur** :
+1. `wrangler deploy` (auto via GitHub Actions dès merge).
+2. Aucune migration SQL (`mtp_engine_adjustments` existe déjà depuis migration 005).
+
+**Validation paper** :
+- Laisser tourner 3-5 jours.
+- Vérifier que `GET /api/engine/corrections-detect` retourne des signaux (pas forcément créer tant que < 30 trades par bucket).
+- Après ~20 trades clos par bucket, quelques shadows devraient s'activer OU rollback.
+- Onglet Santé bot : badges `X/20` progressent visiblement, carte « Règles actives » se remplit ou reste vide.
+
+**Scope volontairement exclu** :
+- R3/R4 : détectés + observés + status=active possible, MAIS **non appliqués** à la construction du plan dans cette PR (touchent `buildPlanFromConfiguration`, plus risqué). Les proposals sont historisées pour analyse et report à une PR follow-up.
+- R7 : retrain régression logistique des poids — reporté tant que < 500 trades accumulés.
+- Décroissance temporelle (PR #9) : toutes les agrégations pondèrent chaque trade à 1.0 pour le moment.
 
 #### PR #7 — News modulateur ±10 pts + Claude directionnel niveau 3 + kill switch gradué — ⏳ À VENIR
 Enrichissement du `calcDetailScore` avec sentiment agrégé (Alpha Vantage + CryptoPanic + Finnhub + Messari). Claude Haiku sur les news ambiguës avec kill switch win-rate 30 trades.
@@ -658,3 +715,5 @@ Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'
 | 2026-04-21 | Claude opus-4-7 | Audit data-* — fix bouton Rafraîchir opportunités, nettoyage sélecteur mort `.ai-card` |
 | 2026-04-22 | Claude sonnet-4-6 | Phase 1 livrée (4 PRs mergées : cron autonome, long/short + F&G/VIX, news garde-fou, shadow/drift) |
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #5 : `mtp_trade_feedback` + MAE/MFE intra-trade + badges historique |
+| 2026-04-23 | Claude opus-4-7 | Hotfix deploy : doublon `handleEconomicCalendar` (PR #60) + workflow `apiToken` (PR #61) |
+| 2026-04-23 | Claude opus-4-7 | Phase 2 PR #6 : détection 6 règles corrections + shadow→active/rollback + apply moteur + UI Santé bot |

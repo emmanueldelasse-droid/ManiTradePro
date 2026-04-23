@@ -1,4 +1,4 @@
-const CACHE_VERSION = "manitradepro-v7.1";
+const CACHE_VERSION = "manitradepro-v7.2";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 

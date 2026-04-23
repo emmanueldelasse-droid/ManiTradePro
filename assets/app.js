@@ -5725,28 +5725,57 @@ function openPositionsRiskView() {
 
     const severityLabel = (s) => s === "severe" ? "grave" : s === "moderate" ? "moyen" : s === "light" ? "léger" : "";
     const statusLabel = (s) => s === "shadow" ? "en observation" : s === "active" ? "actif" : s === "rollback" ? "annulé" : s;
+    // PR #6 Phase 2 — libellés des 6 règles de correction
     const typeLabel = (t) => ({
       drift_alert: "drift detecté",
-      bucket_threshold_up: "seuil rehaussé",
-      bucket_disabled: "bucket désactivé",
-      stop_widen: "stop élargi",
-      tp_extend: "TP étendu",
-      position_halved: "taille /2",
-      position_normalized: "taille normale",
-      weights_retrain: "retrain poids"
+      raise_min_score: "seuil rehaussé +5",
+      disable_bucket: "bucket désactivé",
+      widen_stop: "stop élargi (proposition)",
+      extend_tp: "TP étendu (proposition)",
+      reduce_size: "taille ×0.5",
+      restore_size: "taille normale"
     })[t] || t;
 
-    const adjRow = (a) => `
+    const adjRow = (a) => {
+      // PR #6 Phase 2 — progression observation X/20 pour les shadows non-drift
+      let progressBadge = "";
+      if (a.status === "shadow" && a.adjustment_type !== "drift_alert") {
+        const observed = Number(a.shadow_trades_observed || 0);
+        const target = a.adjustment_type === "reduce_size" ? 1 : 20;
+        progressBadge = `<span class="health-adj-progress">${observed}/${target}</span>`;
+      }
+      return `
       <div class="health-adj-row ${a.severity || ""} status-${a.status}">
         <div class="health-adj-head">
           <span class="health-adj-type">${safeText(typeLabel(a.adjustment_type))}</span>
           ${a.severity ? `<span class="health-adj-severity ${a.severity}">${safeText(severityLabel(a.severity))}</span>` : ""}
           <span class="health-adj-status">${safeText(statusLabel(a.status))}</span>
+          ${progressBadge}
         </div>
         ${a.bucket_key ? `<div class="health-adj-bucket">${safeText(a.bucket_key)}</div>` : ""}
         ${a.notes ? `<div class="health-adj-notes">${safeText(a.notes)}</div>` : ""}
+        ${a.rollback_reason ? `<div class="health-adj-notes muted">Rollback : ${safeText(a.rollback_reason)}</div>` : ""}
         <div class="health-adj-date muted">${safeText(new Date(a.created_at).toLocaleString("fr-FR"))}</div>
       </div>`;
+    };
+
+    // PR #6 Phase 2 — carte résumé des règles actives qui touchent le moteur
+    const activeAdjustments = byStatus.active.filter(a => a.adjustment_type !== "drift_alert");
+    const activeSummary = () => {
+      if (!activeAdjustments.length) return `<div class="muted">Aucune règle active. Le moteur tourne sur sa configuration par défaut.</div>`;
+      const lines = [];
+      const disabled = activeAdjustments.filter(a => a.adjustment_type === "disable_bucket");
+      const raises = activeAdjustments.filter(a => a.adjustment_type === "raise_min_score");
+      const reduces = activeAdjustments.filter(a => a.adjustment_type === "reduce_size");
+      const widens = activeAdjustments.filter(a => a.adjustment_type === "widen_stop");
+      const extends_ = activeAdjustments.filter(a => a.adjustment_type === "extend_tp");
+      if (disabled.length) lines.push(`<div class="health-active-line"><strong>${disabled.length} bucket(s) désactivé(s)</strong> — entrées bloquées : ${disabled.map(a => `<code>${safeText(a.bucket_key)}</code>`).join(", ")}</div>`);
+      if (raises.length)   lines.push(`<div class="health-active-line"><strong>${raises.length} seuil(s) rehaussé(s) de +5 pts</strong> — sur ${raises.map(a => `<code>${safeText(a.bucket_key)}</code>`).join(", ")}</div>`);
+      if (reduces.length)  lines.push(`<div class="health-active-line"><strong>Taille de position réduite</strong> — multiplicateur ${reduces[0]?.new_value?.size_mult || 0.5} (rollback auto au 1er 3-gains consécutifs)</div>`);
+      if (widens.length)   lines.push(`<div class="health-active-line muted"><strong>${widens.length} proposition(s) stop élargi</strong> — non appliquée(s) en PR #6, observation seulement</div>`);
+      if (extends_.length) lines.push(`<div class="health-active-line muted"><strong>${extends_.length} proposition(s) TP étendu</strong> — non appliquée(s) en PR #6, observation seulement</div>`);
+      return lines.join("");
+    };
 
     const bucketRow = (b) => {
       const hist = Number(b.historical?.winRate || 0);
@@ -5768,7 +5797,7 @@ function openPositionsRiskView() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Santé du bot</div>
-          <div class="screen-subtitle">Ajustements automatiques, drift detection et stats par bucket. Les alertes restent en mode observation jusqu'à validation manuelle ou Phase 2.</div>
+          <div class="screen-subtitle">PR #6 Phase 2 — apprentissage + corrections. Shadow → 20 trades observés → active ou rollback auto.</div>
         </div>
 
         ${state.health.error ? `<div class="error-box" style="margin-bottom:14px">${safeText(state.health.error)}</div>` : ""}
@@ -5784,8 +5813,8 @@ function openPositionsRiskView() {
             <div class="stat-value">${byStatus.shadow.length}</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">Ajustements actifs</div>
-            <div class="stat-value">${byStatus.active.length}</div>
+            <div class="stat-label">Règles actives</div>
+            <div class="stat-value ${activeAdjustments.length ? "positive" : ""}">${activeAdjustments.length}</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">Annulés (rollback)</div>
@@ -5794,7 +5823,12 @@ function openPositionsRiskView() {
         </div>
 
         <div class="card" style="margin-bottom:18px">
-          <div class="section-title"><span>Alertes drift actives</span><span>${driftActive.length}</span></div>
+          <div class="section-title"><span>Règles actives qui impactent le moteur</span><span>${activeAdjustments.length}</span></div>
+          ${activeSummary()}
+        </div>
+
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title"><span>Alertes drift</span><span>${driftActive.length}</span></div>
           ${driftActive.length ? driftActive.map(adjRow).join("") : `<div class="muted">Aucune alerte drift. Les setups performent dans les normes historiques.</div>`}
         </div>
 
