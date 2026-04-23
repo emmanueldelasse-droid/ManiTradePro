@@ -3069,6 +3069,12 @@ async function handleTrainingAutoCycle(env) {
           try { liveQuote = await withTimeout(resolveUnifiedMarketQuote(symbol, env, null), 6000, `quote:${symbol}`); } catch {}
           try { detailPayload = await withTimeout(buildStableMarketPayload(symbol, env, null, true), 8000, `detail:${symbol}`); } catch {}
 
+          // PR #5 Phase 2 — tracker MAE/MFE en continu, même si pas de clôture ce cycle
+          const excursion = updatePositionIntraExcursion(position, liveQuote?.price ?? null);
+          if (excursion.changed) {
+            await persistPositionIntraExcursion(env, position, excursion);
+          }
+
           const trigger = trainingCloseTrigger(position, liveQuote?.price ?? null, detailPayload, settings);
           if (!trigger) continue;
 
@@ -3329,6 +3335,7 @@ const TRADE_TABLES = { positions: "mtp_positions", trades: "mtp_trades" };
 const TRAINING_SETTINGS_TABLE = "mtp_training_settings";
 const TRAINING_EVENTS_TABLE = "mtp_training_events";
 const ENGINE_ADJUSTMENTS_TABLE = "mtp_engine_adjustments";
+const TRADE_FEEDBACK_TABLE = "mtp_trade_feedback";
 const SIGNAL_TABLE = "mtp_signals";
 
 function coerceBoolean(value, fallback = false) {
@@ -3635,6 +3642,13 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
 
 async function closeTrainingPosition(env, position, exitPrice, closeType, detailPayload) {
   const closedRow = buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload);
+  // Propager intra-high/low au trade clos (utilisé par captureTradeFeedback)
+  const positionLive = position?.live || {};
+  closedRow.live = {
+    ...(closedRow.live || {}),
+    highSinceOpen: finiteOrNull(positionLive.highSinceOpen),
+    lowSinceOpen: finiteOrNull(positionLive.lowSinceOpen)
+  };
   await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -3645,7 +3659,199 @@ async function closeTrainingPosition(env, position, exitPrice, closeType, detail
     headers: { Prefer: "return=minimal" }
   });
   await logTrainingEvent(env, "trade_closed", { id: closedRow.id, trade_id: closedRow.id, symbol: closedRow.symbol, close_type: closeType, exit_price: closedRow.exit_price, pnl: closedRow.pnl, pnl_pct: closedRow.pnl_pct });
+  try {
+    await captureTradeFeedback(env, closedRow, position, closeType);
+  } catch (e) {
+    console.error("captureTradeFeedback failed:", e.message);
+  }
   return closedRow;
+}
+
+// ------------------------------------------------------------
+// PR #5 Phase 2 — Trade feedback (MAE/MFE, bucket_key, exit_reason)
+// ------------------------------------------------------------
+
+// Update intra-trade high/low on live quote during each close-phase cycle.
+// Returns { changed, highSinceOpen, lowSinceOpen } — caller persists if changed.
+function updatePositionIntraExcursion(position, livePrice) {
+  const price = finiteOrNull(livePrice);
+  if (!Number.isFinite(price)) return { changed: false };
+  const live = position?.live || {};
+  const entry = finiteOrNull(position?.entry_price ?? position?.entryPrice ?? position?.execution?.entryPrice);
+  const currentHigh = finiteOrNull(live.highSinceOpen);
+  const currentLow  = finiteOrNull(live.lowSinceOpen);
+  // Initialisation : on compare à la fois au prix actuel et au prix d'entrée pour
+  // ne jamais sous-estimer l'excursion si le cycle #1 arrive après un mouvement.
+  const baseline = Number.isFinite(entry) ? entry : price;
+  const nextHigh = Math.max(Number.isFinite(currentHigh) ? currentHigh : baseline, price);
+  const nextLow  = Math.min(Number.isFinite(currentLow)  ? currentLow  : baseline, price);
+  const changed = nextHigh !== currentHigh || nextLow !== currentLow;
+  return { changed, highSinceOpen: nextHigh, lowSinceOpen: nextLow, lastPrice: price };
+}
+
+async function persistPositionIntraExcursion(env, position, excursion) {
+  if (!excursion?.changed) return;
+  const id = String(position?.id || "");
+  if (!id) return;
+  const nextLive = {
+    ...(position.live || {}),
+    highSinceOpen: excursion.highSinceOpen,
+    lowSinceOpen: excursion.lowSinceOpen,
+    lastPrice: excursion.lastPrice,
+    updatedAt: nowIso()
+  };
+  try {
+    await supabaseFetch(env, `${TRADE_TABLES.positions}?id=eq.${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ live: nextLive, updated_at: nowIso() })
+    });
+    position.live = nextLive; // sync memory pour le trigger suivant
+  } catch (e) {
+    // Non-bloquant — la clôture reste possible sans MAE/MFE à jour.
+    console.error("persistPositionIntraExcursion failed:", e.message);
+  }
+}
+
+function normalizeRegimeLabel(raw) {
+  const up = String(raw || "").toUpperCase();
+  if (up === "RISK_ON" || up === "RISK_OFF" || up === "NEUTRAL") return up;
+  return "UNKNOWN";
+}
+
+function makeBucketKey(setup, side, regime, assetClass) {
+  const s = String(setup || "unknown").toLowerCase();
+  const d = String(side || "long").toLowerCase();
+  const r = String(regime || "UNKNOWN").toUpperCase();
+  const a = String(assetClass || "unknown").toLowerCase();
+  return `${s}|${d}|${r}|${a}`;
+}
+
+function computeTradeExcursion(closedRow, position) {
+  const side = String(closedRow?.side || position?.side || "long").toLowerCase();
+  const entry = finiteOrNull(closedRow?.entry_price ?? position?.entry_price ?? position?.execution?.entryPrice);
+  const exit  = finiteOrNull(closedRow?.exit_price);
+  const live  = closedRow?.live || position?.live || {};
+  const high  = finiteOrNull(live.highSinceOpen);
+  const low   = finiteOrNull(live.lowSinceOpen);
+
+  if (!Number.isFinite(entry) || entry <= 0) {
+    return { maePct: null, mfePct: null };
+  }
+
+  // Fallback : si on n'a pas d'intra-tracking (clôture rapide entre 2 cycles,
+  // ou position ancienne pré-PR #5), on prend l'exit comme borne opposée.
+  const effHigh = Number.isFinite(high) ? high : (Number.isFinite(exit) ? Math.max(exit, entry) : entry);
+  const effLow  = Number.isFinite(low)  ? low  : (Number.isFinite(exit) ? Math.min(exit, entry) : entry);
+
+  let maePct, mfePct;
+  if (side === "short") {
+    // Adverse pour un short = hausse ; favorable = baisse
+    maePct = Math.max(0, ((effHigh - entry) / entry) * 100);
+    mfePct = Math.max(0, ((entry - effLow) / entry) * 100);
+  } else {
+    // Long : adverse = baisse ; favorable = hausse
+    maePct = Math.max(0, ((entry - effLow)  / entry) * 100);
+    mfePct = Math.max(0, ((effHigh - entry) / entry) * 100);
+  }
+  return { maePct, mfePct };
+}
+
+function resolveExitReason(closeType) {
+  const t = String(closeType || "").toLowerCase();
+  if (t === "stop_loss" || t === "take_profit" || t === "time_exit"
+   || t === "engine_invalidation" || t === "manual") return t;
+  return "unknown";
+}
+
+async function captureTradeFeedback(env, closedRow, position, closeType) {
+  if (!supabaseConfigured(env)) return null;
+  const tradeId = String(closedRow?.id || "");
+  if (!tradeId) return null;
+
+  const snapshot = closedRow?.analysis_snapshot || position?.analysis_snapshot || {};
+  const side = String(closedRow?.side || position?.side || snapshot?.direction || "long").toLowerCase();
+  const setup = String(snapshot?.setupType || "unknown").toLowerCase();
+
+  const regimeAtOpen  = normalizeRegimeLabel(snapshot?.regime ?? position?.analysis_snapshot?.regime ?? "UNKNOWN");
+  const regimeAtClose = normalizeRegimeLabel(await kvGet("market:regime", env).catch(() => null));
+
+  const entry = finiteOrNull(closedRow?.entry_price);
+  const exit  = finiteOrNull(closedRow?.exit_price);
+  const sl    = finiteOrNull(closedRow?.stop_loss);
+  const tp    = finiteOrNull(closedRow?.take_profit);
+
+  const stopDistPct = (Number.isFinite(entry) && Number.isFinite(sl) && entry > 0) ? Math.abs((sl - entry) / entry) * 100 : null;
+  const tpDistPct   = (Number.isFinite(entry) && Number.isFinite(tp) && entry > 0) ? Math.abs((tp - entry) / entry) * 100 : null;
+
+  const { maePct, mfePct } = computeTradeExcursion(closedRow, position);
+
+  const maeVsStop = (Number.isFinite(maePct) && Number.isFinite(stopDistPct) && stopDistPct > 0) ? maePct / stopDistPct : null;
+  const mfeVsTp   = (Number.isFinite(mfePct) && Number.isFinite(tpDistPct)   && tpDistPct   > 0) ? mfePct / tpDistPct   : null;
+
+  const openedAt = closedRow?.opened_at || position?.opened_at || null;
+  const closedAt = closedRow?.closed_at || nowIso();
+  const holdingMinutes = (openedAt && closedAt)
+    ? Math.max(0, Math.round((new Date(closedAt).getTime() - new Date(openedAt).getTime()) / 60000))
+    : null;
+
+  const bucketKey = makeBucketKey(setup, side, regimeAtOpen, closedRow?.asset_class || position?.asset_class);
+
+  const feedback = {
+    trade_id: tradeId,
+    symbol: closedRow?.symbol || position?.symbol || null,
+    asset_class: closedRow?.asset_class || position?.asset_class || null,
+    setup_type: setup,
+    direction: side === "short" ? "short" : "long",
+    regime_at_open: regimeAtOpen,
+    regime_at_close: regimeAtClose,
+    exit_reason: resolveExitReason(closeType ?? closedRow?.closed_execution?.closeType),
+    opened_at: openedAt,
+    closed_at: closedAt,
+    holding_minutes: holdingMinutes,
+    entry_price: entry,
+    exit_price: exit,
+    stop_loss: sl,
+    take_profit: tp,
+    pnl: finiteOrNull(closedRow?.pnl),
+    pnl_pct: finiteOrNull(closedRow?.pnl_pct),
+    mae_pct: Number.isFinite(maePct) ? Number(maePct.toFixed(4)) : null,
+    mfe_pct: Number.isFinite(mfePct) ? Number(mfePct.toFixed(4)) : null,
+    stop_distance_pct: Number.isFinite(stopDistPct) ? Number(stopDistPct.toFixed(4)) : null,
+    tp_distance_pct:   Number.isFinite(tpDistPct)   ? Number(tpDistPct.toFixed(4))   : null,
+    mae_vs_stop_ratio: Number.isFinite(maeVsStop) ? Number(maeVsStop.toFixed(4)) : null,
+    mfe_vs_tp_ratio:   Number.isFinite(mfeVsTp)   ? Number(mfeVsTp.toFixed(4))   : null,
+    bucket_key: bucketKey,
+    news_context_open: null,   // réservé Règle #5 (PR #7+)
+    news_context_close: null,
+    notes: null
+  };
+
+  try {
+    await supabaseFetch(env, `${TRADE_FEEDBACK_TABLE}?on_conflict=trade_id`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([feedback])
+    });
+    return feedback;
+  } catch (e) {
+    console.error("captureTradeFeedback persist failed:", e.message);
+    return null;
+  }
+}
+
+async function listTradeFeedback(env, { limit = 100, bucketKey = null, symbol = null } = {}) {
+  if (!supabaseConfigured(env)) return [];
+  const params = [`order=closed_at.desc`, `limit=${clampInt(limit, 1, 1000, 100)}`];
+  if (bucketKey) params.push(`bucket_key=eq.${encodeURIComponent(bucketKey)}`);
+  if (symbol)    params.push(`symbol=eq.${encodeURIComponent(symbol)}`);
+  try {
+    const rows = await supabaseFetch(env, `${TRADE_FEEDBACK_TABLE}?${params.join("&")}`);
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) {
+    console.error("listTradeFeedback failed:", e.message);
+    return [];
+  }
 }
 
 async function openTrainingPositionFromRow(env, row, settings, availableCash) {
@@ -3928,9 +4134,42 @@ async function handleTradesSync(request, env) {
         headers: { Prefer: "resolution=merge-duplicates,return=representation" },
         body: JSON.stringify(rows)
       });
+      // PR #5 Phase 2 — capturer feedback pour les clôtures manuelles (UI → sync)
+      // Idempotent grâce à trade_id unique + on_conflict=trade_id.
+      try {
+        const existingIds = await listExistingFeedbackIds(env, rows.map(r => String(r.id)));
+        for (const row of rows) {
+          if (existingIds.has(String(row.id))) continue;
+          const closeType = row?.closed_execution?.closeType || row?.close_type || "manual";
+          await captureTradeFeedback(env, row, null, closeType);
+        }
+      } catch (e) {
+        console.error("captureTradeFeedback on sync failed:", e.message);
+      }
     }
   }
   return tradesPayload(true, positions, history, "sync_ok");
+}
+
+async function listExistingFeedbackIds(env, tradeIds) {
+  if (!supabaseConfigured(env) || !Array.isArray(tradeIds) || tradeIds.length === 0) return new Set();
+  try {
+    const inList = tradeIds.map(id => `"${encodeURIComponent(id)}"`).join(",");
+    const rows = await supabaseFetch(env, `${TRADE_FEEDBACK_TABLE}?select=trade_id&trade_id=in.(${inList})`);
+    return new Set((Array.isArray(rows) ? rows : []).map(r => String(r.trade_id)));
+  } catch (e) {
+    console.error("listExistingFeedbackIds failed:", e.message);
+    return new Set();
+  }
+}
+
+async function handleTrainingFeedback(url, env) {
+  const limitRaw = Number(url?.searchParams?.get("limit"));
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 100;
+  const bucketKey = url?.searchParams?.get("bucket_key") || null;
+  const symbol    = url?.searchParams?.get("symbol") || null;
+  const rows = await listTradeFeedback(env, { limit, bucketKey, symbol });
+  return json({ status: "ok", asOf: nowIso(), count: rows.length, data: rows });
 }
 
 // ============================================================
@@ -5133,6 +5372,11 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingStats(env));
+    }
+    if (url.pathname === "/api/training/feedback") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingFeedback(url, env));
     }
     if (url.pathname === "/api/user-assets") {
       const denied = await requireAdminAccess(request, env);
