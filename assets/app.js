@@ -1356,6 +1356,12 @@ function confirmTradeFromModal() {
       blockers: Array.isArray(item?.blockers) ? item.blockers : (Array.isArray(item?.plan?.blockers) ? item.plan.blockers : []),
       candles: Array.isArray(item?.candles) ? item.candles : [],
       fxUsdToEur: isValidEurusdRate(item?.fxUsdToEur) ? Number(item.fxUsdToEur) : null,
+      // PR #7 Phase 2 — news modulator + régime bonus pour affichage sur la fiche
+      regimeBonus: Number.isFinite(Number(item?.regimeBonus)) ? Number(item.regimeBonus) : 0,
+      regimeBonusReason: item?.regimeBonusReason || null,
+      newsBonus: Number.isFinite(Number(item?.newsBonus)) ? Number(item.newsBonus) : 0,
+      newsBonusReason: item?.newsBonusReason || null,
+      newsContext: item?.newsContext || null,
       error: compactError(item?.error || item?.reasonShort || null)
     };
   }
@@ -4072,7 +4078,38 @@ function detailTileValue(kind, plan, detail) {
     return "indisponible";
   }
 
-function renderDetail() {
+// PR #7 Phase 2 — chips régime (F&G/VIX) + news modulateur sur la fiche actif
+  function renderModulatorChips(d) {
+    if (!d) return "";
+    const chips = [];
+    const regimeBonus = Number(d.regimeBonus ?? d.plan?.regimeBonus ?? 0);
+    const regimeReason = d.regimeBonusReason || d.plan?.regimeBonusReason;
+    if (regimeBonus !== 0 && regimeReason) {
+      const tone = regimeBonus > 0 ? "positive" : "negative";
+      const sign = regimeBonus > 0 ? "+" : "";
+      chips.push(`<span class="mod-chip ${tone}" title="Modulateur régime F&amp;G/VIX (PR #2)">Régime ${sign}${regimeBonus} — ${safeText(regimeReason)}</span>`);
+    }
+    const newsBonus = Number(d.newsBonus ?? d.plan?.newsBonus ?? 0);
+    const newsReason = d.newsBonusReason || d.plan?.newsBonusReason;
+    if (newsBonus !== 0 && newsReason) {
+      const tone = newsBonus > 0 ? "positive" : "negative";
+      const sign = newsBonus > 0 ? "+" : "";
+      chips.push(`<span class="mod-chip ${tone}" title="Modulateur news ±10 pts (PR #7)">News ${sign}${newsBonus} — ${safeText(newsReason)}</span>`);
+    }
+    const ctx = d.newsContext || d.plan?.newsContext;
+    if (ctx?.topHeadline && (newsBonus === 0 || !newsReason)) {
+      const cls = ctx.classification === "positive" ? "positive" : ctx.classification === "negative" ? "negative" : "neutral";
+      chips.push(`<span class="mod-chip ${cls}" title="${safeText(ctx.source || '')} — ${ctx.articleCount || 0} articles">News ${ctx.classification || "neutre"} · ${safeText(ctx.topHeadline)}</span>`);
+    }
+    if (ctx?.claudeSignal?.direction && ctx.claudeSignal.direction !== "bruit-ignore") {
+      const cs = ctx.claudeSignal;
+      const tone = cs.direction === "long-positif" ? "positive" : "negative";
+      chips.push(`<span class="mod-chip ${tone} mod-claude" title="Claude niveau 3 — ${safeText(cs.reason || '')}">Claude ${safeText(cs.confidence)} ${safeText(cs.direction)}</span>`);
+    }
+    return chips.length ? `<div class="modulator-chips">${chips.join("")}</div>` : "";
+  }
+
+  function renderDetail() {
     const d = state.detail;
     return `
       <div class="screen">
@@ -4233,6 +4270,7 @@ function renderDetail() {
                     <div class="break-item"><div class="break-name">Activite</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.participation))}</div></div>
                   </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
                 }
+                ${renderModulatorChips(d)}
               </div>
 
               <div class="card">

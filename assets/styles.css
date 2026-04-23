@@ -296,6 +296,14 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .break-item{background:var(--bg-elevated);border:1px solid var(--border-subtle);border-radius:12px;padding:12px}
 .break-name{font-size:.78rem;color:var(--text-secondary)}
 .break-value{font-family:var(--font-mono);font-size:1.2rem;font-weight:700;margin-top:6px}
+
+/* PR #7 Phase 2 — modulateurs régime + news sur la fiche actif */
+.modulator-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.mod-chip{display:inline-flex;align-items:center;padding:4px 10px;border-radius:999px;font-size:.72rem;font-weight:600;line-height:1.4;border:1px solid var(--border-subtle);background:var(--bg-elevated);color:var(--text-secondary);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mod-chip.positive{color:var(--profit);border-color:rgba(0,229,160,.25)}
+.mod-chip.negative{color:var(--loss);border-color:rgba(224,90,90,.28)}
+.mod-chip.neutral{color:var(--text-secondary)}
+.mod-chip.mod-claude{font-weight:700;border-style:dashed}
 .kv{display:grid;grid-template-columns:1fr auto;gap:10px 14px}
 .kv div{padding:10px 0;border-bottom:1px solid var(--border-subtle)}
 .muted{color:var(--text-secondary);overflow-wrap:break-word;word-break:break-word}
