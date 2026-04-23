@@ -3342,6 +3342,19 @@ async function handleScheduledCycle(env) {
         console.error("Scheduled watchlist scan error:", e.message);
       }
     }
+    // PR #9 Phase 2 — rapport hebdo Claude, lundi 6h UTC (= 7h CET / 8h CEST).
+    // Dedup via unique(week_start) : re-run le même lundi = skip.
+    if (utcDay === 1 && utcHour === 6 && utcMinute < 15) {
+      try {
+        const rep = await withTimeout(generateWeeklyReport(env), 30000, "scheduled_weekly_report");
+        if (rep?.ok && !rep.skipped) {
+          summary.weekly_report_generated = true;
+          summary.weekly_report_week = rep.weekStart;
+        }
+      } catch (e) {
+        console.error("Scheduled weekly report error:", e.message);
+      }
+    }
   } finally {
     summary.duration_ms = Date.now() - startedAt;
     // 6. Persister le timestamp + résumé + log de fin (best-effort, ne bloque rien)
@@ -5884,6 +5897,257 @@ async function runCorrectionDetection(env) {
   return { detected: signals.length, created: created.length, signals };
 }
 
+// ============================================================
+// PR #9 Phase 2 — Rapport hebdomadaire Claude (Règle #1 F)
+// ============================================================
+// Chaque lundi 6h UTC, agrège les trades de la semaine précédente
+// (lundi→dimanche), les corrections appliquées, et demande à Claude
+// Sonnet un résumé pédagogique en français. Persiste dans
+// mtp_weekly_reports avec unique(week_start) → dedup automatique.
+
+const WEEKLY_REPORTS_TABLE = "mtp_weekly_reports";
+
+// Retourne { weekStart: YYYY-MM-DD, weekEnd: YYYY-MM-DD } pour la semaine
+// écoulée la plus récente (lundi → dimanche de cette semaine, en UTC).
+function getPreviousWeekRange(ref = new Date()) {
+  const d = new Date(ref);
+  // JS getUTCDay : 0 = dimanche, 1 = lundi, ..., 6 = samedi
+  const dow = d.getUTCDay();
+  // Jours à reculer pour atteindre le DIMANCHE précédent (fin de semaine)
+  //   dim=0 → 7 (dimanche d'avant, exclut le jour même si ref=dim)
+  //   lun=1 → 1, mar=2 → 2, ..., sam=6 → 6
+  const daysToLastSunday = dow === 0 ? 7 : dow;
+  const lastSunday = new Date(d);
+  lastSunday.setUTCDate(d.getUTCDate() - daysToLastSunday);
+  lastSunday.setUTCHours(23, 59, 59, 999);
+  const lastMonday = new Date(lastSunday);
+  lastMonday.setUTCDate(lastSunday.getUTCDate() - 6);
+  lastMonday.setUTCHours(0, 0, 0, 0);
+  return {
+    weekStart: lastMonday.toISOString().slice(0, 10),
+    weekEnd: lastSunday.toISOString().slice(0, 10),
+    startMs: lastMonday.getTime(),
+    endMs: lastSunday.getTime()
+  };
+}
+
+async function weeklyReportExists(env, weekStart) {
+  if (!supabaseConfigured(env)) return false;
+  try {
+    const rows = await supabaseFetch(env,
+      `${WEEKLY_REPORTS_TABLE}?select=id&week_start=eq.${weekStart}&limit=1`
+    );
+    return Array.isArray(rows) && rows.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+async function collectWeeklyReportStats(env, weekStart, weekEnd) {
+  const startIso = new Date(weekStart + "T00:00:00.000Z").toISOString();
+  const endIso = new Date(weekEnd + "T23:59:59.999Z").toISOString();
+
+  // Feedback de la semaine
+  const feedback = await supabaseFetch(env,
+    `${TRADE_FEEDBACK_TABLE}?closed_at=gte.${startIso}&closed_at=lte.${endIso}&order=closed_at.desc&limit=500`
+  ).catch(() => []);
+
+  // Ajustements activés / rollback dans la semaine
+  const adjustments = await supabaseFetch(env,
+    `${ENGINE_ADJUSTMENTS_TABLE}?or=(activated_at.gte.${startIso},rollback_at.gte.${startIso})&order=updated_at.desc&limit=100`
+  ).catch(() => []);
+
+  const rows = Array.isArray(feedback) ? feedback : [];
+  const wins = rows.filter(r => Number(r.pnl || 0) > 0);
+  const losses = rows.filter(r => Number(r.pnl || 0) < 0);
+  const totalPnl = rows.reduce((acc, r) => acc + Number(r.pnl || 0), 0);
+  const winRate = rows.length > 0 ? wins.length / rows.length : null;
+  const avgWin = wins.length > 0 ? wins.reduce((a, r) => a + Number(r.pnl || 0), 0) / wins.length : 0;
+  const avgLoss = losses.length > 0 ? Math.abs(losses.reduce((a, r) => a + Number(r.pnl || 0), 0) / losses.length) : 0;
+  const expectancy = rows.length > 0 ? totalPnl / rows.length : null;
+
+  // Top 3 gains + top 3 pertes
+  const top3Wins = [...rows].sort((a, b) => Number(b.pnl || 0) - Number(a.pnl || 0)).slice(0, 3);
+  const top3Losses = [...rows].sort((a, b) => Number(a.pnl || 0) - Number(b.pnl || 0)).slice(0, 3);
+
+  // Leaderboard par bucket (top 5 par pnl)
+  const bucketAgg = {};
+  for (const r of rows) {
+    const key = r.bucket_key || "unknown";
+    if (!bucketAgg[key]) bucketAgg[key] = { bucket: key, n: 0, pnl: 0, wins: 0 };
+    bucketAgg[key].n++;
+    bucketAgg[key].pnl += Number(r.pnl || 0);
+    if (Number(r.pnl || 0) > 0) bucketAgg[key].wins++;
+  }
+  const topBuckets = Object.values(bucketAgg).sort((a, b) => b.pnl - a.pnl).slice(0, 5);
+  const bottomBuckets = Object.values(bucketAgg).sort((a, b) => a.pnl - b.pnl).filter(b => b.pnl < 0).slice(0, 3);
+
+  const adjSummary = Array.isArray(adjustments) ? adjustments.map(a => ({
+    type: a.adjustment_type,
+    bucket: a.bucket_key,
+    status: a.status,
+    severity: a.severity,
+    notes: a.notes
+  })) : [];
+
+  return {
+    weekStart, weekEnd,
+    trades: {
+      total: rows.length,
+      wins: wins.length,
+      losses: losses.length,
+      winRate,
+      totalPnl,
+      avgWin,
+      avgLoss,
+      expectancy,
+      rrEffective: avgLoss > 0 ? avgWin / avgLoss : null
+    },
+    top3Wins: top3Wins.map(r => ({ symbol: r.symbol, pnl: Number(r.pnl || 0), pnl_pct: Number(r.pnl_pct || 0), setup: r.setup_type, direction: r.direction })),
+    top3Losses: top3Losses.map(r => ({ symbol: r.symbol, pnl: Number(r.pnl || 0), pnl_pct: Number(r.pnl_pct || 0), setup: r.setup_type, direction: r.direction })),
+    topBuckets,
+    bottomBuckets,
+    adjustments: adjSummary,
+    adjustmentsCount: adjSummary.length
+  };
+}
+
+async function generateWeeklyReport(env, { refDate = new Date(), force = false } = {}) {
+  if (!supabaseConfigured(env)) return { ok: false, reason: "supabase_not_configured" };
+  if (!env?.CLAUDE_API_KEY) return { ok: false, reason: "claude_api_key_missing" };
+
+  const range = getPreviousWeekRange(refDate);
+  if (!force && await weeklyReportExists(env, range.weekStart)) {
+    return { ok: true, skipped: true, reason: "already_generated", weekStart: range.weekStart };
+  }
+
+  const stats = await collectWeeklyReportStats(env, range.weekStart, range.weekEnd);
+  if (stats.trades.total === 0) {
+    // Persiste quand même un rapport "vide" pour traçabilité
+    const row = {
+      week_start: range.weekStart,
+      week_end: range.weekEnd,
+      report_markdown: `# Rapport semaine ${range.weekStart} → ${range.weekEnd}\n\nAucun trade clos cette semaine. Le bot est resté en observation.`,
+      stats_snapshot: stats,
+      trades_analyzed: 0,
+      corrections_applied: stats.adjustmentsCount,
+      status: "generated"
+    };
+    await supabaseFetch(env, `${WEEKLY_REPORTS_TABLE}?on_conflict=week_start`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([row])
+    });
+    return { ok: true, empty: true, weekStart: range.weekStart };
+  }
+
+  const prompt = `Tu es un coach de trading pédagogique. Résume la semaine passée d'un bot paper-trading en français markdown, sans jargon inutile.
+
+Structure attendue :
+## Synthèse (2-3 phrases)
+## Chiffres clés (liste bullet)
+## Patterns observés (3 bullets max)
+## Corrections appliquées (ou "Aucune correction activée cette semaine")
+## Recommandations pour la semaine à venir (3 bullets max)
+
+Ton : direct, factuel, sans flatter ni dramatiser. Si la semaine est mauvaise, le dire. Si c'est bien, ne pas surjouer.
+
+Données de la semaine ${range.weekStart} → ${range.weekEnd} :
+${JSON.stringify(stats, null, 2)}`;
+
+  const startMs = Date.now();
+  try {
+    const model = env.CLAUDE_MODEL_SONNET || "claude-sonnet-4-6";
+    const res = await withTimeout(fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-api-key": env.CLAUDE_API_KEY, "anthropic-version": "2023-06-01" },
+      body: JSON.stringify({ model, max_tokens: 800, temperature: 0.4, messages: [{ role: "user", content: prompt }] })
+    }), 25000, "weekly_report_claude");
+
+    const durationMs = Date.now() - startMs;
+    if (!res.ok) {
+      const errBody = await res.text().catch(() => "");
+      await supabaseFetch(env, `${WEEKLY_REPORTS_TABLE}?on_conflict=week_start`, {
+        method: "POST",
+        headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+        body: JSON.stringify([{
+          week_start: range.weekStart,
+          week_end: range.weekEnd,
+          stats_snapshot: stats,
+          trades_analyzed: stats.trades.total,
+          corrections_applied: stats.adjustmentsCount,
+          claude_model: model,
+          generation_duration_ms: durationMs,
+          status: "failed",
+          error_message: `HTTP ${res.status} ${errBody.slice(0, 300)}`
+        }])
+      });
+      return { ok: false, reason: `claude_http_${res.status}` };
+    }
+
+    const body = await res.json();
+    const markdown = Array.isArray(body?.content) ? body.content.map(c => c?.text || "").join("\n") : "";
+    const usage = body?.usage || {};
+
+    const row = {
+      week_start: range.weekStart,
+      week_end: range.weekEnd,
+      report_markdown: markdown,
+      stats_snapshot: stats,
+      trades_analyzed: stats.trades.total,
+      corrections_applied: stats.adjustmentsCount,
+      claude_model: model,
+      claude_tokens_input: Number(usage.input_tokens) || null,
+      claude_tokens_output: Number(usage.output_tokens) || null,
+      generation_duration_ms: durationMs,
+      status: "generated"
+    };
+    await supabaseFetch(env, `${WEEKLY_REPORTS_TABLE}?on_conflict=week_start`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify([row])
+    });
+
+    await logTrainingEvent(env, "weekly_report_generated", {
+      week_start: range.weekStart,
+      trades: stats.trades.total,
+      tokens_out: row.claude_tokens_output,
+      duration_ms: durationMs
+    }).catch(() => {});
+
+    return { ok: true, weekStart: range.weekStart, weekEnd: range.weekEnd, trades: stats.trades.total };
+  } catch (e) {
+    return { ok: false, reason: e.message || "unknown" };
+  }
+}
+
+async function listWeeklyReports(env, { limit = 20 } = {}) {
+  if (!supabaseConfigured(env)) return [];
+  try {
+    const rows = await supabaseFetch(env,
+      `${WEEKLY_REPORTS_TABLE}?order=week_start.desc&limit=${clampInt(limit, 1, 100, 20)}`
+    );
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+async function handleWeeklyReportGenerate(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const force = body?.force === true;
+  const refDate = body?.week_end ? new Date(body.week_end + "T23:59:59Z") : new Date();
+  const res = await generateWeeklyReport(env, { refDate, force });
+  return json({ status: res.ok ? "ok" : "error", asOf: nowIso(), data: res });
+}
+
+async function handleWeeklyReportsList(url, env) {
+  const limitRaw = Number(url?.searchParams?.get("limit"));
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 100) : 20;
+  const rows = await listWeeklyReports(env, { limit });
+  return json({ status: "ok", asOf: nowIso(), count: rows.length, data: rows });
+}
+
 async function handleEngineAdjustments(url, env) {
   const status = url.searchParams.get("status");
   const limit = parseInt(url.searchParams.get("limit") || "50", 10);
@@ -6516,6 +6780,11 @@ async function handleRequest(request, env) {
       if (denied) return denied;
       return safeRoute(() => handleWatchlistScan(env));
     }
+    if (url.pathname === "/api/reports/weekly/generate") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleWeeklyReportGenerate(request, env));
+    }
     return fail("Method not allowed", "error", 405);
   }
 
@@ -6604,6 +6873,11 @@ async function handleRequest(request, env) {
           total: adj.raw.length
         }
       });
+    }
+    if (url.pathname === "/api/reports/weekly") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleWeeklyReportsList(url, env));
     }
     if (url.pathname === "/api/trending") return safeRoute(() => handleTrending());
     if (url.pathname === "/api/news") return safeRoute(() => handleNews(env));
