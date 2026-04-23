@@ -121,7 +121,8 @@
     userAssetsError: null,
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
     bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false },
-    health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 }
+    health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 },
+    tradeFeedback: {} // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
   };
 
   const app = document.getElementById("app");
@@ -676,6 +677,11 @@
     }
 
     state.algoJournal = Array.isArray(rawAlgo) ? rawAlgo : [];
+
+    // PR #5 Phase 2 — charger le feedback MAE/MFE en best-effort
+    // (non bloquant : si le worker est vieux ou hors-ligne, l'UI tombe juste
+    // en mode legacy sans badges MAE/MFE).
+    loadTradeFeedback().catch(() => {});
 
     writeJsonToKeys(TRADE_STORAGE.positions, state.trades.positions);
     writeJsonToKeys(TRADE_STORAGE.history, state.trades.history);
@@ -1767,6 +1773,21 @@ function confirmTradeFromModal() {
     } finally {
       state.bot.loading = false;
       render();
+    }
+  }
+
+  async function loadTradeFeedback() {
+    // PR #5 Phase 2 — hydrate state.tradeFeedback (map par trade_id)
+    try {
+      const resp = await api("/api/training/feedback?limit=500").catch(() => null);
+      const rows = Array.isArray(resp?.data) ? resp.data : [];
+      const map = {};
+      for (const row of rows) {
+        if (row && row.trade_id) map[String(row.trade_id)] = row;
+      }
+      state.tradeFeedback = map;
+    } catch {
+      // silencieux — l'UI garde le dernier snapshot
     }
   }
 
@@ -4611,11 +4632,14 @@ function renderHistoryRow(item) {
     const entryMode = trainingEntryModeMeta(p);
     const pnl = Number(p?.pnl || 0);
     const pnlPctValue = Number.isFinite(Number(p?.pnlPct)) ? Number(p.pnlPct) : null;
+    const feedback = state.tradeFeedback?.[String(p.id || "")] || null;
+    const feedbackBadges = renderFeedbackBadges(feedback);
     return `
       <div class="trade-row history simple-history-row">
         <div>
           <div class="trade-symbol">${safeText(p.symbol)}</div>
           <div class="trade-sub">${safeText(validTradeDate(closedAt) ? new Date(closedAt).toLocaleString("fr-FR") : "date indisponible")}${entryMode ? ` Â· ${safeText(entryMode.label)}` : ""}</div>
+          ${feedbackBadges}
         </div>
         <div>${badge(simpleSideLabel(p.side), p.side)}</div>
         <div>${badge(historyResultLabel(p), (pnl >= 0 ? "positive" : "negative"))}</div>
@@ -4625,6 +4649,40 @@ function renderHistoryRow(item) {
         <div>${safeText(scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`)}</div>
         <div>${safeText(displayHistorySourceOrClosure(p))}</div>
       </div>`;
+  }
+
+  // PR #5 Phase 2 — badges MAE/MFE + exit_reason sur les trades clos
+  function renderFeedbackBadges(feedback) {
+    if (!feedback) return "";
+    const parts = [];
+
+    const exitLabels = {
+      stop_loss: "SL",
+      take_profit: "TP",
+      time_exit: "Délai",
+      engine_invalidation: "Invalidé",
+      manual: "Manuel",
+      unknown: "—"
+    };
+    const exit = exitLabels[feedback.exit_reason] || null;
+    if (exit) parts.push(`<span class="fb-badge fb-exit" title="Raison de clôture">${safeText(exit)}</span>`);
+
+    const mae = Number(feedback.mae_pct);
+    const maeRatio = Number(feedback.mae_vs_stop_ratio);
+    if (Number.isFinite(mae)) {
+      const tight = Number.isFinite(maeRatio) && maeRatio >= 0.7;
+      parts.push(`<span class="fb-badge fb-mae${tight ? ' fb-warn' : ''}" title="Pire drawdown intra-trade${tight ? ' — stop touché à >70%' : ''}">MAE ${num(mae, 2)}%</span>`);
+    }
+
+    const mfe = Number(feedback.mfe_pct);
+    const mfeRatio = Number(feedback.mfe_vs_tp_ratio);
+    if (Number.isFinite(mfe)) {
+      const greedy = Number.isFinite(mfeRatio) && mfeRatio >= 1.2;
+      parts.push(`<span class="fb-badge fb-mfe${greedy ? ' fb-info' : ''}" title="Meilleur gain intra-trade${greedy ? ' — TP dépassé puis retour' : ''}">MFE ${num(mfe, 2)}%</span>`);
+    }
+
+    if (!parts.length) return "";
+    return `<div class="trade-feedback-badges">${parts.join("")}</div>`;
   }
 
   function algoDecisionCounts() {

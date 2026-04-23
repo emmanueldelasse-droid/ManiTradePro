@@ -343,6 +343,15 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .trade-row.trade-head{background:transparent;border:none;padding:0 8px 6px;color:var(--text-secondary);font-size:.78rem;letter-spacing:.08em;text-transform:uppercase}
 .trade-symbol{font-family:var(--font-mono);font-weight:700}
 .trade-sub{font-size:.8rem;color:var(--text-secondary);margin-top:4px}
+
+/* PR #5 Phase 2 — badges MAE/MFE + exit_reason sur l'historique */
+.trade-feedback-badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.fb-badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:999px;font-size:.66rem;font-weight:700;letter-spacing:.02em;border:1px solid var(--border-subtle);background:var(--bg-elevated);color:var(--text-secondary);line-height:1.5}
+.fb-badge.fb-exit{color:var(--text-primary)}
+.fb-badge.fb-mae,.fb-badge.fb-mfe{color:var(--neutral)}
+.fb-badge.fb-warn{color:var(--loss);border-color:rgba(224,90,90,.28)}
+.fb-badge.fb-info{color:var(--profit);border-color:rgba(0,229,160,.25)}
+
 .positive{color:var(--profit)} .negative{color:var(--loss)}
 .trades-stats{margin-top:6px}
 .setting-list{display:flex;flex-direction:column}
