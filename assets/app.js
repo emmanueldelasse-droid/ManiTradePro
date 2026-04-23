@@ -1585,7 +1585,7 @@ function confirmTradeFromModal() {
       headers: { "Content-Type": "application/json", ...workerAdminHeaders() },
       body: JSON.stringify(payload)
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data?.message || `HTTP ${res.status}`);
     return data;
   }
@@ -1730,8 +1730,8 @@ function confirmTradeFromModal() {
     if (!symbol) { state.addAssetForm.error = "Saisis un symbole."; render(); return; }
     state.addAssetForm.loading = true;
     state.addAssetForm.error = null;
-    render();
     try {
+      render();
       const payload = { symbol, name: String(f.name || "").trim() || symbol, asset_class: f.assetClass };
       const result = await apiPost("/api/user-assets", payload);
       haptic([15, 20, 15]);
@@ -1742,7 +1742,7 @@ function confirmTradeFromModal() {
     } catch (e) {
       state.addAssetForm.loading = false;
       state.addAssetForm.error = e.message || "Erreur d'ajout";
-      render();
+      try { render(); } catch (_) { /* render crash ne doit pas figer la page */ }
     }
   }
 
