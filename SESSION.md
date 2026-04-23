@@ -113,6 +113,112 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Diagnostic performance bot — 2026-04-23
+
+### Contexte
+Audit des 21 trades clôturés en Supabase (du 2026-04-08 au 2026-04-23). **Paper trading uniquement — aucun capital réel**. L'objectif est d'**apprendre**, pas de protéger du capital. Donc l'auto-cycle **reste actif**, on collecte pour analyser.
+
+### Résultats bruts (21 trades, 100% long)
+- **Win rate** : 2/17 = **11,8 %** (3 trades cassés pnl=0 exclus, 1 BE)
+- **Net cumulé** : ~-510 USD paper
+- **Avg win** : +1,96 USD · **Avg loss** : -34,24 USD
+- **Expected value** : -30 USD/trade
+- **Breakeven théorique** avec RR 2.2 = ~31 % win rate → très loin du compte
+
+### Patterns identifiés
+1. **Stops touchés quasi-systématiquement avant TP** : 15 pertes toutes entre -1 % et -6 %, pile sur la distance du stop (3-5 %). **Aucun trade n'est allé au TP**. Les 2 wins sont minuscules (+0,11 % et +0,15 %) avec durée identique de 121 min → probable time exit ou move-to-BE, pas une sortie en target.
+2. **Zéro short pris** : 17 tendances haussières + 3 neutres, 0 baissières. L'asymétrie codée dans `calcDetailScore` (worker.js:2015-2016, malus -4 shorts vs bonus +4 longs + seuils 44/46 vs 56/54 dans `calcDetailScore:1991-1993`) se confirme : le bot est 100 % long-biased. Soit voulu, soit biais à symétriser.
+3. **Bug `pnl=0` sur 3 trades cassés** (14 % du dataset) : AMD #18, ETH #19, AMD #20 — `exit_price ≠ entry_price` mais `pnl=0` et `rr_ratio=0` ou `null`. Le flow de close n'a pas calculé le PnL. **Chaque close cassé = data d'apprentissage perdue**, donc c'est prioritaire.
+4. **Duplicatas probables** : AAPL @271.29 × 2 identiques, META @668.84 × 2 identiques. Double-sync Supabase ou re-enregistrements.
+
+### Philosophie (validée avec l'utilisateur)
+
+**Principe directeur** : on prend les trades qu'on croit être de bonnes opportunités. Si ça marche, confirmation. Si ça rate, on fait un **post-mortem pour comprendre où on s'est trompé** — pas une correction réflexe des seuils. C'est de la deliberate practice, pas une chasse au win rate.
+
+**Implications** :
+- Le win rate à court terme n'est **pas** la métrique principale. La qualité du diagnostic post-perte l'est.
+- Pas de filtrage préventif pour "améliorer les stats". On trade ce qui passe les critères actuels, on apprend de chaque résultat.
+- Chaque perte = une leçon à formaliser (pourquoi le setup était mauvais, quel indicateur a menti, quel contexte a été mal lu).
+- Les ajustements de seuils viennent **après** plusieurs post-mortem qui pointent la même cause, pas au premier échec.
+
+### Ordre d'attaque
+
+1. **Fix `pnl=0` sur closes** — prioritaire car chaque trade cassé = une leçon perdue. Sans PnL exploitable, pas de post-mortem possible. Investiguer `closeTrainingTrade` (app.js:2414), `trainingCloseTrigger` (worker.js:3651), `handleTradesSync` (worker.js:4239). Vérifier que `pnl` et `rr_ratio` sont calculés et persistés pour TOUS les closes, manuels et auto.
+2. **Mécanisme de post-mortem par trade** — pour chaque trade clôturé, pouvoir reconstituer le contexte d'entrée : indicateurs d'époque, régime, news, setup détecté, distance stop en ATR, position dans la structure prix. `analysis_snapshot` existe déjà dans Supabase — vérifier qu'il capture bien tout ce qu'il faut pour une autopsie lisible 2 semaines plus tard.
+3. **Analyse des 21 trades existants** — appliquer le post-mortem rétrospectivement : pour chaque perte, identifier où on s'est trompé (entrée trop tard, stop mal placé, régime mal lu, news ignorée, etc.). Classer les causes. C'est ça qui fait émerger les ajustements pertinents, pas des stats brutes.
+4. **Laisser tourner** en paper, accumuler des post-mortem. Pas de changement de seuil tant qu'une même cause n'apparaît pas sur ≥ 5 trades.
+5. **Un seul ajustement à la fois** basé sur un pattern de post-mortem récurrent. Mesurer avant/après.
+6. **Décision shorts** : à trancher — biais long assumé (pause en RISK_OFF) ou symétrie `calcDetailScore` (worker.js:2015-2016 + 1991-1993).
+
+### À NE PAS faire
+- ❌ Stopper l'auto-cycle « pour protéger le capital » — paper trading, aucun capital réel, on perdrait la matière première de l'apprentissage.
+- ❌ Resserrer les seuils pour « améliorer les stats » sans post-mortem qui pointe une cause précise.
+- ❌ Refonte moteur — il détecte des trades, c'est la base. Le travail est sur la finesse des setups et la lecture des pertes, pas l'architecture.
+- ❌ Considérer une perte comme un échec — c'est un cas d'étude. Seul un trade dont on ne comprend pas la perte est un vrai échec.
+
+### Critère de passage en argent réel
+
+**Règle impérative** : rester en paper trading tant que le bot n'a pas un résultat positif mesurable. On passe en réel **uniquement** quand :
+
+1. **Expected value > 0** sur **au moins 50 trades** clôturés (échantillon minimum pour une stat fiable).
+2. **PnL cumulé paper net positif** sur la même fenêtre.
+3. **Aucun `pnl=0` cassé** dans le dataset (fix terminé et propre).
+4. **Au moins 5 post-mortem formalisés** avec cause identifiée → ça prouve qu'on sait lire les pertes, pas juste les subir.
+
+Tant que les 4 conditions ne sont pas réunies : **100 % paper**, on apprend.
+
+**Passage en réel progressif** (pas un switch brutal) :
+- Étape A : taille de position réduite (20-30 % de ce que calculerait l'engine en paper), pendant 20 trades réels.
+- Étape B : si Étape A confirme le comportement paper, taille normale.
+- Retour en paper **immédiat** si drawdown réel > 10 % du capital alloué.
+
+Ce critère est verrouillé ici pour que les prochaines sessions Claude ne poussent pas à un passage prématuré, et que l'utilisateur lui-même puisse s'y référer quand l'impatience se fait sentir.
+
+### Architecture cible post-passage en réel (deux pistes en parallèle)
+
+Quand les 4 conditions ci-dessus sont réunies et qu'on passe en réel, le bot **ne devient pas** un auto-trader monolithique qui décide seul avec du vrai argent. Il se scinde en **deux pistes indépendantes** qui tournent en permanence :
+
+#### Piste 1 — « Learning bot » (paper, permanent)
+- Continue à tourner en paper trading **indéfiniment**, même après le go-live réel.
+- Explore, teste de nouveaux setups, valide de nouveaux patterns sans risque.
+- Source permanente de post-mortem et d'ajustements de règles.
+- L'auto-cycle existant devient ce learning bot.
+- Métriques trackées : EV, win rate, expected value par setup, par régime, par asset class.
+
+#### Piste 2 — « Real proposer » (human-in-the-loop)
+- **Ne prend pas de trades automatiquement** en réel.
+- Quand une opportunité passe les critères validés par la piste 1 (pattern confirmé statistiquement sur ≥ N trades paper), elle est proposée à l'utilisateur via notification.
+- L'utilisateur **confirme ou rejette** manuellement avant exécution (pas d'exécution sans validation).
+- Taille de position calibrée selon le stade (20-30 % puis normal, cf. transition progressive).
+- Retour immédiat en "paper-only" si drawdown > 10 %.
+
+#### Pourquoi deux pistes séparées
+- Les règles évoluent. Le learning bot valide les nouvelles avant qu'elles touchent du réel.
+- Le human-in-the-loop sur le réel force une double vérification (engine + utilisateur) — chaque passage en réel est un choix conscient.
+- On garde une trace claire : ce qui est "en expérimentation" (piste 1) vs "production" (piste 2).
+- Si la piste 2 sous-performe vs la piste 1, on sait que c'est la validation humaine qui coince (pas le moteur) — et inversement.
+
+#### Conséquence pour le code
+- Ne pas coder un simple switch `mode: "paper" | "real"`. Coder deux flux distincts :
+  - `training_auto_cycle` (existe déjà, devient la piste 1)
+  - `real_proposal_flow` (à créer, envoie notification + attend confirmation utilisateur)
+- Les deux partagent le même moteur de scoring, mais leurs **critères d'activation** sont différents : la piste 1 prend tout ce qui passe les seuils ; la piste 2 ne propose que ce qui est sur un pattern validé par stats paper.
+- Stockage Supabase séparé : `mtp_trades` (training) + `mtp_real_trades` (production). Analytics séparées.
+
+Cette architecture est un **objectif long terme**, à ne pas développer avant que les 4 conditions de passage en réel soient remplies. Mais elle est notée ici pour que tout développement intermédiaire reste **compatible** avec cette séparation (ex : ne pas verrouiller une architecture mono-flux qui empêcherait de scinder plus tard).
+
+### Clés d'accès au dataset
+- **Endpoint auth admin** : `GET /api/trades/state` avec `Authorization: Bearer <session_token>` (token dans `localStorage["mtp_session_v1"].token` après login PIN).
+- **Snippet console pour dumper** :
+```javascript
+const token = JSON.parse(localStorage.getItem("mtp_session_v1"))?.token;
+fetch("https://manitradepro.emmanueldelasse.workers.dev/api/trades/state", { headers: { "Authorization": "Bearer " + token } })
+  .then(r => r.json()).then(d => window.__MTP_DUMP = d.data);
+```
+- **localStorage peut être vide** même avec des trades actifs : `loadTradesState` (app.js:637) charge depuis Supabase sans persister en local si remote > local. Toujours passer par le worker pour la vérité.
+
+---
+
 ## Dernière session (session 8)
 
 **Date** : 2026-04-21
