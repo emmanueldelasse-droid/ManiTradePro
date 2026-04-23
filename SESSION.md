@@ -113,6 +113,52 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Diagnostic performance bot — 2026-04-23
+
+### Contexte
+Audit des 21 trades clôturés en Supabase (du 2026-04-08 au 2026-04-23). **Paper trading uniquement — aucun capital réel**. L'objectif est d'**apprendre**, pas de protéger du capital. Donc l'auto-cycle **reste actif**, on collecte pour analyser.
+
+### Résultats bruts (21 trades, 100% long)
+- **Win rate** : 2/17 = **11,8 %** (3 trades cassés pnl=0 exclus, 1 BE)
+- **Net cumulé** : ~-510 USD paper
+- **Avg win** : +1,96 USD · **Avg loss** : -34,24 USD
+- **Expected value** : -30 USD/trade
+- **Breakeven théorique** avec RR 2.2 = ~31 % win rate → très loin du compte
+
+### Patterns identifiés
+1. **Stops touchés quasi-systématiquement avant TP** : 15 pertes toutes entre -1 % et -6 %, pile sur la distance du stop (3-5 %). **Aucun trade n'est allé au TP**. Les 2 wins sont minuscules (+0,11 % et +0,15 %) avec durée identique de 121 min → probable time exit ou move-to-BE, pas une sortie en target.
+2. **Zéro short pris** : 17 tendances haussières + 3 neutres, 0 baissières. L'asymétrie codée dans `calcDetailScore` (worker.js:2015-2016, malus -4 shorts vs bonus +4 longs + seuils 44/46 vs 56/54 dans `calcDetailScore:1991-1993`) se confirme : le bot est 100 % long-biased. Soit voulu, soit biais à symétriser.
+3. **Bug `pnl=0` sur 3 trades cassés** (14 % du dataset) : AMD #18, ETH #19, AMD #20 — `exit_price ≠ entry_price` mais `pnl=0` et `rr_ratio=0` ou `null`. Le flow de close n'a pas calculé le PnL. **Chaque close cassé = data d'apprentissage perdue**, donc c'est prioritaire.
+4. **Duplicatas probables** : AAPL @271.29 × 2 identiques, META @668.84 × 2 identiques. Double-sync Supabase ou re-enregistrements.
+
+### Stratégie d'apprentissage (reco validée avec l'utilisateur)
+
+**Principe directeur** : paper trading = on veut apprendre, pas préserver. Laisser tourner l'auto-cycle, fiabiliser la capture de données, puis ajuster au vu des patterns.
+
+**Ordre d'attaque** :
+1. **Fix `pnl=0` sur closes** — prioritaire car chaque trade cassé pollue le dataset. Investiguer `closeTrainingTrade` (app.js:2414) et `trainingCloseTrigger` (worker.js:3651) + `handleTradesSync` (worker.js:4239). Vérifier que `pnl` et `rr_ratio` sont bien calculés et persistés pour TOUS les closes, y compris les anciens et les closes via auto-cycle.
+2. **Script d'analyse des trades existants** — sortir pour chaque perte : distance entry→stop en % et en unités ATR d'époque, delta entry vs plus haut des 5 dernières bougies 1D, temps écoulé depuis le dernier sommet, setup type. Permet de diagnostiquer : "stops trop serrés" vs "entrée tardive en fin de rallye" vs "régime mal détecté".
+3. **Laisser tourner en paper** pendant 50-100 trades pour avoir un échantillon statistiquement solide (21 trades → intervalles de confiance énormes).
+4. **Un seul ajustement à la fois** basé sur le diag de l'étape 2. Mesurer avant/après. Pas de changement multiple simultané.
+5. **Décision shorts** : à trancher par l'utilisateur — garder biais long assumé (hedge régime RISK_OFF avec pause auto-cycle) ou symétriser les seuils et le bonus/malus dans `calcDetailScore`.
+
+### À NE PAS faire
+- ❌ Stopper l'auto-cycle « pour protéger le capital » — il n'y a pas de capital réel, on perdrait la data.
+- ❌ Toucher aux seuils au pif (pas de backtester, toute modification sans diag = oscillation aveugle).
+- ❌ Refonte du moteur — il détecte des trades, la base est là. Le problème est la finesse du setup, pas l'architecture.
+
+### Clés d'accès au dataset
+- **Endpoint auth admin** : `GET /api/trades/state` avec `Authorization: Bearer <session_token>` (token dans `localStorage["mtp_session_v1"].token` après login PIN).
+- **Snippet console pour dumper** :
+```javascript
+const token = JSON.parse(localStorage.getItem("mtp_session_v1"))?.token;
+fetch("https://manitradepro.emmanueldelasse.workers.dev/api/trades/state", { headers: { "Authorization": "Bearer " + token } })
+  .then(r => r.json()).then(d => window.__MTP_DUMP = d.data);
+```
+- **localStorage peut être vide** même avec des trades actifs : `loadTradesState` (app.js:637) charge depuis Supabase sans persister en local si remote > local. Toujours passer par le worker pour la vérité.
+
+---
+
 ## Dernière session (session 8)
 
 **Date** : 2026-04-21
