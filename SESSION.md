@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-22 (audit bot + règles objectif final) |
-| **IA utilisée** | Claude (claude-sonnet-4-6) |
-| **Branche active** | `main` |
+| **Dernière mise à jour** | 2026-04-23 (PR #5 Phase 2 — feedback MAE/MFE) |
+| **IA utilisée** | Claude (claude-opus-4-7) |
+| **Branche active** | `claude/go-phase-2-E81c5` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -587,7 +587,48 @@ Chaque PR est indépendante, mergeable seule, validée 3-5 jours en paper avant 
   2. `wrangler deploy` depuis la machine Windows
 - **Validation paper** : naviguer dans l'app → Plus → Santé bot → page rendue sans crash même sans données. Tester `GET /api/engine/drift-detect` (nécessite token admin) → retourne `{detected, alerts}`. Après quelques trades clos, `GET /api/engine/bucket-stats` retourne les buckets agrégés.
 
-**Total Phase 1** : ~12 jours ouvrés (~3 semaines calendaires avec validations paper intercalées). **4 PRs mergées : #55, #56, #57, et cette PR en attente de merge.**
+**Total Phase 1** : ~12 jours ouvrés (~3 semaines calendaires avec validations paper intercalées). **4 PRs mergées : #55, #56, #57, #58.**
+
+### Phase 2 — Découpage en 5 PRs (session 10, en cours)
+
+Chaque PR indépendante, mergeable seule. Objectif global : opérationnaliser la Règle #1 (apprendre ET se corriger), la Règle #5 niveau 2+3 (news modulateur + Claude directionnel), et l'auto-watchlist.
+
+#### PR #5 — Observation : `mtp_trade_feedback` + MAE/MFE à la clôture — ✅ EN COURS (branche `claude/go-phase-2-E81c5`)
+- [x] **Migration 006** : table `mtp_trade_feedback` avec trade_id unique, bucket_key 4-dim (`setup|direction|regime|asset_class`), mae_pct / mfe_pct, mae_vs_stop_ratio / mfe_vs_tp_ratio, stop_distance_pct / tp_distance_pct, holding_minutes, exit_reason, regime_at_open / regime_at_close, news_context_open / news_context_close (réservés PR #7+), RLS permissif, 4 index.
+- [x] **Tracking intra-trade** dans `handleTrainingAutoCycle` close phase :
+  - `updatePositionIntraExcursion(position, livePrice)` met à jour `live.highSinceOpen` / `live.lowSinceOpen` en mémoire (baseline = entry pour ne jamais sous-estimer).
+  - `persistPositionIntraExcursion()` PATCH Supabase uniquement quand une borne bouge (~1k PATCH/j max, très sous le free tier).
+- [x] **Capture feedback à la clôture** :
+  - `captureTradeFeedback(env, closedRow, position, closeType)` calcule MAE/MFE directionnels, ratios vs stop/TP, holding_minutes, bucket_key.
+  - Upsert idempotent sur trade_id (`on_conflict=trade_id`).
+  - Fallback MAE/MFE quand l'intra-tracking est absent (clôture entre deux cycles ou trade pré-PR #5) : borne opposée = exit.
+  - Appelée depuis `closeTrainingPosition` (auto-close) ET depuis `handleTradesSync` via `listExistingFeedbackIds` pour les clôtures manuelles UI → sync, sans double-capture.
+- [x] `closeTrainingPosition` propage `live.highSinceOpen`/`lowSinceOpen` sur le closed row pour que `computeTradeExcursion` retrouve les bornes intra-trade après DELETE de la position.
+- [x] **Endpoint** : `GET /api/training/feedback?limit&bucket_key&symbol` (admin).
+- [x] **UI historique** : badges MAE/MFE + exit_reason sur chaque ligne de `renderHistoryRow`. Palette :
+  - `fb-exit` : SL / TP / Délai / Invalidé / Manuel (neutre)
+  - `fb-mae` : rouge `fb-warn` si mae_vs_stop_ratio ≥ 0.7 (stop trop serré)
+  - `fb-mfe` : vert `fb-info` si mfe_vs_tp_ratio ≥ 1.2 (TP trop court)
+- [x] `loadTradeFeedback()` best-effort au `loadTradesState`, stocké en map dans `state.tradeFeedback`.
+- [x] CSS `.fb-badge` utilise exclusivement `var(--...)` → 100% compatible light/dark.
+- [x] `sw.js` CACHE_VERSION bumpé v7.0 → v7.1.
+- **Scope volontairement exclu** : pas de correction automatique (réservée PR #6), pas de news_context capturé (réservé PR #7).
+- **Déploiement requis côté utilisateur** :
+  1. Exécuter `cloudflare-worker/migrations/006_trade_feedback.sql` dans Supabase SQL Editor
+  2. `wrangler deploy` depuis la machine Windows
+- **Validation paper** : après qu'un trade se ferme (auto ou manuel), `GET /api/training/feedback?limit=10` doit retourner une ligne avec bucket_key + MAE/MFE. Sur l'onglet Mes Trades, la ligne historique affiche les badges. Vérifier dans Supabase que `mtp_positions.live.highSinceOpen` / `lowSinceOpen` s'incrémentent cycle après cycle.
+
+#### PR #6 — Corrections automatiques (7 règles) + activation shadow→active — ⏳ À VENIR
+Opérationnalisation des ajustements shadow enregistrés en PR #4 + observation des 7 règles de la Règle #1 sur les données capturées par PR #5. Activation auto après 20 trades shadow favorables, rollback sinon.
+
+#### PR #7 — News modulateur ±10 pts + Claude directionnel niveau 3 + kill switch gradué — ⏳ À VENIR
+Enrichissement du `calcDetailScore` avec sentiment agrégé (Alpha Vantage + CryptoPanic + Finnhub + Messari). Claude Haiku sur les news ambiguës avec kill switch win-rate 30 trades.
+
+#### PR #8 — Auto-watchlist (ajout/retrait intelligent) — ⏳ À VENIR
+Ajout automatique si trending 3+ fois/7j OU news verified 10+ mentions/48h + liquidity top 200. Retrait si dormant 90j ou volume -70%. Core 35-40 protégés + 10 actifs pinnables manuellement.
+
+#### PR #9 — Rapport Claude hebdo + décroissance temporelle — ⏳ À VENIR
+Rapport lundi matin via Claude Sonnet ($2/mois). Pondération exponentielle des trades anciens (30j=1.0, 90j=0.5, 365j=0.2, >1an=0.1) dans les agrégations de buckets.
 
 ### Règle de garde — ne pas ajouter de feature qui n'avance pas ces 5 règles
 Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'apprentissage+correction, ni la validation, ni l'exécution long/short, ni l'intégration du contexte fondamental → le reporter. L'app a déjà trop de features d'assistant ; il en faut moins mais qui servent le bot.
@@ -615,3 +656,5 @@ Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'
 | 2026-04-19 | Claude sonnet-4-6 | Fix wipe historique + Fear&Greed + Trending + CSV + Performance + notifs enrichies |
 | 2026-04-20 | Claude sonnet-4-6 | UI/UX iPhone/web — SVG icons, touch targets, a11y, fix data-open-detail, fix grid metrics |
 | 2026-04-21 | Claude opus-4-7 | Audit data-* — fix bouton Rafraîchir opportunités, nettoyage sélecteur mort `.ai-card` |
+| 2026-04-22 | Claude sonnet-4-6 | Phase 1 livrée (4 PRs mergées : cron autonome, long/short + F&G/VIX, news garde-fou, shadow/drift) |
+| 2026-04-23 | Claude opus-4-7 | Phase 2 PR #5 : `mtp_trade_feedback` + MAE/MFE intra-trade + badges historique |
