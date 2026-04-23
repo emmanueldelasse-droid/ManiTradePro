@@ -1756,6 +1756,26 @@ function confirmTradeFromModal() {
     }
   }
 
+  // PR #8 Phase 2 — pin/unpin actif
+  async function togglePinUserAsset(symbol, currentlyPinned) {
+    haptic(8);
+    const pin = !currentlyPinned;
+    try {
+      const res = await apiPost("/api/user-assets/pin", { symbol, pin });
+      if (res?.data?.ok === false) {
+        alert(`Erreur : ${res.data.error || "pin impossible"}`);
+        return;
+      }
+      state.userAssets = state.userAssets.map(a =>
+        String(a.symbol).toUpperCase() === symbol.toUpperCase() ? { ...a, is_pinned: pin } : a
+      );
+      render();
+    } catch (e) {
+      alert(`Erreur : ${e.message || "pin impossible"}`);
+      await loadUserAssets();
+    }
+  }
+
   // ============================================================
   // BOT (training auto-cycle)
   // ============================================================
@@ -5667,13 +5687,30 @@ function openPositionsRiskView() {
     const cls = safeText(a.asset_class || "");
     const provider = safeText(a.provider_used || "");
     const enabled = a.enabled !== false;
+    const source = String(a.source || "user");
+    const isPinned = a.is_pinned === true;
+    const autoReason = a.auto_reason;
+
+    // PR #8 Phase 2 — badges source + pin toggle
+    let sourceBadge = "";
+    if (source === "auto") {
+      const trendCount = autoReason?.trending_count;
+      sourceBadge = `<span class="ua-badge ua-auto" title="Ajouté automatiquement par le bot${trendCount ? ` · trending ${trendCount}× sur 7j` : ""}">auto</span>`;
+    } else if (source === "core") {
+      sourceBadge = `<span class="ua-badge ua-core" title="Actif de base protégé">core</span>`;
+    }
+    const pinBadge = isPinned ? `<span class="ua-badge ua-pinned" title="Épinglé — ne sera jamais retiré auto">épinglé</span>` : "";
+
     return `
-      <div class="user-asset-row ${enabled ? "" : "is-disabled"}">
+      <div class="user-asset-row ${enabled ? "" : "is-disabled"}${isPinned ? " is-pinned" : ""}">
         <div class="user-asset-main">
-          <div class="user-asset-sym">${sym}</div>
+          <div class="user-asset-sym">${sym} ${sourceBadge}${pinBadge}</div>
           <div class="user-asset-meta">${name} · ${cls}${provider ? ` · ${provider}` : ""}</div>
         </div>
         <div class="user-asset-actions">
+          <button class="btn btn-secondary user-asset-pin" data-pin-user-asset="${sym}" data-pin-state="${isPinned ? "on" : "off"}" aria-label="${isPinned ? "Désépingler" : "Épingler"} ${sym}" title="${isPinned ? "Désépingler" : "Épingler"}">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="${isPinned ? "currentColor" : "none"}" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/></svg>
+          </button>
           <label class="user-asset-toggle">
             <input type="checkbox" ${enabled ? "checked" : ""} data-toggle-user-asset="${sym}">
           </label>
@@ -6848,6 +6885,13 @@ function renderMain() {
       el.addEventListener("click", () => {
         const sym = el.getAttribute("data-delete-user-asset");
         deleteUserAsset(sym);
+      });
+    });
+    app.querySelectorAll("[data-pin-user-asset]").forEach(el => {
+      el.addEventListener("click", () => {
+        const sym = el.getAttribute("data-pin-user-asset");
+        const currentlyPinned = el.getAttribute("data-pin-state") === "on";
+        togglePinUserAsset(sym, currentlyPinned);
       });
     });
     app.querySelectorAll("[data-load-user-assets]").forEach(el => {

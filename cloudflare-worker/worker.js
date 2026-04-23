@@ -3329,6 +3329,19 @@ async function handleScheduledCycle(env) {
         console.error("Scheduled shadow observer error:", e.message);
       }
     }
+    // PR #8 Phase 2 — auto-watchlist scan — 1×/jour à 3h UTC (décalé du 2h UTC
+    // pour ne pas rentrer en concurrence avec drift + corrections detection).
+    if (utcHour === 3 && utcMinute < 15) {
+      try {
+        const wl = await withTimeout(runWatchlistScan(env), 20000, "scheduled_watchlist_scan");
+        if (wl && (wl.added > 0 || wl.removed > 0)) {
+          summary.watchlist_added = wl.added;
+          summary.watchlist_removed = wl.removed;
+        }
+      } catch (e) {
+        console.error("Scheduled watchlist scan error:", e.message);
+      }
+    }
   } finally {
     summary.duration_ms = Date.now() - startedAt;
     // 6. Persister le timestamp + résumé + log de fin (best-effort, ne bloque rien)
@@ -5924,6 +5937,320 @@ async function handleTrending() {
     return json({ status: "partial", source: "error", asOf: nowIso(), freshness: "unknown", message: String(err?.message || err), data: [] });
   }
 }
+
+// ============================================================
+// PR #8 Phase 2 — Auto-watchlist (Règle #5 C)
+// ============================================================
+// Auto-add : symboles trending 3+ fois sur 7 jours (CoinGecko), max 20/mois.
+// Auto-remove : actifs sans signal depuis 90 jours, sauf core + pinned.
+// Historique complet dans mtp_watchlist_history.
+
+const WATCHLIST_CONFIG = {
+  trendingHistoryKey: "watchlist:trending_history",
+  trendingHistoryDays: 7,
+  autoAddTrendingThreshold: 3,    // nb d'apparitions trending min sur 7j
+  autoRemoveDormantDays: 90,       // nb de jours sans signal avant retrait
+  maxAutoAddsPerMonth: 20,
+  maxPinned: 10
+};
+// USER_ASSETS_TABLE est déjà déclarée en haut du fichier (ligne ~109).
+const WATCHLIST_HISTORY_TABLE = "mtp_watchlist_history";
+
+// Enregistre le snapshot trending du jour en KV (rolling 7 jours)
+async function recordTrendingSnapshot(env) {
+  if (!env) return;
+  try {
+    const res = await withTimeout(fetch("https://api.coingecko.com/api/v3/search/trending"), 8000, "coingecko_trending");
+    if (!res.ok) return;
+    const body = await res.json();
+    const symbols = Array.isArray(body?.coins)
+      ? body.coins.slice(0, 15).map(c => String(c?.item?.symbol || "").toUpperCase()).filter(Boolean)
+      : [];
+    if (!symbols.length) return;
+
+    const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+    const history = (await kvGet(WATCHLIST_CONFIG.trendingHistoryKey, env)) || [];
+    const filtered = history.filter(s => s.date !== today);
+    filtered.push({ date: today, symbols });
+    // Garde les 7 derniers jours
+    filtered.sort((a, b) => a.date < b.date ? -1 : 1);
+    const trimmed = filtered.slice(-WATCHLIST_CONFIG.trendingHistoryDays);
+    await kvSet(WATCHLIST_CONFIG.trendingHistoryKey, trimmed, WATCHLIST_CONFIG.trendingHistoryDays * 24 * 3600 + 86400, env);
+  } catch (e) {
+    console.error("recordTrendingSnapshot failed:", e.message);
+  }
+}
+
+// Compte les apparitions en trending sur les 7 derniers jours
+async function countTrendingMentions(env) {
+  const history = (await kvGet(WATCHLIST_CONFIG.trendingHistoryKey, env)) || [];
+  const counts = new Map(); // symbol → count
+  for (const snap of history) {
+    if (!Array.isArray(snap.symbols)) continue;
+    for (const s of snap.symbols) {
+      counts.set(s, (counts.get(s) || 0) + 1);
+    }
+  }
+  return counts;
+}
+
+async function listUserAssetsRaw(env) {
+  if (!supabaseConfigured(env)) return [];
+  try {
+    const rows = await supabaseFetch(env, `${USER_ASSETS_TABLE}?select=*&order=created_at.desc`);
+    return Array.isArray(rows) ? rows : [];
+  } catch (e) {
+    console.error("listUserAssetsRaw failed:", e.message);
+    return [];
+  }
+}
+
+async function recordWatchlistHistory(env, { action, symbol, assetClass = null, reason = null, triggeredBy = null }) {
+  if (!supabaseConfigured(env)) return null;
+  try {
+    const row = {
+      action, symbol, asset_class: assetClass,
+      reason: reason || {}, triggered_by: triggeredBy || "scheduled_cycle",
+      created_at: nowIso()
+    };
+    await supabaseFetch(env, `${WATCHLIST_HISTORY_TABLE}`, {
+      method: "POST",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify([row])
+    });
+    return row;
+  } catch (e) {
+    console.error("recordWatchlistHistory failed:", e.message);
+    return null;
+  }
+}
+
+// Compte les auto-adds du mois courant (depuis mtp_watchlist_history)
+async function countAutoAddsThisMonth(env) {
+  if (!supabaseConfigured(env)) return 0;
+  try {
+    const monthStart = new Date();
+    monthStart.setUTCDate(1);
+    monthStart.setUTCHours(0, 0, 0, 0);
+    const iso = monthStart.toISOString();
+    const rows = await supabaseFetch(env,
+      `${WATCHLIST_HISTORY_TABLE}?select=id&action=eq.auto_add&created_at=gte.${encodeURIComponent(iso)}&limit=100`
+    );
+    return Array.isArray(rows) ? rows.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Calcule le dernier timestamp d'activité (signal ou trade) par symbole
+async function computeLastActivityPerSymbol(env) {
+  if (!supabaseConfigured(env)) return new Map();
+  const map = new Map();
+  try {
+    const signals = await supabaseFetch(env,
+      `${SIGNAL_TABLE}?select=symbol,created_at&order=created_at.desc&limit=2000`
+    ).catch(() => []);
+    const trades = await supabaseFetch(env,
+      `${TRADE_TABLES.trades}?select=symbol,opened_at,closed_at&mode=eq.training&order=closed_at.desc&limit=2000`
+    ).catch(() => []);
+
+    const upsert = (sym, tsStr) => {
+      if (!sym || !tsStr) return;
+      const ts = new Date(tsStr).getTime();
+      if (!Number.isFinite(ts)) return;
+      const cur = map.get(sym);
+      if (!cur || ts > cur) map.set(sym, ts);
+    };
+    for (const r of (Array.isArray(signals) ? signals : [])) upsert(r.symbol, r.created_at);
+    for (const r of (Array.isArray(trades) ? trades : [])) {
+      upsert(r.symbol, r.closed_at);
+      upsert(r.symbol, r.opened_at);
+    }
+  } catch (e) {
+    console.error("computeLastActivityPerSymbol failed:", e.message);
+  }
+  return map;
+}
+
+async function runWatchlistScan(env) {
+  if (!supabaseConfigured(env)) return { added: 0, removed: 0, skipped: 0, reason: "supabase_not_configured" };
+
+  const summary = { added: 0, removed: 0, skipped: 0, adds: [], removes: [] };
+
+  // 1. Enregistre le snapshot trending du jour (pour les scans futurs)
+  await recordTrendingSnapshot(env);
+
+  // 2. Charge la watchlist actuelle + l'historique d'activité
+  const [assets, trendingCounts, lastActivity, addsThisMonth] = await Promise.all([
+    listUserAssetsRaw(env),
+    countTrendingMentions(env),
+    computeLastActivityPerSymbol(env),
+    countAutoAddsThisMonth(env)
+  ]);
+
+  const existingSymbols = new Set(assets.map(a => String(a.symbol || "").toUpperCase()));
+  const pinnedCount = assets.filter(a => a.is_pinned).length;
+
+  // ---- AUTO-ADD ----
+  const remainingQuota = Math.max(0, WATCHLIST_CONFIG.maxAutoAddsPerMonth - addsThisMonth);
+  if (remainingQuota > 0) {
+    // Candidats : trending 3+ fois ET absent de la watchlist
+    const candidates = [];
+    for (const [sym, count] of trendingCounts.entries()) {
+      if (count < WATCHLIST_CONFIG.autoAddTrendingThreshold) continue;
+      // CoinGecko retourne un ticker nu (BTC, SOL) ; on doit mapper vers un symbole
+      // tradeable sur Binance. Stratégie MVP : ajouter `${sym}USDT`.
+      const binanceSymbol = `${sym}USDT`;
+      if (existingSymbols.has(binanceSymbol)) continue;
+      if (existingSymbols.has(sym)) continue; // déjà présent sous forme nue
+      candidates.push({ symbol: binanceSymbol, trendingCount: count });
+    }
+    // Trie par count desc, prend les top N selon quota restant
+    candidates.sort((a, b) => b.trendingCount - a.trendingCount);
+    for (const cand of candidates.slice(0, remainingQuota)) {
+      try {
+        const reason = { trending_count: cand.trendingCount, days_span: WATCHLIST_CONFIG.trendingHistoryDays, source: "coingecko" };
+        const row = {
+          symbol: cand.symbol,
+          name: cand.symbol.replace(/USDT$/, ""),
+          asset_class: "crypto",
+          enabled: true,
+          provider_used: "binance",
+          source: "auto",
+          auto_added_at: nowIso(),
+          auto_reason: reason,
+          last_signal_at: null,
+          dormant_flag: false,
+          is_pinned: false
+        };
+        await supabaseFetch(env, `${USER_ASSETS_TABLE}?on_conflict=symbol`, {
+          method: "POST",
+          headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+          body: JSON.stringify([row])
+        });
+        await recordWatchlistHistory(env, { action: "auto_add", symbol: cand.symbol, assetClass: "crypto", reason, triggeredBy: "scheduled_cycle" });
+        summary.added++;
+        summary.adds.push({ symbol: cand.symbol, reason });
+      } catch (e) {
+        console.error("auto_add failed:", e.message);
+      }
+    }
+  } else {
+    summary.skipped++;
+  }
+
+  // ---- AUTO-REMOVE ----
+  const cutoffMs = Date.now() - (WATCHLIST_CONFIG.autoRemoveDormantDays * 86400000);
+  for (const asset of assets) {
+    if (asset.source === "core") continue;       // core protégé
+    if (asset.is_pinned) continue;               // épinglé protégé
+    if (asset.source !== "auto") continue;       // on ne retire QUE les auto-added
+    const sym = String(asset.symbol || "").toUpperCase();
+    const lastActivityMs = lastActivity.get(sym) || 0;
+    if (lastActivityMs === 0) continue;          // jamais d'activité → probablement tout juste ajouté, skip
+    if (lastActivityMs > cutoffMs) continue;     // actif récent, skip
+
+    try {
+      const reason = { dormant_days: Math.round((Date.now() - lastActivityMs) / 86400000), last_activity: new Date(lastActivityMs).toISOString() };
+      await supabaseFetch(env, `${USER_ASSETS_TABLE}?symbol=eq.${encodeURIComponent(sym)}`, {
+        method: "DELETE",
+        headers: { Prefer: "return=minimal" }
+      });
+      await recordWatchlistHistory(env, { action: "auto_remove", symbol: sym, assetClass: asset.asset_class, reason, triggeredBy: "scheduled_cycle" });
+      summary.removed++;
+      summary.removes.push({ symbol: sym, reason });
+    } catch (e) {
+      console.error("auto_remove failed:", e.message);
+    }
+  }
+
+  if (summary.added > 0 || summary.removed > 0) {
+    await logTrainingEvent(env, "watchlist_scan", {
+      added: summary.added, removed: summary.removed,
+      adds: summary.adds.slice(0, 10),
+      removes: summary.removes.slice(0, 10),
+      adds_quota_remaining: Math.max(0, remainingQuota - summary.added),
+      pinned_count: pinnedCount
+    }).catch(() => {});
+  }
+
+  return summary;
+}
+
+async function pinUserAsset(env, symbol) {
+  if (!supabaseConfigured(env)) return { ok: false, error: "supabase_not_configured" };
+  const clean = String(symbol || "").toUpperCase();
+  if (!clean) return { ok: false, error: "invalid_symbol" };
+  // Garde-fou : max 10 pins
+  const assets = await listUserAssetsRaw(env);
+  const currentPins = assets.filter(a => a.is_pinned).length;
+  if (currentPins >= WATCHLIST_CONFIG.maxPinned) {
+    return { ok: false, error: `max_pins_reached (${WATCHLIST_CONFIG.maxPinned})` };
+  }
+  try {
+    await supabaseFetch(env, `${USER_ASSETS_TABLE}?symbol=eq.${encodeURIComponent(clean)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ is_pinned: true, updated_at: nowIso() })
+    });
+    await recordWatchlistHistory(env, { action: "manual_pin", symbol: clean, triggeredBy: "user_ui" });
+    return { ok: true, symbol: clean, pinned: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function unpinUserAsset(env, symbol) {
+  if (!supabaseConfigured(env)) return { ok: false, error: "supabase_not_configured" };
+  const clean = String(symbol || "").toUpperCase();
+  if (!clean) return { ok: false, error: "invalid_symbol" };
+  try {
+    await supabaseFetch(env, `${USER_ASSETS_TABLE}?symbol=eq.${encodeURIComponent(clean)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ is_pinned: false, updated_at: nowIso() })
+    });
+    await recordWatchlistHistory(env, { action: "manual_unpin", symbol: clean, triggeredBy: "user_ui" });
+    return { ok: true, symbol: clean, pinned: false };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+}
+
+async function listWatchlistHistory(env, { limit = 50 } = {}) {
+  if (!supabaseConfigured(env)) return [];
+  try {
+    const rows = await supabaseFetch(env,
+      `${WATCHLIST_HISTORY_TABLE}?order=created_at.desc&limit=${clampInt(limit, 1, 500, 50)}`
+    );
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+async function handleWatchlistScan(env) {
+  const summary = await runWatchlistScan(env);
+  return json({ status: "ok", asOf: nowIso(), ...summary });
+}
+
+async function handleWatchlistHistory(url, env) {
+  const limitRaw = Number(url?.searchParams?.get("limit"));
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, 500) : 50;
+  const rows = await listWatchlistHistory(env, { limit });
+  return json({ status: "ok", asOf: nowIso(), count: rows.length, data: rows });
+}
+
+async function handlePinAsset(request, env) {
+  const body = await request.json().catch(() => ({}));
+  const symbol = parseSymbol(body?.symbol || "");
+  if (!symbol) return fail("symbol required", "error", 400);
+  const pin = body?.pin !== false;
+  const res = pin ? await pinUserAsset(env, symbol) : await unpinUserAsset(env, symbol);
+  if (!res.ok) return fail(res.error || "pin_failed", "error", 400);
+  return json({ status: "ok", asOf: nowIso(), data: res });
+}
+
 async function handlePortfolioSummary() { return json({ status:"not_configured",source:null,asOf:null,freshness:"unknown",message:"No real portfolio source configured",data:{totalEquity:null,availableCash:null,totalPnl:null,totalPnlPct:null} }); }
 async function handlePortfolioPositions() { return json({ status:"not_configured",source:null,asOf:null,freshness:"unknown",message:"No real positions source configured",data:[] }); }
 
@@ -6138,6 +6465,16 @@ async function handleRequest(request, env) {
       if (denied) return denied;
       return safeRoute(() => handleUserAssetsAdd(request, env));
     }
+    if (url.pathname === "/api/user-assets/pin") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handlePinAsset(request, env));
+    }
+    if (url.pathname === "/api/watchlist/scan") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleWatchlistScan(env));
+    }
     return fail("Method not allowed", "error", 405);
   }
 
@@ -6266,6 +6603,11 @@ async function handleRequest(request, env) {
       if (denied) return denied;
       return safeRoute(() => handleUserAssetsList(env));
     }
+    if (url.pathname === "/api/watchlist/history") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleWatchlistHistory(url, env));
+    }
     // Route de debug état des circuits
     if (url.pathname === "/api/debug/circuits") {
       const denied = await requireAdminAccess(request, env);
@@ -6332,7 +6674,7 @@ async function handleUserAssetsList(env) {
     return ok({ assets: [], supabaseConfigured: false }, "worker", nowIso(), "unknown", "Supabase non configuré — impossible de charger la liste.");
   }
   try {
-    const rows = await supabaseFetch(env, `${USER_ASSETS_TABLE}?select=symbol,name,asset_class,enabled,provider_used,created_at&order=created_at.desc`);
+    const rows = await supabaseFetch(env, `${USER_ASSETS_TABLE}?select=symbol,name,asset_class,enabled,provider_used,created_at,source,is_pinned,auto_added_at,auto_reason,last_signal_at,dormant_flag&order=created_at.desc`);
     return ok({ assets: Array.isArray(rows) ? rows : [], supabaseConfigured: true }, "supabase", nowIso(), "recent");
   } catch (e) {
     return fail(`Erreur chargement : ${e.message || "supabase indisponible"}`, "error", 500);

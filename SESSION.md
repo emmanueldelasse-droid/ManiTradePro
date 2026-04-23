@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-23 (PR #7 Phase 2 — news modulateur + Claude niveau 3) |
+| **Dernière mise à jour** | 2026-04-23 (PR #8 Phase 2 — auto-watchlist) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/phase2-pr7-news-modulator` |
+| **Branche active** | `claude/phase2-pr8-auto-watchlist` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -742,8 +742,69 @@ Implémente la **Règle #5 niveaux 2 et 3** (Phase 1 avait livré le niveau 1 ha
 - Auto-reset 60 j du kill switch silent : documenté, non branché.
 - Modulator news côté opportunities list (liste des opps) : seul `handleOpportunityDetail` et `buildOpportunityRowsForTraining` bénéficient actuellement du fetch news (caller 1 + caller 2 inline). La liste générale `/api/opportunities` passe aussi par `calcDetailScore` donc reçoit bien le modulator.
 
-#### PR #8 — Auto-watchlist (ajout/retrait intelligent) — ⏳ À VENIR
-Ajout automatique si trending 3+ fois/7j OU news verified 10+ mentions/48h + liquidity top 200. Retrait si dormant 90j ou volume -70%. Core 35-40 protégés + 10 actifs pinnables manuellement.
+#### PR #8 — Auto-watchlist (ajout/retrait intelligent) — ✅ EN COURS (branche `claude/phase2-pr8-auto-watchlist`)
+
+Implémente la **Règle #5 C** : le bot ajoute automatiquement les cryptos trending sur 7 jours (CoinGecko) et retire les actifs dormants depuis 90 jours, sauf core + pinned. Max 20 adds/mois, 10 pins max.
+
+**Migration 007** (obligatoire côté utilisateur avant merge)
+- Extensions `mtp_user_assets` : `source` (user|auto|core), `is_pinned`, `auto_added_at`, `auto_reason` (jsonb), `last_signal_at`, `dormant_flag`.
+- Nouvelle table `mtp_watchlist_history` : action (auto_add|auto_remove|manual_pin|manual_unpin|manual_add|manual_remove), symbol, reason jsonb, triggered_by. RLS permissif + 3 index.
+
+**Helpers backend**
+- `recordTrendingSnapshot(env)` : fetch CoinGecko top 15 trending, persist en KV `watchlist:trending_history` avec date YYYY-MM-DD, rolling 7j.
+- `countTrendingMentions(env)` : map symbol → count sur 7j depuis KV.
+- `computeLastActivityPerSymbol(env)` : agrège 2000 derniers signals + 2000 derniers trades pour dernier `last_activity_ms` par symbole (détecteur dormance).
+- `countAutoAddsThisMonth(env)` : query mtp_watchlist_history pour rate limit 20/mois.
+
+**runWatchlistScan(env)**
+- **AUTO-ADD** : candidats trending ≥ 3 fois sur 7j ET absents de la watchlist (format Binance `${ticker}USDT`). Trie par count desc, limité au quota restant. Upsert avec `source='auto'` + `auto_reason`.
+- **AUTO-REMOVE** : parcourt la watchlist, skip core + pinned + user ; ne retire QUE les rows `source='auto'` sans activité > 90j. DELETE + history avec reason `{dormant_days, last_activity}`.
+- Event `watchlist_scan` loggé dans `mtp_training_events`.
+
+**Pin / unpin**
+- `pinUserAsset(env, symbol)` : PATCH is_pinned=true, respecte cap 10. Logge `manual_pin`.
+- `unpinUserAsset(env, symbol)` : PATCH is_pinned=false. Logge `manual_unpin`.
+
+**Endpoints admin**
+- `POST /api/user-assets/pin` body `{ symbol, pin: bool }` → toggle pin.
+- `POST /api/watchlist/scan` : force un scan manuel.
+- `GET /api/watchlist/history?limit=N` : 50 derniers events par défaut.
+
+**Intégration moteur**
+- Tick quotidien **3h UTC** dans `handleScheduledCycle`, décalé du 2h UTC (drift + corrections PR #4/#6) pour éviter contention des scheduled tasks.
+- `handleUserAssetsList` étendu pour renvoyer source + is_pinned + auto_added_at + auto_reason + last_signal_at + dormant_flag.
+
+**UI Réglages → Actifs surveillés**
+- Badges `.ua-badge` : `ua-auto` (vert teinté, tooltip count trending), `ua-core` (neutre), `ua-pinned` (vert profit).
+- Nouveau bouton pin (SVG épingle rempli quand épinglé) à côté du toggle enabled + delete.
+- Bordure carte renforcée en profit si pinned.
+- Listener `data-pin-user-asset` appelle `togglePinUserAsset()`.
+- CSS 100% `var(--...)` + rgba profit sémantiques → light/dark OK.
+
+**Garde-fous**
+- maxAutoAddsPerMonth: 20 (Règle #5 C).
+- maxPinned: 10.
+- Core jamais retiré auto (`source='core'`).
+- User jamais retiré auto (seul `source='auto'` éligible).
+- Pinned jamais retiré.
+- Rate limit : skip auto-add si quota mois épuisé.
+
+**Scope volontairement exclu**
+- News verified mention counter (10+ mentions/48h) : reporté, nécessite agrégation news robuste.
+- Volume drop -70% detector : reporté, nécessite historique volume 90j stocké.
+- Liquidity top 200 check : reporté, nécessite endpoint Binance volumes.
+- Onglet dédié « Watchlist dynamique » : l'historique est accessible via l'endpoint admin, intégration UI à faire en follow-up si besoin.
+- Core symbols tagués `source='core'` en base : à faire manuellement (UPDATE mtp_user_assets SET source='core' WHERE symbol IN (liste des 35 de LIGHT_SYMBOLS)). Non bloquant : par défaut les rows sont `source='user'` et restent donc protégés de l'auto-remove.
+
+**Déploiement requis côté utilisateur**
+1. Exécuter `cloudflare-worker/migrations/007_auto_watchlist.sql` dans Supabase SQL Editor.
+2. `wrangler deploy` (auto via GitHub Actions dès merge).
+
+**Validation paper**
+- Laisser tourner ≥ 7 jours pour remplir l'historique trending.
+- Après 7j, `GET /api/watchlist/history` doit montrer des `auto_add` si des cryptos trending persistantes émergent.
+- Après 90 j d'inactivité sur un symbole `source='auto'`, `auto_remove` apparaît.
+- Onglet **Réglages → Actifs surveillés** : badges `auto` sur les ajouts bot, bouton épingle opérationnel.
 
 #### PR #9 — Rapport Claude hebdo + décroissance temporelle — ⏳ À VENIR
 Rapport lundi matin via Claude Sonnet ($2/mois). Pondération exponentielle des trades anciens (30j=1.0, 90j=0.5, 365j=0.2, >1an=0.1) dans les agrégations de buckets.
@@ -779,3 +840,4 @@ Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'
 | 2026-04-23 | Claude opus-4-7 | Hotfix deploy : doublon `handleEconomicCalendar` (PR #60) + workflow `apiToken` (PR #61) |
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #6 : détection 6 règles corrections + shadow→active/rollback + apply moteur + UI Santé bot |
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #7 : news modulateur ±10 pts (CryptoPanic + Alpha Vantage) + Claude Haiku niveau 3 + kill switch gradué |
+| 2026-04-23 | Claude opus-4-7 | Phase 2 PR #8 : auto-watchlist trending CoinGecko + dormancy detector + pin/unpin + UI Réglages |
