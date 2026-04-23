@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-23 (PR #6 Phase 2 — corrections auto shadow→active) |
+| **Dernière mise à jour** | 2026-04-23 (PR #7 Phase 2 — news modulateur + Claude niveau 3) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/phase2-pr6-auto-corrections` |
+| **Branche active** | `claude/phase2-pr7-news-modulator` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -678,8 +678,69 @@ Opérationnalisation de la Règle #1 (apprendre ET se corriger). Sans migration 
 - R7 : retrain régression logistique des poids — reporté tant que < 500 trades accumulés.
 - Décroissance temporelle (PR #9) : toutes les agrégations pondèrent chaque trade à 1.0 pour le moment.
 
-#### PR #7 — News modulateur ±10 pts + Claude directionnel niveau 3 + kill switch gradué — ⏳ À VENIR
-Enrichissement du `calcDetailScore` avec sentiment agrégé (Alpha Vantage + CryptoPanic + Finnhub + Messari). Claude Haiku sur les news ambiguës avec kill switch win-rate 30 trades.
+#### PR #7 — News modulateur ±10 pts + Claude directionnel niveau 3 + kill switch gradué — ✅ EN COURS (branche `claude/phase2-pr7-news-modulator`)
+
+Implémente la **Règle #5 niveaux 2 et 3** (Phase 1 avait livré le niveau 1 hard block). Aucune migration SQL (les colonnes `news_context_open`/`close` existent depuis migration 006).
+
+**Sources de sentiment gratuites**
+- ~~CryptoPanic Free~~ : le Free tier a été supprimé en 2026 (avant ce projet : 200 req/j, gratuit ; depuis : Growth $50/semaine minimum). Le helper `fetchCryptoPanicSentiment` reste présent pour rétro-compatibilité si `CRYPTOPANIC_KEY` est un jour configuré, mais n'est jamais actif par défaut.
+- **Alpha Vantage News Sentiment** (stocks/ETF **et crypto** via préfixe `CRYPTO:BTC`) : score ∈ [-1..1] pondéré par relevance, **cache 6 h**. Source unique pour tous les asset classes supportés. Clé `ALPHAVANTAGE_KEY` déjà configurée.
+- `resolveSymbolNewsContext(env, symbol, assetClass)` : priorité CryptoPanic si clé présente (future-proof), sinon fallback AV en crypto mode. Retourne null sur forex/commodity.
+- `fetchCryptoPanicSentiment` capture en plus des `ambiguousArticles` (votes nuls mais important) pour alimenter Claude niveau 3.
+- `fetchAlphaVantageNewsSentiment` idem si relevance > 0.5 et score absolu < 0.15.
+
+**Niveau 2 — modulateur sentiment** (cap ±5 pts via sources gratuites)
+- `applyNewsModulator(newsContext, direction, claudeMaxWeight)` dans `calcDetailScore` (6e param `newsContext`, 7e param `claudeMaxWeight`).
+- Sentiment × 5 = source bonus, inversé pour short.
+- Minimum 3 articles requis.
+
+**Niveau 3 — Claude Haiku sur ambiguous** (±claudeMaxWeight pts dégradé par kill switch)
+- `classifyNewsArticleWithClaude(env, article)` prompt 120 tokens, cache 6 h par hash FNV-1a d'URL.
+- Classe en `{long-positif, short-negatif, bruit-ignore}` + confidence `{high, medium, low}`.
+- `enrichNewsContextWithClaude` appelée UNIQUEMENT si classification neutre ET articles ambigus → un seul article/symbole/cycle pour contenir le budget (~cents/mois).
+- Aligné direction = bonus, opposé = malus, bruit-ignore = 0.
+- Tiers : high = poids max, medium = moitié, low = 0.
+
+**Kill switch gradué** (anti-hallucination)
+- `getClaudeNewsKillSwitchWeight(env)` lit `mtp_trade_feedback`, filtre `news_context_open.claudeSignal.confidence = 'high'`, calcule win rate sur 30 plus récents.
+- Tiers : ≥55% → ±8 | 45-55% → ±4 | 35-45% → ±2 | <35% → 0 silent.
+- Cache 1 h. Sous 10 trades high-confidence : défaut ±8 (observation).
+- Reset 60 j + réactivation ±2 test × 20 trades : documenté mais pas automatisé.
+
+**Cap global ±10 pts** sur le score final via `applyNewsModulator`.
+
+**Persistance**
+- `buildTrainingAnalysisSnapshotFromPayload` copie `newsContext + newsBonus + newsBonusReason` dans `analysis_snapshot`.
+- `captureTradeFeedback` persiste `snapshot.newsContext` en `news_context_open` + re-fetch resolver au close pour `news_context_close` (cache déjà chaud).
+- `buildStablePayload` propage `newsContext + newsBonus + regimeBonus + reasons` au top-level payload.
+
+**UI fiche actif**
+- `renderModulatorChips(d)` : chips pour régime bonus (PR #2), news bonus (PR #7), news context neutre avec topHeadline, Claude signal bordure dashed.
+- Intégré dans la carte breakdown après la grille des 6 métriques.
+- Palette : positive (var(--profit)), negative (var(--loss)), neutral, mod-claude dashed.
+- 100% `var(--...)` + rgba tints sémantiques → light/dark OK.
+
+**Endpoint admin**
+- `GET /api/engine/news-context?symbol=X&asset_class=Y` → dump complet : context + claudeSignal + tier kill switch.
+
+**Variables d'env nouvelles**
+- ~~`CRYPTOPANIC_KEY`~~ : Free tier supprimé — pas configuré, le code tombe gracieusement en AV.
+- `CLAUDE_MODEL_HAIKU` (optionnel) : défaut `claude-haiku-4-5-20251001`.
+
+**Déploiement requis côté utilisateur**
+1. Aucune nouvelle clé à créer (AV déjà configuré).
+2. `wrangler deploy` (auto via GitHub Actions dès merge).
+3. Aucune migration SQL.
+
+**Validation paper** : 3-5 jours. Vérifier :
+- `GET /api/engine/news-context?symbol=BTCUSDT&asset_class=crypto` retourne un context avec sentiment + articleCount.
+- Sur la fiche actif d'un crypto/action liquide, chips modulator apparaissent si sentiment ≠ 0.
+- Dans `mtp_trade_feedback`, nouvelles lignes contiennent `news_context_open` populé au lieu de null.
+
+**Scope volontairement exclu**
+- Messari / CoinDesk / Binance Announcements RSS (déjà listés dans SESSION.md Règle #5) : reportés en follow-up.
+- Auto-reset 60 j du kill switch silent : documenté, non branché.
+- Modulator news côté opportunities list (liste des opps) : seul `handleOpportunityDetail` et `buildOpportunityRowsForTraining` bénéficient actuellement du fetch news (caller 1 + caller 2 inline). La liste générale `/api/opportunities` passe aussi par `calcDetailScore` donc reçoit bien le modulator.
 
 #### PR #8 — Auto-watchlist (ajout/retrait intelligent) — ⏳ À VENIR
 Ajout automatique si trending 3+ fois/7j OU news verified 10+ mentions/48h + liquidity top 200. Retrait si dormant 90j ou volume -70%. Core 35-40 protégés + 10 actifs pinnables manuellement.
@@ -717,3 +778,4 @@ Si on se retrouve à développer quelque chose qui ne sert ni l'autonomie, ni l'
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #5 : `mtp_trade_feedback` + MAE/MFE intra-trade + badges historique |
 | 2026-04-23 | Claude opus-4-7 | Hotfix deploy : doublon `handleEconomicCalendar` (PR #60) + workflow `apiToken` (PR #61) |
 | 2026-04-23 | Claude opus-4-7 | Phase 2 PR #6 : détection 6 règles corrections + shadow→active/rollback + apply moteur + UI Santé bot |
+| 2026-04-23 | Claude opus-4-7 | Phase 2 PR #7 : news modulateur ±10 pts (CryptoPanic + Alpha Vantage) + Claude Haiku niveau 3 + kill switch gradué |
