@@ -5460,6 +5460,29 @@ async function getClaudeNewsKillSwitchWeight(env) {
 }
 
 // ============================================================
+// PR #9 Phase 2 — Décroissance temporelle (weighted aggregations)
+// ============================================================
+// Pondération exponentielle des trades anciens pour que le bot s'adapte
+// aux changements de régime de marché :
+//   - Trades des 30 derniers jours : poids 1.0
+//   - 31-90 jours  : 0.5
+//   - 91-365 jours : 0.2
+//   - > 1 an       : 0.1
+// Les agrégations (expectancy, win rate) sont disponibles en version
+// brute ET pondérée pour que les détecteurs de correction puissent
+// choisir selon leur contexte.
+function computeTemporalWeight(closedAtIso) {
+  if (!closedAtIso) return 1;
+  const ms = new Date(closedAtIso).getTime();
+  if (!Number.isFinite(ms)) return 1;
+  const daysAgo = Math.max(0, (Date.now() - ms) / 86400000);
+  if (daysAgo <= 30) return 1.0;
+  if (daysAgo <= 90) return 0.5;
+  if (daysAgo <= 365) return 0.2;
+  return 0.1;
+}
+
+// ============================================================
 // PR #6 Phase 2 — Corrections automatiques (Règle #1)
 // ============================================================
 // Détecte les 7 signaux de la Règle #1 depuis mtp_trade_feedback, crée des
@@ -5499,7 +5522,10 @@ async function aggregateFeedbackBuckets(env, { limit = 1000 } = {}) {
           sumStopDistPct: 0, sumTpDistPct: 0,
           sumMaeVsStop: 0, sumMfeVsTp: 0,
           countMaeVsStop: 0, countMfeVsTp: 0,
-          countStopDist: 0, countTpDist: 0
+          countStopDist: 0, countTpDist: 0,
+          // PR #9 — agrégats pondérés par décroissance temporelle
+          totalWeight: 0, weightedWins: 0,
+          weightedSumPnl: 0, weightedSumPnlPct: 0
         };
       }
       const b = buckets[key];
@@ -5514,6 +5540,12 @@ async function aggregateFeedbackBuckets(env, { limit = 1000 } = {}) {
       if (Number.isFinite(Number(row.tp_distance_pct)))   { b.sumTpDistPct   += Number(row.tp_distance_pct);   b.countTpDist++; }
       if (Number.isFinite(Number(row.mae_vs_stop_ratio))) { b.sumMaeVsStop   += Number(row.mae_vs_stop_ratio); b.countMaeVsStop++; }
       if (Number.isFinite(Number(row.mfe_vs_tp_ratio)))   { b.sumMfeVsTp     += Number(row.mfe_vs_tp_ratio);   b.countMfeVsTp++; }
+      // PR #9 — accumulation pondérée (décroissance temporelle)
+      const w = computeTemporalWeight(row.closed_at);
+      b.totalWeight += w;
+      if (pnl > 0) b.weightedWins += w;
+      b.weightedSumPnl += pnl * w;
+      b.weightedSumPnlPct += Number(row.pnl_pct || 0) * w;
     }
 
     for (const b of Object.values(buckets)) {
@@ -5526,6 +5558,10 @@ async function aggregateFeedbackBuckets(env, { limit = 1000 } = {}) {
       b.avgTpDistPct   = b.countTpDist   > 0 ? b.sumTpDistPct   / b.countTpDist   : null;
       b.avgMaeVsStop   = b.countMaeVsStop > 0 ? b.sumMaeVsStop / b.countMaeVsStop : null;
       b.avgMfeVsTp     = b.countMfeVsTp   > 0 ? b.sumMfeVsTp   / b.countMfeVsTp   : null;
+      // PR #9 — expectancy et win rate pondérés (utilisés par detectCorrectionSignals)
+      b.weightedWinRate    = b.totalWeight > 0 ? b.weightedWins  / b.totalWeight : null;
+      b.weightedExpectancy = b.totalWeight > 0 ? b.weightedSumPnl / b.totalWeight : null;
+      b.weightedAvgPnlPct  = b.totalWeight > 0 ? b.weightedSumPnlPct / b.totalWeight : null;
     }
     return buckets;
   } catch (e) {
@@ -5576,30 +5612,35 @@ function detectCorrectionSignals(buckets, streaks, existingShadowOrActive) {
   // Règle 1 : expectancy < 0 sur 30+ trades → raise_min_score +5
   // Règle 2 : toujours négatif sur 50+ trades → disable_bucket (prioritaire sur rule 1)
   for (const b of Object.values(buckets)) {
-    if (!Number.isFinite(b.expectancy)) continue;
+    // PR #9 — priorise l'expectancy pondérée (décroissance temporelle) quand
+    // elle est disponible. Fallback vers l'expectancy brute pour les buckets
+    // sans trades récents (totalWeight = 0 ou null).
+    const expectancy = Number.isFinite(b.weightedExpectancy) ? b.weightedExpectancy : b.expectancy;
+    const winRate    = Number.isFinite(b.weightedWinRate)    ? b.weightedWinRate    : b.winRate;
+    if (!Number.isFinite(expectancy)) continue;
 
-    if (b.n >= 50 && b.expectancy < 0 && b.winRate != null && b.winRate < 0.45) {
+    if (b.n >= 50 && expectancy < 0 && winRate != null && winRate < 0.45) {
       if (!isDup("disable_bucket", b.bucketKey)) {
         signals.push({
           type: "disable_bucket",
           bucketKey: b.bucketKey,
           newValue: { disabled: true },
-          signalTrigger: { n: b.n, expectancy: b.expectancy, win_rate: b.winRate, avg_pnl_pct: b.avgPnlPct },
+          signalTrigger: { n: b.n, expectancy, win_rate: winRate, avg_pnl_pct: b.weightedAvgPnlPct ?? b.avgPnlPct, weighted: Number.isFinite(b.weightedExpectancy) },
           severity: "severe",
-          notes: `Bucket ${b.bucketKey} : expectancy négative (${b.expectancy.toFixed(2)}) sur ${b.n} trades, win rate ${(b.winRate * 100).toFixed(0)}%. Désactivation proposée.`
+          notes: `Bucket ${b.bucketKey} : expectancy pondérée négative (${expectancy.toFixed(2)}) sur ${b.n} trades, win rate ${(winRate * 100).toFixed(0)}%. Désactivation proposée.`
         });
       }
-      continue; // si rule 2 s'applique, on ne propose pas rule 1 en plus
+      continue;
     }
-    if (b.n >= 30 && b.expectancy < 0) {
+    if (b.n >= 30 && expectancy < 0) {
       if (!isDup("raise_min_score", b.bucketKey)) {
         signals.push({
           type: "raise_min_score",
           bucketKey: b.bucketKey,
           newValue: { boost: 5 },
-          signalTrigger: { n: b.n, expectancy: b.expectancy, win_rate: b.winRate },
+          signalTrigger: { n: b.n, expectancy, win_rate: winRate, weighted: Number.isFinite(b.weightedExpectancy) },
           severity: "moderate",
-          notes: `Bucket ${b.bucketKey} : expectancy négative (${b.expectancy.toFixed(2)}) sur ${b.n} trades. min_dossier_score +5 proposé.`
+          notes: `Bucket ${b.bucketKey} : expectancy pondérée négative (${expectancy.toFixed(2)}) sur ${b.n} trades. min_dossier_score +5 proposé.`
         });
       }
     }
