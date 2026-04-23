@@ -1,0 +1,93 @@
+name: Apply Supabase Migrations
+
+# Applique les fichiers .sql de cloudflare-worker/migrations/ via la Supabase
+# Management API. Toutes les migrations du projet sont idempotentes (CREATE
+# IF NOT EXISTS, ALTER ADD COLUMN IF NOT EXISTS, DROP POLICY IF EXISTS / CREATE)
+# donc re-runner sur un schéma à jour est no-op.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudflare-worker/migrations/**.sql'
+      - '.github/workflows/migrate-supabase.yml'
+  workflow_dispatch:
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    name: Apply migrations to Supabase
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug — secrets presence (sans afficher valeur)
+        env:
+          TOKEN_SET: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
+          REF_SET: ${{ secrets.SUPABASE_PROJECT_REF != '' }}
+        run: |
+          echo "SUPABASE_ACCESS_TOKEN défini : $TOKEN_SET"
+          echo "SUPABASE_PROJECT_REF défini : $REF_SET"
+
+      - name: Apply each migration via Management API
+        env:
+          SUPABASE_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_TOKEN:-}" ] || [ -z "${SUPABASE_PROJECT_REF:-}" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN ou SUPABASE_PROJECT_REF manquant dans les secrets GitHub."
+            exit 1
+          fi
+
+          MIG_DIR="cloudflare-worker/migrations"
+          if [ ! -d "$MIG_DIR" ]; then
+            echo "::warning::Aucun dossier $MIG_DIR — rien à appliquer."
+            exit 0
+          fi
+
+          shopt -s nullglob
+          files=("$MIG_DIR"/*.sql)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::warning::Aucune migration .sql — rien à appliquer."
+            exit 0
+          fi
+
+          # Tri lexicographique = ordre 001 → 002 → 003 ...
+          IFS=$'\n' sorted=($(sort <<<"${files[*]}"))
+          unset IFS
+
+          applied=0
+          failed=0
+
+          for f in "${sorted[@]}"; do
+            echo "::group::Applying $(basename "$f")"
+            # Construit le body JSON {query: "<contenu SQL échappé>"}
+            body=$(jq -Rsa '{query: .}' < "$f")
+
+            http_code=$(curl -sS -o /tmp/resp.json -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $SUPABASE_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$body" \
+              "https://api.supabase.com/v1/projects/$SUPABASE_PROJECT_REF/database/query") || http_code="000"
+
+            body_preview=$(head -c 400 /tmp/resp.json || echo "<empty>")
+            if [ "$http_code" = "200" ] || [ "$http_code" = "201" ]; then
+              echo "✅ OK ($http_code)"
+              echo "Response: $body_preview"
+              applied=$((applied + 1))
+            else
+              echo "::error::$(basename "$f") failed with HTTP $http_code"
+              echo "Response: $body_preview"
+              failed=$((failed + 1))
+            fi
+            echo "::endgroup::"
+          done
+
+          echo ""
+          echo "===== Summary ====="
+          echo "Applied successfully : $applied"
+          echo "Failed               : $failed"
+          if [ "$failed" -gt 0 ]; then
+            exit 1
+          fi
