@@ -4140,7 +4140,26 @@ function detailTileValue(kind, plan, detail) {
     return "indisponible";
   }
 
-// PR #7 Phase 2 — chips régime (F&G/VIX) + news modulateur sur la fiche actif
+// iPhone compactification — rangées compactes pour le breakdown (6 rangées
+  // denses au lieu de 6 cartes 2x3). Label à gauche, valeur + barre à droite.
+  function renderBreakdownRow(label, rawValue) {
+    const value = Number(rawValue);
+    const hasValue = Number.isFinite(value);
+    const clampedValue = hasValue ? Math.max(0, Math.min(100, value)) : 0;
+    const text = hasValue ? simpleReliabilityLabel(value) : "—";
+    const tone = !hasValue ? "neutral"
+               : value >= 65 ? "positive"
+               : value >= 45 ? "neutral"
+               : "negative";
+    return `
+      <div class="bd-row tone-${tone}">
+        <span class="bd-label">${safeText(label)}</span>
+        <span class="bd-value">${safeText(text)}</span>
+        <span class="bd-bar"><span class="bd-bar-fill" style="width:${clampedValue}%"></span></span>
+      </div>`;
+  }
+
+  // PR #7 Phase 2 — chips régime (F&G/VIX) + news modulateur sur la fiche actif
   function renderModulatorChips(d) {
     if (!d) return "";
     const chips = [];
@@ -4267,26 +4286,29 @@ function detailTileValue(kind, plan, detail) {
                 ` : `<div class="empty-state">Aucune validation IA disponible pour le moment.</div>`}
               </div>
 
-              <div class="card" style="margin-bottom:18px">
-                <div class="section-title"><span>News liees a l'actif</span><span>${relatedNewsForSymbol(d.symbol, d.name).length}</span></div>
-                ${relatedNewsForSymbol(d.symbol, d.name).length ? `
-                  <div class="news-list">
-                    ${relatedNewsForSymbol(d.symbol, d.name).map((item) => `
-                      <article class="news-card compact">
-                        <div class="news-source-row">
-                          <strong>${safeText(item.source || "source")}</strong>
-                          <span class="muted">${safeText(item.topic || "news")}</span>
-                        </div>
-                        <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
-                        <div class="muted">${safeText(item.summary || "Resume indisponible")}</div>
-                        <div class="trade-actions" style="margin-top:10px">
-                          ${item.link ? `<a class="btn" href="${safeText(item.link)}" target="_blank" rel="noopener noreferrer">Ouvrir la source</a>` : ""}
-                        </div>
-                      </article>
-                    `).join("")}
-                  </div>
-                ` : `<div class="empty-state">Aucune news directement reliee a cet actif pour le moment.</div>`}
-              </div>
+              ${(() => {
+                const newsItems = relatedNewsForSymbol(d.symbol, d.name);
+                if (!newsItems.length) return ""; // Masque entièrement la carte si aucune news (iPhone compact)
+                return `
+                  <div class="card" style="margin-bottom:18px">
+                    <div class="section-title"><span>News liees a l'actif</span><span>${newsItems.length}</span></div>
+                    <div class="news-list">
+                      ${newsItems.map((item) => `
+                        <article class="news-card compact">
+                          <div class="news-source-row">
+                            <strong>${safeText(item.source || "source")}</strong>
+                            <span class="muted">${safeText(item.topic || "news")}</span>
+                          </div>
+                          <div class="news-title">${safeText(item.title || "Titre indisponible")}</div>
+                          <div class="muted">${safeText(item.summary || "Resume indisponible")}</div>
+                          <div class="trade-actions" style="margin-top:10px">
+                            ${item.link ? `<a class="btn" href="${safeText(item.link)}" target="_blank" rel="noopener noreferrer">Ouvrir la source</a>` : ""}
+                          </div>
+                        </article>
+                      `).join("")}
+                    </div>
+                  </div>`;
+              })()}
 
               <div class="card">
                 <div class="section-title"><span>Evolution recente</span><span>${Array.isArray(d.candles) && d.candles.length ? `${d.candles.length} bougies` : "historique recent"}</span></div>
@@ -4323,13 +4345,13 @@ function detailTileValue(kind, plan, detail) {
                   <div>${safeText(simpleWaitForText(currentTradePlan()))}</div>
                 </div>
                 ${state.settings.showScoreBreakdown ? `
-                  <div class="breakdown" style="margin-top:14px">
-                    <div class="break-item"><div class="break-name">Contexte</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.regime))}</div></div>
-                    <div class="break-item"><div class="break-name">Tendance</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.trend))}</div></div>
-                    <div class="break-item"><div class="break-name">Elan</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.momentum))}</div></div>
-                    <div class="break-item"><div class="break-name">Entree</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.entryQuality))}</div></div>
-                    <div class="break-item"><div class="break-name">Risque</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.risk))}</div></div>
-                    <div class="break-item"><div class="break-name">Activite</div><div class="break-value">${safeText(simpleReliabilityLabel(d.breakdown?.participation))}</div></div>
+                  <div class="breakdown-compact" style="margin-top:14px">
+                    ${renderBreakdownRow("Contexte", d.breakdown?.regime)}
+                    ${renderBreakdownRow("Tendance", d.breakdown?.trend)}
+                    ${renderBreakdownRow("Elan", d.breakdown?.momentum)}
+                    ${renderBreakdownRow("Entrée", d.breakdown?.entryQuality)}
+                    ${renderBreakdownRow("Risque", d.breakdown?.risk)}
+                    ${renderBreakdownRow("Activité", d.breakdown?.participation)}
                   </div>` : `<div class="muted">Le detail du signal est masque dans les reglages.</div>`
                 }
                 ${renderModulatorChips(d)}
