@@ -2974,7 +2974,7 @@ function getTrainingDefaults() {
   };
 }
 
-function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, newsWindow = null) {
+function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, newsWindow = null, activeAdjustments = null) {
   if (!row || row.status !== "ok") return false;
   if (row.decision !== "Trade propose") return false;
   if (!row.plan?.tradeNow) return false;
@@ -2992,9 +2992,19 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   // Mean reversion bloquée
   if (setupType === "mean_reversion" && !settings.mean_reversion_enabled) return false;
 
-  // Scores
-  const minActionability = Number(settings.min_actionability_score || 72);
-  const minDecision = Number(settings.min_dossier_score || 74);
+  // PR #6 Phase 2 — bucket_key du candidat
+  const side = String(row.plan?.side || row.direction || "long").toLowerCase();
+  const regime = normalizeRegimeLabel(row.plan?.regime || row.regime || "UNKNOWN");
+  const assetClass = row.assetClass || row.asset_class || getAssetClass(parseSymbol(row.symbol || ""));
+  const bucketKey = makeBucketKey(setupType || "unknown", side, regime, assetClass);
+
+  // Règle 2 — bucket désactivé par ajustement actif ?
+  if (activeAdjustments?.disabledBuckets?.has(bucketKey)) return false;
+
+  // Scores (avec boost éventuel de règle 1)
+  const scoreBoost = activeAdjustments?.minScoreBoosts?.get(bucketKey) || 0;
+  const minActionability = Number(settings.min_actionability_score || 72) + scoreBoost;
+  const minDecision = Number(settings.min_dossier_score || 74) + scoreBoost;
   const minSafety = Math.max(68, minDecision - 4);
   const actionabilityScore = Number(row.plan?.exploitabilityScore || 0);
   const decisionScore = Number(
@@ -3114,7 +3124,9 @@ async function handleTrainingAutoCycle(env) {
           }).catch(() => {});
         }
         const rows = await buildOpportunityRowsForTraining(env);
-        const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows, riskState, newsWindow));
+        // PR #6 Phase 2 — pré-fetch les ajustements actifs une fois par cycle
+        const activeAdjustments = await resolveActiveAdjustments(env).catch(() => null);
+        const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows, riskState, newsWindow, activeAdjustments));
 
         let availableCash = Number(settings.capital_base || 0) - openRows.reduce((acc, row) => acc + (Number(row?.invested || row?.execution?.invested || 0) || 0), 0);
 
@@ -3122,7 +3134,7 @@ async function handleTrainingAutoCycle(env) {
           if (openRows.length >= Number(settings.max_open_positions || 10)) break;
           try {
             const opened = await withTimeout(
-              openTrainingPositionFromRow(env, row, settings, availableCash),
+              openTrainingPositionFromRow(env, row, settings, availableCash, activeAdjustments),
               8000, `open:${row.symbol}`
             );
             if (!opened) {
@@ -3253,7 +3265,7 @@ async function handleScheduledCycle(env) {
       summary.errors++;
     }
 
-    // 6. Drift detection — 1×/jour à 2h UTC (évite spam, suffisant pour audit trends)
+    // 6. Drift detection + détection corrections auto — 1×/jour à 2h UTC
     if (utcHour === 2 && utcMinute < 15) {
       try {
         const drift = await withTimeout(detectDriftAlerts(env), 15000, "scheduled_drift");
@@ -3265,6 +3277,26 @@ async function handleScheduledCycle(env) {
         }
       } catch (e) {
         console.error("Scheduled drift detect error:", e.message);
+      }
+      // PR #6 Phase 2 — détection des 6 règles de correction + création shadow
+      try {
+        const corr = await withTimeout(runCorrectionDetection(env), 15000, "scheduled_corrections_detect");
+        if (corr?.created > 0) {
+          summary.corrections_created = corr.created;
+        }
+      } catch (e) {
+        console.error("Scheduled corrections detect error:", e.message);
+      }
+      // PR #6 Phase 2 — observer shadow → active / rollback après 20 trades
+      try {
+        const obs = await withTimeout(observeShadowAdjustments(env), 15000, "scheduled_shadow_observer");
+        if (obs && (obs.activated > 0 || obs.rolledBack > 0)) {
+          summary.shadow_activated = obs.activated;
+          summary.shadow_rolled_back = obs.rolledBack;
+          await logTrainingEvent(env, "shadow_observer_ran", obs).catch(() => {});
+        }
+      } catch (e) {
+        console.error("Scheduled shadow observer error:", e.message);
       }
     }
   } finally {
@@ -3527,7 +3559,7 @@ function buildTrainingAnalysisSnapshotFromPayload(payload) {
   };
 }
 
-function chooseTrainingExecution(payload, settings, currentAvailableCash) {
+function chooseTrainingExecution(payload, settings, currentAvailableCash, activeAdjustments = null) {
   const plan = payload?.plan || {};
   const price = finiteOrNull(plan?.entry ?? payload?.price);
   const stopLoss = finiteOrNull(plan?.stopLoss);
@@ -3539,7 +3571,9 @@ function chooseTrainingExecution(payload, settings, currentAvailableCash) {
   if (!["long","short"].includes(side)) return null;
   const capitalBase = Math.max(0, Number(settings?.capital_base || 0));
   const availableCash = Math.max(0, Number(currentAvailableCash ?? capitalBase));
-  const allocatedCash = Math.min(availableCash, capitalBase * Number(settings?.allocation_per_trade_pct || 0.10));
+  // PR #6 Phase 2 — règle 5/6 : multiplicateur de taille global (reduce_size)
+  const sizeMult = Number.isFinite(Number(activeAdjustments?.sizeMultiplier)) ? Number(activeAdjustments.sizeMultiplier) : 1;
+  const allocatedCash = Math.min(availableCash, capitalBase * Number(settings?.allocation_per_trade_pct || 0.10) * sizeMult);
   if (!Number.isFinite(allocatedCash) || allocatedCash <= 50) return null;
   const quantity = allocatedCash / price;
   if (!Number.isFinite(quantity) || quantity <= 0) return null;
@@ -3854,8 +3888,8 @@ async function listTradeFeedback(env, { limit = 100, bucketKey = null, symbol = 
   }
 }
 
-async function openTrainingPositionFromRow(env, row, settings, availableCash) {
-  const execution = chooseTrainingExecution(row, settings, availableCash);
+async function openTrainingPositionFromRow(env, row, settings, availableCash, activeAdjustments = null) {
+  const execution = chooseTrainingExecution(row, settings, availableCash, activeAdjustments);
   if (!execution) return null;
   const positionRow = buildTrainingPositionRowFromSignal(row, execution, settings);
   await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
@@ -5030,11 +5064,446 @@ async function detectDriftAlerts(env) {
   return { detected: alerts.length, alerts };
 }
 
+// ============================================================
+// PR #6 Phase 2 — Corrections automatiques (Règle #1)
+// ============================================================
+// Détecte les 7 signaux de la Règle #1 depuis mtp_trade_feedback, crée des
+// ajustements en status="shadow". L'observateur (observeShadowAdjustments)
+// décide ensuite d'activer ou rollback après 20 trades observés.
+//
+// Scope MVP :
+//   Règle 1 — raise_min_score   (bucket, expectancy < 0 sur 30+ trades)
+//   Règle 2 — disable_bucket    (bucket, toujours négatif sur 50+ trades)
+//   Règle 3 — widen_stop        (setup, MAE moyen > 70% stop distance) — shadow only, pas appliqué
+//   Règle 4 — extend_tp         (setup, MFE moyen > 1.5× tp distance) — shadow only, pas appliqué
+//   Règle 5 — reduce_size       (global, 3 pertes consécutives)
+//   Règle 6 — restore_size      (global, 3 gains consécutifs, rollback rule 5 active)
+//   Règle 7 — retrain_weights   (global, 500+ trades) — RÉSERVÉE, pas implémentée
+
+async function aggregateFeedbackBuckets(env, { limit = 1000 } = {}) {
+  if (!supabaseConfigured(env)) return {};
+  try {
+    const rows = await supabaseFetch(env,
+      `${TRADE_FEEDBACK_TABLE}?order=closed_at.desc&limit=${clampInt(limit, 1, 2000, 1000)}`
+    );
+    if (!Array.isArray(rows) || rows.length === 0) return {};
+
+    const buckets = {};
+    for (const row of rows) {
+      const key = row.bucket_key || makeBucketKey(row.setup_type, row.direction, row.regime_at_open, row.asset_class);
+      if (!buckets[key]) {
+        buckets[key] = {
+          bucketKey: key,
+          setup: row.setup_type || "unknown",
+          direction: row.direction || "long",
+          regime: row.regime_at_open || "UNKNOWN",
+          assetClass: row.asset_class || "unknown",
+          n: 0, wins: 0, losses: 0,
+          sumPnl: 0, sumPnlPct: 0,
+          sumMaePct: 0, sumMfePct: 0,
+          sumStopDistPct: 0, sumTpDistPct: 0,
+          sumMaeVsStop: 0, sumMfeVsTp: 0,
+          countMaeVsStop: 0, countMfeVsTp: 0,
+          countStopDist: 0, countTpDist: 0
+        };
+      }
+      const b = buckets[key];
+      b.n++;
+      const pnl = Number(row.pnl || 0);
+      if (pnl > 0) b.wins++; else if (pnl < 0) b.losses++;
+      b.sumPnl += pnl;
+      b.sumPnlPct += Number(row.pnl_pct || 0);
+      b.sumMaePct += Number(row.mae_pct || 0);
+      b.sumMfePct += Number(row.mfe_pct || 0);
+      if (Number.isFinite(Number(row.stop_distance_pct))) { b.sumStopDistPct += Number(row.stop_distance_pct); b.countStopDist++; }
+      if (Number.isFinite(Number(row.tp_distance_pct)))   { b.sumTpDistPct   += Number(row.tp_distance_pct);   b.countTpDist++; }
+      if (Number.isFinite(Number(row.mae_vs_stop_ratio))) { b.sumMaeVsStop   += Number(row.mae_vs_stop_ratio); b.countMaeVsStop++; }
+      if (Number.isFinite(Number(row.mfe_vs_tp_ratio)))   { b.sumMfeVsTp     += Number(row.mfe_vs_tp_ratio);   b.countMfeVsTp++; }
+    }
+
+    for (const b of Object.values(buckets)) {
+      b.winRate   = b.n > 0 ? b.wins / b.n : null;
+      b.avgPnlPct = b.n > 0 ? b.sumPnlPct / b.n : null;
+      b.expectancy = b.n > 0 ? b.sumPnl / b.n : null;
+      b.avgMaePct = b.n > 0 ? b.sumMaePct / b.n : null;
+      b.avgMfePct = b.n > 0 ? b.sumMfePct / b.n : null;
+      b.avgStopDistPct = b.countStopDist > 0 ? b.sumStopDistPct / b.countStopDist : null;
+      b.avgTpDistPct   = b.countTpDist   > 0 ? b.sumTpDistPct   / b.countTpDist   : null;
+      b.avgMaeVsStop   = b.countMaeVsStop > 0 ? b.sumMaeVsStop / b.countMaeVsStop : null;
+      b.avgMfeVsTp     = b.countMfeVsTp   > 0 ? b.sumMfeVsTp   / b.countMfeVsTp   : null;
+    }
+    return buckets;
+  } catch (e) {
+    console.error("aggregateFeedbackBuckets failed:", e.message);
+    return {};
+  }
+}
+
+// Retourne { consecutiveLosses, consecutiveWins } sur les N derniers trades clos.
+async function computeGlobalStreaks(env, { limit = 10 } = {}) {
+  if (!supabaseConfigured(env)) return { consecutiveLosses: 0, consecutiveWins: 0 };
+  try {
+    const rows = await supabaseFetch(env,
+      `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&select=pnl,closed_at&order=closed_at.desc&limit=${limit}`
+    );
+    if (!Array.isArray(rows) || rows.length === 0) return { consecutiveLosses: 0, consecutiveWins: 0 };
+    let losses = 0, wins = 0;
+    // La série part du trade le plus récent ; dès qu'on change de signe on s'arrête.
+    let mode = null;
+    for (const row of rows) {
+      const pnl = Number(row.pnl || 0);
+      if (pnl === 0) break;
+      const isWin = pnl > 0;
+      if (mode === null) mode = isWin ? "win" : "loss";
+      if (mode === "win" && !isWin) break;
+      if (mode === "loss" && isWin) break;
+      if (isWin) wins++; else losses++;
+    }
+    return { consecutiveLosses: losses, consecutiveWins: wins };
+  } catch (e) {
+    console.error("computeGlobalStreaks failed:", e.message);
+    return { consecutiveLosses: 0, consecutiveWins: 0 };
+  }
+}
+
+function detectCorrectionSignals(buckets, streaks, existingShadowOrActive) {
+  const signals = [];
+
+  // Dédup : skip si un ajustement shadow OU active existe déjà pour (type, bucket_key).
+  const existingKeys = new Set();
+  for (const adj of existingShadowOrActive) {
+    if (adj.status !== "shadow" && adj.status !== "active") continue;
+    existingKeys.add(`${adj.adjustment_type}|${adj.bucket_key || "__global__"}`);
+  }
+  const isDup = (type, bucketKey) => existingKeys.has(`${type}|${bucketKey || "__global__"}`);
+
+  // Règles 1 et 2 — expectancy par bucket
+  // Règle 1 : expectancy < 0 sur 30+ trades → raise_min_score +5
+  // Règle 2 : toujours négatif sur 50+ trades → disable_bucket (prioritaire sur rule 1)
+  for (const b of Object.values(buckets)) {
+    if (!Number.isFinite(b.expectancy)) continue;
+
+    if (b.n >= 50 && b.expectancy < 0 && b.winRate != null && b.winRate < 0.45) {
+      if (!isDup("disable_bucket", b.bucketKey)) {
+        signals.push({
+          type: "disable_bucket",
+          bucketKey: b.bucketKey,
+          newValue: { disabled: true },
+          signalTrigger: { n: b.n, expectancy: b.expectancy, win_rate: b.winRate, avg_pnl_pct: b.avgPnlPct },
+          severity: "severe",
+          notes: `Bucket ${b.bucketKey} : expectancy négative (${b.expectancy.toFixed(2)}) sur ${b.n} trades, win rate ${(b.winRate * 100).toFixed(0)}%. Désactivation proposée.`
+        });
+      }
+      continue; // si rule 2 s'applique, on ne propose pas rule 1 en plus
+    }
+    if (b.n >= 30 && b.expectancy < 0) {
+      if (!isDup("raise_min_score", b.bucketKey)) {
+        signals.push({
+          type: "raise_min_score",
+          bucketKey: b.bucketKey,
+          newValue: { boost: 5 },
+          signalTrigger: { n: b.n, expectancy: b.expectancy, win_rate: b.winRate },
+          severity: "moderate",
+          notes: `Bucket ${b.bucketKey} : expectancy négative (${b.expectancy.toFixed(2)}) sur ${b.n} trades. min_dossier_score +5 proposé.`
+        });
+      }
+    }
+  }
+
+  // Règle 3 — MAE moyen > 70% du stop sur un setup
+  // Agrégation au niveau setup (pas bucket) car le stop est défini par setup.
+  const setupStats = {};
+  for (const b of Object.values(buckets)) {
+    const key = b.setup;
+    if (!setupStats[key]) setupStats[key] = { setup: key, n: 0, sumMaeVsStop: 0, countMaeVsStop: 0, sumMfeVsTp: 0, countMfeVsTp: 0 };
+    setupStats[key].n += b.n;
+    if (b.countMaeVsStop > 0) { setupStats[key].sumMaeVsStop += b.sumMaeVsStop; setupStats[key].countMaeVsStop += b.countMaeVsStop; }
+    if (b.countMfeVsTp > 0)   { setupStats[key].sumMfeVsTp   += b.sumMfeVsTp;   setupStats[key].countMfeVsTp   += b.countMfeVsTp; }
+  }
+  for (const s of Object.values(setupStats)) {
+    if (s.n < 20) continue; // seuil minimum pour éviter le bruit
+    const avgMaeVsStop = s.countMaeVsStop > 0 ? s.sumMaeVsStop / s.countMaeVsStop : null;
+    const avgMfeVsTp   = s.countMfeVsTp   > 0 ? s.sumMfeVsTp   / s.countMfeVsTp   : null;
+
+    if (avgMaeVsStop != null && avgMaeVsStop > 0.7 && !isDup("widen_stop", `setup:${s.setup}`)) {
+      signals.push({
+        type: "widen_stop",
+        bucketKey: `setup:${s.setup}`,
+        newValue: { atr_mult_delta: 0.5, applies_to: "plan_construction" },
+        signalTrigger: { n: s.n, avg_mae_vs_stop_ratio: avgMaeVsStop },
+        severity: "moderate",
+        notes: `Setup ${s.setup} : MAE moyen = ${(avgMaeVsStop * 100).toFixed(0)}% du stop. Élargir stop de +0.5×ATR proposé (shadow — non appliqué en PR #6).`
+      });
+    }
+    if (avgMfeVsTp != null && avgMfeVsTp > 1.5 && !isDup("extend_tp", `setup:${s.setup}`)) {
+      signals.push({
+        type: "extend_tp",
+        bucketKey: `setup:${s.setup}`,
+        newValue: { mode: "trailing", applies_to: "plan_construction" },
+        signalTrigger: { n: s.n, avg_mfe_vs_tp_ratio: avgMfeVsTp },
+        severity: "light",
+        notes: `Setup ${s.setup} : MFE moyen = ${(avgMfeVsTp * 100).toFixed(0)}% du TP. Trailing stop proposé (shadow — non appliqué en PR #6).`
+      });
+    }
+  }
+
+  // Règle 5 — 3 pertes consécutives globales → reduce_size 0.5
+  if (streaks.consecutiveLosses >= 3 && !isDup("reduce_size", null)) {
+    signals.push({
+      type: "reduce_size",
+      bucketKey: null,
+      newValue: { size_mult: 0.5 },
+      signalTrigger: { consecutive_losses: streaks.consecutiveLosses },
+      severity: "moderate",
+      notes: `${streaks.consecutiveLosses} pertes consécutives. Taille de position × 0.5 jusqu'à un gain.`
+    });
+  }
+
+  // Règle 6 — 3 gains consécutifs + reduce_size actif → restore_size (rollback rule 5)
+  // Ici on ne crée pas un nouvel ajustement ; la logique de rollback vit dans l'observer.
+  // On signale juste l'intention via un event notes côté UI.
+
+  return signals;
+}
+
+async function createShadowAdjustmentsFromSignals(env, signals) {
+  const created = [];
+  for (const sig of signals) {
+    try {
+      const adj = await createEngineAdjustment(env, {
+        adjustmentType: sig.type,
+        bucketKey: sig.bucketKey,
+        signalTrigger: sig.signalTrigger,
+        newValue: sig.newValue,
+        severity: sig.severity,
+        notes: sig.notes
+      });
+      if (adj) created.push(adj);
+    } catch (e) {
+      console.error("createShadowAdjustmentsFromSignals failed:", e.message);
+    }
+  }
+  return created;
+}
+
+// Observe les ajustements en status="shadow" : compte les trades clos depuis la
+// création dans le scope de l'ajustement (bucket ou global), puis active ou
+// rollback selon les critères ci-dessous. Appelée 1×/jour.
+//
+// Critères d'activation :
+//   - raise_min_score / disable_bucket : après 20 trades dans le bucket,
+//     activer si l'expectancy sur ces 20 trades est toujours < 0.
+//     Rollback sinon.
+//   - widen_stop / extend_tp : après 20 trades dans le setup, activer si le
+//     ratio MAE/stop (resp. MFE/TP) reste au-dessus du seuil déclencheur.
+//     Note : leur application côté moteur est réservée (applies_to=
+//     plan_construction), mais le statut active permet d'historiser la
+//     décision.
+//   - reduce_size : activer immédiatement après création si 3 pertes
+//     consécutives confirmées (seuil déjà atteint à la création), OU
+//     rollback à la 1re gain suivant.
+//   - restore_size : pas observé (créé par l'observer lui-même en rollback
+//     d'un reduce_size actif).
+async function observeShadowAdjustments(env) {
+  if (!supabaseConfigured(env)) return { activated: 0, rolledBack: 0, reviewed: 0 };
+
+  const shadows = await listEngineAdjustments(env, { status: "shadow", limit: 100 });
+  if (!Array.isArray(shadows) || shadows.length === 0) return { activated: 0, rolledBack: 0, reviewed: 0 };
+
+  // Pré-fetch les feedback rows récents pour éviter une requête par ajustement.
+  let feedback = [];
+  try {
+    feedback = await supabaseFetch(env,
+      `${TRADE_FEEDBACK_TABLE}?order=closed_at.desc&limit=500`
+    );
+  } catch (e) {
+    console.error("observeShadowAdjustments feedback fetch failed:", e.message);
+    return { activated: 0, rolledBack: 0, reviewed: 0 };
+  }
+  if (!Array.isArray(feedback)) feedback = [];
+
+  // Active reduce_size pour savoir si on doit proposer restore_size (rule 6).
+  const activeReduce = (await listEngineAdjustments(env, { status: "active", limit: 50 }))
+    .filter(a => a.adjustment_type === "reduce_size");
+
+  // Règle 6 — rollback reduce_size si 3 gains consécutifs globaux depuis son
+  // activation. On ne le crée pas comme shadow séparé : on fait directement le
+  // rollback (rollback_reason indique la cause).
+  let activated = 0, rolledBack = 0, reviewed = 0;
+  for (const adj of activeReduce) {
+    const sinceMs = adj.activated_at ? new Date(adj.activated_at).getTime() : 0;
+    const postTrades = feedback.filter(f => f.closed_at && new Date(f.closed_at).getTime() > sinceMs)
+      .sort((a, b) => new Date(a.closed_at).getTime() - new Date(b.closed_at).getTime());
+    // Recherche d'une série de 3 gains consécutifs (depuis le début, ou à n'importe quel moment)
+    let streakWin = 0, confirmed = false;
+    for (const t of postTrades) {
+      const pnl = Number(t.pnl || 0);
+      if (pnl > 0) {
+        streakWin++;
+        if (streakWin >= 3) { confirmed = true; break; }
+      } else if (pnl < 0) {
+        streakWin = 0;
+      }
+    }
+    if (confirmed) {
+      await updateEngineAdjustmentStatus(env, adj.id, "rollback", {
+        rollback_reason: "Règle 6 : 3 gains consécutifs depuis activation → restauration taille normale.",
+        shadow_trades_observed: postTrades.length
+      });
+      rolledBack++;
+    }
+  }
+
+  for (const adj of shadows) {
+    reviewed++;
+    const createdMs = adj.created_at ? new Date(adj.created_at).getTime() : 0;
+    const postFeedback = feedback.filter(f => f.closed_at && new Date(f.closed_at).getTime() > createdMs);
+
+    // Filtre par scope
+    let inScope = postFeedback;
+    if (adj.bucket_key && adj.bucket_key.startsWith("setup:")) {
+      const setup = adj.bucket_key.slice("setup:".length);
+      inScope = postFeedback.filter(f => String(f.setup_type || "").toLowerCase() === setup);
+    } else if (adj.bucket_key) {
+      inScope = postFeedback.filter(f => f.bucket_key === adj.bucket_key);
+    }
+    // Global (bucket_key null) : reduce_size / restore_size → tous les trades
+
+    const n = inScope.length;
+
+    if (adj.adjustment_type === "reduce_size") {
+      // Activation immédiate : le seuil est déjà atteint à la création.
+      // (On active dès le 1er passage de l'observer après création.)
+      await updateEngineAdjustmentStatus(env, adj.id, "active", {
+        shadow_trades_observed: n,
+        shadow_result_better: true,
+        notes: (adj.notes || "") + " | Activé : seuil déjà confirmé à la création."
+      });
+      activated++;
+      continue;
+    }
+
+    // Pour les autres règles, on attend 20 trades
+    if (n < 20) continue;
+
+    if (adj.adjustment_type === "disable_bucket" || adj.adjustment_type === "raise_min_score") {
+      const sumPnl = inScope.reduce((acc, f) => acc + Number(f.pnl || 0), 0);
+      const expectancy = sumPnl / n;
+      const better = expectancy < 0; // signal confirmé → la correction aurait aidé
+      await updateEngineAdjustmentStatus(env, adj.id, better ? "active" : "rollback", {
+        shadow_trades_observed: n,
+        shadow_result_better: better,
+        rollback_reason: better ? null : `Expectancy remontée à ${expectancy.toFixed(2)} sur 20 trades → signal invalidé.`
+      });
+      better ? activated++ : rolledBack++;
+    } else if (adj.adjustment_type === "widen_stop") {
+      const sum = inScope.reduce((acc, f) => acc + (Number.isFinite(Number(f.mae_vs_stop_ratio)) ? Number(f.mae_vs_stop_ratio) : 0), 0);
+      const cnt = inScope.filter(f => Number.isFinite(Number(f.mae_vs_stop_ratio))).length;
+      const avg = cnt > 0 ? sum / cnt : null;
+      const better = avg != null && avg > 0.7;
+      await updateEngineAdjustmentStatus(env, adj.id, better ? "active" : "rollback", {
+        shadow_trades_observed: n,
+        shadow_result_better: better,
+        rollback_reason: better ? null : `MAE vs stop redescendu à ${avg != null ? (avg * 100).toFixed(0) + '%' : 'N/A'} sur 20 trades → signal invalidé.`
+      });
+      better ? activated++ : rolledBack++;
+    } else if (adj.adjustment_type === "extend_tp") {
+      const sum = inScope.reduce((acc, f) => acc + (Number.isFinite(Number(f.mfe_vs_tp_ratio)) ? Number(f.mfe_vs_tp_ratio) : 0), 0);
+      const cnt = inScope.filter(f => Number.isFinite(Number(f.mfe_vs_tp_ratio))).length;
+      const avg = cnt > 0 ? sum / cnt : null;
+      const better = avg != null && avg > 1.5;
+      await updateEngineAdjustmentStatus(env, adj.id, better ? "active" : "rollback", {
+        shadow_trades_observed: n,
+        shadow_result_better: better,
+        rollback_reason: better ? null : `MFE vs TP redescendu à ${avg != null ? (avg * 100).toFixed(0) + '%' : 'N/A'} sur 20 trades → signal invalidé.`
+      });
+      better ? activated++ : rolledBack++;
+    }
+    // drift_alert : reste en shadow, ne s'active pas automatiquement (informatif)
+  }
+
+  if (activated > 0 || rolledBack > 0) {
+    // Invalide le cache resolveActiveAdjustments pour que le prochain cycle
+    // voie immédiatement les nouveaux actifs / rollbacks.
+    setMemoryCache("engine_active_adjustments", 0, null);
+  }
+  return { activated, rolledBack, reviewed };
+}
+
+async function runCorrectionDetection(env) {
+  if (!supabaseConfigured(env)) return { detected: 0, created: 0, signals: [] };
+  const [buckets, streaks, existingList] = await Promise.all([
+    aggregateFeedbackBuckets(env),
+    computeGlobalStreaks(env, { limit: 10 }),
+    listEngineAdjustments(env, { limit: 500 })
+  ]);
+  const signals = detectCorrectionSignals(buckets, streaks, existingList);
+  const created = await createShadowAdjustmentsFromSignals(env, signals);
+  if (created.length > 0) {
+    await logTrainingEvent(env, "corrections_detected", {
+      created: created.length,
+      signals: signals.map(s => ({ type: s.type, bucket: s.bucketKey, severity: s.severity }))
+    }).catch(() => {});
+  }
+  return { detected: signals.length, created: created.length, signals };
+}
+
 async function handleEngineAdjustments(url, env) {
   const status = url.searchParams.get("status");
   const limit = parseInt(url.searchParams.get("limit") || "50", 10);
   const rows = await listEngineAdjustments(env, { status, limit });
   return json({ status: "ok", asOf: nowIso(), count: rows.length, data: rows });
+}
+
+// PR #6 Phase 2 — Résout les ajustements actifs en maps compactes utilisables
+// par le moteur sans re-parser les rows à chaque candidat.
+// Cache mémoire 2 min pour éviter un round-trip Supabase à chaque cycle.
+async function resolveActiveAdjustments(env) {
+  const cached = getMemoryCache("engine_active_adjustments");
+  if (cached) return cached;
+
+  const rows = await listEngineAdjustments(env, { status: "active", limit: 200 }).catch(() => []);
+  const result = {
+    disabledBuckets: new Set(),
+    minScoreBoosts: new Map(),
+    sizeMultiplier: 1,
+    widenStopSetups: new Map(), // réservé, non appliqué en PR #6
+    extendTpSetups: new Map(),  // réservé, non appliqué en PR #6
+    raw: rows
+  };
+  for (const adj of rows) {
+    const type = adj.adjustment_type;
+    if (type === "disable_bucket" && adj.bucket_key) {
+      result.disabledBuckets.add(adj.bucket_key);
+    } else if (type === "raise_min_score" && adj.bucket_key) {
+      const boost = Number(adj.new_value?.boost || 5);
+      result.minScoreBoosts.set(adj.bucket_key, (result.minScoreBoosts.get(adj.bucket_key) || 0) + boost);
+    } else if (type === "reduce_size") {
+      const mult = Number(adj.new_value?.size_mult || 0.5);
+      // Si plusieurs reduce_size actifs (bug), on prend le plus restrictif
+      result.sizeMultiplier = Math.min(result.sizeMultiplier, mult);
+    } else if (type === "widen_stop" && adj.bucket_key?.startsWith("setup:")) {
+      const setup = adj.bucket_key.slice("setup:".length);
+      result.widenStopSetups.set(setup, Number(adj.new_value?.atr_mult_delta || 0.5));
+    } else if (type === "extend_tp" && adj.bucket_key?.startsWith("setup:")) {
+      const setup = adj.bucket_key.slice("setup:".length);
+      result.extendTpSetups.set(setup, adj.new_value?.mode || "trailing");
+    }
+  }
+  setMemoryCache("engine_active_adjustments", 120, result);
+  return result;
+}
+
+async function handleRunCorrectionsDetect(env) {
+  const res = await runCorrectionDetection(env);
+  return json({ status: "ok", asOf: nowIso(), ...res });
+}
+
+async function handleObserveShadows(env) {
+  const res = await observeShadowAdjustments(env);
+  // Invalide le cache pour que le prochain cycle voie les nouveaux active
+  setMemoryCache("engine_active_adjustments", 0, null);
+  return json({ status: "ok", asOf: nowIso(), ...res });
 }
 
 async function handleDriftDetect(env) {
@@ -5342,6 +5811,30 @@ async function handleRequest(request, env) {
       return safeRoute(() => handleDriftDetect(env));
     }
     if (url.pathname === "/api/engine/bucket-stats") return safeRoute(() => handleBucketStats(env));
+    if (url.pathname === "/api/engine/corrections-detect") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleRunCorrectionsDetect(env));
+    }
+    if (url.pathname === "/api/engine/observe-shadows") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleObserveShadows(env));
+    }
+    if (url.pathname === "/api/engine/active-adjustments") {
+      const adj = await resolveActiveAdjustments(env);
+      return json({
+        status: "ok", asOf: nowIso(),
+        data: {
+          disabledBuckets: Array.from(adj.disabledBuckets),
+          minScoreBoosts: Array.from(adj.minScoreBoosts.entries()).map(([k, v]) => ({ bucket: k, boost: v })),
+          sizeMultiplier: adj.sizeMultiplier,
+          widenStopSetups: Array.from(adj.widenStopSetups.entries()).map(([k, v]) => ({ setup: k, atr_mult_delta: v })),
+          extendTpSetups: Array.from(adj.extendTpSetups.entries()).map(([k, v]) => ({ setup: k, mode: v })),
+          total: adj.raw.length
+        }
+      });
+    }
     if (url.pathname === "/api/trending") return safeRoute(() => handleTrending());
     if (url.pathname === "/api/news") return safeRoute(() => handleNews(env));
     if (url.pathname === "/api/portfolio/summary") return safeRoute(() => handlePortfolioSummary());
