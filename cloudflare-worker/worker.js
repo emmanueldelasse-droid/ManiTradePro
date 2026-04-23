@@ -71,8 +71,9 @@ const LIGHT_SYMBOLS = [
   "NVDA", "AAPL", "MSFT", "AMD", "META", "GOOGL", "AMZN", "TSLA",
   // Finance US
   "JPM", "V", "MA",
-  // Europe
-  "ASML", "AIR",
+  // Actions Europe — rééquilibre les heures de scan (ouvre 07-15h UTC été,
+  // comble le trou US-fermé du matin à Paris).
+  "ASML", "AIR", "LVMH", "TTE", "SAP", "NESN", "RMS", "SIE",
   // Forex
   "EURUSD", "GBPUSD", "USDJPY",
   // Matières premières
@@ -99,6 +100,8 @@ const NAME_MAP = {
   AAPL:"Apple",MSFT:"Microsoft",NVDA:"NVIDIA",TSLA:"Tesla",AMZN:"Amazon",
   GOOGL:"Alphabet",META:"Meta",NFLX:"Netflix",AMD:"AMD",JPM:"JPMorgan Chase",
   COIN:"Coinbase",ASML:"ASML",AIR:"Airbus",
+  LVMH:"LVMH", TTE:"TotalEnergies", SAP:"SAP", NESN:"Nestlé",
+  RMS:"Hermès", SIE:"Siemens",
   EURUSD:"EUR/USD",GBPUSD:"GBP/USD",USDJPY:"USD/JPY",
   GOLD:"Gold",SILVER:"Silver",OIL:"Crude Oil"
 };
@@ -639,6 +642,10 @@ function attachBudgetHeaders(response, ctx) {
 function normalizeTwelveSymbol(symbol) {
   const map = {
     AIR:"AIR.PA",GOLD:"XAU/USD",SILVER:"XAG/USD",OIL:"BRENT",
+    // Actions Europe — suffixes de bourse natifs Twelve Data
+    LVMH:"LVMH.PA", TTE:"TTE.PA", RMS:"RMS.PA",
+    SAP:"SAP.DE", SIE:"SIE.DE",
+    NESN:"NESN.SW",
     EURUSD:"EUR/USD",GBPUSD:"GBP/USD",USDJPY:"USD/JPY",USDCHF:"USD/CHF",AUDUSD:"AUD/USD"
   };
   return map[symbol] || symbol;
