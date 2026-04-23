@@ -683,9 +683,9 @@ Opérationnalisation de la Règle #1 (apprendre ET se corriger). Sans migration 
 Implémente la **Règle #5 niveaux 2 et 3** (Phase 1 avait livré le niveau 1 hard block). Aucune migration SQL (les colonnes `news_context_open`/`close` existent depuis migration 006).
 
 **Sources de sentiment gratuites**
-- CryptoPanic Free (crypto) : votes positive/negative, 30 posts hot, **cache 3 h** pour tenir sous quota 200/j avec ~20 cryptos × 4 scans/h.
-- Alpha Vantage News Sentiment (stocks/ETF) : score ∈ [-1..1] pondéré par relevance, **cache 6 h** (quota serré).
-- `resolveSymbolNewsContext(env, symbol, assetClass)` : retourne best-effort, null sur forex/commodity.
+- ~~CryptoPanic Free~~ : le Free tier a été supprimé en 2026 (avant ce projet : 200 req/j, gratuit ; depuis : Growth $50/semaine minimum). Le helper `fetchCryptoPanicSentiment` reste présent pour rétro-compatibilité si `CRYPTOPANIC_KEY` est un jour configuré, mais n'est jamais actif par défaut.
+- **Alpha Vantage News Sentiment** (stocks/ETF **et crypto** via préfixe `CRYPTO:BTC`) : score ∈ [-1..1] pondéré par relevance, **cache 6 h**. Source unique pour tous les asset classes supportés. Clé `ALPHAVANTAGE_KEY` déjà configurée.
+- `resolveSymbolNewsContext(env, symbol, assetClass)` : priorité CryptoPanic si clé présente (future-proof), sinon fallback AV en crypto mode. Retourne null sur forex/commodity.
 - `fetchCryptoPanicSentiment` capture en plus des `ambiguousArticles` (votes nuls mais important) pour alimenter Claude niveau 3.
 - `fetchAlphaVantageNewsSentiment` idem si relevance > 0.5 et score absolu < 0.15.
 
@@ -724,11 +724,11 @@ Implémente la **Règle #5 niveaux 2 et 3** (Phase 1 avait livré le niveau 1 ha
 - `GET /api/engine/news-context?symbol=X&asset_class=Y` → dump complet : context + claudeSignal + tier kill switch.
 
 **Variables d'env nouvelles**
-- `CRYPTOPANIC_KEY` : gratuit sur cryptopanic.com/developers/.
+- ~~`CRYPTOPANIC_KEY`~~ : Free tier supprimé — pas configuré, le code tombe gracieusement en AV.
 - `CLAUDE_MODEL_HAIKU` (optionnel) : défaut `claude-haiku-4-5-20251001`.
 
 **Déploiement requis côté utilisateur**
-1. Ajouter `CRYPTOPANIC_KEY` via `wrangler secret put CRYPTOPANIC_KEY` (ou dashboard Cloudflare).
+1. Aucune nouvelle clé à créer (AV déjà configuré).
 2. `wrangler deploy` (auto via GitHub Actions dès merge).
 3. Aucune migration SQL.
 

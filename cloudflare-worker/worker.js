@@ -5184,14 +5184,25 @@ async function fetchCryptoPanicSentiment(env, symbol) {
 
 // ---- Alpha Vantage News Sentiment (gratuit pour quotidien, key déjà utilisée) ----
 // Endpoint : NEWS_SENTIMENT&tickers=X
-async function fetchAlphaVantageNewsSentiment(env, symbol) {
+// Supporte stocks/ETF ET crypto (via préfixe CRYPTO:BTC).
+async function fetchAlphaVantageNewsSentiment(env, symbol, assetClass = "stock") {
   if (!env?.ALPHAVANTAGE_KEY) return null;
-  const cacheKey = `av_news:${symbol}`;
+  const cacheKey = `av_news:${assetClass}:${symbol}`;
   const cached = getMemoryCache(cacheKey);
   if (cached) return cached;
 
-  const ticker = String(symbol || "").replace(/\.PA$|\.DE$|\.L$/i, "").toUpperCase();
-  if (!ticker) return null;
+  // Format ticker AV selon asset class
+  //   stock/etf : "AAPL" ou "ASML.PA" → "AAPL" (strip suffix)
+  //   crypto    : "BTCUSDT" → "CRYPTO:BTC" (strip pair suffix + préfixe)
+  let ticker;
+  if (assetClass === "crypto") {
+    const base = String(symbol || "").replace(/USDT?$|EUR$|USDC$|BUSD$/i, "").toUpperCase();
+    if (!base || base.length > 8) return null;
+    ticker = `CRYPTO:${base}`;
+  } else {
+    ticker = String(symbol || "").replace(/\.PA$|\.DE$|\.L$/i, "").toUpperCase();
+    if (!ticker) return null;
+  }
 
   try {
     const url = `https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${encodeURIComponent(ticker)}&limit=20&apikey=${encodeURIComponent(env.ALPHAVANTAGE_KEY)}`;
@@ -5242,9 +5253,16 @@ async function resolveSymbolNewsContext(env, symbol, assetClass) {
 
   let raw = null;
   if (assetClass === "crypto") {
+    // Priorité CryptoPanic si clé configurée (historiquement Free 200/j, mais
+    // depuis 2026 le Free a disparu → utilisateurs sans clé tombent direct en AV).
     raw = await fetchCryptoPanicSentiment(env, symbol);
+    if (!raw) {
+      // Fallback Alpha Vantage qui supporte nativement CRYPTO:BTC — utilise la
+      // clé ALPHAVANTAGE_KEY déjà configurée pour stocks.
+      raw = await fetchAlphaVantageNewsSentiment(env, symbol, "crypto");
+    }
   } else if (assetClass === "stock" || assetClass === "etf") {
-    raw = await fetchAlphaVantageNewsSentiment(env, symbol);
+    raw = await fetchAlphaVantageNewsSentiment(env, symbol, "stock");
   }
   // forex, commodity, unknown : pas de news sentiment pour l'instant (sources
   // spécifiques à ajouter en follow-up).
