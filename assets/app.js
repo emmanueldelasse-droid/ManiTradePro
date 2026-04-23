@@ -6014,7 +6014,7 @@ function openPositionsRiskView() {
           <div class="report-head">
             <div>
               <div class="report-title">Semaine ${formatDate(r.week_start)} → ${formatDate(r.week_end)}</div>
-              <div class="report-meta">${stats.total || 0} trades · ${stats.winRate != null ? Math.round(stats.winRate * 100) + "% win" : "—"} · <span class="${pnlTone}">${money(pnl, "USD")}</span>${r.corrections_applied ? ` · ${r.corrections_applied} corr.` : ""} ${statusBadge}</div>
+              <div class="report-meta">${Number(stats.total) || 0} trades · ${stats.winRate != null ? Math.round(Number(stats.winRate) * 100) + "% win" : "—"} · <span class="${pnlTone}">${money(pnl, "USD")}</span>${r.corrections_applied ? ` · ${Number(r.corrections_applied) || 0} corr.` : ""} ${statusBadge}</div>
             </div>
             <svg class="report-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}"/></svg>
           </div>
@@ -6022,7 +6022,7 @@ function openPositionsRiskView() {
             <div class="report-body">
               ${r.status === "failed" ? `<div class="error-box">${safeText(r.error_message || "Échec de génération")}</div>` : ""}
               <div class="report-markdown">${renderMarkdown(r.report_markdown || "")}</div>
-              ${r.claude_model ? `<div class="report-footer muted">${safeText(r.claude_model)} · ${r.claude_tokens_output || "?"} tokens · ${r.generation_duration_ms || "?"}ms</div>` : ""}
+              ${r.claude_model ? `<div class="report-footer muted">${safeText(r.claude_model)} · ${Number(r.claude_tokens_output) || "?"} tokens · ${Number(r.generation_duration_ms) || "?"}ms</div>` : ""}
             </div>
           ` : ""}
         </div>`;
