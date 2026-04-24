@@ -4770,16 +4770,23 @@ function renderHistoryRow(item) {
     const entryPrice = displayHistoryEntryPrice(p);
     const exitPrice = displayHistoryExitPrice(p);
     const closedAt = displayHistoryClosedAt(p);
+    const openedAt = p?.execution?.openedAt || p?.openedAt || null;
     const entryMode = trainingEntryModeMeta(p);
     const pnl = Number(p?.pnl || 0);
     const pnlPctValue = Number.isFinite(Number(p?.pnlPct)) ? Number(p.pnlPct) : null;
     const feedback = state.tradeFeedback?.[String(p.id || "")] || null;
     const feedbackBadges = renderFeedbackBadges(feedback);
+    const fmtDateTime = ts => validTradeDate(ts) ? new Date(ts).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : null;
+    const openTxt  = fmtDateTime(openedAt);
+    const closeTxt = fmtDateTime(closedAt);
+    const dateLine = openTxt && closeTxt
+      ? `Ouvert ${openTxt} · Clos ${closeTxt}`
+      : (closeTxt ? `Clos ${closeTxt}` : (openTxt ? `Ouvert ${openTxt}` : "date indisponible"));
     return `
       <div class="trade-row history simple-history-row">
         <div>
           <div class="trade-symbol">${safeText(p.symbol)}</div>
-          <div class="trade-sub">${safeText(validTradeDate(closedAt) ? new Date(closedAt).toLocaleString("fr-FR") : "date indisponible")}${entryMode ? ` Â· ${safeText(entryMode.label)}` : ""}</div>
+          <div class="trade-sub">${safeText(dateLine)}${entryMode ? ` · ${safeText(entryMode.label)}` : ""}</div>
           ${feedbackBadges}
         </div>
         <div>${badge(simpleSideLabel(p.side), p.side)}</div>
@@ -6248,6 +6255,9 @@ function openPositionsRiskView() {
           </div>
         ` : (acc ? `<div class="card" style="margin-top:16px"><div class="empty-state">Aucun trade clôturé. Active le bot et laisse tourner quelques cycles.</div></div>` : "")}
 
+        <!-- Historique des trades pris par le bot -->
+        ${renderBotTradesHistory()}
+
         <!-- Activité récente (compacte) -->
         ${events.length ? `
           <details class="card bot-events-card" ${events.length > 0 ? "" : "open"}>
@@ -6325,6 +6335,46 @@ function openPositionsRiskView() {
       </div>
       ${stats.bySetup.map(s => renderBotBreakdownRow(s.setup || "autre", s.winRate, s.count, s.pnl)).join("")}
     </div>`;
+  }
+
+  function renderBotTradesHistory() {
+    const history = Array.isArray(state.trades.history) ? state.trades.history : [];
+    const botHistory = history
+      .filter(p => tradeSource(p) === "algo")
+      .slice()
+      .sort((a, b) => {
+        const da = new Date(a?.closedExecution?.closedAt || a?.closedAt || 0).getTime();
+        const db = new Date(b?.closedExecution?.closedAt || b?.closedAt || 0).getTime();
+        return db - da;
+      });
+    const positions = Array.isArray(state.trades.positions) ? state.trades.positions : [];
+    const botPositions = positions.filter(p => tradeSource(p) === "algo");
+
+    if (!botHistory.length && !botPositions.length) {
+      return `<div class="card" style="margin-top:16px">
+        <div class="section-title"><span>Trades du bot</span></div>
+        <div class="empty-state">Aucun trade du bot pour l'instant.</div>
+      </div>`;
+    }
+
+    return `
+      ${botPositions.length ? `
+        <div class="card" style="margin-top:16px">
+          <div class="section-title"><span>Positions ouvertes du bot</span><span class="badge">${botPositions.length}</span></div>
+          <div class="pos-list">${botPositions.map(renderPositionRow).join("")}</div>
+        </div>
+      ` : ""}
+      ${botHistory.length ? `
+        <div class="card" style="margin-top:16px">
+          <div class="section-title"><span>Historique des trades du bot</span><span class="badge">${botHistory.length}</span></div>
+          <div class="trade-table simplified-history">
+            <div class="trade-row trade-head">
+              <div>Actif</div><div>Sens</div><div>Résultat</div><div>Entrée</div><div>Sortie</div><div>P/L</div><div>Clôture</div>
+            </div>
+            ${botHistory.map(renderHistoryRow).join("")}
+          </div>
+        </div>
+      ` : ""}`;
   }
 
   function renderBotParamsReadonly(settings, capitalBase) {
