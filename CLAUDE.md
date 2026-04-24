@@ -25,7 +25,7 @@ Toujours développer sur la branche indiquée dans les instructions de la sessio
 
 - PWA vanilla JS, zéro build, zéro dépendance front.
 - Frontend monolithe : `assets/app.js` (~5700 l.) + `assets/styles.css` (~1300 l.) + `index.html` + `sw.js`.
-- Backend : Cloudflare Worker `cloudflare-worker/worker.js` (~4000 l.), déployé manuellement via `wrangler deploy` par l'utilisateur depuis sa machine Windows.
+- Backend : Cloudflare Worker `cloudflare-worker/worker.js` (~4000 l.). **Déploiement auto via GitHub Actions** — cf. section *Contraintes de déploiement*.
 - Sync : Supabase (`mtp_positions`, `mtp_trades`).
 - Auth : PIN → HMAC session token 24h.
 - APIs marché : Binance, Twelve Data (4 clés rotation), Yahoo, CoinGecko, Alpha Vantage, Finnhub, Claude AI.
@@ -39,7 +39,9 @@ Toujours développer sur la branche indiquée dans les instructions de la sessio
 ## Contraintes de déploiement
 
 - **Frontend** : push sur `main` → GitHub Pages publie en 2-5 min.
-- **Worker** : `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`. Toujours `git pull origin main` avant. Après deploy : `wrangler secret list` pour vérifier que `SUPABASE_URL` est présent (les vars dashboard sont effacées par deploy).
+- **Worker** : **déploiement automatique** via GitHub Action `.github/workflows/deploy-worker.yml`. Déclencheur = `push` sur `main` touchant `cloudflare-worker/**` (ou trigger manuel via `workflow_dispatch`). Le workflow utilise `cloudflare/wrangler-action@v3` + secret GitHub `CLOUDFLARE_API_TOKEN`. Durée habituelle : 30-60 s après le merge. Vérification : onglet *Actions* du repo → workflow *Deploy Cloudflare Worker*.
+  - **Conséquences pour Claude** : après merge d'une PR qui touche `cloudflare-worker/**`, **ne PAS** demander à l'utilisateur de faire `wrangler deploy` ni de copier-coller dans le dashboard Cloudflare. Lui donner le lien Actions et attendre le run vert. Les secrets (`SUPABASE_URL`, `ADMIN_API_TOKEN`, etc.) sont stockés côté Cloudflare et préservés par `wrangler deploy` — pas d'action à faire dessus en routine.
+  - Fallback manuel (si CI down) : `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker` sur la machine Windows de l'utilisateur, précédé d'un `git pull origin main`. Après : `wrangler secret list` pour vérifier que `SUPABASE_URL` est présent.
 - **SW** : `CACHE_VERSION` dans `sw.js` à bumper à chaque release (sinon pas de réinstall). Assets en *network-first* depuis commit `176524d` — les releases suivantes se propageront sans vider le cache.
 
 ## Langue
