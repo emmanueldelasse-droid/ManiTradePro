@@ -4312,70 +4312,87 @@ async function handleTradesWipe(request, env) {
     : null;
   const validSource = sourceFilter === "manual" || sourceFilter === "algo" ? sourceFilter : null;
 
-  let ids = Array.from(new Set(
-    rawIds.map(v => String(v ?? "").trim()).filter(Boolean)
-  ));
+  try {
+    // Cas 1 — wipeAll : DELETE direct, aucun SELECT préalable (le plus rapide).
+    // On sacrifie la cascade feedback pour éviter tout timeout Safari iOS.
+    if (wipeAll) {
+      let deletedTrades = 0;
+      let deletedPositions = 0;
+      const tradesRes = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed`, {
+        method: "DELETE",
+        headers: { Prefer: "return=representation", Accept: "application/json" }
+      });
+      deletedTrades = Array.isArray(tradesRes) ? tradesRes.length : 0;
+      if (includePositions) {
+        const posRes = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training`, {
+          method: "DELETE",
+          headers: { Prefer: "return=representation", Accept: "application/json" }
+        });
+        deletedPositions = Array.isArray(posRes) ? posRes.length : 0;
+      }
+      return ok({ deletedTrades, deletedPositions, mode: "wipe_all" });
+    }
 
-  // Mode "wipe exhaustif par source" : on ignore la liste d'IDs locaux
-  // (forcément partielle si le client n'a pas tout téléchargé) et on résout
-  // la liste complète côté serveur depuis Supabase.
-  if (wipeAll || validSource) {
-    const allRows = await supabaseFetch(
-      env,
-      `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&select=id,source,trade_decision&limit=100000`
-    ).catch(() => []);
-    const rows = Array.isArray(allRows) ? allRows : [];
-    const matching = validSource
-      ? rows.filter(r => tradeSourceServer(r) === validSource)
-      : rows;
-    ids = Array.from(new Set(matching.map(r => String(r?.id ?? "")).filter(Boolean)));
-  }
+    // Cas 2 — par source (manual/algo) : SELECT minimal + DELETE chunked.
+    let ids = Array.from(new Set(
+      rawIds.map(v => String(v ?? "").trim()).filter(Boolean)
+    ));
+    if (validSource) {
+      const allRows = await supabaseFetch(
+        env,
+        `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&select=id,source,trade_decision&limit=100000`
+      );
+      const rows = Array.isArray(allRows) ? allRows : [];
+      const matching = rows.filter(r => tradeSourceServer(r) === validSource);
+      ids = Array.from(new Set(matching.map(r => String(r?.id ?? "")).filter(Boolean)));
+    }
 
-  if (!ids.length && !includePositions) {
-    return ok({ deletedTrades: 0, deletedPositions: 0, reason: "nothing_to_delete" });
-  }
+    if (!ids.length && !includePositions) {
+      return ok({ deletedTrades: 0, deletedPositions: 0, reason: "nothing_to_delete" });
+    }
 
-  let deletedTrades = 0;
-  if (ids.length) {
-    // Supabase/PostgREST limite la longueur d'URL — on chunk par 500 IDs.
-    const CHUNK = 500;
-    for (let i = 0; i < ids.length; i += CHUNK) {
-      const slice = ids.slice(i, i + CHUNK);
-      const inList = encodeInList(slice);
-      const res = await supabaseFetch(env, `${TRADE_TABLES.trades}?id=in.(${inList})&mode=eq.training`, {
+    let deletedTrades = 0;
+    if (ids.length) {
+      const CHUNK = 500;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        const inList = encodeInList(slice);
+        const res = await supabaseFetch(env, `${TRADE_TABLES.trades}?id=in.(${inList})&mode=eq.training`, {
+          method: "DELETE",
+          headers: { Prefer: "return=representation" }
+        });
+        deletedTrades += Array.isArray(res) ? res.length : 0;
+        await supabaseFetch(env, `${TRADE_FEEDBACK_TABLE}?trade_id=in.(${inList})`, {
+          method: "DELETE"
+        }).catch(() => {});
+      }
+    }
+
+    let deletedPositions = 0;
+    if (includePositions) {
+      const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training`, {
         method: "DELETE",
         headers: { Prefer: "return=representation" }
       });
-      deletedTrades += Array.isArray(res) ? res.length : 0;
-      // Nettoie le feedback attaché — cascade manuelle, la FK n'est pas garantie.
-      await supabaseFetch(env, `${TRADE_FEEDBACK_TABLE}?trade_id=in.(${inList})`, {
-        method: "DELETE"
-      }).catch(() => {});
+      deletedPositions = Array.isArray(res) ? res.length : 0;
+    } else if (ids.length) {
+      const CHUNK = 500;
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const slice = ids.slice(i, i + CHUNK);
+        const inList = encodeInList(slice);
+        const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?id=in.(${inList})&mode=eq.training`, {
+          method: "DELETE",
+          headers: { Prefer: "return=representation" }
+        });
+        deletedPositions += Array.isArray(res) ? res.length : 0;
+      }
     }
-  }
 
-  let deletedPositions = 0;
-  if (includePositions) {
-    const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training`, {
-      method: "DELETE",
-      headers: { Prefer: "return=representation" }
-    });
-    deletedPositions = Array.isArray(res) ? res.length : 0;
-  } else if (ids.length) {
-    // Si certains IDs correspondent à des positions encore ouvertes, on les retire aussi.
-    const CHUNK = 500;
-    for (let i = 0; i < ids.length; i += CHUNK) {
-      const slice = ids.slice(i, i + CHUNK);
-      const inList = encodeInList(slice);
-      const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?id=in.(${inList})&mode=eq.training`, {
-        method: "DELETE",
-        headers: { Prefer: "return=representation" }
-      });
-      deletedPositions += Array.isArray(res) ? res.length : 0;
-    }
+    return ok({ deletedTrades, deletedPositions });
+  } catch (e) {
+    console.error("handleTradesWipe failed:", e?.message || e);
+    return fail(`wipe_failed: ${e?.message || "unknown"}`, "wipe_error", 500);
   }
-
-  return ok({ deletedTrades, deletedPositions });
 }
 
 async function listExistingFeedbackIds(env, tradeIds) {
