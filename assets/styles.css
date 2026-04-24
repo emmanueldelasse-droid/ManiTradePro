@@ -1191,6 +1191,33 @@ input,select,textarea{font-family:inherit;font-size:16px;-webkit-appearance:none
 .bot-params .kv{grid-template-columns:1.4fr 1fr}
 @media (max-width:520px){.bot-params .kv{grid-template-columns:1fr auto}}
 
+/* Bot — refonte lisibilité : tabs résultats + collapsibles */
+.bot-stat-sub{font-size:.8rem;color:var(--text-muted);font-weight:500;margin-left:2px}
+.bot-results-card{margin-top:16px}
+.bot-events-card,.bot-params-card{margin-top:16px;padding:0}
+.bot-collapsible-summary{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 16px;cursor:pointer;list-style:none;min-height:52px;font-weight:600;user-select:none;-webkit-user-select:none}
+.bot-collapsible-summary::-webkit-details-marker{display:none}
+.bot-collapsible-summary::after{content:"▾";color:var(--text-muted);transition:transform .18s;flex-shrink:0;font-size:.9rem}
+details[open] > .bot-collapsible-summary::after{transform:rotate(180deg)}
+.bot-events-card[open] .bot-timeline,
+.bot-params-card[open] .bot-params-form,
+.bot-params-card[open] > :not(summary){padding-left:16px;padding-right:16px;padding-bottom:16px}
+.bot-events-card[open] .bot-timeline{padding-top:4px}
+.bot-stats-tabs{display:flex;gap:6px;margin:16px 0 12px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.bot-stats-tabs::-webkit-scrollbar{display:none}
+.bot-stats-tab{flex-shrink:0;padding:8px 14px;min-height:36px;border-radius:999px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-secondary);font-family:inherit;font-size:.82rem;font-weight:500;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,color .15s,transform .08s;-webkit-user-select:none;user-select:none}
+.bot-stats-tab:active{transform:scale(.97)}
+.bot-stats-tab.active{background:var(--accent);border-color:var(--accent);color:#0a0e1a}
+.bot-tab-empty{padding:18px;font-size:.88rem}
+
+.app-shell:not(.theme-light) .bot-events-card,
+.app-shell:not(.theme-light) .bot-params-card{background:rgba(14,19,35,.7)}
+.app-shell:not(.theme-light) .bot-stats-tab{background:rgba(255,255,255,.02)}
+.app-shell:not(.theme-light) .bot-stats-tab:hover{border-color:rgba(138,163,255,.28);color:var(--text-primary)}
+
+.app-shell.theme-light .bot-stats-tab{background:#ffffff;border-color:rgba(15,23,42,.12)}
+.app-shell.theme-light .bot-stats-tab.active{background:var(--accent);border-color:var(--accent);color:#0a0e1a}
+
 /* Bot — formulaire d'édition */
 .bot-params-form{display:flex;flex-direction:column;gap:14px}
 .bot-field-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}

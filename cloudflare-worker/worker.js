@@ -4280,6 +4280,54 @@ async function handleTradesSync(request, env) {
   return tradesPayload(true, positions, history, "sync_ok");
 }
 
+async function handleTradesWipe(request, env) {
+  if (!supabaseConfigured(env)) return fail("Secrets Supabase absents", "supabase_missing", 500);
+  const body = await request.json().catch(() => ({}));
+  const rawIds = Array.isArray(body?.ids) ? body.ids : [];
+  const includePositions = body?.includePositions === true;
+
+  const ids = Array.from(new Set(
+    rawIds.map(v => String(v ?? "").trim()).filter(Boolean)
+  ));
+  if (!ids.length && !includePositions) {
+    return ok({ deletedTrades: 0, deletedPositions: 0, reason: "nothing_to_delete" });
+  }
+
+  // Supabase PostgREST `in.(...)` — les valeurs non-numériques doivent être quotées.
+  const inList = ids.map(id => `"${encodeURIComponent(id)}"`).join(",");
+
+  let deletedTrades = 0;
+  if (ids.length) {
+    const res = await supabaseFetch(env, `${TRADE_TABLES.trades}?id=in.(${inList})&mode=eq.training`, {
+      method: "DELETE",
+      headers: { Prefer: "return=representation" }
+    });
+    deletedTrades = Array.isArray(res) ? res.length : 0;
+    // Nettoie le feedback attaché — cascade manuelle, la FK n'est pas garantie.
+    await supabaseFetch(env, `${TRADE_FEEDBACK_TABLE}?trade_id=in.(${inList})`, {
+      method: "DELETE"
+    }).catch(() => {});
+  }
+
+  let deletedPositions = 0;
+  if (includePositions) {
+    const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training`, {
+      method: "DELETE",
+      headers: { Prefer: "return=representation" }
+    });
+    deletedPositions = Array.isArray(res) ? res.length : 0;
+  } else if (ids.length) {
+    // Si certains IDs correspondent à des positions encore ouvertes, on les retire aussi.
+    const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?id=in.(${inList})&mode=eq.training`, {
+      method: "DELETE",
+      headers: { Prefer: "return=representation" }
+    });
+    deletedPositions = Array.isArray(res) ? res.length : 0;
+  }
+
+  return ok({ deletedTrades, deletedPositions });
+}
+
 async function listExistingFeedbackIds(env, tradeIds) {
   if (!supabaseConfigured(env) || !Array.isArray(tradeIds) || tradeIds.length === 0) return new Set();
   try {
@@ -6767,6 +6815,11 @@ async function handleRequest(request, env) {
       const denied = await requireFrontAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTradesSync(request, env));
+    }
+    if (url.pathname === "/api/trades/wipe") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTradesWipe(request, env));
     }
     if (url.pathname === "/api/training/settings") {
       const denied = await requireAdminAccess(request, env);
