@@ -301,15 +301,25 @@
     }
   }
 
-  async function wipeTradesOnServer(ids, { includePositions = false } = {}) {
+  async function wipeTradesOnServer(ids, { includePositions = false, source = null, wipeAll = false } = {}) {
     const cleanIds = Array.from(new Set(
       (Array.isArray(ids) ? ids : []).map(v => String(v ?? "").trim()).filter(Boolean)
     ));
-    if (!cleanIds.length && !includePositions) return { ok: true, deletedTrades: 0, deletedPositions: 0 };
+    const validSource = source === "manual" || source === "algo" ? source : null;
+    // Si on ne demande ni wipeAll, ni un filtre par source, ni des IDs,
+    // et pas de suppression de positions → rien à faire.
+    if (!wipeAll && !validSource && !cleanIds.length && !includePositions) {
+      return { ok: true, deletedTrades: 0, deletedPositions: 0 };
+    }
     try {
       const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.wipe, {
         method: "POST",
-        body: JSON.stringify({ ids: cleanIds, includePositions })
+        body: JSON.stringify({
+          ids: cleanIds,
+          includePositions,
+          source: validSource,
+          wipeAll: wipeAll === true
+        })
       });
       return {
         ok: true,
@@ -6909,11 +6919,13 @@ function renderMain() {
         const label = src === "algo" ? "algo" : "manuel";
         const victims = (state.trades.history || []).filter(p => tradeSource(p) === src);
         if (!victims.length) return;
-        if (!confirm(`Supprimer définitivement ${victims.length} trade(s) ${label} (Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
+        if (!confirm(`Supprimer définitivement tous les trades ${label} (Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
         exportTradesToCSV(victims, `backup_${label}_avant_suppression`);
         haptic([30, 60, 30]);
-        const ids = victims.map(p => p?.id).filter(Boolean);
-        const res = await wipeTradesOnServer(ids);
+        // Suppression exhaustive côté serveur : on s'appuie sur le filtre `source`
+        // et non sur la liste d'IDs locaux (forcément partielle si le cache local
+        // n'a pas tout téléchargé — sinon les trades non listés réapparaissent au reload).
+        const res = await wipeTradesOnServer([], { source: src });
         if (!res.ok) {
           alert(`Suppression serveur échouée : ${res.error}. Rien n'a été supprimé. Le CSV de sauvegarde reste dans tes téléchargements.`);
           return;
@@ -6930,16 +6942,17 @@ function renderMain() {
       el.addEventListener("click", async () => {
         const victims = Array.isArray(state.trades.history) ? state.trades.history.slice() : [];
         if (!victims.length) return;
-        if (!confirm(`Supprimer définitivement tout l'historique (${victims.length} trade(s), Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
+        if (!confirm(`Supprimer définitivement tout l'historique (Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
         exportTradesToCSV(victims, "backup_complet_avant_suppression");
         haptic([30, 60, 30]);
-        const ids = victims.map(p => p?.id).filter(Boolean);
-        const res = await wipeTradesOnServer(ids);
+        // Wipe exhaustif : ignore les IDs locaux, nettoie toute la table côté serveur.
+        const res = await wipeTradesOnServer([], { wipeAll: true, includePositions: true });
         if (!res.ok) {
           alert(`Suppression serveur échouée : ${res.error}. Rien n'a été supprimé. Le CSV de sauvegarde reste dans tes téléchargements.`);
           return;
         }
         state.trades.history = [];
+        state.trades.positions = [];
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
         showAlertToast("Historique", `${res.deletedTrades} trade(s) supprimé(s) définitivement.`);
