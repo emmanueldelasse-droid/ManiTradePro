@@ -4322,7 +4322,7 @@ async function handleTradesWipe(request, env) {
   if (wipeAll || validSource) {
     const allRows = await supabaseFetch(
       env,
-      `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&select=id,source,trade_decision,analysis_snapshot&limit=100000`
+      `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&select=id,source,trade_decision&limit=100000`
     ).catch(() => []);
     const rows = Array.isArray(allRows) ? allRows : [];
     const matching = validSource
