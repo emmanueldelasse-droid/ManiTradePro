@@ -120,7 +120,7 @@
     userAssetsLoading: false,
     userAssetsError: null,
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
-    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false },
+    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false },
     health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 },
     reports: { list: [], loading: false, error: null, openId: null, generating: false },   // PR #9 Phase 2 — rapports hebdo
     tradeFeedback: {} // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
@@ -219,7 +219,8 @@
 
   const WORKER_TRADES_ROUTES = {
     state: "/api/trades/state",
-    sync: "/api/trades/sync"
+    sync: "/api/trades/sync",
+    wipe: "/api/trades/wipe"
   };
 
   function workerAdminHeaders() {
@@ -297,6 +298,26 @@
         history: [],
         payload: null
       };
+    }
+  }
+
+  async function wipeTradesOnServer(ids, { includePositions = false } = {}) {
+    const cleanIds = Array.from(new Set(
+      (Array.isArray(ids) ? ids : []).map(v => String(v ?? "").trim()).filter(Boolean)
+    ));
+    if (!cleanIds.length && !includePositions) return { ok: true, deletedTrades: 0, deletedPositions: 0 };
+    try {
+      const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.wipe, {
+        method: "POST",
+        body: JSON.stringify({ ids: cleanIds, includePositions })
+      });
+      return {
+        ok: true,
+        deletedTrades: Number(payload?.data?.deletedTrades || 0),
+        deletedPositions: Number(payload?.data?.deletedPositions || 0)
+      };
+    } catch (err) {
+      return { ok: false, error: err?.message || "wipe_failed" };
     }
   }
 
@@ -2066,64 +2087,6 @@ async function confirmTradeFromModal() {
     }
   }
 
-  function renderBot() {
-    const { loading, error, account, events, stats } = state.bot;
-    if (loading) return `<div class="screen"><div class="empty-state">Chargement du bot…</div></div>`;
-    if (error) return `<div class="screen"><div class="error-box">${safeText(error)}</div></div>`;
-    if (!account) {
-      return `<div class="screen">
-        <div class="screen-header"><div class="screen-title">Bot d'entraînement</div></div>
-        <div class="empty-state" style="margin-top:24px">
-          <div style="margin-bottom:14px">Aucune donnée chargée.</div>
-          <button class="btn btn-primary" data-bot-refresh>Charger</button>
-        </div>
-        ${renderBottomNav()}
-      </div>`;
-    }
-    const cfg = account.settings || {};
-    const wr = stats?.winRate != null ? `${(stats.winRate * 100).toFixed(0)} %` : "—";
-    const pnl = stats?.totalPnl != null ? `${stats.totalPnl >= 0 ? "+" : ""}${stats.totalPnl.toFixed(2)} €` : "—";
-    const pnlClass = stats?.totalPnl != null ? (stats.totalPnl >= 0 ? "positive" : "negative") : "";
-    return `<div class="screen">
-      <div class="screen-header">
-        <div class="screen-title">Bot d'entraînement</div>
-        <div class="screen-subtitle">Simulation automatique${account.balance_eur != null ? ` — capital virtuel ${Number(account.balance_eur).toFixed(2)} €` : ""}</div>
-      </div>
-      <div class="grid" style="grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:18px">
-        <div class="stat-card"><div class="stat-label">Trades</div><div class="stat-value">${stats?.totalCount ?? "—"}</div></div>
-        <div class="stat-card"><div class="stat-label">Win rate</div><div class="stat-value">${wr}</div></div>
-        <div class="stat-card"><div class="stat-label">PnL total</div><div class="stat-value ${pnlClass}">${pnl}</div></div>
-      </div>
-      <div class="card" style="margin-bottom:14px">
-        <div class="section-title">Paramètres</div>
-        <div style="display:flex;flex-direction:column;gap:10px">
-          <label style="display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px">
-            <span>Bot actif</span>
-            <input type="checkbox" ${cfg.enabled ? "checked" : ""} data-bot-toggle="enabled">
-          </label>
-          <label style="display:flex;justify-content:space-between;align-items:center;gap:12px;min-height:44px">
-            <span>Notifications cycle</span>
-            <input type="checkbox" ${cfg.notifyOnCycle ? "checked" : ""} data-bot-toggle="notifyOnCycle">
-          </label>
-        </div>
-        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-primary" data-bot-force-cycle ${state.bot.forcingCycle ? "disabled" : ""}>${state.bot.forcingCycle ? "En cours…" : "Forcer un cycle"}</button>
-          <button class="btn" data-bot-refresh>Actualiser</button>
-        </div>
-      </div>
-      ${events.length ? `<div class="card">
-        <div class="section-title">Derniers événements</div>
-        <div style="display:flex;flex-direction:column;gap:0">
-          ${events.slice(0, 20).map(ev => `
-            <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-subtle);font-size:.85rem">
-              <span class="muted" style="font-size:.75rem;white-space:nowrap;flex-shrink:0">${new Date(ev.at).toLocaleTimeString("fr-FR",{hour:"2-digit",minute:"2-digit"})}</span>
-              <span style="flex:1;min-width:0;overflow-wrap:break-word">${safeText(ev.type)}${ev.symbol ? ` — ${safeText(ev.symbol)}` : ""}</span>
-            </div>`).join("")}
-        </div>
-      </div>` : `<div class="empty-state" style="margin-top:8px">Aucun événement enregistré.</div>`}
-      ${renderBottomNav()}
-    </div>`;
-  }
 
   async function loadPortfolioPriority() {
     const opps = state.filteredOpportunities.length ? state.filteredOpportunities : state.opportunities;
@@ -5375,8 +5338,10 @@ function openPositionsRiskView() {
     });
   }
 
-  function exportTradesToCSV() {
-    const history = Array.isArray(state.trades.history) ? state.trades.history : [];
+  function exportTradesToCSV(subset, filenameSuffix = "") {
+    const history = Array.isArray(subset)
+      ? subset
+      : (Array.isArray(state.trades.history) ? state.trades.history : []);
     if (!history.length) return;
     const esc = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
     const headers = ["Date ouverture","Date cloture","Symbole","Nom","Direction","Prix entree","Prix sortie","Quantite","Investi USD","P&L USD","P&L %","Source","Score","Stop Loss","Take Profit"];
@@ -5402,7 +5367,7 @@ function openPositionsRiskView() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `manitradepro_trades_${new Date().toISOString().slice(0,10)}.csv`;
+    a.download = `manitradepro_trades${filenameSuffix ? "_" + filenameSuffix : ""}_${new Date().toISOString().slice(0,10)}.csv`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -6179,27 +6144,31 @@ function openPositionsRiskView() {
       ? riskState.blockers.map(b => typeof b === "string" ? b : (b?.message || b?.code || "")).filter(Boolean).join(" · ")
       : "";
 
+    const hasStats = stats && stats.totalCount > 0;
+    const statsTab = state.bot.statsTab || "setup";
+    const paramsOpen = state.bot.editDraft ? true : !!state.bot.paramsOpen;
+
     return `
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Bot d'entrainement</div>
-          <div class="screen-subtitle">Paper trading auto — le bot tente des positions sur capital virtuel pour collecter des données et apprendre.</div>
+          <div class="screen-subtitle">Paper trading auto — capital virtuel, cycles auto toutes les 15 min pour collecter de la donnée.</div>
         </div>
 
         ${state.bot.error ? `<div class="error-box" style="margin-bottom:14px">${safeText(state.bot.error)}</div>` : ""}
         ${state.bot.loading && !acc ? `<div class="loading-state" style="margin-bottom:14px">Chargement du bot…</div>` : ""}
 
-        <!-- Carte contrôle -->
+        <!-- SECTION A — État live -->
         <div class="card bot-control-card ${enabled ? "is-on" : "is-off"}">
           <div class="bot-status-row">
             <div>
-              <div class="bot-status-label">État du bot</div>
+              <div class="bot-status-label">État</div>
               <div class="bot-status-value ${enabled ? "on" : "off"}">
-                ${enabled ? "● Actif — cycles 15 min" : "○ Désactivé — aucun trade"}
+                ${enabled ? "● Actif" : "○ En pause"}
               </div>
               <div class="bot-cycle-sub ${cycleFreshness}">${safeText(lastCycleText)}</div>
             </div>
-            <label class="bot-toggle-big">
+            <label class="bot-toggle-big" title="${enabled ? "Désactiver le bot" : "Activer le bot"}">
               <input type="checkbox" data-bot-toggle="is_enabled" ${enabled ? "checked" : ""}>
               <span class="bot-toggle-slider"></span>
             </label>
@@ -6208,7 +6177,7 @@ function openPositionsRiskView() {
           <div class="bot-stats-row">
             <div class="bot-stat">
               <div class="stat-label">Positions</div>
-              <div class="stat-value">${openCount}/${maxOpen}</div>
+              <div class="stat-value">${openCount}<span class="bot-stat-sub">/${maxOpen}</span></div>
             </div>
             <div class="bot-stat">
               <div class="stat-label">Capital dispo</div>
@@ -6226,10 +6195,14 @@ function openPositionsRiskView() {
 
           ${riskBlocked ? `
             <div class="bot-risk-warn">
-              Trading bloqué par risk state : ${safeText(blockerText || "limite dépassée")}.
+              Trading bloqué : ${safeText(blockerText || "limite de risque dépassée")}.
             </div>` : ""}
 
-          <div class="bot-sub-toggles">
+          <div class="bot-actions">
+            <button class="btn btn-primary" data-bot-force-cycle ${state.bot.forcingCycle ? "disabled" : ""}>
+              ${state.bot.forcingCycle ? "Cycle en cours…" : "Lancer un cycle"}
+            </button>
+            <button class="btn btn-secondary" data-bot-reload>Actualiser</button>
             <label class="bot-sub-toggle">
               <input type="checkbox" data-bot-toggle="auto_open_enabled" ${autoOpen ? "checked" : ""}>
               <span>Ouvertures auto</span>
@@ -6239,19 +6212,12 @@ function openPositionsRiskView() {
               <span>Fermetures auto</span>
             </label>
           </div>
-
-          <div class="bot-actions">
-            <button class="btn btn-primary" data-bot-force-cycle ${state.bot.forcingCycle ? "disabled" : ""}>
-              ${state.bot.forcingCycle ? "Cycle en cours…" : "Lancer un cycle maintenant"}
-            </button>
-            <button class="btn btn-secondary" data-bot-reload>Actualiser</button>
-          </div>
         </div>
 
-        <!-- Apprentissage / Stats -->
-        ${stats && stats.totalCount > 0 ? `
-          <div class="card" style="margin-top:16px">
-            <div class="section-title"><span>Apprentissage</span><span>${stats.totalCount} trades clôturés</span></div>
+        <!-- SECTION B — Résultats -->
+        ${hasStats ? `
+          <div class="card bot-results-card">
+            <div class="section-title"><span>Résultats</span><span class="muted">${stats.totalCount} trades clôturés</span></div>
             <div class="bot-kpi-grid">
               <div class="stat-card">
                 <div class="stat-label">Win rate</div>
@@ -6271,60 +6237,94 @@ function openPositionsRiskView() {
               </div>
             </div>
 
-            ${Array.isArray(stats.bySetup) && stats.bySetup.length ? `
-              <div class="section-title" style="margin-top:18px"><span>Par setup</span></div>
-              <div class="bot-breakdown">
-                <div class="bot-breakdown-row bot-breakdown-head">
-                  <div class="bot-breakdown-label">Setup</div>
-                  <div class="bot-breakdown-count">N</div>
-                  <div class="bot-breakdown-wr">WR</div>
-                  <div class="bot-breakdown-pnl">P&L</div>
-                </div>
-                ${stats.bySetup.map(s => renderBotBreakdownRow(s.setup || "autre", s.winRate, s.count, s.pnl)).join("")}
-              </div>
-            ` : ""}
+            <div class="bot-stats-tabs" role="tablist">
+              <button class="bot-stats-tab ${statsTab==="setup"?"active":""}" data-bot-stats-tab="setup" role="tab">Par setup</button>
+              <button class="bot-stats-tab ${statsTab==="class"?"active":""}" data-bot-stats-tab="class" role="tab">Par classe</button>
+              <button class="bot-stats-tab ${statsTab==="top"?"active":""}" data-bot-stats-tab="top" role="tab">Top</button>
+              <button class="bot-stats-tab ${statsTab==="bottom"?"active":""}" data-bot-stats-tab="bottom" role="tab">À surveiller</button>
+            </div>
 
-            ${Array.isArray(stats.byClass) && stats.byClass.length ? `
-              <div class="section-title" style="margin-top:18px"><span>Par classe d'actif</span></div>
-              <div class="bot-breakdown">
-                <div class="bot-breakdown-row bot-breakdown-head">
-                  <div class="bot-breakdown-label">Classe</div>
-                  <div class="bot-breakdown-count">N</div>
-                  <div class="bot-breakdown-wr">WR</div>
-                  <div class="bot-breakdown-pnl">P&L</div>
-                </div>
-                ${stats.byClass.map(c => renderBotBreakdownRow(c.class || "—", c.winRate, c.count, c.pnl)).join("")}
-              </div>
-            ` : ""}
-
-            ${Array.isArray(stats.topSymbols) && stats.topSymbols.length ? `
-              <div class="section-title" style="margin-top:18px"><span>Top 5 rentables</span></div>
-              <div class="bot-breakdown">
-                ${stats.topSymbols.map(s => renderBotBreakdownRow(s.symbol, s.count > 0 ? s.wins / s.count : null, s.count, s.pnl)).join("")}
-              </div>
-            ` : ""}
-
-            ${Array.isArray(stats.bottomSymbols) && stats.bottomSymbols.length ? `
-              <div class="section-title" style="margin-top:18px"><span>À surveiller (perdants)</span></div>
-              <div class="bot-breakdown">
-                ${stats.bottomSymbols.map(s => renderBotBreakdownRow(s.symbol, s.count > 0 ? s.wins / s.count : null, s.count, s.pnl)).join("")}
-              </div>
-            ` : ""}
+            ${renderBotStatsTabContent(stats, statsTab)}
           </div>
         ` : (acc ? `<div class="card" style="margin-top:16px"><div class="empty-state">Aucun trade clôturé. Active le bot et laisse tourner quelques cycles.</div></div>` : "")}
 
-        <!-- Timeline -->
-        <div class="card" style="margin-top:16px">
-          <div class="section-title"><span>Dernière activité</span><span>${events.length} événements</span></div>
-          ${events.length ? `<div class="bot-timeline">${events.map(renderBotEventRow).join("")}</div>` : `<div class="empty-state">Aucun événement pour l'instant.</div>`}
-        </div>
+        <!-- Activité récente (compacte) -->
+        ${events.length ? `
+          <details class="card bot-events-card" ${events.length > 0 ? "" : "open"}>
+            <summary class="bot-collapsible-summary">
+              <span>Activité récente</span>
+              <span class="muted">${events.length} événement${events.length > 1 ? "s" : ""}</span>
+            </summary>
+            <div class="bot-timeline">${events.slice(0, 30).map(renderBotEventRow).join("")}</div>
+          </details>
+        ` : ""}
 
-        <!-- Paramètres avancés — éditables -->
-        <div class="card" style="margin-top:16px">
-          <div class="section-title"><span>Paramètres du bot</span><span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span></div>
+        <!-- SECTION C — Paramètres (collapsible) -->
+        <details class="card bot-params-card" ${paramsOpen ? "open" : ""}>
+          <summary class="bot-collapsible-summary">
+            <span>Paramètres du bot</span>
+            <span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span>
+          </summary>
           ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
-        </div>
+        </details>
       </div>`;
+  }
+
+  function renderBotStatsTabContent(stats, tab) {
+    if (tab === "class") {
+      if (!Array.isArray(stats?.byClass) || !stats.byClass.length) {
+        return `<div class="empty-state bot-tab-empty">Pas encore de données par classe d'actif.</div>`;
+      }
+      return `<div class="bot-breakdown">
+        <div class="bot-breakdown-row bot-breakdown-head">
+          <div class="bot-breakdown-label">Classe</div>
+          <div class="bot-breakdown-count">N</div>
+          <div class="bot-breakdown-wr">WR</div>
+          <div class="bot-breakdown-pnl">P&L</div>
+        </div>
+        ${stats.byClass.map(c => renderBotBreakdownRow(c.class || "—", c.winRate, c.count, c.pnl)).join("")}
+      </div>`;
+    }
+    if (tab === "top") {
+      if (!Array.isArray(stats?.topSymbols) || !stats.topSymbols.length) {
+        return `<div class="empty-state bot-tab-empty">Pas encore de symboles rentables.</div>`;
+      }
+      return `<div class="bot-breakdown">
+        <div class="bot-breakdown-row bot-breakdown-head">
+          <div class="bot-breakdown-label">Symbole</div>
+          <div class="bot-breakdown-count">N</div>
+          <div class="bot-breakdown-wr">WR</div>
+          <div class="bot-breakdown-pnl">P&L</div>
+        </div>
+        ${stats.topSymbols.map(s => renderBotBreakdownRow(s.symbol, s.count > 0 ? s.wins / s.count : null, s.count, s.pnl)).join("")}
+      </div>`;
+    }
+    if (tab === "bottom") {
+      if (!Array.isArray(stats?.bottomSymbols) || !stats.bottomSymbols.length) {
+        return `<div class="empty-state bot-tab-empty">Aucun symbole perdant significatif.</div>`;
+      }
+      return `<div class="bot-breakdown">
+        <div class="bot-breakdown-row bot-breakdown-head">
+          <div class="bot-breakdown-label">Symbole</div>
+          <div class="bot-breakdown-count">N</div>
+          <div class="bot-breakdown-wr">WR</div>
+          <div class="bot-breakdown-pnl">P&L</div>
+        </div>
+        ${stats.bottomSymbols.map(s => renderBotBreakdownRow(s.symbol, s.count > 0 ? s.wins / s.count : null, s.count, s.pnl)).join("")}
+      </div>`;
+    }
+    if (!Array.isArray(stats?.bySetup) || !stats.bySetup.length) {
+      return `<div class="empty-state bot-tab-empty">Pas encore de données par setup.</div>`;
+    }
+    return `<div class="bot-breakdown">
+      <div class="bot-breakdown-row bot-breakdown-head">
+        <div class="bot-breakdown-label">Setup</div>
+        <div class="bot-breakdown-count">N</div>
+        <div class="bot-breakdown-wr">WR</div>
+        <div class="bot-breakdown-pnl">P&L</div>
+      </div>
+      ${stats.bySetup.map(s => renderBotBreakdownRow(s.setup || "autre", s.winRate, s.count, s.pnl)).join("")}
+    </div>`;
   }
 
   function renderBotParamsReadonly(settings, capitalBase) {
@@ -6854,25 +6854,45 @@ function renderMain() {
     });
 
     app.querySelectorAll("[data-clear-history]").forEach(el => {
-      el.addEventListener("click", () => {
+      el.addEventListener("click", async () => {
         const src = el.getAttribute("data-clear-history");
         const label = src === "algo" ? "algo" : "manuel";
-        if (!confirm(`Supprimer tout l'historique ${label} ? Cette action est irréversible.`)) return;
+        const victims = (state.trades.history || []).filter(p => tradeSource(p) === src);
+        if (!victims.length) return;
+        if (!confirm(`Supprimer définitivement ${victims.length} trade(s) ${label} (Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
+        exportTradesToCSV(victims, `backup_${label}_avant_suppression`);
         haptic([30, 60, 30]);
+        const ids = victims.map(p => p?.id).filter(Boolean);
+        const res = await wipeTradesOnServer(ids);
+        if (!res.ok) {
+          alert(`Suppression serveur échouée : ${res.error}. Rien n'a été supprimé. Le CSV de sauvegarde reste dans tes téléchargements.`);
+          return;
+        }
         state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
+        showAlertToast("Historique", `${res.deletedTrades} trade(s) ${label} supprimé(s) définitivement.`);
         render();
       });
     });
 
     app.querySelectorAll("[data-clear-all-history]").forEach(el => {
-      el.addEventListener("click", () => {
-        if (!confirm("Supprimer tout l'historique ? Cette action est irréversible.")) return;
+      el.addEventListener("click", async () => {
+        const victims = Array.isArray(state.trades.history) ? state.trades.history.slice() : [];
+        if (!victims.length) return;
+        if (!confirm(`Supprimer définitivement tout l'historique (${victims.length} trade(s), Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
+        exportTradesToCSV(victims, "backup_complet_avant_suppression");
         haptic([30, 60, 30]);
+        const ids = victims.map(p => p?.id).filter(Boolean);
+        const res = await wipeTradesOnServer(ids);
+        if (!res.ok) {
+          alert(`Suppression serveur échouée : ${res.error}. Rien n'a été supprimé. Le CSV de sauvegarde reste dans tes téléchargements.`);
+          return;
+        }
         state.trades.history = [];
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
+        showAlertToast("Historique", `${res.deletedTrades} trade(s) supprimé(s) définitivement.`);
         render();
       });
     });
@@ -7158,6 +7178,18 @@ function renderMain() {
     app.querySelectorAll("[data-bot-field-setup]").forEach(el => {
       el.addEventListener("change", () => {
         toggleBotDraftSetup(el.getAttribute("data-bot-field-setup"), el.checked);
+      });
+    });
+    app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.bot.statsTab = el.getAttribute("data-bot-stats-tab") || "setup";
+        haptic(5);
+        render();
+      });
+    });
+    app.querySelectorAll(".bot-params-card").forEach(el => {
+      el.addEventListener("toggle", () => {
+        state.bot.paramsOpen = el.open;
       });
     });
 

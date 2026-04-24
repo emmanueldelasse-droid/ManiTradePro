@@ -374,7 +374,7 @@ Audit iPhone complet réalisé session 8. Plan de refonte en 3 sprints, un commi
 - Worker : `wrangler deploy` dans `cloudflare-worker/` (`git pull origin main` avant)
 
 ### TODOs non iPhone (conservés)
-- Nettoyage CSS `.ai-card` (lignes 135, 162, 239, 449, 450, 1230) — classe non émise par aucun template
+- ~~Nettoyage CSS `.ai-card` — classe non émise par aucun template~~ ✅ fait (branche `claude/implement-todo-item-udOhw`)
 
 **Fonctionnalités backlog**
 - [ ] Rapports PDF hebdomadaires
