@@ -3544,13 +3544,15 @@ function normalizeRowByKeys(row, keys) {
   return out;
 }
 
-const TRAINING_POSITION_KEYS = ["id","symbol","name","direction","entry_price","quantity","invested","stop_loss","take_profit","mode","status","opened_at","updated_at","score","decision","trend_label","source_used"];
-const TRAINING_TRADE_KEYS = ["id","symbol","name","direction","entry_price","exit_price","quantity","invested","stop_loss","take_profit","pnl","pnl_pct","opened_at","closed_at","duration_days","mode","status","score","adj_score","rr_ratio","decision","trend_label","source_used","updated_at"];
+const TRAINING_POSITION_KEYS = ["id","symbol","name","side","direction","asset_class","entry_price","quantity","invested","stop_loss","take_profit","mode","status","opened_at","updated_at","score","decision","trade_decision","trade_reason","trend_label","horizon","source_used","analysis_snapshot","execution","live"];
+const TRAINING_TRADE_KEYS = ["id","symbol","name","side","direction","asset_class","entry_price","exit_price","quantity","invested","stop_loss","take_profit","pnl","pnl_pct","opened_at","closed_at","duration_days","mode","status","score","adj_score","rr_ratio","decision","trade_decision","trade_reason","trend_label","horizon","source_used","analysis_snapshot","execution","live","closed_execution","updated_at"];
 
 function normalizeTrainingPositions(rows) {
   return (Array.isArray(rows) ? rows : []).filter(row => row && typeof row === "object").map(row => normalizeRowByKeys({
     ...row,
+    side: row.side ?? row.direction ?? row?.analysis_snapshot?.direction ?? null,
     direction: row.direction ?? row.side ?? row?.analysis_snapshot?.direction ?? null,
+    asset_class: row.asset_class ?? row.assetClass ?? null,
     entry_price: row.entry_price ?? row.entryPrice ?? row?.execution?.entryPrice ?? null,
     quantity: row.quantity ?? row?.execution?.quantity ?? null,
     invested: row.invested ?? row?.execution?.invested ?? null,
@@ -3559,9 +3561,15 @@ function normalizeTrainingPositions(rows) {
     opened_at: row.opened_at ?? row.openedAt ?? row?.execution?.openedAt ?? null,
     updated_at: row.updated_at ?? row.updatedAt ?? null,
     score: row.score ?? row?.analysis_snapshot?.score ?? null,
+    horizon: row.horizon ?? row?.analysis_snapshot?.horizon ?? null,
     trend_label: row.trend_label ?? row.trendLabel ?? row?.analysis_snapshot?.trendLabel ?? null,
     source_used: row.source_used ?? row.sourceUsed ?? row?.analysis_snapshot?.sourceUsed ?? null,
     decision: row.decision ?? row.trade_decision ?? row?.analysis_snapshot?.decision ?? null,
+    trade_decision: row.trade_decision ?? row.tradeDecision ?? row.decision ?? row?.analysis_snapshot?.decision ?? null,
+    trade_reason: row.trade_reason ?? row.tradeReason ?? row?.analysis_snapshot?.reason ?? null,
+    analysis_snapshot: row.analysis_snapshot ?? row.analysisSnapshot ?? null,
+    execution: row.execution ?? null,
+    live: row.live ?? null,
     status: row.status ?? "open"
   }, TRAINING_POSITION_KEYS));
 }
@@ -3569,24 +3577,33 @@ function normalizeTrainingPositions(rows) {
 function normalizeTrainingTrades(rows) {
   return (Array.isArray(rows) ? rows : []).filter(row => row && typeof row === "object").map(row => normalizeRowByKeys({
     ...row,
+    side: row.side ?? row.direction ?? row?.analysis_snapshot?.direction ?? null,
     direction: row.direction ?? row.side ?? row?.analysis_snapshot?.direction ?? null,
+    asset_class: row.asset_class ?? row.assetClass ?? null,
     entry_price: row.entry_price ?? row.entryPrice ?? row?.execution?.entryPrice ?? null,
-    exit_price: row.exit_price ?? row.exitPrice ?? row?.closedExecution?.exitPrice ?? null,
+    exit_price: row.exit_price ?? row.exitPrice ?? row?.closedExecution?.exitPrice ?? row?.closed_execution?.exitPrice ?? null,
     quantity: row.quantity ?? row?.execution?.quantity ?? null,
     invested: row.invested ?? row?.execution?.invested ?? null,
     stop_loss: row.stop_loss ?? row.stopLoss ?? null,
     take_profit: row.take_profit ?? row.takeProfit ?? null,
-    opened_at: row.opened_at ?? row.openedAt ?? null,
-    closed_at: row.closed_at ?? row.closedAt ?? row?.closedExecution?.closedAt ?? null,
+    opened_at: row.opened_at ?? row.openedAt ?? row?.execution?.openedAt ?? null,
+    closed_at: row.closed_at ?? row.closedAt ?? row?.closedExecution?.closedAt ?? row?.closed_execution?.closedAt ?? null,
     updated_at: row.updated_at ?? row.updatedAt ?? null,
     score: row.score ?? row?.analysis_snapshot?.score ?? null,
     pnl_pct: row.pnl_pct ?? row.pnlPct ?? null,
     duration_days: row.duration_days ?? row.durationDays ?? null,
     adj_score: row.adj_score ?? row.adjScore ?? null,
     rr_ratio: row.rr_ratio ?? row.rrRatio ?? row.rr ?? null,
+    horizon: row.horizon ?? row?.analysis_snapshot?.horizon ?? null,
     trend_label: row.trend_label ?? row.trendLabel ?? null,
     source_used: row.source_used ?? row.sourceUsed ?? null,
     decision: row.decision ?? row.trade_decision ?? null,
+    trade_decision: row.trade_decision ?? row.tradeDecision ?? row.decision ?? row?.analysis_snapshot?.decision ?? null,
+    trade_reason: row.trade_reason ?? row.tradeReason ?? row?.analysis_snapshot?.reason ?? null,
+    analysis_snapshot: row.analysis_snapshot ?? row.analysisSnapshot ?? null,
+    execution: row.execution ?? null,
+    live: row.live ?? null,
+    closed_execution: row.closed_execution ?? row.closedExecution ?? null,
     status: row.status ?? "closed"
   }, TRAINING_TRADE_KEYS));
 }
