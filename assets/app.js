@@ -4674,6 +4674,10 @@ function renderPositionRow(position) {
   }
 
   const lastLive = live?.updatedAt ? new Date(live.updatedAt).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
+  const openedAtRaw = exec.openedAt || p.openedAt || null;
+  const openedAtTxt = validTradeDate(openedAtRaw)
+    ? new Date(openedAtRaw).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" })
+    : null;
   const ms = getMarketStatus(p.symbol, inferAssetClass(p.symbol, p.assetClass));
 
   return `
@@ -4682,6 +4686,7 @@ function renderPositionRow(position) {
       <div class="pos-header-left">
         <div class="pos-symbol">${safeText(p.symbol)}</div>
         <div class="pos-name">${safeText(snap.decision || p.tradeDecision || "Trade ouvert")}${snap.horizon || p.horizon ? ` · ${safeText(snap.horizon || p.horizon)}` : ""}</div>
+        ${openedAtTxt ? `<div class="pos-opened">Ouvert ${safeText(openedAtTxt)}</div>` : ""}
       </div>
       <div class="pos-header-right">
         ${badge(simpleSideLabel(p.side), p.side)}
@@ -5163,17 +5168,47 @@ function normalizePositionRecord(position){
   const stopLossRaw   = positiveOrNull(rawAnalysisSnapshot?.stopLoss  ?? position?.stop_loss  ?? position?.stopLoss);
   const takeProfitRaw = positiveOrNull(rawAnalysisSnapshot?.takeProfit ?? position?.take_profit ?? position?.takeProfit);
   const ratioRaw = positiveOrNull(rawAnalysisSnapshot?.ratio ?? position?.rrRatio ?? position?.rr);
-  const exitPriceRaw = positiveOrNull(position?.closedExecution?.exitPrice ?? position?.exitPrice);
+  const rawClosedExecution = position?.closedExecution || position?.closed_execution || {};
+  const exitPriceRaw = positiveOrNull(rawClosedExecution?.exitPrice ?? position?.exitPrice ?? position?.exit_price);
   const livePriceRaw = positiveOrNull(position?.live?.price);
   const pnlRaw = safeNumber(position?.pnl);
   const pnlPctRaw = safeNumber(position?.pnlPct);
   const sourceUsed = position?.sourceUsed || position?.source || rawAnalysisSnapshot?.sourceUsed || null;
-  const inferredClosed = !!(
-    position?.closedExecution?.closedAt || position?.closedAt ||
-    position?.closedExecution?.exitPrice || position?.exitPrice
-  );
+  const openedAtRaw = position?.execution?.openedAt
+    || position?.openedAt
+    || position?.opened_at
+    || rawAnalysisSnapshot?.analysisTimestamp
+    || null;
+  const closedAtRaw = rawClosedExecution?.closedAt
+    || position?.closedAt
+    || position?.closed_at
+    || null;
+  const closeTypeRaw = rawClosedExecution?.closeType
+    || position?.closeType
+    || position?.close_type
+    || null;
+  const inferredClosed = !!(closedAtRaw || exitPriceRaw);
   const normalizedStatus = position?.status || (inferredClosed ? "closed" : "open");
   const entryMode = String(rawAnalysisSnapshot?.entryMode || position?.execution?.entryMode || position?.entryMode || "").trim().toLowerCase() || null;
+
+  const sideHint = String(
+    position?.side
+    || position?.direction
+    || rawAnalysisSnapshot?.direction
+    || ""
+  ).trim().toLowerCase();
+  let normalizedSide;
+  if (sideHint === "long" || sideHint === "buy" || sideHint === "hausse" || sideHint === "haussier") {
+    normalizedSide = "long";
+  } else if (sideHint === "short" || sideHint === "sell" || sideHint === "baisse" || sideHint === "baissier") {
+    normalizedSide = "short";
+  } else if (stopLossRaw != null && takeProfitRaw != null && stopLossRaw !== takeProfitRaw) {
+    normalizedSide = takeProfitRaw > stopLossRaw ? "long" : "short";
+  } else if (entryPriceRaw != null && takeProfitRaw != null && entryPriceRaw !== takeProfitRaw) {
+    normalizedSide = takeProfitRaw > entryPriceRaw ? "long" : "short";
+  } else {
+    normalizedSide = "long";
+  }
 
   const snapshot = {
     symbol: position.symbol || null,
@@ -5199,7 +5234,7 @@ function normalizePositionRecord(position){
     analysisSnapshot: snapshot,
     execution: {
       ...(position.execution || {}),
-      openedAt: position?.execution?.openedAt || position?.openedAt || null,
+      openedAt: openedAtRaw,
       entryPrice: entryPriceRaw,
       quantity: quantityRaw,
       invested: investedFinal,
@@ -5213,11 +5248,15 @@ function normalizePositionRecord(position){
       pnlPct: position?.live?.pnlPct != null ? safeNumber(position.live.pnlPct) : null
     },
     closedExecution: {
-      ...(position.closedExecution || {}),
+      ...rawClosedExecution,
       exitPrice: exitPriceRaw,
-      closedAt: position?.closedExecution?.closedAt || position?.closedAt || null,
-      closeType: position?.closedExecution?.closeType || position?.closeType || null
+      closedAt: closedAtRaw,
+      closeType: closeTypeRaw
     },
+    side: normalizedSide,
+    direction: position?.direction || normalizedSide,
+    openedAt: openedAtRaw,
+    closedAt: closedAtRaw,
     tradeDecision: snapshot.decision,
     tradeReason: snapshot.reason,
     trendLabel: snapshot.trendLabel,
