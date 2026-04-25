@@ -164,8 +164,27 @@ Audit des 21 trades clôturés en Supabase (du 2026-04-08 au 2026-04-23). **Pape
 2. **PnL cumulé paper net positif** sur la même fenêtre.
 3. **Aucun `pnl=0` cassé** dans le dataset (fix terminé et propre).
 4. **Au moins 5 post-mortem formalisés** avec cause identifiée → ça prouve qu'on sait lire les pertes, pas juste les subir.
+5. **Frictions shorts modélisées** dans le calcul paper (cf. todo dédiée plus bas) — sinon les EV des shorts paper sont trompeuses vs réel.
 
-Tant que les 4 conditions ne sont pas réunies : **100 % paper**, on apprend.
+Tant que les 5 conditions ne sont pas réunies : **100 % paper**, on apprend.
+
+### Activation des shorts (2026-04-25)
+
+**Décision** : shorts activés en paper. Asymétrie corrigée dans `worker.js:2016` (`raw -= 4` → `raw += 4`) — un short avec structure ≤ 40 + momentum ≤ 40 reçoit désormais le même bonus +4 qu'un long avec structure ≥ 60 + momentum ≥ 60. Les seuils de direction (`structure >= 56 / <= 44`, `momentum >= 54 / <= 46`) étaient déjà symétriques autour de 50, pas un bug.
+
+**Pourquoi maintenant** : 0 short sur 21 trades empêche d'évaluer la stratégie en marché baissier. Doubler la matière d'apprentissage est plus utile que protéger un dataset 100 % long déjà perdant.
+
+### TODO — Modéliser les frictions shorts AVANT passage en réel
+
+Les shorts paper actuels sont calculés comme un long inversé (`(entry - exit) * quantity`). Sur réel les coûts sont différents et asymétriques. **Sans modélisation, l'EV des shorts paper sur-estime la perf réelle.** À implémenter avant que le critère #5 ci-dessus soit considéré rempli :
+
+1. **Funding rate / borrow fee overnight** : sur crypto perpétuels (~0.01-0.10 % par 8h variable) et actions (frais d'emprunt 0.5-30 %/an selon dispo). Soustraire du PnL au prorata de la durée de holding.
+2. **Cap d'asymétrie du gain** : un short ne peut pas faire plus de +100 % (l'actif tombe à zéro). En paper actuel, un take_profit fixe en % peut donner mécaniquement plus que possible — capper.
+3. **Borrow availability** : certaines actions ne sont pas shortable. À terme, un check côté broker simulé (skip le trade si pas de borrow). Pour le paper actuel, lister une whitelist statique des shortables liquides.
+4. **Leverage crypto perp** : si le bot passera en réel via futures, ajouter une simulation de liquidation à -X % selon le levier. Pour démarrer, levier 1 (équivalent spot) → pas de liquidation.
+5. **Short squeeze** : pas de modélisation possible (événement queue). Mais documenter dans chaque post-mortem de short si le pattern détecté correspond à un squeeze typique (gap haussier > 5 %, volume > 3×).
+
+Cette todo est verrouillée comme **bloquante** pour le passage en réel — le critère #5 ci-dessus en dépend.
 
 **Passage en réel progressif** (pas un switch brutal) :
 - Étape A : taille de position réduite (20-30 % de ce que calculerait l'engine en paper), pendant 20 trades réels.

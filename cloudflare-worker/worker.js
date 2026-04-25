@@ -2013,7 +2013,7 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
 
   let raw = 0.24 * structure + 0.20 * momentum + 0.20 * timing + 0.18 * risk + 0.10 * context + 0.08 * dataQuality;
   if (direction === "long" && structure >= 60 && momentum >= 60) raw += 4;
-  if (direction === "short" && structure <= 40 && momentum <= 40) raw -= 4;
+  if (direction === "short" && structure <= 40 && momentum <= 40) raw += 4;
   if (trendConflict) raw -= 6;
   if (extensionTooHigh) raw -= 8;
   if (riskTooHigh) raw -= 6;
