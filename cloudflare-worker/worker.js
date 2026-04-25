@@ -6835,6 +6835,52 @@ JSON attendu (champs exacts) :
 // ============================================================
 // ROUTE HEALTH
 // ============================================================
+async function getCronFreshness(env) {
+  try {
+    const settings = await getTrainingSettings(env);
+    const lastCycleAt = settings?.last_cycle_at || null;
+    if (!lastCycleAt) return { lastCycleAt: null, ageMin: null, status: "unknown" };
+    const ageMin = (Date.now() - new Date(lastCycleAt).getTime()) / 60000;
+    let status = "unknown";
+    if (Number.isFinite(ageMin)) {
+      if (ageMin < 30) status = "fresh";
+      else if (ageMin < 120) status = "stale";
+      else status = "down";
+    }
+    return {
+      lastCycleAt,
+      ageMin: Number.isFinite(ageMin) ? Number(ageMin.toFixed(1)) : null,
+      status,
+      lastCycleMode: settings?.last_cycle_mode || null
+    };
+  } catch (e) {
+    return { lastCycleAt: null, ageMin: null, status: "error", error: e?.message || String(e) };
+  }
+}
+
+async function getPnlIntegrity(env) {
+  if (!supabaseConfigured(env)) return { configured: false };
+  try {
+    const rows = await supabaseFetch(env,
+      `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,pnl&mode=eq.training&pnl=eq.0&limit=200`
+    );
+    const broken = (Array.isArray(rows) ? rows : []).filter(r => {
+      const entry = Number(r?.entry_price);
+      const exit = Number(r?.exit_price);
+      const qty = Number(r?.quantity);
+      return Number.isFinite(entry) && Number.isFinite(exit) && Number.isFinite(qty)
+        && qty > 0 && entry > 0 && exit > 0 && Math.abs(exit - entry) > 0.000001;
+    });
+    return {
+      configured: true,
+      brokenPnlCount: broken.length,
+      brokenSamples: broken.slice(0, 5).map(r => ({ id: r.id, symbol: r.symbol, entry: r.entry_price, exit: r.exit_price }))
+    };
+  } catch (e) {
+    return { configured: true, error: e?.message || String(e) };
+  }
+}
+
 async function handleHealth(request, env) {
   const adminAccess = requestHasAdminAccess(request, env);
   const circuits = {
@@ -6844,6 +6890,7 @@ async function handleHealth(request, env) {
     binance: circuitStatus("binance")
   };
   const rateWindow = rateLimiter.calls.filter(t => t > Date.now() - rateLimiter.windowMs).length;
+  const cronFreshness = await getCronFreshness(env);
   const basePayload = {
     app: "ManiTradePro API V2",
     engineVersion: ENGINE_VERSION,
@@ -6851,10 +6898,18 @@ async function handleHealth(request, env) {
     liveDataOnly: true,
     panel: { symbols: LIGHT_SYMBOLS.length, proxyRegime: PROXY_REGIME_SYMBOLS },
     strategies: { enabled: ["pullback","breakout","continuation"], disabled: ["mean_reversion"], shorts: true },
-    cron: { configured: true, schedule: "*/30 13-20 utc weekdays + 0 */2 off-hours" },
+    cron: {
+      configured: true,
+      schedule: "*/30 13-20 utc weekdays + 0 */2 off-hours",
+      lastCycleAt: cronFreshness.lastCycleAt,
+      ageMin: cronFreshness.ageMin,
+      status: cronFreshness.status,
+      lastCycleMode: cronFreshness.lastCycleMode
+    },
     adminProtectionEnabled: hasConfiguredAdminToken(env)
   };
   if (!adminAccess) return ok(basePayload, "worker-v2", nowIso(), "live", null);
+  const pnlIntegrity = await getPnlIntegrity(env);
   return ok({
     ...basePayload,
     budgetConfig: { dailyLimit: DAILY_TWELVE_BUDGET, rateLimitPerMinute: rateLimiter.maxPerWindow, callsInLastMinute: rateWindow },
@@ -6864,8 +6919,73 @@ async function handleHealth(request, env) {
     claudeConfigured: !!env?.CLAUDE_API_KEY,
     twelveKeysConfigured: getTwelveKeys(env).length,
     alphaConfigured: !!env?.ALPHAVANTAGE_KEY,
-    trainingDefaults: getTrainingDefaults()
+    trainingDefaults: getTrainingDefaults(),
+    pnlIntegrity
   }, "worker-v2", nowIso(), "live", null);
+}
+
+async function handleBackfillPnl(env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const rows = await supabaseFetch(env,
+    `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,side,direction,pnl,pnl_pct,stop_loss,take_profit&mode=eq.training&pnl=eq.0&limit=500`
+  );
+  const candidates = (Array.isArray(rows) ? rows : []).filter(r => {
+    const entry = Number(r?.entry_price);
+    const exit = Number(r?.exit_price);
+    const qty = Number(r?.quantity);
+    return Number.isFinite(entry) && Number.isFinite(exit) && Number.isFinite(qty)
+      && qty > 0 && entry > 0 && exit > 0 && Math.abs(exit - entry) > 0.000001;
+  });
+  const updated = [];
+  const failed = [];
+  for (const row of candidates) {
+    const entry = Number(row.entry_price);
+    const exit = Number(row.exit_price);
+    const qty = Number(row.quantity);
+    let side = String(row.side || row.direction || "").toLowerCase();
+    if (side !== "long" && side !== "short") {
+      const stop = Number(row.stop_loss);
+      const tp = Number(row.take_profit);
+      if (Number.isFinite(stop) && Number.isFinite(tp) && stop !== tp) {
+        side = tp > stop ? "long" : "short";
+      } else {
+        side = "long";
+      }
+    }
+    const pnl = side === "short" ? (entry - exit) * qty : (exit - entry) * qty;
+    const invested = Math.abs(entry * qty);
+    const pnlPct = invested > 0 ? (pnl / invested) * 100 : null;
+    let rrRatio = null;
+    const stop = Number(row.stop_loss);
+    const tp = Number(row.take_profit);
+    if (Number.isFinite(stop) && Number.isFinite(tp) && Number.isFinite(entry)) {
+      const risk = Math.abs(entry - stop);
+      const reward = Math.abs(tp - entry);
+      if (risk > 0) rrRatio = Number((reward / risk).toFixed(3));
+    }
+    try {
+      await supabaseFetch(env, `${TRADE_TABLES.trades}?id=eq.${encodeURIComponent(String(row.id))}`, {
+        method: "PATCH",
+        headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({
+          pnl: Number(pnl.toFixed(6)),
+          pnl_pct: pnlPct != null ? Number(pnlPct.toFixed(4)) : null,
+          rr_ratio: rrRatio,
+          side,
+          updated_at: nowIso()
+        })
+      });
+      updated.push({ id: row.id, symbol: row.symbol, pnl: Number(pnl.toFixed(6)), pnl_pct: pnlPct, side });
+    } catch (e) {
+      failed.push({ id: row.id, symbol: row.symbol, error: e?.message || String(e) });
+    }
+  }
+  await logTrainingEvent(env, "pnl_backfill", {
+    scanned: candidates.length,
+    updated: updated.length,
+    failed: failed.length
+  }).catch(() => {});
+  return ok({ scanned: candidates.length, updated, failed }, "worker-v2", nowIso(), "live", null);
 }
 
 // ============================================================
@@ -6937,6 +7057,11 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleWeeklyReportGenerate(request, env));
+    }
+    if (url.pathname === "/api/admin/backfill-pnl") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBackfillPnl(env));
     }
     return fail("Method not allowed", "error", 405);
   }
