@@ -5146,6 +5146,7 @@ function normalizePositionRecord(position){
 
   const rawAnalysisSnapshot = position?.analysisSnapshot || position?.analysis_snapshot || {};
   const safeNumber = (value) => {
+    if (value == null || value === "") return null;
     const num = Number(value);
     return Number.isFinite(num) ? num : null;
   };
