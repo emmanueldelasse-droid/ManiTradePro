@@ -118,7 +118,19 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 ### Contexte
 Audit des 21 trades clôturés en Supabase (du 2026-04-08 au 2026-04-23). **Paper trading uniquement — aucun capital réel**. L'objectif est d'**apprendre**, pas de protéger du capital. Donc l'auto-cycle **reste actif**, on collecte pour analyser.
 
-### Résultats bruts (21 trades, 100% long)
+### Mise à jour 2026-04-26 (post-backfill)
+Après exécution de l'endpoint `/api/admin/backfill-pnl` (PR #81 + #83), les 3 trades cassés sont chiffrés correctement :
+- AMD #18 : **+20,58 USD** (+4,64 %) — était 0
+- AMD #20 : **+23,28 USD** (+5,29 %) — était 0
+- ETH #19 : **-70,11 USD** (-3,11 %) — était 0
+
+**Stats actualisées (20 trades exploitables, 100 % long)** :
+- Win rate : **4/20 = 20 %** (au lieu de 2/17 = 11,8 % avec 3 cassés exclus)
+- Net additionnel : -26,25 USD ajouté à la perte cumulée (+43,86 wins - 70,11 loss)
+- Lecture : le bot reste structurellement perdant (20 % WR avec RR 2.2 demande ~31 % pour breakeven), mais moins catastrophique que l'estimation originale. Le bug `pnl=0` cachait des wins réels.
+- Les shorts viennent d'être activés (PR #82, 2026-04-25) — encore 0 short pris, surveillance sous 24-48h.
+
+### Résultats bruts (21 trades, 100% long) [état initial avant backfill]
 - **Win rate** : 2/17 = **11,8 %** (3 trades cassés pnl=0 exclus, 1 BE)
 - **Net cumulé** : ~-510 USD paper
 - **Avg win** : +1,96 USD · **Avg loss** : -34,24 USD
@@ -162,7 +174,7 @@ Audit des 21 trades clôturés en Supabase (du 2026-04-08 au 2026-04-23). **Pape
 
 1. **Expected value > 0** sur **au moins 50 trades** clôturés (échantillon minimum pour une stat fiable).
 2. **PnL cumulé paper net positif** sur la même fenêtre.
-3. **Aucun `pnl=0` cassé** dans le dataset (fix terminé et propre).
+3. ✅ **Aucun `pnl=0` cassé** dans le dataset — **rempli le 2026-04-26** (PR #80 + #81 + #83 + endpoint backfill exécuté). `/health` pnlIntegrity.brokenPnlCount = 0.
 4. **Au moins 5 post-mortem formalisés** avec cause identifiée → ça prouve qu'on sait lire les pertes, pas juste les subir.
 5. **Frictions shorts modélisées** dans le calcul paper (cf. todo dédiée plus bas) — sinon les EV des shorts paper sont trompeuses vs réel.
 
@@ -185,6 +197,26 @@ Les shorts paper actuels sont calculés comme un long inversé (`(entry - exit) 
 5. **Short squeeze** : pas de modélisation possible (événement queue). Mais documenter dans chaque post-mortem de short si le pattern détecté correspond à un squeeze typique (gap haussier > 5 %, volume > 3×).
 
 Cette todo est verrouillée comme **bloquante** pour le passage en réel — le critère #5 ci-dessus en dépend.
+
+### Backtest historique (en cours — démarré 2026-04-26)
+
+**But** : analyser 5-8 ans de marché, apprendre quelle stratégie marche dans quel régime, alimenter la mémoire contextuelle fine. Pas un simple go/no-go — un vrai moteur d'apprentissage par contexte (Phase 3 de la roadmap).
+
+**Périmètre validé avec l'utilisateur** :
+- **Crypto** : 10 symboles top cap (BTC, ETH, SOL, BNB, XRP, ADA, AVAX, LINK, MATIC, DOT) sur 2020-2025 (5 ans).
+- **Actions** : 30 symboles diversifiés sectoriellement (7 tech mega caps, 5 finance, 4 santé, 4 conso, 4 industriels, 6 ETF) sur 2018-2025 (8 ans).
+- Volume : ~80 000 bougies 1D, ~12 MB en cache KV (largement sous le quota free tier 1 GB).
+- Buckets : `setup × direction × régime × asset_class` (~140 buckets théoriques).
+- **Méthodologie anti curve-fitting** : walk-forward strict (train 2020-2023 / valide 2024 / teste 2025), N ≥ 30 par bucket pour validation, sinon mode exploration en live.
+
+**Découpage 3 PRs** :
+1. **Backtest #1** — récupération + cache KV bougies + replay engine + table `mtp_backtest_trades` + endpoint admin POST `/api/admin/backtest-run` (chunking par symbole pour respecter la limite CPU 50ms Cloudflare Workers).
+2. **Backtest #2** — agrégation par buckets + walk-forward + UI admin.
+3. **Backtest #3** — câblage au bot live (skip toxique, taille réduite non-validé, taille pleine validé, logging exploitation vs exploration).
+
+**Décisions verrouillées** :
+- Pas de modification des règles après lecture des résultats du backtest dans la même session — c'est un go/no-go statistique, pas un terrain d'optimisation. Sinon = curve-fitting.
+- Buckets sous N=30 → marqués « insuffisant », le bot fait de l'exploration prudente dessus en live (taille réduite). On accepte la zone d'incertitude.
 
 **Passage en réel progressif** (pas un switch brutal) :
 - Étape A : taille de position réduite (20-30 % de ce que calculerait l'engine en paper), pendant 20 trades réels.
