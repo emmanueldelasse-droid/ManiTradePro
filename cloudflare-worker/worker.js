@@ -6989,6 +6989,174 @@ async function handleBackfillPnl(env) {
 }
 
 // ============================================================
+// BACKTEST HISTORIQUE — Phase 3 (squelette, PR backtest #1)
+// ============================================================
+// Le replay engine bougie-par-bougie viendra dans une PR suivante.
+// Cette PR pose : tables Supabase, configuration symboles + périodes,
+// orchestrateur d'un run, endpoints admin. Le simulateur produit pour
+// l'instant 1 trade stub par symbole pour valider tout le pipeline
+// (auth, écriture Supabase, suivi du run, agrégation finale).
+
+const BACKTEST_TABLES = { trades: "mtp_backtest_trades", runs: "mtp_backtest_runs" };
+
+const BACKTEST_SYMBOLS_CRYPTO = [
+  "BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT",
+  "ADAUSDT","AVAXUSDT","LINKUSDT","MATICUSDT","DOTUSDT"
+];
+
+const BACKTEST_SYMBOLS_STOCKS = [
+  "AAPL","MSFT","NVDA","GOOGL","META","AMZN","TSLA",
+  "JPM","BAC","GS","V","MA",
+  "UNH","JNJ","LLY","PFE",
+  "KO","PG","WMT","COST",
+  "CAT","BA","XOM","CVX",
+  "SPY","QQQ","IWM","XLK","XLF","GLD"
+];
+
+const BACKTEST_DATE_RANGES = {
+  crypto: { from: "2020-01-01", to: null },   // null = jusqu'à aujourd'hui
+  stocks: { from: "2018-01-01", to: null }
+};
+
+function backtestRunId() {
+  const d = new Date();
+  const stamp = `${d.getUTCFullYear()}${String(d.getUTCMonth()+1).padStart(2,"0")}${String(d.getUTCDate()).padStart(2,"0")}_${String(d.getUTCHours()).padStart(2,"0")}${String(d.getUTCMinutes()).padStart(2,"0")}`;
+  const rand = Math.random().toString(36).slice(2, 6);
+  return `run_${stamp}_${rand}`;
+}
+
+function backtestBucketKey(setup, direction, regime, assetClass) {
+  return [setup || "unknown", direction || "unknown", regime || "unknown", assetClass || "unknown"].join("_");
+}
+
+// STUB — sera remplacé par le vrai replay engine dans la PR backtest #1.1.
+// Génère un trade simulé bidon pour valider l'écriture Supabase de bout en bout.
+async function simulateBacktestForSymbol(symbol, fromDate, toDate, runId, env) {
+  const isCryptoSym = isCrypto(symbol);
+  const assetClass = isCryptoSym ? "crypto" : (symbol.startsWith("XL") || ["SPY","QQQ","IWM","GLD"].includes(symbol) ? "etf" : "stock");
+  const openedAt = new Date(`${fromDate}T12:00:00Z`).toISOString();
+  const closedAt = new Date(new Date(openedAt).getTime() + 3 * 24 * 3600 * 1000).toISOString();
+  const entry = isCryptoSym ? 100 : 200;
+  const exit = entry * 1.02;
+  const pnlPct = ((exit - entry) / entry) * 100;
+  const trade = {
+    run_id: runId,
+    symbol,
+    asset_class: assetClass,
+    setup_type: "stub",
+    direction: "long",
+    regime_at_open: "unknown",
+    regime_label: "unknown",
+    bucket_key: backtestBucketKey("stub", "long", "unknown", assetClass),
+    opened_at: openedAt,
+    closed_at: closedAt,
+    holding_minutes: 3 * 24 * 60,
+    exit_reason: "stub_simulated",
+    entry_price: entry,
+    exit_price: exit,
+    stop_loss: entry * 0.97,
+    take_profit: entry * 1.06,
+    pnl_pct: Number(pnlPct.toFixed(4)),
+    rr_ratio: 2.0,
+    mae_pct: 0.5,
+    mfe_pct: 2.5,
+    indicators: { stub: true },
+    scores: { stub: true }
+  };
+  await supabaseFetch(env, BACKTEST_TABLES.trades, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify([trade])
+  });
+  return { tradesGenerated: 1 };
+}
+
+async function handleBacktestRun(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const body = await request.json().catch(() => ({}));
+  const requestedSymbols = Array.isArray(body?.symbols) ? body.symbols.map(s => String(s).toUpperCase().trim()).filter(Boolean) : null;
+  const symbols = requestedSymbols && requestedSymbols.length
+    ? requestedSymbols
+    : [...BACKTEST_SYMBOLS_CRYPTO, ...BACKTEST_SYMBOLS_STOCKS];
+
+  const cryptoFrom = body?.crypto_from || BACKTEST_DATE_RANGES.crypto.from;
+  const stocksFrom = body?.stocks_from || BACKTEST_DATE_RANGES.stocks.from;
+  const dateTo = body?.to || new Date().toISOString().slice(0, 10);
+
+  const runId = backtestRunId();
+  const runRow = {
+    id: runId,
+    engine_version: ENGINE_VERSION,
+    engine_ruleset: ENGINE_RULESET,
+    symbols,
+    date_from: null,
+    date_to: dateTo,
+    status: "running",
+    symbols_total: symbols.length,
+    symbols_done: 0,
+    trades_generated: 0
+  };
+  await supabaseFetch(env, BACKTEST_TABLES.runs, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify([runRow])
+  });
+
+  let symbolsDone = 0;
+  let tradesGenerated = 0;
+  const errors = [];
+  for (const symbol of symbols) {
+    const fromDate = isCrypto(symbol) ? cryptoFrom : stocksFrom;
+    try {
+      const r = await simulateBacktestForSymbol(symbol, fromDate, dateTo, runId, env);
+      tradesGenerated += Number(r?.tradesGenerated || 0);
+      symbolsDone += 1;
+    } catch (e) {
+      errors.push({ symbol, error: e?.message || String(e) });
+    }
+  }
+
+  const finalStatus = errors.length === 0 ? "completed" : (symbolsDone > 0 ? "partial" : "failed");
+  await supabaseFetch(env, `${BACKTEST_TABLES.runs}?id=eq.${encodeURIComponent(runId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      status: finalStatus,
+      finished_at: nowIso(),
+      symbols_done: symbolsDone,
+      trades_generated: tradesGenerated,
+      notes: "PR backtest #1 (squelette) — trades stub. Replay engine viendra dans PR #1.1.",
+      error_message: errors.length ? JSON.stringify(errors).slice(0, 1000) : null
+    })
+  });
+
+  await logTrainingEvent(env, "backtest_run", {
+    run_id: runId,
+    status: finalStatus,
+    symbols_done: symbolsDone,
+    symbols_total: symbols.length,
+    trades_generated: tradesGenerated,
+    errors: errors.length
+  }).catch(() => {});
+
+  return ok({
+    runId,
+    status: finalStatus,
+    symbolsTotal: symbols.length,
+    symbolsDone,
+    tradesGenerated,
+    errors,
+    note: "Squelette : 1 trade stub par symbole. Le vrai replay engine arrive dans la PR backtest #1.1."
+  }, "worker-v2", nowIso(), "live", null);
+}
+
+async function handleBacktestRunsList(env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const rows = await supabaseFetch(env, `${BACKTEST_TABLES.runs}?order=created_at.desc&limit=50`);
+  return ok({ runs: Array.isArray(rows) ? rows : [] }, "worker-v2", nowIso(), "live", null);
+}
+
+// ============================================================
 // ROUTER PRINCIPAL
 // ============================================================
 async function handleRequest(request, env) {
@@ -7062,6 +7230,11 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleBackfillPnl(env));
+    }
+    if (url.pathname === "/api/admin/backtest-run") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestRun(request, env));
     }
     return fail("Method not allowed", "error", 405);
   }
@@ -7185,6 +7358,11 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingStats(env));
+    }
+    if (url.pathname === "/api/admin/backtest-runs") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestRunsList(env));
     }
     if (url.pathname === "/api/training/feedback") {
       const denied = await requireAdminAccess(request, env);
