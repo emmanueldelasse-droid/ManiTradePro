@@ -7157,6 +7157,329 @@ async function handleBacktestRunsList(env) {
 }
 
 // ============================================================
+// BACKTEST PR #1.1a — Fetch historique + cache KV + loop replay trivial
+// ============================================================
+// Stratégie triviale (acheter lundi close, vendre vendredi close) — pas
+// les vrais setups, c'est pour valider le loop bougie-par-bougie + le
+// fetch historique + le cache KV avant la PR #1.1b qui branchera la
+// vraie détection de setups via calcDetailScore.
+
+const BACKTEST_KV_KEY = (symbol) => `backtest:candles:${symbol}:1d:v1`;
+const BACKTEST_KV_TTL = 30 * 24 * 3600; // 30 jours — bougies historiques 1D bougent peu
+
+// Pagine Binance pour fetch toutes les bougies 1D depuis fromMs jusqu'à
+// nowMs. Chaque appel = max 1000 bougies. Pour 5 ans = ~1825 bougies →
+// 2 appels suffisent.
+async function fetchBinanceCandlesHistorical(symbol, fromMs, env) {
+  if (circuitIsOpen("binance")) throw new Error("binance_circuit_open");
+  const pair = normalizeBinanceSymbol(symbol);
+  const out = [];
+  let cursor = fromMs;
+  const nowMs = Date.now();
+  let safety = 0;
+  while (cursor < nowMs && safety < 20) {
+    safety += 1;
+    const url = `https://api.binance.com/api/v3/klines?symbol=${encodeURIComponent(pair)}&interval=1d&startTime=${cursor}&limit=1000`;
+    const res = await fetchWithRetry(url, {}, { timeoutMs: 10000, maxRetries: 2 });
+    if (!res.ok) throw new Error(`Binance candles HTTP ${res.status}`);
+    const rows = await res.json();
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    for (const row of rows) {
+      out.push({
+        time: new Date(row[0]).toISOString(),
+        open: Number(row[1]), high: Number(row[2]),
+        low: Number(row[3]), close: Number(row[4]),
+        volume: row[7] != null ? Number(row[7]) : null
+      });
+    }
+    const lastMs = Number(rows[rows.length - 1][0]);
+    if (!Number.isFinite(lastMs) || lastMs <= cursor) break;
+    cursor = lastMs + 1; // +1ms : évite tout saut de bougie sur openTime non-aligné
+    if (rows.length < 1000) break;
+  }
+  // Déduplique au cas où Binance renverrait des recouvrements (rare mais possible)
+  const seen = new Set();
+  return out.filter(c => {
+    if (seen.has(c.time)) return false;
+    seen.add(c.time);
+    return true;
+  });
+}
+
+// Twelve Data accepte outputsize jusqu'à 5000 → 1 seul appel suffit pour
+// 8 ans de bougies 1D (~2000). Pas de pagination nécessaire.
+async function fetchTwelveCandlesHistorical(symbol, fromDate, env) {
+  const tdSymbol = normalizeTwelveSymbol(symbol);
+  const path = `/time_series?symbol=${encodeURIComponent(tdSymbol)}&interval=1day&start_date=${encodeURIComponent(fromDate)}&outputsize=5000&order=ASC`;
+  const result = await callTwelveJson(path, env, `backtest:${symbol}`, null);
+  if (!result.ok) throw new Error(result.message || "twelve_unavailable");
+  const values = Array.isArray(result.data?.values) ? result.data.values : [];
+  if (!values.length) throw new Error("no_candles_returned");
+  return values.map(row => ({
+    time: new Date(row.datetime).toISOString(),
+    open: Number(row.open), high: Number(row.high),
+    low: Number(row.low), close: Number(row.close),
+    volume: row.volume != null && row.volume !== "" ? Number(row.volume) : null
+  }));
+}
+
+async function getBacktestCandles(symbol, fromDate, env) {
+  const cacheKey = BACKTEST_KV_KEY(symbol);
+  const cached = await kvGet(cacheKey, env);
+  if (cached && Array.isArray(cached.candles) && cached.candles.length > 0) {
+    return { candles: cached.candles, fromCache: true };
+  }
+  let candles;
+  if (isCrypto(symbol)) {
+    const fromMs = new Date(`${fromDate}T00:00:00Z`).getTime();
+    candles = await fetchBinanceCandlesHistorical(symbol, fromMs, env);
+  } else {
+    candles = await fetchTwelveCandlesHistorical(symbol, fromDate, env);
+  }
+  if (!candles || candles.length === 0) throw new Error("no_candles_fetched");
+  candles.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+  await kvSet(cacheKey, { candles, cachedAt: nowIso() }, BACKTEST_KV_TTL, env);
+  return { candles, fromCache: false };
+}
+
+// Stratégie triviale : pour chaque lundi (jour UTC = 1) on simule l'entrée
+// au close de la bougie, on cherche la bougie de vendredi suivante (jour
+// UTC = 5) et on simule la sortie au close. Pas d'indicateurs, pas de
+// régime, pas de stop/TP — juste pour vérifier que le loop bougie-par-
+// bougie produit des trades cohérents avec des prix réels.
+function simulateTrivialMondayFridayTrades(candles, symbol, runId) {
+  const trades = [];
+  const isCryptoSym = isCrypto(symbol);
+  const assetClass = isCryptoSym
+    ? "crypto"
+    : (["SPY","QQQ","IWM","XLK","XLF","GLD"].includes(symbol) ? "etf" : "stock");
+  for (let i = 0; i < candles.length; i++) {
+    const bar = candles[i];
+    const date = new Date(bar.time);
+    if (date.getUTCDay() !== 1) continue; // lundi
+    let exitIdx = -1;
+    for (let j = i + 1; j < Math.min(i + 8, candles.length); j++) {
+      if (new Date(candles[j].time).getUTCDay() === 5) { exitIdx = j; break; }
+    }
+    if (exitIdx === -1) continue;
+    const exitBar = candles[exitIdx];
+    const entry = Number(bar.close);
+    const exit = Number(exitBar.close);
+    if (!Number.isFinite(entry) || !Number.isFinite(exit) || entry <= 0) continue;
+    const pnlPct = ((exit - entry) / entry) * 100;
+    const slice = candles.slice(i, exitIdx + 1);
+    const lows = slice.map(b => Number(b.low)).filter(Number.isFinite);
+    const highs = slice.map(b => Number(b.high)).filter(Number.isFinite);
+    // Si low/high indisponibles → null (pas 0, qui serait faussement rassurant)
+    const maePct = lows.length ? Number(Math.max(0, ((entry - Math.min(...lows)) / entry) * 100).toFixed(4)) : null;
+    const mfePct = highs.length ? Number(Math.max(0, ((Math.max(...highs) - entry) / entry) * 100).toFixed(4)) : null;
+    const holdingMin = Math.max(0, Math.round((new Date(exitBar.time).getTime() - date.getTime()) / 60000));
+    trades.push({
+      run_id: runId,
+      symbol,
+      asset_class: assetClass,
+      setup_type: "trivial_monday_friday",
+      direction: "long",
+      regime_at_open: "unknown",
+      regime_label: "unknown",
+      bucket_key: backtestBucketKey("trivial_monday_friday", "long", "unknown", assetClass),
+      opened_at: bar.time,
+      closed_at: exitBar.time,
+      holding_minutes: holdingMin,
+      exit_reason: "time_exit",
+      entry_price: entry,
+      exit_price: exit,
+      stop_loss: null,
+      take_profit: null,
+      pnl_pct: Number(pnlPct.toFixed(4)),
+      rr_ratio: null,
+      mae_pct: maePct,
+      mfe_pct: mfePct,
+      indicators: { trivial: true },
+      scores: { trivial: true }
+    });
+  }
+  return trades;
+}
+
+async function persistBacktestTradesBatch(trades, env) {
+  if (!Array.isArray(trades) || trades.length === 0) return 0;
+  const chunkSize = 100;
+  let inserted = 0;
+  // Upsert sur (run_id, symbol, opened_at) — la contrainte unique de la
+  // migration 009 rend l'opération idempotente : un retry après partial
+  // commit ne crée pas de doublons.
+  for (let i = 0; i < trades.length; i += chunkSize) {
+    const chunk = trades.slice(i, i + chunkSize);
+    await supabaseFetch(env, `${BACKTEST_TABLES.trades}?on_conflict=run_id,symbol,opened_at`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify(chunk)
+    });
+    inserted += chunk.length;
+  }
+  return inserted;
+}
+
+// Whitelist runId / symbol — caractères ASCII safe + longueur bornée. Empêche
+// injection PostgREST, payload abusif, ou symbole inattendu qui passerait
+// `encodeURIComponent` mais ne correspondrait à rien dans nos sources.
+const BACKTEST_RUNID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+const BACKTEST_SYMBOL_RE = /^[A-Z0-9.-]{1,20}$/;
+
+// POST /api/admin/backtest-init — crée le run, retourne runId + symboles
+// à traiter. L'utilisateur appelle ensuite /backtest-symbol en boucle.
+async function handleBacktestInit(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const body = await request.json().catch(() => ({}));
+  const requestedSymbols = Array.isArray(body?.symbols)
+    ? body.symbols.map(s => String(s).toUpperCase().trim()).filter(s => BACKTEST_SYMBOL_RE.test(s))
+    : null;
+  const symbols = requestedSymbols && requestedSymbols.length
+    ? requestedSymbols
+    : [...BACKTEST_SYMBOLS_CRYPTO, ...BACKTEST_SYMBOLS_STOCKS];
+  const cryptoFrom = body?.crypto_from || BACKTEST_DATE_RANGES.crypto.from;
+  const stocksFrom = body?.stocks_from || BACKTEST_DATE_RANGES.stocks.from;
+  const dateTo = body?.to || new Date().toISOString().slice(0, 10);
+  const runId = backtestRunId();
+  const runRow = {
+    id: runId,
+    engine_version: ENGINE_VERSION,
+    engine_ruleset: ENGINE_RULESET,
+    symbols,
+    date_from: null,
+    date_to: dateTo,
+    status: "running",
+    symbols_total: symbols.length,
+    symbols_done: 0,
+    trades_generated: 0,
+    notes: "PR #1.1a — strategie triviale lundi/vendredi (pas les vrais setups)"
+  };
+  await supabaseFetch(env, BACKTEST_TABLES.runs, {
+    method: "POST",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify([runRow])
+  });
+  await logTrainingEvent(env, "backtest_init", { run_id: runId, symbols_total: symbols.length }).catch(() => {});
+  return ok({
+    runId,
+    symbols,
+    cryptoFrom,
+    stocksFrom,
+    dateTo,
+    next: "Appeler POST /api/admin/backtest-symbol?runId=...&symbol=... pour chaque symbole"
+  }, "worker-v2", nowIso(), "live", null);
+}
+
+// POST /api/admin/backtest-symbol?runId=...&symbol=... — process 1 symbole
+// (fetch + cache KV + loop replay + insertion Supabase + bump compteurs).
+// Une invocation = 1 symbole pour rester sous les limites CPU/subrequêtes
+// Cloudflare Workers.
+async function handleBacktestSymbol(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const url = new URL(request.url);
+  const runId = String(url.searchParams.get("runId") || "").trim();
+  const symbol = String(url.searchParams.get("symbol") || "").toUpperCase().trim();
+  const fromOverride = url.searchParams.get("from");
+  if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide (attendu: [A-Za-z0-9_-]{1,64})", "error", 400);
+  if (!BACKTEST_SYMBOL_RE.test(symbol)) return fail("symbol invalide (attendu: [A-Z0-9.-]{1,20})", "error", 400);
+
+  const fromDate = fromOverride
+    || (isCrypto(symbol) ? BACKTEST_DATE_RANGES.crypto.from : BACKTEST_DATE_RANGES.stocks.from);
+
+  let candles, fromCache, error = null;
+  try {
+    const fetched = await getBacktestCandles(symbol, fromDate, env);
+    candles = fetched.candles;
+    fromCache = fetched.fromCache;
+  } catch (e) {
+    error = e?.message || String(e);
+    await supabaseFetch(env, `${BACKTEST_TABLES.runs}?id=eq.${encodeURIComponent(runId)}`, {
+      method: "PATCH",
+      headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ status: "partial", error_message: `${symbol}: ${error}`.slice(0, 1000) })
+    }).catch(() => {});
+    return fail(`fetch_failed: ${error}`, "error", 502);
+  }
+
+  const trades = simulateTrivialMondayFridayTrades(candles, symbol, runId);
+  let inserted = 0;
+  try {
+    inserted = await persistBacktestTradesBatch(trades, env);
+  } catch (e) {
+    return fail(`persist_failed: ${e?.message || String(e)}`, "error", 502);
+  }
+
+  // Bump compteurs du run (lecture-modif-ecriture, pas atomique mais OK
+  // car 1 seul client lance le loop).
+  const runRows = await supabaseFetch(env, `${BACKTEST_TABLES.runs}?id=eq.${encodeURIComponent(runId)}&select=symbols_done,trades_generated`);
+  const current = Array.isArray(runRows) && runRows[0] ? runRows[0] : { symbols_done: 0, trades_generated: 0 };
+  await supabaseFetch(env, `${BACKTEST_TABLES.runs}?id=eq.${encodeURIComponent(runId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      symbols_done: Number(current.symbols_done || 0) + 1,
+      trades_generated: Number(current.trades_generated || 0) + inserted
+    })
+  });
+
+  return ok({
+    runId,
+    symbol,
+    candlesCount: candles.length,
+    fromCache,
+    tradesInserted: inserted,
+    firstCandle: candles[0]?.time || null,
+    lastCandle: candles[candles.length - 1]?.time || null
+  }, "worker-v2", nowIso(), "live", null);
+}
+
+// POST /api/admin/backtest-finalize?runId=... — marque le run comme
+// completed une fois tous les symboles traités côté client.
+async function handleBacktestFinalize(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const url = new URL(request.url);
+  const runId = String(url.searchParams.get("runId") || "").trim();
+  if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide (attendu: [A-Za-z0-9_-]{1,64})", "error", 400);
+  const tradesAgg = await supabaseFetch(env, `${BACKTEST_TABLES.trades}?run_id=eq.${encodeURIComponent(runId)}&select=pnl_pct`);
+  const rows = Array.isArray(tradesAgg) ? tradesAgg : [];
+  const pnls = rows.map(r => Number(r.pnl_pct)).filter(Number.isFinite);
+  const total = pnls.length;
+  const wins = pnls.filter(p => p > 0).length;
+  const winRate = total > 0 ? wins / total : null;
+  const totalPnl = pnls.reduce((s, p) => s + p, 0);
+  const expectancy = total > 0 ? totalPnl / total : null;
+  let cum = 0, peak = 0, maxDD = 0;
+  for (const p of pnls) {
+    cum += p;
+    if (cum > peak) peak = cum;
+    const dd = peak - cum;
+    if (dd > maxDD) maxDD = dd;
+  }
+  await supabaseFetch(env, `${BACKTEST_TABLES.runs}?id=eq.${encodeURIComponent(runId)}`, {
+    method: "PATCH",
+    headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({
+      status: "completed",
+      finished_at: nowIso(),
+      win_rate: winRate,
+      expectancy_pct: expectancy,
+      total_pnl_pct: totalPnl,
+      max_drawdown_pct: -maxDD
+    })
+  });
+  await logTrainingEvent(env, "backtest_finalize", { run_id: runId, trades: total, win_rate: winRate, expectancy }).catch(() => {});
+  return ok({
+    runId,
+    tradesCount: total,
+    winRate,
+    expectancyPct: expectancy,
+    totalPnlPct: totalPnl,
+    maxDrawdownPct: -maxDD
+  }, "worker-v2", nowIso(), "live", null);
+}
+
+// ============================================================
 // ROUTER PRINCIPAL
 // ============================================================
 async function handleRequest(request, env) {
@@ -7235,6 +7558,21 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleBacktestRun(request, env));
+    }
+    if (url.pathname === "/api/admin/backtest-init") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestInit(request, env));
+    }
+    if (url.pathname === "/api/admin/backtest-symbol") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestSymbol(request, env));
+    }
+    if (url.pathname === "/api/admin/backtest-finalize") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestFinalize(request, env));
     }
     return fail("Method not allowed", "error", 405);
   }

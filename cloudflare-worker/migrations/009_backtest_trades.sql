@@ -49,6 +49,12 @@ create table if not exists public.mtp_backtest_trades (
 create index if not exists idx_mtp_backtest_trades_run
   on public.mtp_backtest_trades (run_id);
 
+-- Garantit qu'un retry du même symbole sur le même run ne produit pas de
+-- doublons (même bougie d'entrée → même opened_at). En cas de partial
+-- commit du batch INSERT, le retry est idempotent au lieu d'empiler.
+create unique index if not exists uq_mtp_backtest_trades_run_symbol_open
+  on public.mtp_backtest_trades (run_id, symbol, opened_at);
+
 create index if not exists idx_mtp_backtest_trades_bucket
   on public.mtp_backtest_trades (bucket_key)
   where bucket_key is not null;
