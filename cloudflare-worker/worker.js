@@ -7436,13 +7436,32 @@ async function handleBacktestSymbol(request, env) {
 
 // POST /api/admin/backtest-finalize?runId=... — marque le run comme
 // completed une fois tous les symboles traités côté client.
+// Helper : paginé pour contourner la limite PostgREST de 1000 lignes par
+// défaut. On fetch par chunks de 1000 jusqu'à ce qu'on reçoive moins, ce
+// qui marque la fin. Pour ~10-20k trades c'est ~10-20 fetch séquentiels.
+async function fetchAllBacktestRowsForRun(runId, selectCols, env) {
+  const out = [];
+  const chunk = 1000;
+  let offset = 0;
+  let safety = 0;
+  while (safety < 50) {
+    safety += 1;
+    const path = `${BACKTEST_TABLES.trades}?run_id=eq.${encodeURIComponent(runId)}&select=${selectCols}&order=opened_at.asc&limit=${chunk}&offset=${offset}`;
+    const rows = await supabaseFetch(env, path);
+    if (!Array.isArray(rows) || rows.length === 0) break;
+    for (const r of rows) out.push(r);
+    if (rows.length < chunk) break;
+    offset += chunk;
+  }
+  return out;
+}
+
 async function handleBacktestFinalize(request, env) {
   if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
   const url = new URL(request.url);
   const runId = String(url.searchParams.get("runId") || "").trim();
   if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide (attendu: [A-Za-z0-9_-]{1,64})", "error", 400);
-  const tradesAgg = await supabaseFetch(env, `${BACKTEST_TABLES.trades}?run_id=eq.${encodeURIComponent(runId)}&select=pnl_pct`);
-  const rows = Array.isArray(tradesAgg) ? tradesAgg : [];
+  const rows = await fetchAllBacktestRowsForRun(runId, "pnl_pct", env);
   const pnls = rows.map(r => Number(r.pnl_pct)).filter(Number.isFinite);
   const total = pnls.length;
   const wins = pnls.filter(p => p > 0).length;
@@ -7477,6 +7496,54 @@ async function handleBacktestFinalize(request, env) {
     totalPnlPct: totalPnl,
     maxDrawdownPct: -maxDD
   }, "worker-v2", nowIso(), "live", null);
+}
+
+// GET /api/admin/backtest-symbol-summary?runId=X — breakdown par symbole.
+// Permet de vérifier après un run que chaque symbole a bien des données
+// distinctes (count, prix moyen, P&L moyen).
+async function handleBacktestSymbolSummary(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const url = new URL(request.url);
+  const runId = String(url.searchParams.get("runId") || "").trim();
+  if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide", "error", 400);
+  const rows = await fetchAllBacktestRowsForRun(runId, "symbol,asset_class,entry_price,exit_price,pnl_pct", env);
+  const bySymbol = new Map();
+  for (const r of rows) {
+    const sym = String(r.symbol || "").toUpperCase();
+    if (!sym) continue;
+    if (!bySymbol.has(sym)) {
+      bySymbol.set(sym, {
+        symbol: sym,
+        asset_class: r.asset_class || null,
+        count: 0,
+        sumEntry: 0,
+        sumExit: 0,
+        sumPnl: 0,
+        wins: 0,
+        firstEntry: Number(r.entry_price),
+        lastEntry: Number(r.entry_price)
+      });
+    }
+    const s = bySymbol.get(sym);
+    s.count += 1;
+    s.sumEntry += Number(r.entry_price) || 0;
+    s.sumExit += Number(r.exit_price) || 0;
+    s.sumPnl += Number(r.pnl_pct) || 0;
+    if (Number(r.pnl_pct) > 0) s.wins += 1;
+    s.lastEntry = Number(r.entry_price);
+  }
+  const summary = [...bySymbol.values()].map(s => ({
+    symbol: s.symbol,
+    asset_class: s.asset_class,
+    count: s.count,
+    avg_entry_price: s.count ? Number((s.sumEntry / s.count).toFixed(4)) : null,
+    avg_exit_price: s.count ? Number((s.sumExit / s.count).toFixed(4)) : null,
+    avg_pnl_pct: s.count ? Number((s.sumPnl / s.count).toFixed(4)) : null,
+    win_rate: s.count ? Number((s.wins / s.count).toFixed(4)) : null,
+    first_entry_price: s.firstEntry,
+    last_entry_price: s.lastEntry
+  })).sort((a, b) => a.symbol.localeCompare(b.symbol));
+  return ok({ runId, totalSymbols: summary.length, totalTrades: rows.length, summary }, "worker-v2", nowIso(), "live", null);
 }
 
 // ============================================================
@@ -7701,6 +7768,11 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleBacktestRunsList(env));
+    }
+    if (url.pathname === "/api/admin/backtest-symbol-summary") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestSymbolSummary(request, env));
     }
     if (url.pathname === "/api/training/feedback") {
       const denied = await requireAdminAccess(request, env);
