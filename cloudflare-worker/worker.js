@@ -6927,7 +6927,7 @@ async function handleHealth(request, env) {
 async function handleBackfillPnl(env) {
   if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
   const rows = await supabaseFetch(env,
-    `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,side,direction,pnl,pnl_pct,stop_loss,take_profit&mode=eq.training&pnl=eq.0&limit=500`
+    `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,side,pnl,pnl_pct,stop_loss,take_profit&mode=eq.training&pnl=eq.0&limit=500`
   );
   const candidates = (Array.isArray(rows) ? rows : []).filter(r => {
     const entry = Number(r?.entry_price);
