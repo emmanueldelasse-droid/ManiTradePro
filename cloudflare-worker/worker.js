@@ -7302,6 +7302,162 @@ function simulateTrivialMondayFridayTrades(candles, symbol, runId) {
   return trades;
 }
 
+// ============================================================
+// BACKTEST PR #1.1b — Replay engine via le moteur live
+// ============================================================
+// Réutilise detectConfiguration() + validateConfiguration() +
+// buildPlanFromConfiguration() exactement comme le bot live, mais sur
+// la slice de bougies disponibles à chaque date historique. Backtest
+// fidèle : les setups détectés sont les MÊMES que ceux que le bot
+// aurait pris en live.
+//
+// Compromis cette PR : régime passé en "RANGE" (validation neutre) car
+// le calcul d'un régime simulé date-par-date demande de fetch SPY/QQQ
+// /TLT en parallèle, ce qui sera fait dans la PR backtest #2 (avec
+// walk-forward et buckets régime). Pour l'instant on désactive la
+// validation par régime via le shortcut ci-dessous, ce qui équivaut à
+// "le régime aurait toujours validé". Document ce point pour la PR
+// suivante qui devra réintroduire le régime simulé.
+
+const BACKTEST_REPLAY_WARMUP = 60;       // bougies de warmup avant le 1er trade
+const BACKTEST_REPLAY_MAX_HOLDING = 14;  // jours de bougies, identique au bot live
+const BACKTEST_REPLAY_COOLDOWN = 1;      // jours après une sortie avant nouveau setup
+
+function backtestSymbolAssetClass(symbol) {
+  if (isCrypto(symbol)) return "crypto";
+  if (["SPY","QQQ","IWM","XLK","XLF","GLD","TLT"].includes(symbol)) return "etf";
+  return "stock";
+}
+
+// Simule un trade à partir d'un plan (entry/stop/TP) en parcourant les
+// bougies post-décision. Convention conservative : si stop ET TP touchés
+// dans la même bougie, on considère que le stop est touché en premier
+// (impossible à départager sans intra-day, prudent côté EV).
+function simulateTradeFromPlan(candles, startIdx, plan, symbol, runId, assetClass) {
+  const entry = Number(plan.entry);
+  const stop = Number(plan.stopLoss);
+  const tp = Number(plan.takeProfit);
+  const isLong = plan.side === "long";
+  if (![entry, stop, tp].every(Number.isFinite) || entry <= 0) return null;
+
+  let mae = 0;
+  let mfe = 0;
+  let exitIdx = -1;
+  let exitPrice = null;
+  let exitReason = "time_exit";
+  const lastIdx = Math.min(startIdx + BACKTEST_REPLAY_MAX_HOLDING, candles.length - 1);
+
+  for (let j = startIdx + 1; j <= lastIdx; j++) {
+    const bar = candles[j];
+    const high = Number(bar?.high);
+    const low = Number(bar?.low);
+    if (!Number.isFinite(high) || !Number.isFinite(low)) continue;
+    if (isLong) {
+      const adverse = ((entry - low) / entry) * 100;
+      const favorable = ((high - entry) / entry) * 100;
+      if (adverse > mae) mae = adverse;
+      if (favorable > mfe) mfe = favorable;
+      if (low <= stop) { exitIdx = j; exitPrice = stop; exitReason = "stop_loss"; break; }
+      if (high >= tp) { exitIdx = j; exitPrice = tp; exitReason = "take_profit"; break; }
+    } else {
+      const adverse = ((high - entry) / entry) * 100;
+      const favorable = ((entry - low) / entry) * 100;
+      if (adverse > mae) mae = adverse;
+      if (favorable > mfe) mfe = favorable;
+      if (high >= stop) { exitIdx = j; exitPrice = stop; exitReason = "stop_loss"; break; }
+      if (low <= tp) { exitIdx = j; exitPrice = tp; exitReason = "take_profit"; break; }
+    }
+  }
+  if (exitIdx === -1) {
+    if (lastIdx <= startIdx) return null;
+    exitIdx = lastIdx;
+    exitPrice = Number(candles[lastIdx].close);
+    if (!Number.isFinite(exitPrice) || exitPrice <= 0) return null;
+  }
+
+  const pnlPct = isLong
+    ? ((exitPrice - entry) / entry) * 100
+    : ((entry - exitPrice) / entry) * 100;
+
+  const openedAt = candles[startIdx].time;
+  const closedAt = candles[exitIdx].time;
+  const holdingMin = Math.max(0, Math.round((new Date(closedAt).getTime() - new Date(openedAt).getTime()) / 60000));
+
+  return {
+    exitIdx,   // séparé du trade row pour ne pas polluer l'INSERT Supabase
+    trade: {
+      run_id: runId,
+      symbol,
+      asset_class: assetClass,
+      setup_type: plan.setupType,
+      direction: plan.side,
+      regime_at_open: "unknown",   // calculé en PR #2 via SPY/QQQ/TLT à la date
+      regime_label: "unknown",
+      bucket_key: backtestBucketKey(plan.setupType, plan.side, "unknown", assetClass),
+      opened_at: openedAt,
+      closed_at: closedAt,
+      holding_minutes: holdingMin,
+      exit_reason: exitReason,
+      entry_price: Number(entry.toFixed(6)),
+      exit_price: Number(exitPrice.toFixed(6)),
+      stop_loss: Number(stop.toFixed(6)),
+      take_profit: Number(tp.toFixed(6)),
+      pnl_pct: Number(pnlPct.toFixed(4)),
+      rr_ratio: Number((plan.rr || 0).toFixed(3)),
+      mae_pct: Number(mae.toFixed(4)),
+      mfe_pct: Number(mfe.toFixed(4)),
+      indicators: {
+        ema20: plan._levels?.ema20 ?? null,
+        ema50: plan._levels?.ema50 ?? null,
+        atr: plan._levels?.atr ?? null,
+        distEma20Pct: plan._levels?.distEma20 ?? null
+      },
+      scores: {
+        planRr: plan.rr,
+        planHorizon: plan.horizon,
+        planSlPct: plan.slPct,
+        planTpPct: plan.tpPct
+      }
+    }
+  };
+}
+
+// Replay engine : pour chaque bougie i (à partir de WARMUP), construit
+// la slice candles[0..i], appelle detectConfiguration, valide en mode
+// permissif (validation par régime sera réintroduite en PR #2), simule
+// le trade jusqu'à sortie, et avance idx avec un cooldown post-sortie.
+function replaySymbolWithEngine(candles, symbol, runId) {
+  const trades = [];
+  const assetClass = backtestSymbolAssetClass(symbol);
+  let nextOpenIdx = BACKTEST_REPLAY_WARMUP;
+
+  for (let i = BACKTEST_REPLAY_WARMUP; i < candles.length - 1; i++) {
+    if (i < nextOpenIdx) continue;
+    const slice = candles.slice(0, i + 1);
+    const lastBar = candles[i];
+    const lastClose = Number(lastBar?.close);
+    if (!Number.isFinite(lastClose) || lastClose <= 0) continue;
+
+    const detected = detectConfiguration(slice, { price: lastClose });
+    if (!detected || detected.config === "AUCUNE" || detected.blocked) continue;
+
+    // Validation permissive : on accepte tous les setups que le moteur
+    // aurait détectés, indépendamment du régime (TODO PR #2 : passer le
+    // régime simulé à la date pour reproduire le filtrage live).
+    const validation = { valid: true, scoreMalus: 0, reason: "replay_permissive" };
+
+    const plan = buildPlanFromConfiguration(detected, validation, { price: lastClose }, 70);
+    if (!plan) continue;
+    plan._levels = detected.levels;
+
+    const sim = simulateTradeFromPlan(candles, i, plan, symbol, runId, assetClass);
+    if (!sim || !sim.trade) continue;
+    trades.push(sim.trade);
+    nextOpenIdx = sim.exitIdx + 1 + BACKTEST_REPLAY_COOLDOWN;
+  }
+  return trades;
+}
+
 async function persistBacktestTradesBatch(trades, env) {
   if (!Array.isArray(trades) || trades.length === 0) return 0;
   const chunkSize = 100;
@@ -7381,8 +7537,12 @@ async function handleBacktestSymbol(request, env) {
   const runId = String(url.searchParams.get("runId") || "").trim();
   const symbol = String(url.searchParams.get("symbol") || "").toUpperCase().trim();
   const fromOverride = url.searchParams.get("from");
+  // strategy=engine (défaut) → replay du moteur live ; strategy=trivial
+  // → ancienne stratégie lundi/vendredi (gardée pour reproductibilité).
+  const strategy = (url.searchParams.get("strategy") || "engine").toLowerCase();
   if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide (attendu: [A-Za-z0-9_-]{1,64})", "error", 400);
   if (!BACKTEST_SYMBOL_RE.test(symbol)) return fail("symbol invalide (attendu: [A-Z0-9.-]{1,20})", "error", 400);
+  if (!["engine", "trivial"].includes(strategy)) return fail("strategy invalide (attendu: engine|trivial)", "error", 400);
 
   const fromDate = fromOverride
     || (isCrypto(symbol) ? BACKTEST_DATE_RANGES.crypto.from : BACKTEST_DATE_RANGES.stocks.from);
@@ -7402,7 +7562,9 @@ async function handleBacktestSymbol(request, env) {
     return fail(`fetch_failed: ${error}`, "error", 502);
   }
 
-  const trades = simulateTrivialMondayFridayTrades(candles, symbol, runId);
+  const trades = strategy === "engine"
+    ? replaySymbolWithEngine(candles, symbol, runId)
+    : simulateTrivialMondayFridayTrades(candles, symbol, runId);
   let inserted = 0;
   try {
     inserted = await persistBacktestTradesBatch(trades, env);
