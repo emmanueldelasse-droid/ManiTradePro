@@ -7000,8 +7000,8 @@ async function handleBackfillPnl(env) {
 const BACKTEST_TABLES = { trades: "mtp_backtest_trades", runs: "mtp_backtest_runs" };
 
 const BACKTEST_SYMBOLS_CRYPTO = [
-  "BTCUSDT","ETHUSDT","SOLUSDT","BNBUSDT","XRPUSDT",
-  "ADAUSDT","AVAXUSDT","LINKUSDT","MATICUSDT","DOTUSDT"
+  "BTC","ETH","SOL","BNB","XRP",
+  "ADA","AVAX","LINK","MATIC","DOT"
 ];
 
 const BACKTEST_SYMBOLS_STOCKS = [
