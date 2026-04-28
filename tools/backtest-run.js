@@ -24,6 +24,13 @@
 
   // Périmètre : 5 crypto + 5 actions diversifiées
   const symbols = ["BTC", "ETH", "SOL", "BNB", "LINK", "AAPL", "MSFT", "META", "JPM", "SPY"];
+  // Twelve Data plan gratuit ≈ 8 req/min → sleep entre symboles pour ne pas
+  // taper le rate limit. Crypto via Binance/CoinGecko (pas concerné), actions
+  // via Twelve Data → on espace seulement les actions. 8s entre actions = sous
+  // les 8/min même avec un fetch ratté qui retry.
+  const SLEEP_BETWEEN_STOCKS_MS = 8000;
+  const isCryptoSymbol = s => ["BTC","ETH","SOL","BNB","XRP","ADA","AVAX","LINK","MATIC","DOT"].includes(s);
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
 
   console.log(`[backtest] init avec ${symbols.length} symboles : ${symbols.join(", ")}`);
   const initRes = await fetch(`${baseUrl}/api/admin/backtest-init`, {
@@ -36,9 +43,11 @@
   const runId = initJson.data.runId;
   console.log(`[backtest] runId = ${runId}`);
 
-  // Boucle séquentielle pour respecter limite CPU 50ms par invocation
+  // Boucle séquentielle pour respecter limite CPU 50ms par invocation +
+  // rate limit Twelve Data sur les actions.
   const perSymbol = [];
-  for (const symbol of symbols) {
+  for (let i = 0; i < symbols.length; i++) {
+    const symbol = symbols[i];
     const t0 = Date.now();
     const url = `${baseUrl}/api/admin/backtest-symbol?runId=${encodeURIComponent(runId)}&symbol=${encodeURIComponent(symbol)}`;
     try {
@@ -56,6 +65,11 @@
     } catch (e) {
       console.warn(`  ✗ ${symbol} — exception`, e?.message);
       perSymbol.push({ symbol, error: e?.message || String(e), ms: Date.now() - t0 });
+    }
+    // Sleep avant le prochain symbole action si le suivant est aussi une action
+    const next = symbols[i + 1];
+    if (next && !isCryptoSymbol(next) && !isCryptoSymbol(symbol)) {
+      await sleep(SLEEP_BETWEEN_STOCKS_MS);
     }
   }
 
@@ -95,31 +109,27 @@
   }
   lines.push("");
 
-  // Summary par symbole — agrégé côté serveur
-  if (Array.isArray(summary?.bySymbol) && summary.bySymbol.length) {
+  // Summary par symbole — l'endpoint retourne data.summary (array), pas
+  // data.bySymbol. Les champs : count, win_rate (0-1), avg_pnl_pct, etc.
+  const arr = Array.isArray(summary?.summary) ? summary.summary : [];
+  if (arr.length) {
     lines.push(`## Stats par symbole (depuis Supabase)`);
-    lines.push("| symbol | trades | wins | losses | wr% | totalPnl | avgPnl | avgWin | avgLoss |");
-    lines.push("|--------|--------|------|--------|-----|----------|--------|--------|---------|");
-    for (const s of summary.bySymbol) {
-      const wr = s.trades > 0 ? (s.wins / s.trades * 100) : 0;
-      lines.push(`| ${s.symbol} | ${s.trades} | ${s.wins} | ${s.losses} | ${fmt(wr, 1)} | ${fmt(s.total_pnl)} | ${fmt(s.avg_pnl)} | ${fmt(s.avg_win)} | ${fmt(s.avg_loss)} |`);
+    lines.push("| symbol | class | trades | wr% | avg_pnl% | first_entry | last_entry |");
+    lines.push("|--------|-------|--------|-----|----------|-------------|------------|");
+    let totTrades = 0, totWins = 0, totPnlPct = 0;
+    for (const s of arr) {
+      const wrPct = (s.win_rate || 0) * 100;
+      lines.push(`| ${s.symbol} | ${s.asset_class || "-"} | ${s.count} | ${fmt(wrPct, 1)} | ${fmt(s.avg_pnl_pct, 3)} | ${fmt(s.first_entry_price)} | ${fmt(s.last_entry_price)} |`);
+      totTrades += s.count;
+      totWins += Math.round((s.win_rate || 0) * s.count);
+      totPnlPct += (s.avg_pnl_pct || 0) * s.count;
     }
     lines.push("");
-
-    // Total agrégé
-    const tot = summary.bySymbol.reduce((acc, s) => ({
-      trades: acc.trades + (s.trades || 0),
-      wins: acc.wins + (s.wins || 0),
-      losses: acc.losses + (s.losses || 0),
-      pnl: acc.pnl + (s.total_pnl || 0),
-    }), { trades: 0, wins: 0, losses: 0, pnl: 0 });
-    const wrTot = tot.trades > 0 ? (tot.wins / tot.trades * 100) : 0;
     lines.push(`## Agrégé global`);
-    lines.push(`- Trades : ${tot.trades}`);
-    lines.push(`- Wins / Losses : ${tot.wins} / ${tot.losses}`);
-    lines.push(`- Win rate : ${fmt(wrTot, 1)}%`);
-    lines.push(`- PnL cumulé : ${fmt(tot.pnl)}`);
-    lines.push(`- EV : ${fmt(tot.trades > 0 ? tot.pnl / tot.trades : 0)} / trade`);
+    lines.push(`- Trades : ${totTrades}`);
+    lines.push(`- Wins approx : ${totWins}`);
+    lines.push(`- Win rate global : ${fmt(totTrades > 0 ? (totWins / totTrades * 100) : 0, 1)}%`);
+    lines.push(`- EV pondéré : ${fmt(totTrades > 0 ? totPnlPct / totTrades : 0, 3)}% / trade`);
   } else {
     lines.push(`## Stats par symbole`);
     lines.push(`(Aucune donnée — vérifier que le replay engine a généré des trades)`);
