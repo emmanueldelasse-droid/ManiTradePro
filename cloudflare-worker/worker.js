@@ -4015,6 +4015,17 @@ async function openTrainingPositionFromRow(env, row, settings, availableCash, ac
   const execution = chooseTrainingExecution(row, settings, availableCash, activeAdjustments);
   if (!execution) return null;
   const positionRow = buildTrainingPositionRowFromSignal(row, execution, settings);
+  // Anti-race : vérifier en BDD qu'aucune position ouverte n'existe déjà sur ce
+  // symbol+side avant d'insérer. L'ID embarque Date.now() donc resolution=
+  // merge-duplicates ne dédupe pas les INSERTs concurrents avec timestamps
+  // différents. Sans ce check, deux cycles cron qui se chevauchent peuvent
+  // produire 2 trades identiques (cf. post-mortem 2026-04-28 : META × 2,
+  // MSFT × 2 à 30 min d'écart avec PnL strictement identiques).
+  const existingRaw = await supabaseFetch(
+    env,
+    `${TRADE_TABLES.positions}?select=id&mode=eq.training&status=eq.open&symbol=eq.${encodeURIComponent(positionRow.symbol)}&side=eq.${encodeURIComponent(positionRow.side)}`
+  ).catch(() => null);
+  if (Array.isArray(existingRaw) && existingRaw.length > 0) return null;
   await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
