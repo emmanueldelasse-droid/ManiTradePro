@@ -7746,6 +7746,96 @@ async function handleBacktestSymbolSummary(request, env) {
   return ok({ runId, totalSymbols: summary.length, totalTrades: rows.length, frictionPct, summary }, "worker-v2", nowIso(), "live", null);
 }
 
+// GET /api/admin/backtest-bucket-stats?runId=X[&frictionPct=0.2] — agrège
+// les trades par bucket (setup_type × direction × asset_class). Permet de
+// voir quels patterns sont rentables sur l'historique. Ne couvre pas le
+// régime (à ajouter avec calcul SPY/QQQ/TLT à la date — plus tard).
+async function handleBacktestBucketStats(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const url = new URL(request.url);
+  const runId = String(url.searchParams.get("runId") || "").trim();
+  if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide", "error", 400);
+  const frictionRaw = Number(url.searchParams.get("frictionPct"));
+  const frictionPct = Number.isFinite(frictionRaw) && frictionRaw >= 0 && frictionRaw <= 5 ? frictionRaw : 0;
+  const rows = await fetchAllBacktestRowsForRun(runId, "setup_type,direction,asset_class,pnl_pct", env);
+  const byBucket = new Map();
+  for (const r of rows) {
+    const setup = String(r.setup_type || "unknown").toLowerCase();
+    const dir = String(r.direction || "long").toLowerCase();
+    const ac = String(r.asset_class || "unknown").toLowerCase();
+    const key = `${setup}|${dir}|${ac}`;
+    if (!byBucket.has(key)) {
+      byBucket.set(key, { setup, direction: dir, asset_class: ac, count: 0, sumPnl: 0, sumPnlNet: 0, wins: 0, winsNet: 0 });
+    }
+    const b = byBucket.get(key);
+    const pnl = Number(r.pnl_pct) || 0;
+    const pnlNet = pnl - frictionPct;
+    b.count += 1;
+    b.sumPnl += pnl;
+    b.sumPnlNet += pnlNet;
+    if (pnl > 0) b.wins += 1;
+    if (pnlNet > 0) b.winsNet += 1;
+  }
+  const buckets = [...byBucket.values()].map(b => ({
+    setup: b.setup,
+    direction: b.direction,
+    asset_class: b.asset_class,
+    count: b.count,
+    avg_pnl_pct: b.count ? Number((b.sumPnl / b.count).toFixed(4)) : null,
+    win_rate: b.count ? Number((b.wins / b.count).toFixed(4)) : null,
+    avg_pnl_pct_net: b.count ? Number((b.sumPnlNet / b.count).toFixed(4)) : null,
+    win_rate_net: b.count ? Number((b.winsNet / b.count).toFixed(4)) : null,
+    sum_pnl_pct: Number(b.sumPnl.toFixed(2)),
+    sum_pnl_pct_net: Number(b.sumPnlNet.toFixed(2))
+  })).sort((a, b) => (b.avg_pnl_pct || 0) - (a.avg_pnl_pct || 0));
+  return ok({ runId, totalBuckets: buckets.length, totalTrades: rows.length, frictionPct, buckets }, "worker-v2", nowIso(), "live", null);
+}
+
+// GET /api/admin/backtest-walkforward?runId=X[&frictionPct=0.2] — split
+// temporel des trades pour vérifier si l'edge tient hors-échantillon.
+// Fenêtres : train (≤ 2023-12-31), valide (2024), test (≥ 2025-01-01).
+// Si l'edge est uniforme entre les 3, c'est robuste. Si l'edge est concentré
+// sur le train, c'est curve-fitting (ou drift de marché).
+async function handleBacktestWalkforward(request, env) {
+  if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
+  const url = new URL(request.url);
+  const runId = String(url.searchParams.get("runId") || "").trim();
+  if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide", "error", 400);
+  const frictionRaw = Number(url.searchParams.get("frictionPct"));
+  const frictionPct = Number.isFinite(frictionRaw) && frictionRaw >= 0 && frictionRaw <= 5 ? frictionRaw : 0;
+  const rows = await fetchAllBacktestRowsForRun(runId, "opened_at,pnl_pct", env);
+  const buckets = {
+    train: { label: "≤ 2023-12-31", count: 0, sumPnl: 0, sumPnlNet: 0, wins: 0, winsNet: 0 },
+    valide: { label: "2024", count: 0, sumPnl: 0, sumPnlNet: 0, wins: 0, winsNet: 0 },
+    test: { label: "≥ 2025-01-01", count: 0, sumPnl: 0, sumPnlNet: 0, wins: 0, winsNet: 0 }
+  };
+  for (const r of rows) {
+    const t = Date.parse(r.opened_at);
+    if (!Number.isFinite(t)) continue;
+    const yr = new Date(t).getUTCFullYear();
+    const bucket = yr <= 2023 ? buckets.train : yr === 2024 ? buckets.valide : buckets.test;
+    const pnl = Number(r.pnl_pct) || 0;
+    const pnlNet = pnl - frictionPct;
+    bucket.count += 1;
+    bucket.sumPnl += pnl;
+    bucket.sumPnlNet += pnlNet;
+    if (pnl > 0) bucket.wins += 1;
+    if (pnlNet > 0) bucket.winsNet += 1;
+  }
+  const stats = Object.entries(buckets).map(([phase, b]) => ({
+    phase,
+    label: b.label,
+    count: b.count,
+    avg_pnl_pct: b.count ? Number((b.sumPnl / b.count).toFixed(4)) : null,
+    win_rate: b.count ? Number((b.wins / b.count).toFixed(4)) : null,
+    avg_pnl_pct_net: b.count ? Number((b.sumPnlNet / b.count).toFixed(4)) : null,
+    win_rate_net: b.count ? Number((b.winsNet / b.count).toFixed(4)) : null,
+    sum_pnl_pct: Number(b.sumPnl.toFixed(2)),
+    sum_pnl_pct_net: Number(b.sumPnlNet.toFixed(2))
+  }));
+  return ok({ runId, totalTrades: rows.length, frictionPct, phases: stats }, "worker-v2", nowIso(), "live", null);
+}
+
 // ============================================================
 // ROUTER PRINCIPAL
 // ============================================================
@@ -7973,6 +8063,16 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleBacktestSymbolSummary(request, env));
+    }
+    if (url.pathname === "/api/admin/backtest-bucket-stats") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestBucketStats(request, env));
+    }
+    if (url.pathname === "/api/admin/backtest-walkforward") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleBacktestWalkforward(request, env));
     }
     if (url.pathname === "/api/training/feedback") {
       const denied = await requireAdminAccess(request, env);
