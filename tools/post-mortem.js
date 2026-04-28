@@ -29,7 +29,7 @@
     headers: { "Authorization": "Bearer " + token }
   });
   const json = await res.json();
-  if (!json?.ok) { console.error("Fetch failed", json); return; }
+  if (json?.status !== "ok") { console.error("Fetch failed", json); return; }
 
   const history = Array.isArray(json?.data?.history) ? json.data.history : [];
   if (!history.length) { console.error("Aucun trade clos dans le dump"); return; }
