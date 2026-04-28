@@ -7682,14 +7682,22 @@ async function handleBacktestFinalize(request, env) {
   }, "worker-v2", nowIso(), "live", null);
 }
 
-// GET /api/admin/backtest-symbol-summary?runId=X — breakdown par symbole.
-// Permet de vérifier après un run que chaque symbole a bien des données
-// distinctes (count, prix moyen, P&L moyen).
+// GET /api/admin/backtest-symbol-summary?runId=X[&frictionPct=0.2] — breakdown
+// par symbole. Permet de vérifier après un run que chaque symbole a bien des
+// données distinctes (count, prix moyen, P&L moyen).
+//
+// Param `frictionPct` (défaut 0) : % retiré du pnl_pct brut de chaque trade
+// pour modéliser frais + spread + slippage stop. Valeur typique : 0.15-0.30
+// pour swing daily (frais 0.05 % aller + 0.05 % retour + spread 0.05 % +
+// slippage moyen sur stops). Si > 0, le payload inclut `avg_pnl_pct_net`
+// et `win_rate_net` à côté des valeurs brutes pour comparer.
 async function handleBacktestSymbolSummary(request, env) {
   if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
   const url = new URL(request.url);
   const runId = String(url.searchParams.get("runId") || "").trim();
   if (!BACKTEST_RUNID_RE.test(runId)) return fail("runId invalide", "error", 400);
+  const frictionRaw = Number(url.searchParams.get("frictionPct"));
+  const frictionPct = Number.isFinite(frictionRaw) && frictionRaw >= 0 && frictionRaw <= 5 ? frictionRaw : 0;
   const rows = await fetchAllBacktestRowsForRun(runId, "symbol,asset_class,entry_price,exit_price,pnl_pct", env);
   const bySymbol = new Map();
   for (const r of rows) {
@@ -7703,17 +7711,23 @@ async function handleBacktestSymbolSummary(request, env) {
         sumEntry: 0,
         sumExit: 0,
         sumPnl: 0,
+        sumPnlNet: 0,
         wins: 0,
+        winsNet: 0,
         firstEntry: Number(r.entry_price),
         lastEntry: Number(r.entry_price)
       });
     }
     const s = bySymbol.get(sym);
+    const pnl = Number(r.pnl_pct) || 0;
+    const pnlNet = pnl - frictionPct;
     s.count += 1;
     s.sumEntry += Number(r.entry_price) || 0;
     s.sumExit += Number(r.exit_price) || 0;
-    s.sumPnl += Number(r.pnl_pct) || 0;
-    if (Number(r.pnl_pct) > 0) s.wins += 1;
+    s.sumPnl += pnl;
+    s.sumPnlNet += pnlNet;
+    if (pnl > 0) s.wins += 1;
+    if (pnlNet > 0) s.winsNet += 1;
     s.lastEntry = Number(r.entry_price);
   }
   const summary = [...bySymbol.values()].map(s => ({
@@ -7724,10 +7738,12 @@ async function handleBacktestSymbolSummary(request, env) {
     avg_exit_price: s.count ? Number((s.sumExit / s.count).toFixed(4)) : null,
     avg_pnl_pct: s.count ? Number((s.sumPnl / s.count).toFixed(4)) : null,
     win_rate: s.count ? Number((s.wins / s.count).toFixed(4)) : null,
+    avg_pnl_pct_net: s.count ? Number((s.sumPnlNet / s.count).toFixed(4)) : null,
+    win_rate_net: s.count ? Number((s.winsNet / s.count).toFixed(4)) : null,
     first_entry_price: s.firstEntry,
     last_entry_price: s.lastEntry
   })).sort((a, b) => a.symbol.localeCompare(b.symbol));
-  return ok({ runId, totalSymbols: summary.length, totalTrades: rows.length, summary }, "worker-v2", nowIso(), "live", null);
+  return ok({ runId, totalSymbols: summary.length, totalTrades: rows.length, frictionPct, summary }, "worker-v2", nowIso(), "live", null);
 }
 
 // ============================================================
