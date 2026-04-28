@@ -190,6 +190,34 @@ si on relance les 17 symboles manquants.
 
 Ordre proposé : C → B → A.
 
+### Implémentation C + B (2026-04-28)
+
+**C : friction modeling**
+- `GET /api/admin/backtest-symbol-summary?runId=X&frictionPct=0.2` — ajout
+  param query optionnel qui retire `frictionPct` de chaque trade brut.
+  Renvoie `avg_pnl_pct_net` + `win_rate_net` en plus des bruts. Valeur
+  typique : 0.15 (frais 0.05% × 2 + spread 0.05%) à 0.30 (avec slippage
+  stop). Rétro-compatible si non fourni.
+- Même param ajouté aux 2 endpoints B ci-dessous.
+
+**B : walk-forward + bucket analytics (partiel)**
+- `GET /api/admin/backtest-bucket-stats?runId=X[&frictionPct=0.2]` —
+  agrège par bucket `setup_type × direction × asset_class`. Identifie
+  quels patterns marchent. Régime non couvert (à ajouter avec calcul
+  SPY/QQQ/TLT à la date — sous-PR séparée).
+- `GET /api/admin/backtest-walkforward?runId=X[&frictionPct=0.2]` —
+  split temporel : train (≤2023), valide (2024), test (≥2025). Si
+  l'edge est uniforme entre les 3 fenêtres → robuste. Sinon curve-
+  fitting ou drift de marché.
+
+**Restant pour PR #2 complet** :
+- Calcul `regime_at_open` historique (SPY/QQQ/TLT à la date) pour les
+  trades existants (script de backfill).
+- UI admin pour visualiser les résultats.
+
+**A : à faire dans une session future** — relancer le snippet
+`tools/backtest-run.js` avec les 17 symboles restants et sleep 20s.
+
 ---
 
 ## Review bot trades — 2026-04-28 (4 bugs structurels)
