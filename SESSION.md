@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-23 (iPhone compactification fiche actif — post Phase 2) |
+| **Dernière mise à jour** | 2026-04-28 (review bot trades — 4 bugs structurels investigués, 3 fixés) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/iphone-compact-asset-detail` |
+| **Branche active** | `claude/review-bot-trades-b7LwR` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -110,6 +110,111 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 - [ ] Rapports PDF hebdomadaires (non implémentés)
 - [ ] Trending Assets — données CoinGecko présentes mais affichage conditionnel (s'affiche seulement si données chargées)
 - [ ] Mode hors-ligne complet (cache SW)
+
+---
+
+## Review bot trades — 2026-04-28 (4 bugs structurels)
+
+Audit complet du dataset Supabase via `tools/post-mortem.js` (snippet console
+qui appelle `/api/trades/state` et produit un rapport markdown). **39 trades
+clos** dans le dump (vs 21 le 2026-04-23 — 18 nouveaux trades en 5 jours).
+
+### Stats actualisées (39 trades exploitables)
+- Win rate : **3/39 = 7,7 %** — **dégradation forte** vs 4/20 = 20 % au 2026-04-26
+- PnL cumulé : **-1036 USD paper** (presque doublé en 5 jours)
+- EV : **-26,56 USD/trade**
+- 0 TP touché en 39 trades (24 stops, 11 manual/time, 4 BE, **0 TP**)
+- 39 longs / 0 shorts (PR #82 activée le 25/04 — pas un bug, cf. #4 ci-dessous)
+- Stop_dist médiane 5,12 % · TP médiane 10,21 % · RR cible médian 2,2
+
+### 4 bugs structurels identifiés
+
+#### Bug #1 — Doublons de positions (race condition cycles concurrents)
+**Symptôme** : META × 2, MSFT × 2, AAPL × 2 à 30 min d'écart avec PnL strictement
+identiques (-40,96 / -42,29 / -34,43). L'ID embarque `Date.now()` donc
+`Prefer: resolution=merge-duplicates` ne dédupe rien. Deux cycles cron qui se
+chevauchent voient `openRows` vide et insèrent chacun.
+
+**Fix** (commit `<TBD>`) : `openTrainingPositionFromRow` (worker.js:4014)
+fait maintenant un GET sur Supabase avant l'INSERT (`status=eq.open & symbol=eq.X
+& side=eq.Y`) et skip si déjà ouvert. Élimine la race sans changer la logique
+métier.
+
+**Note** : ne couvre pas les **re-entries successives** (bot ouvre META, stop
+touché, ré-ouvre 30 min plus tard sur le même plan persistant) — qui restent
+techniquement légitimes mais probablement néfastes. Question ouverte : faut-il
+un cooldown post-stop sur le même symbole ? Décision repoussée à plus de data.
+
+#### Bug #2 — `duration_days = 0` sur 32/39 trades
+**Symptôme** : la colonne `duration_days` était lue à la sortie mais jamais
+peuplée à la fermeture (worker.js:3737 `buildClosedTradeRowFromPosition`).
+
+**Fix** (commit `5f527a7`) : calcul `(closed_at - opened_at) / 86400000` en
+jours décimaux (précision 6 chiffres pour holdings < 1 minute).
+
+#### Bug #3 — `setupType = "unknown"` sur 26/39 trades (67 %)
+**Cause racine** : ce n'est pas un bug d'enregistrement — le moteur **ouvre
+réellement des trades sans setup structurel détecté**. `tradeReady` à
+worker.js:2287 ne dépend que des scores (decisionScore ≥ 74, actionability ≥ 72,
+safety ≥ 68), pas de `plan.setupType`. Conséquence : 67 % des trades sont pris
+"score-only" — sans niveau d'invalidation propre, sans niveau cible propre,
+sur un % fixe ~5 %.
+
+**Fix partiel** (commit `5f527a7`) : `setupType: plan?.setupType ||
+"no_structural_setup"` (au lieu de `null`) pour distinguer ces trades dans
+Supabase et les comparer en stats vs les trades avec setup réel.
+
+**Décision en suspens** : 3 options — (1) strict, rejeter ces candidats dans
+`isTrainingCandidateAllowed` (coupe 67 % du flux) ; (2) souple, laisser passer
+et stat sur ≥ 20 trades par groupe avant décision ; (3) investiguer si
+`detectConfiguration` (worker.js:1645) a un bug et **devrait** détecter des
+patterns mais ne le fait pas. **Choix actuel : option 2** — pas de blocage,
+on collecte la donnée d'abord.
+
+**Important** : sur les 13 trades avec `setupType="continuation"`, la perf est
+**aussi mauvaise**. Ce n'est donc pas LA cause des pertes — une cause possible.
+
+#### Bug #4 — 0 short malgré PR #82 — **PAS UN BUG**
+**Verdict après investigation** : la matrice `validateConfiguration`
+(worker.js:1760-1793) bloque les setups short en RISK_ON sauf
+PULLBACK_SHORT sur crypto. 38/39 trades ont `regime="tendance haussiere"`,
+donc le marché est en phase RISK_ON depuis l'activation. La PR #82 a corrigé
+l'asymétrie de **bonus de scoring** (-4 → +4) mais n'a pas changé la matrice
+de régime — et c'est **correct** : on ne shorte pas en haut d'un cycle
+haussier.
+
+**Pas de fix code**. Les shorts apparaîtront naturellement quand le marché
+passera en RISK_OFF. Si on veut explorer les shorts en RISK_ON pour de la
+data, il faudrait modifier la matrice — mais c'est une **décision stratégique**,
+pas une correction de bug.
+
+### Outil : `tools/post-mortem.js`
+Snippet console à coller dans la fenêtre du navigateur (login PIN requis) qui
+fetch `/api/trades/state` et produit un rapport markdown : stats agrégées,
+distribution `exit_reason` inférée, classement des pertes par cause probable,
+tableau détaillé trade par trade. Réutilisable à chaque session pour suivre
+l'évolution. Limite connue : `analysis_snapshot` ne persiste pas
+`atrAtEntry` — proxy "stop dans le bruit" en seuil absolu par classe d'actif.
+
+### Pattern dominant des pertes (confirmé sur 24 stops)
+Sur les 24 stops touchés, `pnl_pct` est **strictement égal à
+-stop_dist_pct** (META 5,12 % → -5,12 %, MSFT 5,29 % → -5,29 %, BTC 5,73 %
+→ -5,73 %). **Aucun trade ne fait BE intermédiaire avant stop**, aucun ne
+touche TP. Signature : entrée tardive sur un mouvement épuisé, retracement
+direct au stop sans pull-back favorable. Cohérent avec le constat "trade
+hors setup" (#3) : sans pattern technique pour timer l'entrée, on rentre
+au pire moment.
+
+### Prochaines étapes (post-fix)
+1. **Attendre la propagation Cloudflare** (`.github/workflows/deploy-worker.yml`,
+   30-60 s après merge).
+2. **Re-dump des trades dans 5-7 jours** pour valider les fixes :
+   - `duration_days` populé sur les nouveaux trades
+   - `setupType` distingue clairement `"continuation"` / `"no_structural_setup"`
+   - Pas de nouveaux doublons à 30 min d'écart
+3. **Décision sur l'option du bug #3** une fois ≥ 20 trades par groupe.
+4. **Cooldown post-stop** : à investiguer si on confirme que les "doublons" sont
+   en fait des re-entries successives.
 
 ---
 
