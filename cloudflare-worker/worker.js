@@ -3640,7 +3640,7 @@ function buildTrainingAnalysisSnapshotFromPayload(payload) {
     horizon: plan?.horizon || null,
     reason: payload?.reasonShort || plan?.reason || null,
     sourceUsed: payload?.sourceUsed || null,
-    setupType: plan?.setupType || null,
+    setupType: plan?.setupType || "no_structural_setup",
     setupStatus: plan?.setupStatus || null,
     confirmationCount: Number.isFinite(Number(plan?.confirmationCount)) ? Number(plan.confirmationCount) : null,
     blockerFlags: Array.isArray(plan?.blockerFlags) ? plan.blockerFlags : [],
@@ -3737,6 +3737,16 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings) {
 function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload) {
   const analysisSnapshot = position?.analysis_snapshot || buildTrainingAnalysisSnapshotFromPayload(detailPayload || {});
   const { pnl, pnlPct } = computePnlForClose(position, exitPrice);
+  const closedAt = nowIso();
+  const openedAt = position?.opened_at || null;
+  let durationDays = null;
+  if (openedAt) {
+    const openMs = Date.parse(openedAt);
+    const closeMs = Date.parse(closedAt);
+    if (Number.isFinite(openMs) && Number.isFinite(closeMs) && closeMs >= openMs) {
+      durationDays = Number(((closeMs - openMs) / 86_400_000).toFixed(6));
+    }
+  }
   return {
     id: position?.id || null,
     symbol: parseSymbol(position?.symbol || ""),
@@ -3758,13 +3768,14 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
     trade_reason: position?.trade_reason || analysisSnapshot?.reason || null,
     horizon: position?.horizon || analysisSnapshot?.horizon || null,
     source_used: position?.source_used || analysisSnapshot?.sourceUsed || null,
-    opened_at: position?.opened_at || null,
-    closed_at: nowIso(),
+    opened_at: openedAt,
+    closed_at: closedAt,
+    duration_days: durationDays,
     analysis_snapshot: analysisSnapshot,
     execution: position?.execution || null,
-    live: { lastPrice: finiteOrNull(exitPrice), updatedAt: nowIso() },
-    closed_execution: { exitPrice: finiteOrNull(exitPrice), closedAt: nowIso(), closeType: String(closeType || "unknown") },
-    updated_at: nowIso()
+    live: { lastPrice: finiteOrNull(exitPrice), updatedAt: closedAt },
+    closed_execution: { exitPrice: finiteOrNull(exitPrice), closedAt: closedAt, closeType: String(closeType || "unknown") },
+    updated_at: closedAt
   };
 }
 
