@@ -1213,6 +1213,17 @@ details[open] > .bot-collapsible-summary::after{transform:rotate(180deg)}
 .bot-stats-tab.active{background:var(--accent);border-color:var(--accent);color:#0a0e1a}
 .bot-tab-empty{padding:18px;font-size:.88rem}
 
+/* Sous-onglets État / Performance / Santé de l'onglet Bot unifié */
+.bot-subtabs{display:flex;gap:6px;margin:0 0 16px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.bot-subtabs::-webkit-scrollbar{display:none}
+.bot-subtab{flex-shrink:0;padding:8px 16px;min-height:44px;border-radius:999px;border:1px solid var(--border-subtle);background:transparent;color:var(--text-secondary);font-family:inherit;font-size:.85rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,border-color .15s,color .15s,transform .08s;-webkit-user-select:none;user-select:none}
+.bot-subtab:active{transform:scale(.97)}
+.bot-subtab.active{background:var(--accent);border-color:var(--accent);color:#0a0e1a}
+.app-shell:not(.theme-light) .bot-subtab{background:rgba(255,255,255,.02)}
+.app-shell:not(.theme-light) .bot-subtab:hover{border-color:rgba(138,163,255,.28);color:var(--text-primary)}
+.app-shell.theme-light .bot-subtab{background:#ffffff;border-color:rgba(15,23,42,.12)}
+.app-shell.theme-light .bot-subtab.active{background:var(--accent);border-color:var(--accent);color:#0a0e1a}
+
 .app-shell:not(.theme-light) .bot-events-card,
 .app-shell:not(.theme-light) .bot-params-card{background:rgba(14,19,35,.7)}
 .app-shell:not(.theme-light) .bot-stats-tab{background:rgba(255,255,255,.02)}

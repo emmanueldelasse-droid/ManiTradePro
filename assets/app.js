@@ -117,7 +117,7 @@
     userAssetsLoading: false,
     userAssetsError: null,
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
-    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false },
+    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false, subTab: "stats" },
     health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 },
     reports: { list: [], loading: false, error: null, openId: null, generating: false },   // PR #9 Phase 2 — rapports hebdo
     tradeFeedback: {} // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
@@ -131,15 +131,14 @@
     ["portfolio", "Mes trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
     ["news", "News", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>`],
     ["bot", "Bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`],
-    ["health", "Sante bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`],
     ["reports", "Rapports hebdo", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`],
-    ["performance", "Performance", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
 
-  // Mobile bottom-nav : 4 items principaux + "Plus" (News + Bot + Santé + Rapports + Performance + Réglages)
+  // Mobile bottom-nav : 4 items principaux + "Plus" (News + Bot + Rapports + Réglages).
+  // Bot inclut maintenant Santé et Performance comme sous-onglets internes.
   const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
-  const MORE_NAV_ROUTES = ["news", "bot", "health", "reports", "performance", "settings"];
+  const MORE_NAV_ROUTES = ["news", "bot", "reports", "settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
@@ -2607,11 +2606,16 @@ function applyFilter() {
       if (route === "settings" && isSessionValid()) {
         loadUserAssets().catch(() => {});
       }
-      if (route === "bot" && isSessionValid()) {
-        loadBot().catch(() => {});
-      }
-      if (route === "health") {
-        loadHealth().catch(() => {});
+      // Anciens chemins "health" et "performance" — redirige vers Bot avec
+      // le sous-onglet correspondant pré-sélectionné (la fonction render
+      // affichera Santé ou Performance via renderBotUnified).
+      if ((route === "bot" || route === "health" || route === "performance") && isSessionValid()) {
+        if (route === "health") state.bot.subTab = "health";
+        else if (route === "performance") state.bot.subTab = "performance";
+        const sub = state.bot.subTab || "stats";
+        if (sub === "health") loadHealth().catch(() => {});
+        else if (sub === "stats") loadBot().catch(() => {});
+        // performance : utilise les données déjà chargées
       }
     }
   }
@@ -5981,6 +5985,27 @@ function openPositionsRiskView() {
       </div>`;
   }
 
+  function renderBotSubTabs() {
+    const sub = state.bot.subTab || "stats";
+    return `<div class="bot-subtabs" role="tablist">
+      <button class="bot-subtab ${sub==="stats"?"active":""}" data-bot-subtab="stats" role="tab">État</button>
+      <button class="bot-subtab ${sub==="performance"?"active":""}" data-bot-subtab="performance" role="tab">Performance</button>
+      <button class="bot-subtab ${sub==="health"?"active":""}" data-bot-subtab="health" role="tab">Santé</button>
+    </div>`;
+  }
+
+  // Onglet "Bot" unifié (PR ui-cleanup-session2) — fusionne État, Performance,
+  // Santé en un seul onglet avec 3 sous-onglets cliquables. Délègue au render
+  // existant (renderBot/renderPerformance/renderHealth) puis injecte la barre
+  // de sous-onglets juste après le `<div class="screen">` ouvrant.
+  function renderBotUnified() {
+    const sub = state.bot.subTab || "stats";
+    const inner = sub === "performance" ? renderPerformance()
+                : sub === "health" ? renderHealth()
+                : renderBot();
+    return inner.replace('<div class="screen">', `<div class="screen">${renderBotSubTabs()}`);
+  }
+
   function renderBot() {
     if (!isSessionValid()) {
       return `
@@ -6490,11 +6515,17 @@ function renderMain() {
       case "news": return renderNews();
       case "asset-detail": return renderDetail();
       case "portfolio": return renderPortfolio();
-      case "performance": return renderPerformance();
       case "alerts": return renderAlerts();
       case "settings": return renderSettings();
-      case "bot": return renderBot();
-      case "health": return renderHealth();
+      case "bot": return renderBotUnified();
+      // Anciennes routes "health" et "performance" — redirigées vers Bot
+      // (sous-onglets Santé / Performance) pour rétrocompatibilité des liens.
+      case "health":
+        state.bot.subTab = "health";
+        return renderBotUnified();
+      case "performance":
+        state.bot.subTab = "performance";
+        return renderBotUnified();
       case "reports": return renderReports();
       default: return renderDashboard();
     }
@@ -7119,6 +7150,20 @@ function renderMain() {
         render();
       });
     });
+    // Sous-onglets de l'onglet Bot unifié (État / Performance / Santé)
+    app.querySelectorAll("[data-bot-subtab]").forEach(el => {
+      el.addEventListener("click", () => {
+        const next = el.getAttribute("data-bot-subtab") || "stats";
+        if (state.bot.subTab === next) return;
+        state.bot.subTab = next;
+        haptic(5);
+        // Charge la donnée appropriée selon le sous-onglet
+        if (next === "health") loadHealth();
+        else if (next === "stats") loadBot();
+        // performance = données déjà chargées via state.trades.history (loadTradesState)
+        render();
+      });
+    });
     app.querySelectorAll(".bot-params-card").forEach(el => {
       el.addEventListener("toggle", () => {
         state.bot.paramsOpen = el.open;
@@ -7253,9 +7298,13 @@ function renderMain() {
       case "opportunities": return () => loadOpportunities(true);
       case "portfolio": return () => refreshOpenTradesLive(true);
       case "alerts": return () => loadDashboard();
-      case "health": return () => loadHealth();
       case "reports": return () => loadReports();
-      case "bot": return () => loadBot();
+      case "bot": return () => {
+        const sub = state.bot.subTab || "stats";
+        if (sub === "health") return loadHealth();
+        if (sub === "performance") return refreshOpenTradesLive(true);
+        return loadBot();
+      };
       default: return null;
     }
   }
