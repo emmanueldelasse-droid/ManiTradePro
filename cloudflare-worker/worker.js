@@ -3020,6 +3020,18 @@ function getTrainingDefaults() {
   };
 }
 
+// Buckets identifiés comme statistiquement perdants dans le backtest
+// run_20260428_1457_4tvm (2841 trades sur 5-8 ans, 23 symboles). Format :
+// `${setupType}|${side}|${assetClass}`. À ré-évaluer après backfill du
+// regime_at_open historique — certains pourraient être profitables sur
+// des fenêtres régime spécifiques.
+const TOXIC_BUCKETS_BACKTEST_2026_04_28 = new Set([
+  "continuation_short|short|stock",   // -0.93 % net, 390 trades, WR 33.9 %
+  "continuation_short|short|etf",     // -0.89 % net,  20 trades (échantillon petit, gardé par cohérence)
+  "continuation|long|crypto",         // -0.32 % net, 391 trades, WR 30.9 %
+  "pullback_short|short|stock"        // -0.26 % net, 195 trades, WR 27.7 %
+]);
+
 function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, newsWindow = null, activeAdjustments = null) {
   if (!row || row.status !== "ok") return false;
   if (row.decision !== "Trade propose") return false;
@@ -3046,6 +3058,19 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
 
   // Règle 2 — bucket désactivé par ajustement actif ?
   if (activeAdjustments?.disabledBuckets?.has(bucketKey)) return false;
+
+  // Backtest 2026-04-28 (run_20260428_1457_4tvm, 2841 trades sur 5-8 ans) —
+  // 4 combinaisons setup × direction × asset_class statistiquement perdantes
+  // après friction 0.15 % :
+  //   continuation_short × short × stock : -0.93 % net sur 390 trades
+  //   continuation_short × short × etf   : -0.89 % net sur  20 trades
+  //   continuation       × long  × crypto: -0.32 % net sur 391 trades
+  //   pullback_short     × short × stock : -0.26 % net sur 195 trades
+  // Désactivées sans condition de régime tant qu'on n'a pas le calcul
+  // regime_at_open historique pour ces backtests. À ré-évaluer après
+  // backfill du régime.
+  const bucketKeyNoRegime = `${setupType || "unknown"}|${side}|${assetClass}`;
+  if (TOXIC_BUCKETS_BACKTEST_2026_04_28.has(bucketKeyNoRegime)) return false;
 
   // Scores (avec boost éventuel de règle 1)
   const scoreBoost = activeAdjustments?.minScoreBoosts?.get(bucketKey) || 0;
