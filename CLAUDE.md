@@ -44,9 +44,39 @@ Toujours développer sur la branche indiquée dans les instructions de la sessio
   - Fallback manuel (si CI down) : `wrangler deploy` depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker` sur la machine Windows de l'utilisateur, précédé d'un `git pull origin main`. Après : `wrangler secret list` pour vérifier que `SUPABASE_URL` est présent.
 - **SW** : `CACHE_VERSION` dans `sw.js` à bumper à chaque release (sinon pas de réinstall). Assets en *network-first* depuis commit `176524d` — les releases suivantes se propageront sans vider le cache.
 
-## Langue
+## Langue et vocabulaire
 
-Réponses utilisateur **toujours en français**. Commits, code, identifiants : anglais.
+### Réponses utilisateur — **toujours en français**.
+Commits, code, identifiants : anglais.
+
+### Vocabulaire — **simple, pas de jargon**.
+
+L'utilisateur n'est pas développeur professionnel. Il comprend le sens
+général des choses techniques mais **se perd** quand on lui balance du
+jargon (EV, walk-forward, bucket, curve-fitting, RR, friction, slippage,
+rate limit, race condition, etc.) sans le traduire.
+
+**Règles** :
+1. **Pas de termes anglais techniques** sans traduction immédiate. Pas
+   "EV +0,3 %" → écrire "le bot gagne 0,3 % par trade en moyenne".
+2. **Pas d'acronymes** sans expansion. Pas "WR 37 %" → écrire
+   "il gagne 37 fois sur 100".
+3. **Pas de noms de fichiers/lignes/PR** dans les explications de fond.
+   Garder ça pour les sections "ce que j'ai modifié" ou "à vérifier",
+   pas dans le résumé pour comprendre.
+4. **Métaphores avant techniques** quand on explique pourquoi quelque
+   chose marche ou pas. Exemple : "le bot achète au sommet d'une
+   montée" plutôt que "entrée tardive sur extension parabolic".
+5. **Format préféré pour les bilans** : 3 sections max — "Ce qu'on a
+   trouvé / Ce qu'on a fait / Ce que tu dois faire". Phrases courtes,
+   pas de tableaux à 6 colonnes sauf si l'utilisateur demande du détail.
+6. Si on **doit** utiliser un terme technique parce qu'on parle de code
+   ou de procédure, le traduire entre parenthèses la première fois :
+   *"on retire les frais (les coûts de courtage)"*.
+
+Erreur type à NE PAS répéter : balancer un rapport markdown structuré
+avec EV / WR / RR / friction / walk-forward / curve-fitting comme si
+c'était évident. L'utilisateur perd le fil et ne peut pas décider.
 
 ## Style code
 
