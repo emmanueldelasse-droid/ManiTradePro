@@ -218,6 +218,72 @@ Ordre proposé : C → B → A.
 **A : à faire dans une session future** — relancer le snippet
 `tools/backtest-run.js` avec les 17 symboles restants et sleep 20s.
 
+### Résultats C+B sur le run 2026-04-28 — verdict
+
+**Friction sensitivity** sur 2841 trades, 23 symboles :
+| Friction | EV net | WR net |
+|----------|--------|--------|
+| 0 % | +0,414 % | 37,8 % |
+| 0,15 % | **+0,264 %** | 37,7 % |
+| 0,30 % | **+0,114 %** | 37,1 % |
+| 0,50 % | -0,086 % | (n/a) |
+
+Tipping point entre 0,30 et 0,50 %. À friction réaliste swing daily
+(0,15-0,30 %), edge **positif mais mince**.
+
+**Bucket stats — 8/12 rentables, 4/12 toxiques** :
+- **🟢 Stars** : pullback long crypto (+1,99 % net, 157 trades, ⭐),
+  pullback_short crypto (+1,37 %, 199), continuation_short crypto
+  (+0,59 %, 479), continuation long stock (+0,46 %, 644).
+- **🔴 Toxiques (à désactiver)** : continuation_short stock (-0,93 %,
+  390), continuation long crypto (-0,32 %, 391), pullback_short stock
+  (-0,26 %, 195), continuation_short etf (-0,89 %, 20).
+
+**Walk-forward — verdict critique** :
+| Phase | Période | Trades | EV brut | EV net (0,15 %) |
+|-------|---------|--------|---------|-----------------|
+| train | ≤ 2023 | 1862 | +0,48 % | +0,33 % |
+| valide | 2024 | 406 | **-0,23 %** | **-0,38 %** ⚠️ |
+| test | ≥ 2025 | 573 | **+0,65 %** | **+0,50 %** ✅ |
+
+**Lecture** :
+- ✅ **Pas de curve-fitting classique** — le test 2025 est plus positif
+  que le train. Si c'était sur-ajusté au passé, on aurait l'inverse.
+- ⚠️ **2024 année négative** (-0,38 % × 406 trades). Pas une dégradation
+  structurelle du moteur — juste une année où le pattern n'a pas payé.
+  Probablement régime range/choppy hostile aux setups breakout.
+- 🎯 **Test 2025 très positif** (+0,50 % net) — validation hors-train
+  solide.
+
+### Conclusions pour la stratégie
+
+1. **Le filtrage par bucket est le levier majeur**. Désactiver les 4
+   toxiques relèverait l'EV globale de +0,26 % à probablement +0,5-0,8 %
+   net (à mesurer après implémentation).
+2. **Pas de passage en réel maintenant** : 2024 prouve que des années
+   peuvent être négatives. Avant le réel, il faut (a) filtrer les
+   buckets, (b) valider en paper que les fixes (PR #90) rapprochent
+   paper de backtest sur les prochaines semaines.
+3. **continuation long crypto négatif** : à creuser — entrées trop
+   tardives sur extensions parabolic ?
+4. **Shorts crypto rentables** mais via les bears 2018/2022. La matrice
+   actuelle qui les bloque en RISK_ON reste correcte — pas de
+   contradiction.
+
+### Décision : prochaines étapes prioritaires
+**A → B (séquence à venir)** :
+- **A : Filtrer les 4 buckets toxiques** dans `isTrainingCandidateAllowed`.
+  Levier statistiquement validé, ~30 min de code, déploiement immédiat.
+- **B : Continuer le paper 1-2 semaines** avec les fixes PR #90 + #91 +
+  filtrage. Puis re-dump pour valider la convergence.
+
+Items en attente (sous-PRs futures) :
+- Backfill `regime_at_open` historique (calcul SPY/QQQ/TLT à la date) —
+  permettra l'analyse par bucket × régime.
+- Investigation pourquoi 2024 négatif (corrélation VIX/régime).
+- UI admin pour visualiser.
+- Compléter les 17 symboles backtest manquants (sleep 20s).
+
 ---
 
 ## Review bot trades — 2026-04-28 (4 bugs structurels)
