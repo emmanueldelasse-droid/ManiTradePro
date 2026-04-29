@@ -61,8 +61,6 @@
     opportunitiesLastGoodAt: 0,
     detailRequestStartedAt: 0,
     dashboard: {
-      fearGreed: null,
-      trending: [],
       portfolio: null,
       newsWindow: null
     },
@@ -114,7 +112,6 @@
     algoSignalsPrev: null,
     journalAnalysis: null,
     loadingJournalAnalysis: false,
-    portfolioPriority: null,
     loadingPortfolioPriority: false,
     userAssets: [],
     userAssetsLoading: false,
@@ -132,6 +129,7 @@
     ["opportunities", "Opportunites", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`],
     ["alerts", "Alertes", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`],
     ["portfolio", "Mes trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
+    ["news", "News", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>`],
     ["bot", "Bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`],
     ["health", "Sante bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>`],
     ["reports", "Rapports hebdo", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`],
@@ -139,9 +137,9 @@
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
 
-  // Mobile bottom-nav : 4 items principaux + "Plus" (Bot + Santé + Rapports + Performance + Réglages)
+  // Mobile bottom-nav : 4 items principaux + "Plus" (News + Bot + Santé + Rapports + Performance + Réglages)
   const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
-  const MORE_NAV_ROUTES = ["bot", "health", "reports", "performance", "settings"];
+  const MORE_NAV_ROUTES = ["news", "bot", "health", "reports", "performance", "settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
@@ -2098,40 +2096,13 @@ async function confirmTradeFromModal() {
   }
 
 
-  async function loadPortfolioPriority() {
-    const opps = state.filteredOpportunities.length ? state.filteredOpportunities : state.opportunities;
-    if (!opps.length) { showAlertToast("Priorite IA", "Lance d'abord un scan pour avoir des opportunites."); return; }
-    state.loadingPortfolioPriority = true;
-    state.portfolioPriority = null;
-    render();
-    try {
-      const stats = trainingStats();
-      const result = await apiPost("/api/ai/portfolio-priority", {
-        opportunities: opps.slice(0, 10),
-        positions: state.trades.positions.map(p => normalizePositionRecord(p)),
-        capitalAvailable: stats.wallet.availableEur || 0
-      });
-      state.portfolioPriority = result?.data || null;
-    } catch(e) {
-      state.portfolioPriority = { conseil: "Erreur : " + (e.message || "IA indisponible"), ranking: [], eviter: [] };
-    } finally {
-      state.loadingPortfolioPriority = false;
-      render();
-    }
-  }
-
-
   async function loadDashboard() {
     try {
-      const [fg, trending, portfolio, news, newsWindow] = await Promise.all([
-        api("/api/fear-greed").catch(() => null),
-        api("/api/trending").catch(() => null),
+      const [portfolio, news, newsWindow] = await Promise.all([
         api("/api/portfolio/summary").catch(() => null),
         api("/api/news").catch(() => null),
         api("/api/news-window").catch(() => null)
       ]);
-      state.dashboard.fearGreed = fg?.data || null;
-      state.dashboard.trending = trending?.data || [];
       state.dashboard.portfolio = portfolio?.data || null;
       state.dashboard.newsWindow = newsWindow || null;
       state.news = {
@@ -2527,15 +2498,7 @@ function closeTrainingTrade(id, livePrice = null) {
     return utcMin >= 8 * 60 && utcMin < 21 * 60;
   }
 
-  function marketStatusBadge() {
-    const cryptoOpen = true;
-    const stockOpen = isStockMarketOpen();
-    return `<span class="market-status-pill ${stockOpen ? "open" : "closed"}">
-      ${stockOpen ? "Marchés ouverts" : "Marchés fermés"}
-    </span><span class="market-status-pill open">Crypto 24/7</span>`;
-  }
 
-  
 function groupedOpportunities(rows) {
   const items = Array.isArray(rows) ? rows.slice() : [];
   const buckets = { proposed: [], watch: [], noTrade: [] };
@@ -3435,38 +3398,6 @@ function renderNewsWindowWidget(nw) {
     </div>`;
 }
 
-function renderFearGreedWidget(fg) {
-  if (!fg || fg.value == null) return "";
-  const v = fg.value;
-  const label = fg.label || "";
-  const tone = v <= 25 ? "extreme-fear" : v <= 45 ? "fear" : v <= 55 ? "neutral" : v <= 75 ? "greed" : "extreme-greed";
-  const color = v <= 25 ? "#ef4444" : v <= 45 ? "#f97316" : v <= 55 ? "#a3a3a3" : v <= 75 ? "#22c55e" : "#00e5a0";
-  const arcLen = Math.round((v / 100) * 251);
-  return `
-    <div class="fg-widget" title="Fear & Greed Index — Alternative.me">
-      <svg class="fg-arc" viewBox="0 0 100 54" aria-hidden="true">
-        <path d="M10 50 A 40 40 0 0 1 90 50" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="8" stroke-linecap="round"/>
-        <path d="M10 50 A 40 40 0 0 1 90 50" fill="none" stroke="${color}" stroke-width="8" stroke-linecap="round"
-          stroke-dasharray="${arcLen} 251" pathLength="251"/>
-      </svg>
-      <div class="fg-value" style="color:${color}">${v}</div>
-      <div class="fg-label">${safeText(label)}</div>
-    </div>`;
-}
-
-function renderTrendingStrip(trending) {
-  if (!Array.isArray(trending) || !trending.length) return "";
-  const items = trending.map(t => {
-    const up = t.pct24h != null && t.pct24h >= 0;
-    const pctHtml = t.pct24h != null
-      ? `<span class="trending-pct ${up ? "up" : "down"}">${up ? "+" : ""}${t.pct24h.toFixed(1)}%</span>`
-      : "";
-    return `<div class="trending-pill" data-open-detail="${safeText(t.symbol)}">
-      <span class="trending-sym">${safeText(t.symbol)}</span>${pctHtml}
-    </div>`;
-  }).join("");
-  return `<div class="trending-strip"><span class="trending-label">Trending</span>${items}</div>`;
-}
 
 function renderMarketRegimeBanner(regime = state.market?.regime) {
   const vm = marketRegimeViewModel(regime);
@@ -3604,11 +3535,9 @@ function renderDashboard() {
 
         ${renderMarketRegimeBanner()}
 
-        ${(state.dashboard.fearGreed || (state.dashboard.trending || []).length || state.dashboard.newsWindow) ? `
+        ${state.dashboard.newsWindow ? `
         <div class="card" style="margin-bottom:18px;padding:14px 18px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
-          ${renderFearGreedWidget(state.dashboard.fearGreed)}
           ${renderNewsWindowWidget(state.dashboard.newsWindow)}
-          ${renderTrendingStrip(state.dashboard.trending)}
         </div>` : ""}
 
         <div class="card dashboard-hero-card" style="margin-bottom:18px">
@@ -3616,11 +3545,6 @@ function renderDashboard() {
             <div>
               <div class="dashboard-hero-title">${stats.openCount} position${stats.openCount > 1 ? "s ouvertes" : " ouverte"}</div>
               <div class="dashboard-hero-subtitle">${safeText(summary.title + " · " + (summary.text || ""))}</div>
-            </div>
-            <div class="legend" style="${mobile ? "margin-top:10px;display:flex;flex-wrap:wrap;gap:8px;" : ""}">
-              ${badge("Training")}
-              ${badge(`${stats.closedCount} trade${stats.closedCount > 1 ? "s" : ""} cloture${stats.closedCount > 1 ? "s" : ""}`)}
-              ${badge(`${money(stats.realized * fxRateUsdToEur(), "EUR")} realise`)}
             </div>
           </div>
         </div>
@@ -3710,8 +3634,6 @@ function renderDashboard() {
 
   function renderOpportunities() {
     const groups = groupedOpportunities(state.filteredOpportunities || []);
-    const total = (state.filteredOpportunities || []).length;
-    const visibleHydrating = (state.filteredOpportunities || []).filter((item) => !!state.nonCryptoHydration[String(item?.symbol || "").toUpperCase()]).length;
 
     return `
       <div class="screen">
@@ -3748,35 +3670,6 @@ function renderDashboard() {
           </div>
         ` : ""}
 
-        <div class="grid trades-stats" style="margin-bottom:18px">
-          <div class="stat-card">
-            <div class="stat-label">Trades proposes</div>
-            <div class="stat-value">${groups.proposed.length}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">A surveiller</div>
-            <div class="stat-value">${groups.watch.length}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Pas de trade</div>
-            <div class="stat-value">${groups.noTrade.length}</div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-label">Analyses en cours</div>
-            <div class="stat-value">${visibleHydrating}</div>
-          </div>
-        </div>
-
-        <div class="card" style="margin-bottom:18px">
-          <div class="section-title"><span>Lecture rapide</span><span>${total}</span></div>
-          <div class="opp-overview-text">
-            ${groups.proposed.length
-              ? `${groups.proposed.length} actif${groups.proposed.length > 1 ? "s" : ""} ressort${groups.proposed.length > 1 ? "ent" : ""} comme prioritaire${groups.proposed.length > 1 ? "s" : ""}.`
-              : groups.watch.length
-                ? `Aucun trade propose net. ${groups.watch.length} actif${groups.watch.length > 1 ? "s sont" : " est"} surtout a surveiller.`
-                : "Aucun trade propre pour le moment. La liste est plutot defensive."}
-          </div>
-        </div>
 
         ${renderOpportunitySection(
           "Trades proposes",
@@ -4262,37 +4155,6 @@ function detailTileValue(kind, plan, detail) {
                   <button class="btn btn-secondary" style="font-size:.8rem" data-open-alert-modal="${safeText(d.symbol)}" data-alert-name="${safeText(d.name || d.symbol)}" data-alert-price="${d.price != null ? d.price : ""}">+ Alerte prix</button>
                 </div>
                 ${renderTradePlanHero(d, currentTradePlan())}
-                ${(() => {
-                  const plan = currentTradePlan();
-                  return `
-                    <div class="plan-card" style="display:none">
-                      <div class="section-title"><span>Decision automatique</span><span>${safeText(plan?.decision || "—")}</span></div>
-                      <div class="kv plan-grid">
-                        <div class="muted">Decision simple</div><div>${safeText(plan?.decision || "Pas de trade")}</div>
-                        <div class="muted">Tendance</div><div>${safeText(plan?.trendLabel || d.trendLabel || detectedTrendLabel(d.direction || "neutral"))}</div>
-                        <div class="muted">Entree</div><div>${plan?.entry != null ? priceDisplay(plan.entry) : "—"}</div>
-                        <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
-                        <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
-                        <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
-                        <div class="muted">Score de surete</div><div>${safetyScoreFrom(plan) != null ? `${num(safetyScoreFrom(plan), 0)}/100 · ${safeText(safetyLabel(safetyScoreFrom(plan), plan))}` : "—"}</div><div class="muted">Exploitabilite</div><div>${actionabilityScoreFrom(plan) != null ? `${num(actionabilityScoreFrom(plan), 0)}/100 · ${safeText(actionabilityLabel(actionabilityScoreFrom(plan)))}` : "—"}</div>
-                        <div class="muted">Horizon</div><div>${safeText(plan?.horizon || "—")}</div>
-                        <div class="muted">En clair</div><div>${safeText(simpleDecisionSentence(plan))}</div>
-                        <div class="muted">Resume simple</div><div>${safeText(simpleContextSentence(plan))} ${safeText(plan?.aiSummary || "")}</div>
-                      </div>
-                      <div class="plan-reason">${safeText(plan?.reason || plan?.refusalReason || "Pas d'analyse disponible.")}</div>
-                      <div class="plan-ai-summary">
-                        <div class="muted">Resume court</div>
-                        <div>${safeText(plan?.aiSummary || "Pas d'avis complementaire.")}</div>
-                      </div>
-                      <div class="plan-context">
-                        ${(plan?.aiContext || []).map(label => `<span class="mini-pill">${safeText(label)}</span>`).join("")}
-                        ${plan?.safety ? `<span class="mini-pill strong">niveau : ${safeText(plan.safety)}</span>` : ""}
-                      </div>
-                      <div class="trade-actions">
-                        ${plan && plan.decision === "Trade propose" && plan.side ? `<button class="btn trade-btn primary" data-create-trade-plan>Ouvrir le trade propose</button>` : ""}
-                      </div>
-                    </div>`;
-                })()}
               </div>
 
               <div class="card" style="margin-bottom:18px">
@@ -5431,32 +5293,6 @@ function openPositionsRiskView() {
     URL.revokeObjectURL(url);
   }
 
-  function renderPortfolioPriorityCard() {
-    const p = state.portfolioPriority;
-    const loading = state.loadingPortfolioPriority;
-    const priColor = { haute: "positive", moyenne: "", faible: "muted" };
-    return `<div class="card" style="margin-top:18px">
-      <div class="section-title">
-        <span>IA — Quoi trader maintenant ?</span>
-        <button class="btn" data-action="load-portfolio-priority" ${loading ? "disabled" : ""}>${loading ? "Analyse..." : "Analyser"}</button>
-      </div>
-      ${loading ? `<div class="chart-loading">Analyse en cours...</div>` : p ? `
-        <div class="ai-insight-card">
-          ${p.conseil ? `<div class="ai-insight-resume">${safeText(p.conseil)}</div>` : ""}
-          ${(p.ranking||[]).length ? `<div class="ai-insight-section">
-            <div class="ai-insight-label">Priorites</div>
-            ${p.ranking.map((r,i) => `<div class="ai-priority-row">
-              <span class="ai-priority-rank">${i+1}</span>
-              <span class="ai-priority-symbol">${safeText(r.symbol)}</span>
-              <span class="ai-priority-badge ${priColor[r.priorite]||""}">${safeText(r.priorite)}</span>
-              <span class="ai-priority-reason">${safeText(r.raison)}</span>
-            </div>`).join("")}
-          </div>` : ""}
-          ${(p.eviter||[]).length ? `<div class="ai-insight-section"><div class="ai-insight-label">A eviter</div><div class="ai-insight-warn">${p.eviter.map(s=>safeText(s)).join(", ")}</div></div>` : ""}
-        </div>` : `<div class="empty-state">Lance l'analyse pour savoir quoi trader en priorite.</div>`}
-    </div>`;
-  }
-
   function renderJournalAnalysisCard() {
     const a = state.journalAnalysis;
     const loading = state.loadingJournalAnalysis;
@@ -5694,7 +5530,6 @@ function openPositionsRiskView() {
                   <span class="class-perf-trades">${stockStats.closedCount} trades</span>
                   <span class="class-perf-pnl ${stockStats.realizedEur >= 0 ? "positive" : "negative"}">${money(stockStats.realizedEur, "EUR")}</span>
                   <span class="class-perf-wr">${stockStats.winRate != null ? num(stockStats.winRate,0)+"%" : "—"} win</span>
-                  <span class="market-status-pill ${isStockMarketOpen() ? "open" : "closed"}">${isStockMarketOpen() ? "ouvert" : "fermé"}</span>
                 </div>
               ` : ""}
               ${cryptoStats.closedCount === 0 && stockStats.closedCount === 0 ? `<div class="muted" style="padding:8px 0;font-size:.83rem">Aucun trade fermé pour le moment.</div>` : ""}
@@ -5705,10 +5540,6 @@ function openPositionsRiskView() {
           <div class="card" style="margin-top:18px">
             <div class="section-title">
               <span>Positions ouvertes <span class="badge">${positions.length}</span></span>
-              <span style="display:flex;gap:6px;align-items:center">
-                <span class="market-status-pill open">Crypto 24/7</span>
-                <span class="market-status-pill ${isStockMarketOpen()?"open":"closed"}">${isStockMarketOpen()?"Marchés ouverts":"Marchés fermés"}</span>
-              </span>
             </div>
             ${positions.length
               ? `<div class="pos-list">${positions.map(renderPositionRow).join("")}</div>`
@@ -5738,7 +5569,6 @@ function openPositionsRiskView() {
           `}
 
           <!-- IA OUTILS -->
-          ${renderPortfolioPriorityCard()}
           ${renderJournalAnalysisCard()}
 
           ${state.settings.showAlgoJournal ? `<div style="margin-top:8px">${renderJournalMoteurCard()}</div>` : ""}
@@ -7004,7 +6834,6 @@ function renderMain() {
       el.addEventListener("click", () => {
         const action = el.getAttribute("data-action");
         if (action === "load-journal-analysis") loadJournalAnalysis();
-        if (action === "load-portfolio-priority") loadPortfolioPriority();
       });
     });
 
