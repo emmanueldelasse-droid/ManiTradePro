@@ -113,6 +113,113 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Backtest historique — 2026-04-28 (premier run de validation)
+
+Run id `run_20260428_1457_4tvm` — **23 symboles · 2841 trades · 5-8 ans**.
+Lancé via `tools/backtest-run.js` puis snippet d'extension. 17 symboles
+manquants à compléter en batch séparé (rate limit Twelve Data ~5/min effectif
+en plan gratuit).
+
+### Verdict global
+- **Win rate : 37,8 %** (vs 31 % breakeven théorique pour RR 2,2)
+- **EV pondéré : +0,414 % / trade**
+- **17/23 symboles en EV positive**, 6 en négative
+
+L'edge passe de +0,308 % (10 symboles) à +0,414 % (23 symboles) — la
+stat se renforce avec l'échantillon, pas l'inverse.
+
+### Lecture par bucket
+**Stars (>+1 %/trade)** : ADA (+2,40), MATIC (+2,14), DOT (+2,13). Le moteur
+pullback/breakout marche très bien sur les altcoins volatils en cycles
+tendanciels nets.
+
+**Solides (+0,3 à 1 %)** : AAPL, ETH, AVAX, BNB, NVDA, LINK, TSLA.
+
+**Modestes (+0 à 0,3 %)** : META, GS, GOOGL, AMZN, SPY, JPM.
+
+**Négatifs** : V (-0,62 %), XRP (-0,42 %), SOL (-0,22 %), BAC, MSFT, MA, BTC.
+
+### Paradoxe MA / MSFT (à creuser en PR #2)
+WR élevé (43 % MA, 41 % MSFT) — bien au-dessus du 31 % breakeven théorique
+— mais EV négative. Ça veut dire que les pertes pèsent plus lourd que
+les gains, contrairement au RR cible 2,2. Causes possibles :
+- TP atteint partiellement avant retour
+- Stops élargis par gaps overnight
+- Slippage exit asymétrique
+
+À investiguer dans la PR #2 (analytics par bucket + walk-forward).
+
+### Limites du résultat
+- ❌ **Pas de modélisation des frottements réels** : frais (~0,1 %), spread
+  (~0,05 %), slippage stop (~5-10 % du stop). Si on retranche 0,2-0,3 % par
+  trade, les symboles "modestes" passent en EV ≤ 0.
+- ❌ **Pas de walk-forward** — risque de curve-fitting implicite. Sans
+  validation hors-échantillon (train 2020-2023 / valide 2024 / test 2025),
+  on ne peut pas dire que l'edge tient hors-historique.
+- ❌ **MATIC (591 candles, 26 trades)** : période plus courte que les
+  autres crypto (lancement plus tardif sur Binance). Stat moins fiable.
+
+### Comparaison avec le paper récent
+| | Paper (39 trades) | Backtest (2841 trades) |
+|---|---|---|
+| Win rate | 7,7 % | 37,8 % |
+| EV / trade | -2,7 % | +0,414 % |
+| TP touchés | 0 | ~1074 |
+
+Le paper négatif récent est **statistiquement plausible** comme bruit
+défavorable sur un échantillon de 39 trades, sans signature de défaut
+moteur. Les 4 bugs structurels qu'on vient de corriger (PR #90) vont
+rapprocher la donnée paper de la donnée backtest sur les prochains trades.
+
+### Outil
+`tools/backtest-run.js` — snippet console qui orchestre init/symbols/finalize/
+summary. Limite : sleep 8s entre actions ne suffit pas, le rate limit
+Twelve Data effectif est ~5/min. À porter à 20s dans une prochaine PR
+si on relance les 17 symboles manquants.
+
+### Prochaines étapes
+- **C : Modéliser les frottements** sur les 2841 trades existants (post-
+  traitement, pas de nouveau backtest). Donne l'EV "réaliste" en 1h de
+  calcul.
+- **B : Lancer PR #2 — walk-forward + analytics par bucket**. Split
+  train/valide/test, agrégation par `setup × direction × régime ×
+  asset_class`. C'est ça qui donne la vraie réponse hors-échantillon.
+- **A : Compléter les 17 symboles manquants** (UNH, JNJ, LLY, PFE, KO, PG,
+  WMT, COST, CAT, BA, XOM, CVX, QQQ, IWM, XLK, XLF, GLD) avec sleep 20s
+  entre actions. Probablement pas de surprise majeure.
+
+Ordre proposé : C → B → A.
+
+### Implémentation C + B (2026-04-28)
+
+**C : friction modeling**
+- `GET /api/admin/backtest-symbol-summary?runId=X&frictionPct=0.2` — ajout
+  param query optionnel qui retire `frictionPct` de chaque trade brut.
+  Renvoie `avg_pnl_pct_net` + `win_rate_net` en plus des bruts. Valeur
+  typique : 0.15 (frais 0.05% × 2 + spread 0.05%) à 0.30 (avec slippage
+  stop). Rétro-compatible si non fourni.
+- Même param ajouté aux 2 endpoints B ci-dessous.
+
+**B : walk-forward + bucket analytics (partiel)**
+- `GET /api/admin/backtest-bucket-stats?runId=X[&frictionPct=0.2]` —
+  agrège par bucket `setup_type × direction × asset_class`. Identifie
+  quels patterns marchent. Régime non couvert (à ajouter avec calcul
+  SPY/QQQ/TLT à la date — sous-PR séparée).
+- `GET /api/admin/backtest-walkforward?runId=X[&frictionPct=0.2]` —
+  split temporel : train (≤2023), valide (2024), test (≥2025). Si
+  l'edge est uniforme entre les 3 fenêtres → robuste. Sinon curve-
+  fitting ou drift de marché.
+
+**Restant pour PR #2 complet** :
+- Calcul `regime_at_open` historique (SPY/QQQ/TLT à la date) pour les
+  trades existants (script de backfill).
+- UI admin pour visualiser les résultats.
+
+**A : à faire dans une session future** — relancer le snippet
+`tools/backtest-run.js` avec les 17 symboles restants et sleep 20s.
+
+---
+
 ## Review bot trades — 2026-04-28 (4 bugs structurels)
 
 Audit complet du dataset Supabase via `tools/post-mortem.js` (snippet console
