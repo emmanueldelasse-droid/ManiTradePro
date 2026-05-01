@@ -6304,7 +6304,16 @@ function openPositionsRiskView() {
           </div>
         </div>
 
-        <!-- SECTION B — Résultats -->
+        <!-- SECTION B — Paramètres (collapsible, juste sous l'état) -->
+        <details class="card bot-params-card" ${paramsOpen ? "open" : ""}>
+          <summary class="bot-collapsible-summary">
+            <span>Paramètres du bot</span>
+            <span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span>
+          </summary>
+          ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
+        </details>
+
+        <!-- SECTION C — Résultats -->
         ${hasStats ? `
           <div class="card bot-results-card">
             <div class="section-title"><span>Résultats</span><span class="muted">${stats.totalCount} trades clôturés</span></div>
@@ -6351,15 +6360,6 @@ function openPositionsRiskView() {
             <div class="bot-timeline">${events.slice(0, 30).map(renderBotEventRow).join("")}</div>
           </details>
         ` : ""}
-
-        <!-- SECTION C — Paramètres (collapsible) -->
-        <details class="card bot-params-card" ${paramsOpen ? "open" : ""}>
-          <summary class="bot-collapsible-summary">
-            <span>Paramètres du bot</span>
-            <span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span>
-          </summary>
-          ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
-        </details>
       </div>`;
   }
 
@@ -6448,15 +6448,18 @@ function openPositionsRiskView() {
         </div>
       ` : ""}
       ${botHistory.length ? `
-        <div class="card" style="margin-top:16px">
-          <div class="section-title"><span>Historique des trades du bot</span><span class="badge">${botHistory.length}</span></div>
+        <details class="card bot-history-card" style="margin-top:16px">
+          <summary class="bot-collapsible-summary">
+            <span>Historique des trades du bot</span>
+            <span class="badge">${botHistory.length}</span>
+          </summary>
           <div class="trade-table simplified-history">
             <div class="trade-row trade-head">
               <div>Actif</div><div>Sens</div><div>Résultat</div><div>Entrée</div><div>Sortie</div><div>P/L</div><div>Clôture</div>
             </div>
             ${botHistory.map(renderHistoryRow).join("")}
           </div>
-        </div>
+        </details>
       ` : ""}`;
   }
 
