@@ -2022,6 +2022,8 @@ async function confirmTradeFromModal() {
   }
   function normalizeBotDraftForSave(d) {
     const out = { ...d };
+    // Coerce bot_mode strict : "exploration" ou "core", défaut "exploration".
+    out.bot_mode = String(out.bot_mode || "").toLowerCase() === "core" ? "core" : "exploration";
     const pctKeys = [
       ["risk_per_trade_pct_display", "risk_per_trade_pct", 100],
       ["allocation_per_trade_pct_display", "allocation_per_trade_pct", 100],
@@ -5056,7 +5058,15 @@ function normalizePositionRecord(position){
     || null;
   const inferredClosed = !!(closedAtRaw || exitPriceRaw);
   const normalizedStatus = position?.status || (inferredClosed ? "closed" : "open");
-  const entryMode = String(rawAnalysisSnapshot?.entryMode || position?.execution?.entryMode || position?.entryMode || "").trim().toLowerCase() || null;
+  // Fallback chain :
+  //   1) snapshot.entryMode (nouvelles écritures worker)
+  //   2) execution.entryMode (rétrocompat front)
+  //   3) position.mode (colonne Supabase mtp_positions/mtp_trades) — couvre les
+  //      trades ouverts/fermés en mode "exploration"|"core" mais sans snapshot
+  //      enrichi (ex : trades avant déploiement de PR A.1).
+  const positionModeRaw = String(position?.mode || "").trim().toLowerCase();
+  const positionModeFallback = (positionModeRaw === "exploration" || positionModeRaw === "core") ? positionModeRaw : null;
+  const entryMode = String(rawAnalysisSnapshot?.entryMode || position?.execution?.entryMode || position?.entryMode || positionModeFallback || "").trim().toLowerCase() || null;
 
   const sideHint = String(
     position?.side
@@ -6283,8 +6293,18 @@ function openPositionsRiskView() {
   }
 
   function renderBotParamsReadonly(settings, capitalBase) {
+    const botMode = String(settings?.bot_mode || "exploration").toLowerCase();
+    const modeLabel = botMode === "core" ? "Core (sélection stricte)" : "Exploration (apprentissage)";
+    const modeHint = botMode === "core"
+      ? "Le bot ouvre peu de trades, seulement les meilleurs."
+      : "Le bot ouvre plus de trades pour apprendre, capital réduit.";
     return `
       <div class="bot-params" style="margin-top:8px">
+        <div class="bot-mode-badge bot-mode-${botMode === "core" ? "core" : "exploration"}" style="margin-bottom:10px">
+          <div class="bot-mode-label">Mode du bot</div>
+          <div class="bot-mode-value">${modeLabel}</div>
+          <div class="bot-mode-hint muted">${modeHint}</div>
+        </div>
         <div class="kv">
           <div class="muted">Capital base</div><div>${priceDisplay(capitalBase)}</div>
           <div class="muted">Risk par trade</div><div>${Math.round((settings.risk_per_trade_pct || 0) * 100)}%</div>
@@ -6312,8 +6332,22 @@ function openPositionsRiskView() {
     const d = state.bot.editDraft || {};
     const allowedSetupsAll = ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"];
     const currentSetups = Array.isArray(d.allowed_setups) ? d.allowed_setups : ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short"];
+    const botMode = String(d.bot_mode || "exploration").toLowerCase() === "core" ? "core" : "exploration";
     return `
       <div class="bot-params-form" style="margin-top:8px">
+        <div class="bot-mode-picker" style="margin-bottom:14px">
+          <div class="muted" style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Mode du bot</div>
+          <div class="bot-mode-row">
+            <button type="button" class="bot-mode-btn ${botMode === "exploration" ? "active" : ""}" data-bot-field-mode="exploration">
+              <div class="bot-mode-btn-title">Exploration</div>
+              <div class="bot-mode-btn-hint">Plus de trades, capital réduit. Le bot apprend.</div>
+            </button>
+            <button type="button" class="bot-mode-btn ${botMode === "core" ? "active" : ""}" data-bot-field-mode="core">
+              <div class="bot-mode-btn-title">Core</div>
+              <div class="bot-mode-btn-hint">Peu de trades, seulement les meilleurs.</div>
+            </button>
+          </div>
+        </div>
         <div class="bot-field-grid">
           <label class="bot-field"><span>Capital base ($)</span><input type="number" inputmode="decimal" min="100" step="100" data-bot-field="capital_base" value="${Number(d.capital_base || 10000)}"></label>
           <label class="bot-field"><span>Risk / trade (%)</span><input type="number" inputmode="decimal" min="0.1" max="20" step="0.1" data-bot-field="risk_per_trade_pct_display" value="${(Number(d.risk_per_trade_pct || 0.02) * 100).toFixed(1)}"></label>
@@ -7141,6 +7175,15 @@ function renderMain() {
     app.querySelectorAll("[data-bot-field-setup]").forEach(el => {
       el.addEventListener("change", () => {
         toggleBotDraftSetup(el.getAttribute("data-bot-field-setup"), el.checked);
+      });
+    });
+    app.querySelectorAll("[data-bot-field-mode]").forEach(el => {
+      el.addEventListener("click", () => {
+        const next = String(el.getAttribute("data-bot-field-mode") || "exploration").toLowerCase();
+        const value = next === "core" ? "core" : "exploration";
+        updateBotDraftField("bot_mode", value);
+        haptic(10);
+        render();
       });
     });
     app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {

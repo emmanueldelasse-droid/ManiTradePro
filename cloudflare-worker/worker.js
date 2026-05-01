@@ -2995,6 +2995,12 @@ async function handleOpportunityDetail(symbol, env, url = null) {
 function getTrainingDefaults() {
   return {
     mode: "training",
+    // Mode d'apprentissage du bot. "exploration" ouvre plus de trades avec des
+    // seuils relâchés pour collecter de la donnée. "core" durcit les seuils et
+    // privilégie la qualité. Le mode est inscrit dans chaque trade ouvert
+    // (mtp_positions.mode, mtp_trades.mode) pour permettre au module
+    // d'apprentissage d'agréger séparément les deux populations.
+    bot_mode: "exploration",
     is_enabled: false,               // master switch — user toggle
     auto_open_enabled: true,
     auto_close_enabled: true,
@@ -3476,6 +3482,16 @@ function coerceBoolean(value, fallback = false) {
   }
   return fallback;
 }
+// Modes valides pour le champ bot_mode des settings et le champ mode des
+// trades/positions. "training" reste accepté en lecture pour rétrocompat
+// avec l'historique avant l'introduction des deux modes.
+const BOT_MODES = ["exploration", "core"];
+const TRADE_MODE_FILTER_VALUES = ["training", "exploration", "core"];
+function coerceBotMode(value, fallback = "exploration") {
+  const clean = String(value || "").trim().toLowerCase();
+  if (BOT_MODES.includes(clean)) return clean;
+  return fallback;
+}
 function clampInt(value, min, max, fallback) {
   const num = Math.round(Number(value));
   if (!Number.isFinite(num)) return fallback;
@@ -3492,6 +3508,7 @@ function normalizeTrainingSettingsRow(row) {
   const safe = row && typeof row === "object" ? row : {};
   return {
     mode: "training",
+    bot_mode: coerceBotMode(safe.bot_mode, base.bot_mode),
     is_enabled: coerceBoolean(safe.is_enabled, base.is_enabled),
     auto_open_enabled: coerceBoolean(safe.auto_open_enabled, base.auto_open_enabled),
     auto_close_enabled: coerceBoolean(safe.auto_close_enabled, base.auto_close_enabled),
@@ -3635,17 +3652,19 @@ function normalizeTrainingTrades(rows) {
 
 async function getOpenTrainingPositionsRaw(env) {
   if (!supabaseConfigured(env)) return [];
-  const rows = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training&status=eq.open&order=opened_at.asc`);
+  const rows = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=in.(training,exploration,core)&status=eq.open&order=opened_at.asc`);
   return Array.isArray(rows) ? rows : [];
 }
 async function getClosedTrainingTradesRaw(env, limit = 200) {
   if (!supabaseConfigured(env)) return [];
-  const rows = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&order=closed_at.desc&limit=${clampInt(limit,1,1000,200)}`);
+  const rows = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed&order=closed_at.desc&limit=${clampInt(limit,1,1000,200)}`);
   return Array.isArray(rows) ? rows : [];
 }
 
-function buildTrainingAnalysisSnapshotFromPayload(payload) {
+function buildTrainingAnalysisSnapshotFromPayload(payload, context = {}) {
   const plan = payload?.plan || {};
+  const regime = context?.regime || payload?.regime || plan?.regime || null;
+  const botMode = coerceBotMode(context?.botMode, "exploration");
   return {
     symbol: payload?.symbol || null,
     name: payload?.name || null,
@@ -3654,6 +3673,7 @@ function buildTrainingAnalysisSnapshotFromPayload(payload) {
     decisionScore: finiteOrNull(plan?.decisionScore),
     safetyScore: finiteOrNull(plan?.safetyScore),
     actionabilityScore: finiteOrNull(plan?.exploitabilityScore),
+    exploitabilityScore: finiteOrNull(plan?.exploitabilityScore),
     officialScore: finiteOrNull(payload?.officialScore ?? plan?.safetyScore ?? plan?.exploitabilityScore),
     decision: payload?.decision || plan?.decision || null,
     trendLabel: payload?.trendLabel || plan?.trendLabel || null,
@@ -3669,6 +3689,14 @@ function buildTrainingAnalysisSnapshotFromPayload(payload) {
     setupStatus: plan?.setupStatus || null,
     confirmationCount: Number.isFinite(Number(plan?.confirmationCount)) ? Number(plan.confirmationCount) : null,
     blockerFlags: Array.isArray(plan?.blockerFlags) ? plan.blockerFlags : [],
+    // PR adaptive — régime de marché + mode du bot capturés à l'ouverture.
+    // Utilisés par le module d'apprentissage pour grouper les trades par
+    // bucket "setup × régime × mode" et calculer l'espérance par bucket.
+    regimeAtOpen: regime?.regime || (typeof regime === "string" ? regime : null),
+    regimeBonus: finiteOrNull(plan?.regimeBonus),
+    regimeBonusReason: plan?.regimeBonusReason || null,
+    botMode,
+    entryMode: botMode,
     // PR #7 Phase 2 — capture le context news à l'ouverture pour que
     // captureTradeFeedback le propage en news_context_open.
     newsContext: plan?.newsContext || payload?.newsContext || null,
@@ -3737,11 +3765,15 @@ function computePnlForClose(position, exitPrice) {
 }
 
 function buildTrainingPositionRowFromSignal(payload, execution, settings) {
-  const analysisSnapshot = buildTrainingAnalysisSnapshotFromPayload(payload);
-  const id = `${parseSymbol(payload?.symbol)}:training:${Date.now()}`;
+  const botMode = coerceBotMode(settings?.bot_mode, "exploration");
+  const analysisSnapshot = buildTrainingAnalysisSnapshotFromPayload(payload, {
+    regime: payload?.regime || payload?.regimeContext || null,
+    botMode
+  });
+  const id = `${parseSymbol(payload?.symbol)}:${botMode}:${Date.now()}`;
   return {
     id, symbol: parseSymbol(payload?.symbol), name: payload?.name || parseSymbol(payload?.symbol),
-    mode: "training", status: "open", side: execution.side,
+    mode: botMode, status: "open", side: execution.side,
     asset_class: payload?.assetClass || getAssetClass(parseSymbol(payload?.symbol)),
     quantity: execution.quantity, entry_price: execution.entryPrice, invested: execution.invested,
     stop_loss: execution.stopLoss, take_profit: execution.takeProfit,
@@ -3760,7 +3792,13 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings) {
 }
 
 function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload) {
-  const analysisSnapshot = position?.analysis_snapshot || buildTrainingAnalysisSnapshotFromPayload(detailPayload || {});
+  const inheritedMode = position?.mode && TRADE_MODE_FILTER_VALUES.includes(String(position.mode))
+    ? String(position.mode)
+    : "exploration";
+  const analysisSnapshot = position?.analysis_snapshot || buildTrainingAnalysisSnapshotFromPayload(detailPayload || {}, {
+    regime: detailPayload?.regime || detailPayload?.regimeContext || null,
+    botMode: inheritedMode === "training" ? "exploration" : inheritedMode
+  });
   const { pnl, pnlPct } = computePnlForClose(position, exitPrice);
   const closedAt = nowIso();
   const openedAt = position?.opened_at || null;
@@ -3776,7 +3814,7 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
     id: position?.id || null,
     symbol: parseSymbol(position?.symbol || ""),
     name: position?.name || parseSymbol(position?.symbol || ""),
-    mode: "training", status: "closed", side: position?.side || null,
+    mode: inheritedMode, status: "closed", side: position?.side || null,
     asset_class: position?.asset_class || null,
     quantity: finiteOrNull(position?.quantity ?? position?.execution?.quantity),
     entry_price: finiteOrNull(position?.entry_price ?? position?.entryPrice ?? position?.execution?.entryPrice),
@@ -4039,6 +4077,13 @@ async function listTradeFeedback(env, { limit = 100, bucketKey = null, symbol = 
 async function openTrainingPositionFromRow(env, row, settings, availableCash, activeAdjustments = null) {
   const execution = chooseTrainingExecution(row, settings, availableCash, activeAdjustments);
   if (!execution) return null;
+  // Capture le régime de marché courant à l'ouverture (KV cache "market:regime")
+  // pour que buildTrainingAnalysisSnapshotFromPayload l'embarque dans
+  // analysis_snapshot.regimeAtOpen. Sans ça, le module d'apprentissage ne peut
+  // pas grouper les trades par bucket "setup × régime".
+  if (!row.regime) {
+    try { row.regime = await kvGet("market:regime", env); } catch {}
+  }
   const positionRow = buildTrainingPositionRowFromSignal(row, execution, settings);
   // Anti-race : vérifier en BDD qu'aucune position ouverte n'existe déjà sur ce
   // symbol+side avant d'insérer. L'ID embarque Date.now() donc resolution=
@@ -4048,7 +4093,7 @@ async function openTrainingPositionFromRow(env, row, settings, availableCash, ac
   // MSFT × 2 à 30 min d'écart avec PnL strictement identiques).
   const existingRaw = await supabaseFetch(
     env,
-    `${TRADE_TABLES.positions}?select=id&mode=eq.training&status=eq.open&symbol=eq.${encodeURIComponent(positionRow.symbol)}&side=eq.${encodeURIComponent(positionRow.side)}`
+    `${TRADE_TABLES.positions}?select=id&mode=in.(training,exploration,core)&status=eq.open&symbol=eq.${encodeURIComponent(positionRow.symbol)}&side=eq.${encodeURIComponent(positionRow.side)}`
   ).catch(() => null);
   if (Array.isArray(existingRaw) && existingRaw.length > 0) return null;
   await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
@@ -4241,8 +4286,8 @@ function tradesPayload(configured, positions = [], history = [], message = null)
 
 async function handleTradesState(env) {
   if (!supabaseConfigured(env)) return tradesPayload(false, [], [], "Secrets Supabase absents");
-  const positionsRaw = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training&status=eq.open&order=opened_at.desc`);
-  const historyRaw = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&order=closed_at.desc`);
+  const positionsRaw = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=in.(training,exploration,core)&status=eq.open&order=opened_at.desc`);
+  const historyRaw = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed&order=closed_at.desc`);
   const history = normalizeTrainingTrades(Array.isArray(historyRaw) ? historyRaw : []);
   const closedIds = new Set(history.map(row => String(row.id || "")).filter(Boolean));
   const positions = normalizeTrainingPositions(Array.isArray(positionsRaw) ? positionsRaw : []).filter(row => !closedIds.has(String(row.id || "")));
@@ -4382,13 +4427,13 @@ async function handleTradesWipe(request, env) {
     if (wipeAll) {
       let deletedTrades = 0;
       let deletedPositions = 0;
-      const tradesRes = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed`, {
+      const tradesRes = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed`, {
         method: "DELETE",
         headers: { Prefer: "return=representation", Accept: "application/json" }
       });
       deletedTrades = Array.isArray(tradesRes) ? tradesRes.length : 0;
       if (includePositions) {
-        const posRes = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training`, {
+        const posRes = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=in.(training,exploration,core)`, {
           method: "DELETE",
           headers: { Prefer: "return=representation", Accept: "application/json" }
         });
@@ -4404,7 +4449,7 @@ async function handleTradesWipe(request, env) {
     if (validSource) {
       const allRows = await supabaseFetch(
         env,
-        `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&select=id,source,trade_decision&limit=100000`
+        `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed&select=id,source,trade_decision&limit=100000`
       );
       const rows = Array.isArray(allRows) ? allRows : [];
       const matching = rows.filter(r => tradeSourceServer(r) === validSource);
@@ -4421,7 +4466,7 @@ async function handleTradesWipe(request, env) {
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);
         const inList = encodeInList(slice);
-        const res = await supabaseFetch(env, `${TRADE_TABLES.trades}?id=in.(${inList})&mode=eq.training`, {
+        const res = await supabaseFetch(env, `${TRADE_TABLES.trades}?id=in.(${inList})&mode=in.(training,exploration,core)`, {
           method: "DELETE",
           headers: { Prefer: "return=representation" }
         });
@@ -4434,7 +4479,7 @@ async function handleTradesWipe(request, env) {
 
     let deletedPositions = 0;
     if (includePositions) {
-      const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=eq.training`, {
+      const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=in.(training,exploration,core)`, {
         method: "DELETE",
         headers: { Prefer: "return=representation" }
       });
@@ -4444,7 +4489,7 @@ async function handleTradesWipe(request, env) {
       for (let i = 0; i < ids.length; i += CHUNK) {
         const slice = ids.slice(i, i + CHUNK);
         const inList = encodeInList(slice);
-        const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?id=in.(${inList})&mode=eq.training`, {
+        const res = await supabaseFetch(env, `${TRADE_TABLES.positions}?id=in.(${inList})&mode=in.(training,exploration,core)`, {
           method: "DELETE",
           headers: { Prefer: "return=representation" }
         });
@@ -5234,7 +5279,7 @@ async function computeBucketStats(env) {
   if (!supabaseConfigured(env)) return {};
   try {
     const rows = await supabaseFetch(env,
-      `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&order=closed_at.desc&limit=1000`
+      `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed&order=closed_at.desc&limit=1000`
     );
     if (!Array.isArray(rows) || rows.length === 0) return {};
 
@@ -5783,7 +5828,7 @@ async function computeGlobalStreaks(env, { limit = 10 } = {}) {
   if (!supabaseConfigured(env)) return { consecutiveLosses: 0, consecutiveWins: 0 };
   try {
     const rows = await supabaseFetch(env,
-      `${TRADE_TABLES.trades}?mode=eq.training&status=eq.closed&select=pnl,closed_at&order=closed_at.desc&limit=${limit}`
+      `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed&select=pnl,closed_at&order=closed_at.desc&limit=${limit}`
     );
     if (!Array.isArray(rows) || rows.length === 0) return { consecutiveLosses: 0, consecutiveWins: 0 };
     let losses = 0, wins = 0;
@@ -6551,7 +6596,7 @@ async function computeLastActivityPerSymbol(env) {
       `${SIGNAL_TABLE}?select=symbol,created_at&order=created_at.desc&limit=2000`
     ).catch(() => []);
     const trades = await supabaseFetch(env,
-      `${TRADE_TABLES.trades}?select=symbol,opened_at,closed_at&mode=eq.training&order=closed_at.desc&limit=2000`
+      `${TRADE_TABLES.trades}?select=symbol,opened_at,closed_at&mode=in.(training,exploration,core)&order=closed_at.desc&limit=2000`
     ).catch(() => []);
 
     const upsert = (sym, tsStr) => {
@@ -6909,7 +6954,7 @@ async function getPnlIntegrity(env) {
   if (!supabaseConfigured(env)) return { configured: false };
   try {
     const rows = await supabaseFetch(env,
-      `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,pnl&mode=eq.training&pnl=eq.0&limit=200`
+      `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,pnl&mode=in.(training,exploration,core)&pnl=eq.0&limit=200`
     );
     const broken = (Array.isArray(rows) ? rows : []).filter(r => {
       const entry = Number(r?.entry_price);
@@ -6974,7 +7019,7 @@ async function handleHealth(request, env) {
 async function handleBackfillPnl(env) {
   if (!supabaseConfigured(env)) return fail("Supabase non configuré", "error", 503);
   const rows = await supabaseFetch(env,
-    `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,side,pnl,pnl_pct,stop_loss,take_profit&mode=eq.training&pnl=eq.0&limit=500`
+    `${TRADE_TABLES.trades}?select=id,symbol,entry_price,exit_price,quantity,side,pnl,pnl_pct,stop_loss,take_profit&mode=in.(training,exploration,core)&pnl=eq.0&limit=500`
   );
   const candidates = (Array.isArray(rows) ? rows : []).filter(r => {
     const entry = Number(r?.entry_price);
