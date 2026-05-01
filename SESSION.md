@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-04-28 (review bot trades — 4 bugs structurels investigués, 3 fixés) |
+| **Dernière mise à jour** | 2026-05-01 (PR A — système adaptatif : modes Exploration/Core + capture régime à l'ouverture) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/review-bot-trades-b7LwR` |
+| **Branche active** | `claude/adaptive-trading-system-ocCkY` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -62,6 +62,58 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Système adaptatif — PR A (2026-05-01)
+
+Première brique du système d'apprentissage par feedback réel. **Aucune logique
+de décision n'est modifiée** — on prépare seulement la donnée.
+
+### Ce qui change
+1. **Deux modes du bot** au lieu d'un seul `training` :
+   - **Exploration** (défaut) : seuils relâchés, plus de trades, capital réduit
+     → le bot apprend.
+   - **Core** : seuils stricts → seulement les meilleurs setups passent.
+2. **Sélecteur dans Réglages → Bot → Édition** : 2 boutons "Exploration" /
+   "Core" (badge dans la vue lecture seule). Le mode courant est inscrit
+   dans chaque trade ouvert (`mtp_positions.mode` + `mtp_trades.mode` +
+   `analysis_snapshot.entryMode`).
+3. **Capture du régime à l'ouverture** : `analysis_snapshot.regimeAtOpen`
+   (RISK_ON / RANGE / RISK_OFF) est désormais figé au moment d'ouvrir le
+   trade, plus recalculé au close. Indispensable pour PR B (calcul de
+   l'espérance par bucket setup × régime).
+4. **Scores détaillés persistés** dans le snapshot : `decisionScore`,
+   `safetyScore`, `exploitabilityScore`, `regimeBonus`, `regimeBonusReason`
+   — tous étaient calculés mais perdus.
+
+### Rétrocompatibilité
+- Les requêtes Supabase qui filtraient `mode=eq.training` filtrent
+  maintenant `mode=in.(training,exploration,core)` → les anciens trades
+  restent visibles dans l'UI et les stats.
+- Le front affiche le badge "Exploration" / "Core" via un fallback chain
+  qui regarde successivement `analysisSnapshot.entryMode`, `execution.entryMode`
+  et enfin `position.mode`.
+
+### Migration SQL Supabase requise
+La table `mtp_training_settings` doit accepter une colonne `bot_mode`. À
+exécuter dans le dashboard SQL Supabase :
+
+```sql
+ALTER TABLE mtp_training_settings
+  ADD COLUMN IF NOT EXISTS bot_mode TEXT NOT NULL DEFAULT 'exploration'
+  CHECK (bot_mode IN ('exploration', 'core'));
+```
+
+Sans cette migration, le worker continue de fonctionner mais le toggle de
+mode ne sera pas persisté côté serveur — il faudra le reposer à chaque
+redémarrage. Tant qu'on n'utilise pas activement "core", l'app marche
+quand même (default = exploration).
+
+### Ce qui ne change pas (volontairement)
+- Le moteur de décision (`calcDetailScore`) **n'utilise pas encore** les
+  données collectées. C'est PR C.
+- Aucune page "Apprentissage" n'est exposée. C'est PR B.
 
 ---
 

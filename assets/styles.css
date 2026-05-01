@@ -1244,6 +1244,27 @@ details[open] > .bot-collapsible-summary::after{transform:rotate(180deg)}
 .bot-field-setups{padding-top:10px;border-top:1px dashed var(--border-subtle)}
 .bot-setups-row{display:flex;gap:14px;flex-wrap:wrap}
 
+/* Bot — sélecteur Mode (Exploration / Core) */
+.bot-mode-row{display:flex;gap:10px}
+@media (max-width:520px){.bot-mode-row{flex-direction:column}}
+.bot-mode-btn{flex:1;display:flex;flex-direction:column;gap:4px;padding:12px 14px;min-height:64px;border-radius:12px;border:1px solid var(--border-medium);background:transparent;color:var(--text-primary);font-family:inherit;text-align:left;cursor:pointer;transition:background .15s,border-color .15s,transform .08s}
+.bot-mode-btn:active{transform:scale(.98)}
+.bot-mode-btn.active{border-color:var(--accent);background:rgba(138,163,255,.10);color:var(--text-primary);box-shadow:inset 0 0 0 1px var(--accent)}
+.bot-mode-btn-title{font-weight:700;font-size:.95rem}
+.bot-mode-btn-hint{font-size:.78rem;color:var(--text-secondary);line-height:1.3}
+.bot-mode-badge{padding:10px 12px;border-radius:10px;border:1px solid var(--border-subtle);display:flex;flex-direction:column;gap:2px}
+.bot-mode-badge .bot-mode-label{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--text-secondary)}
+.bot-mode-badge .bot-mode-value{font-weight:700;font-size:.95rem}
+.bot-mode-badge .bot-mode-hint{font-size:.78rem;line-height:1.3}
+.bot-mode-badge.bot-mode-core{border-left:3px solid var(--accent)}
+.bot-mode-badge.bot-mode-exploration{border-left:3px solid var(--warn,#e0a458)}
+.app-shell:not(.theme-light) .bot-mode-btn{background:rgba(255,255,255,.02)}
+.app-shell:not(.theme-light) .bot-mode-btn.active{background:rgba(138,163,255,.16)}
+.app-shell:not(.theme-light) .bot-mode-badge{background:rgba(14,19,35,.55)}
+.app-shell.theme-light .bot-mode-btn{background:#ffffff;border-color:rgba(15,23,42,.12)}
+.app-shell.theme-light .bot-mode-btn.active{background:rgba(138,163,255,.10);border-color:var(--accent)}
+.app-shell.theme-light .bot-mode-badge{background:#ffffff;border-color:rgba(15,23,42,.12)}
+
 /* Bot — ajustements thème clair */
 .app-shell.theme-light .bot-risk-warn{color:#a83030;background:rgba(224,90,90,.08);border-color:rgba(224,90,90,.22)}
 .app-shell.theme-light .bot-toggle-slider{background:#e5e7eb;border-color:rgba(15,23,42,.12)}
