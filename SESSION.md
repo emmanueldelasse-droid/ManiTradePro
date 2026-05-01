@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-01 (PR A — système adaptatif : modes Exploration/Core + capture régime à l'ouverture) |
-| **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/adaptive-trading-system-ocCkY` |
+| **Dernière mise à jour** | 2026-05-01 (PR C — boucle adaptative branchée + toggle on/off + 3 micro-UX — trilogy complète, mergée sur main) |
+| **IA utilisée** | Claude (claude-sonnet-4-6) |
+| **Branche active** | `main` (prochaine feature : nouvelle branche à créer) |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
