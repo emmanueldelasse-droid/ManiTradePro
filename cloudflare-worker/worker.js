@@ -4074,6 +4074,165 @@ async function listTradeFeedback(env, { limit = 100, bucketKey = null, symbol = 
   }
 }
 
+// ============================================================
+// LEARNING — calcul d'espérance par bucket (PR B système adaptatif)
+// ============================================================
+//
+// Lit mtp_trade_feedback (qui contient déjà bucket_key, pnl_pct, mae_pct,
+// mfe_pct, holding_minutes, regime_at_open, setup_type, direction, asset_class)
+// et agrège par bucket pour calculer winrate, gain moyen, perte moyenne et
+// espérance.
+//
+// Espérance = winrate × gainMoyen − (1 − winrate) × |perteMoyenne|
+//
+// Bucket maturité : un bucket est considéré "actif" pour l'apprentissage à
+// partir de LEARNING_BUCKET_MIN_TRADES trades (par défaut 20). En dessous,
+// on l'affiche en "collecte" — ses stats peuvent être affichées mais ne
+// doivent pas être utilisées pour modifier des décisions (PR C).
+//
+// Le filtrage par mode bot (exploration / core) est fait en joignant en
+// mémoire avec mtp_trades.mode via trade_id. Trades sans entrée mode_map
+// (ex. anciens trades pré-PR A en mode "training") sont catégorisés
+// "training".
+
+const LEARNING_BUCKET_MIN_TRADES = 20;
+const LEARNING_CACHE_TTL_S = 300; // 5 min
+
+async function computeLearningStats(env, { mode = "all", limit = 1000 } = {}) {
+  if (!supabaseConfigured(env)) return { configured: false, buckets: [], totals: null };
+
+  const cacheKey = `learning:stats:${mode}:${limit}`;
+  const cached = getMemoryCache(cacheKey);
+  if (cached) return cached;
+
+  // 1. Lire les feedback rows (riches : pnl_pct, MAE/MFE, holding…)
+  const feedbackRows = await supabaseFetch(env,
+    `${TRADE_FEEDBACK_TABLE}?select=trade_id,bucket_key,setup_type,direction,regime_at_open,asset_class,pnl_pct,holding_minutes,mae_pct,mfe_pct&order=closed_at.desc&limit=${clampInt(limit, 1, 5000, 1000)}`
+  ).catch(() => []);
+  const rows = Array.isArray(feedbackRows) ? feedbackRows : [];
+
+  // 2. Charger la map trade_id → mode pour permettre le filtrage par mode bot.
+  //    Une seule query, on ne sélectionne que ce qu'il faut.
+  let modeMap = new Map();
+  if (rows.length > 0) {
+    const ids = rows.map(r => r.trade_id).filter(Boolean);
+    if (ids.length) {
+      const inList = ids.slice(0, 1000).map(id => `"${id}"`).join(",");
+      const tradeRows = await supabaseFetch(env,
+        `${TRADE_TABLES.trades}?select=id,mode&id=in.(${inList})`
+      ).catch(() => []);
+      if (Array.isArray(tradeRows)) {
+        for (const t of tradeRows) modeMap.set(String(t.id), String(t.mode || "training"));
+      }
+    }
+  }
+
+  // 3. Filtre mode si demandé
+  const wantMode = String(mode || "all").toLowerCase();
+  const filteredRows = wantMode === "all"
+    ? rows
+    : rows.filter(r => (modeMap.get(String(r.trade_id)) || "training") === wantMode);
+
+  // 4. Agrégation par bucket
+  const buckets = new Map();
+  for (const r of filteredRows) {
+    const key = r.bucket_key
+      || `${r.setup_type || "unknown"}|${r.direction || "long"}|${r.regime_at_open || "unknown"}|${r.asset_class || "unknown"}`;
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        bucketKey: key,
+        setupType: r.setup_type || "unknown",
+        direction: r.direction || "long",
+        regime: r.regime_at_open || "unknown",
+        assetClass: r.asset_class || "unknown",
+        n: 0,
+        wins: 0,
+        losses: 0,
+        gainSum: 0,
+        lossSum: 0,
+        holdingSum: 0,
+        holdingN: 0
+      });
+    }
+    const b = buckets.get(key);
+    const pnl = Number(r.pnl_pct);
+    if (!Number.isFinite(pnl)) continue;
+    b.n++;
+    if (pnl > 0) { b.wins++; b.gainSum += pnl; }
+    else if (pnl < 0) { b.losses++; b.lossSum += pnl; }  // pnl déjà négatif
+    if (Number.isFinite(Number(r.holding_minutes))) {
+      b.holdingSum += Number(r.holding_minutes);
+      b.holdingN++;
+    }
+  }
+
+  // 5. Calculs dérivés
+  const out = [];
+  for (const b of buckets.values()) {
+    const winrate = b.n > 0 ? b.wins / b.n : 0;
+    const gainAvg = b.wins > 0 ? b.gainSum / b.wins : 0;
+    // lossAvg est négatif ; on garde le signe pour l'affichage et on prend
+    // la valeur absolue pour le calcul d'espérance.
+    const lossAvg = b.losses > 0 ? b.lossSum / b.losses : 0;
+    const expectancy = winrate * gainAvg - (1 - winrate) * Math.abs(lossAvg);
+    const holdingAvg = b.holdingN > 0 ? b.holdingSum / b.holdingN : null;
+    out.push({
+      bucketKey: b.bucketKey,
+      setupType: b.setupType,
+      direction: b.direction,
+      regime: b.regime,
+      assetClass: b.assetClass,
+      n: b.n,
+      wins: b.wins,
+      losses: b.losses,
+      winrate: Number(winrate.toFixed(4)),
+      gainAvg: Number(gainAvg.toFixed(4)),
+      lossAvg: Number(lossAvg.toFixed(4)),
+      expectancy: Number(expectancy.toFixed(4)),
+      holdingAvgMinutes: holdingAvg != null ? Number(holdingAvg.toFixed(0)) : null,
+      mature: b.n >= LEARNING_BUCKET_MIN_TRADES
+    });
+  }
+  // Tri : matures en premier, par espérance décroissante
+  out.sort((a, b) => {
+    if (a.mature !== b.mature) return a.mature ? -1 : 1;
+    return b.expectancy - a.expectancy;
+  });
+
+  // 6. Totaux globaux (pour le panneau "résumé")
+  const totalN = out.reduce((s, b) => s + b.n, 0);
+  const matureN = out.reduce((s, b) => s + (b.mature ? b.n : 0), 0);
+  const positiveBuckets = out.filter(b => b.mature && b.expectancy > 0).length;
+  const negativeBuckets = out.filter(b => b.mature && b.expectancy < 0).length;
+  const totals = {
+    bucketsTotal: out.length,
+    bucketsMature: out.filter(b => b.mature).length,
+    bucketsPositive: positiveBuckets,
+    bucketsNegative: negativeBuckets,
+    tradesTotal: totalN,
+    tradesMature: matureN,
+    minTradesForMaturity: LEARNING_BUCKET_MIN_TRADES
+  };
+
+  const payload = {
+    configured: true,
+    mode: wantMode,
+    buckets: out,
+    totals
+  };
+  setMemoryCache(cacheKey, LEARNING_CACHE_TTL_S, payload);
+  return payload;
+}
+
+async function handleLearningStats(env, url) {
+  const mode = String(url?.searchParams?.get("mode") || "all").toLowerCase();
+  const validModes = ["all", "training", "exploration", "core"];
+  const safeMode = validModes.includes(mode) ? mode : "all";
+  const limit = clampInt(url?.searchParams?.get("limit"), 1, 5000, 1000);
+  const data = await computeLearningStats(env, { mode: safeMode, limit });
+  return json({ status: "ok", asOf: nowIso(), data });
+}
+
 async function openTrainingPositionFromRow(env, row, settings, availableCash, activeAdjustments = null) {
   const execution = chooseTrainingExecution(row, settings, availableCash, activeAdjustments);
   if (!execution) return null;
@@ -8056,6 +8215,11 @@ async function handleRequest(request, env) {
       return safeRoute(() => handleDriftDetect(env));
     }
     if (url.pathname === "/api/engine/bucket-stats") return safeRoute(() => handleBucketStats(env));
+    if (url.pathname === "/api/learning/stats") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleLearningStats(env, url));
+    }
     if (url.pathname === "/api/engine/corrections-detect") {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;

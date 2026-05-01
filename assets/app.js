@@ -117,7 +117,7 @@
     userAssetsLoading: false,
     userAssetsError: null,
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
-    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false, subTab: "stats" },
+    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false, subTab: "stats", learning: { stats: null, loading: false, error: null, filterMode: "all", lastLoadedAt: 0 } },
     health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 },
     reports: { list: [], loading: false, error: null, openId: null, generating: false },   // PR #9 Phase 2 — rapports hebdo
     tradeFeedback: {} // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
@@ -1884,6 +1884,30 @@ async function confirmTradeFromModal() {
       state.bot.error = e.message || "Erreur de chargement";
     } finally {
       state.bot.loading = false;
+      render();
+    }
+  }
+
+  async function loadLearning() {
+    // PR B système adaptatif — récupère les statistiques d'apprentissage par
+    // bucket (setup × régime × asset_class). Filtre optionnel par mode bot.
+    state.bot.learning.loading = true;
+    state.bot.learning.error = null;
+    render();
+    try {
+      const mode = state.bot.learning.filterMode || "all";
+      const resp = await apiGetAuth(`/api/learning/stats?mode=${encodeURIComponent(mode)}`).catch(e => ({ _err: e?.message }));
+      if (resp && resp.status === "ok" && resp.data) {
+        state.bot.learning.stats = resp.data;
+        state.bot.learning.lastLoadedAt = Date.now();
+        state.bot.learning.error = null;
+      } else {
+        state.bot.learning.error = resp?._err || "Chargement impossible";
+      }
+    } catch (e) {
+      state.bot.learning.error = e?.message || "Chargement impossible";
+    } finally {
+      state.bot.learning.loading = false;
       render();
     }
   }
@@ -6001,7 +6025,126 @@ function openPositionsRiskView() {
       <button class="bot-subtab ${sub==="stats"?"active":""}" data-bot-subtab="stats" role="tab">État</button>
       <button class="bot-subtab ${sub==="performance"?"active":""}" data-bot-subtab="performance" role="tab">Performance</button>
       <button class="bot-subtab ${sub==="health"?"active":""}" data-bot-subtab="health" role="tab">Santé</button>
+      <button class="bot-subtab ${sub==="learning"?"active":""}" data-bot-subtab="learning" role="tab">Apprentissage</button>
     </div>`;
+  }
+
+  function fmtPct(v) {
+    return Number.isFinite(Number(v)) ? `${(Number(v) * 100).toFixed(1)}%` : "—";
+  }
+  function fmtPctSigned(v) {
+    if (!Number.isFinite(Number(v))) return "—";
+    const n = Number(v);
+    const sign = n > 0 ? "+" : "";
+    return `${sign}${n.toFixed(2)}%`;
+  }
+  function fmtMinutes(v) {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return "—";
+    if (n < 60) return `${Math.round(n)} min`;
+    const h = n / 60;
+    if (h < 48) return `${h.toFixed(1)} h`;
+    return `${(h / 24).toFixed(1)} j`;
+  }
+
+  function renderBotLearning() {
+    if (!isSessionValid()) {
+      return `
+        <div class="screen">
+          <div class="screen-header">
+            <div class="screen-title">Apprentissage</div>
+            <div class="screen-subtitle">Connecte-toi (PIN) pour voir ce que le bot a appris.</div>
+          </div>
+        </div>`;
+    }
+    const learning = state.bot.learning || { stats: null, loading: false, error: null, filterMode: "all" };
+    const stats = learning.stats;
+    const buckets = Array.isArray(stats?.buckets) ? stats.buckets : [];
+    const totals = stats?.totals || null;
+    const filterMode = learning.filterMode || "all";
+
+    return `
+      <div class="screen">
+        <div class="screen-header">
+          <div class="screen-title">Ce que le bot a appris</div>
+          <div class="screen-subtitle">Pour chaque combinaison ${"(setup × régime × actif)"}, voici son taux de réussite et son gain moyen par trade. Lecture seule — n'agit pas encore sur les décisions.</div>
+        </div>
+
+        <div class="card">
+          <div class="learning-controls">
+            <div class="learning-filter">
+              <button type="button" class="learning-filter-btn ${filterMode==="all"?"active":""}" data-learning-filter="all">Tous les modes</button>
+              <button type="button" class="learning-filter-btn ${filterMode==="exploration"?"active":""}" data-learning-filter="exploration">Exploration</button>
+              <button type="button" class="learning-filter-btn ${filterMode==="core"?"active":""}" data-learning-filter="core">Core</button>
+              <button type="button" class="learning-filter-btn ${filterMode==="training"?"active":""}" data-learning-filter="training">Historique</button>
+            </div>
+            <button class="btn btn-secondary" data-learning-reload ${learning.loading?"disabled":""}>${learning.loading?"Chargement…":"Rafraîchir"}</button>
+          </div>
+
+          ${learning.error ? `<div class="bot-risk-warn" style="margin-top:12px">${safeText(learning.error)}</div>` : ""}
+
+          ${totals ? `
+            <div class="learning-totals">
+              <div class="learning-total"><div class="learning-total-label">Trades pris en compte</div><div class="learning-total-value">${totals.tradesTotal ?? 0}</div></div>
+              <div class="learning-total"><div class="learning-total-label">Combinaisons matures</div><div class="learning-total-value">${totals.bucketsMature ?? 0} <span class="muted">/ ${totals.bucketsTotal ?? 0}</span></div></div>
+              <div class="learning-total"><div class="learning-total-label">Combinaisons gagnantes</div><div class="learning-total-value pos">${totals.bucketsPositive ?? 0}</div></div>
+              <div class="learning-total"><div class="learning-total-label">Combinaisons perdantes</div><div class="learning-total-value neg">${totals.bucketsNegative ?? 0}</div></div>
+            </div>
+            <div class="muted" style="font-size:.78rem;margin-top:8px">Une combinaison est dite « mature » à partir de ${totals.minTradesForMaturity ?? 20} trades — en dessous on collecte encore.</div>
+          ` : ""}
+        </div>
+
+        <div class="card learning-table-card">
+          ${learning.loading && buckets.length === 0
+            ? `<div class="loading-state">Chargement des stats d'apprentissage…</div>`
+            : buckets.length === 0
+              ? `<div class="empty-state" style="padding:24px">Aucun trade à analyser pour ce filtre. Reviens quand le bot aura clos quelques positions.</div>`
+              : `<div class="learning-table-wrap">${renderLearningTable(buckets)}</div>`
+          }
+        </div>
+      </div>`;
+  }
+
+  function renderLearningTable(buckets) {
+    return `
+      <table class="learning-table">
+        <thead>
+          <tr>
+            <th>Setup</th>
+            <th>Sens</th>
+            <th>Régime</th>
+            <th>Classe</th>
+            <th class="num">Trades</th>
+            <th class="num">Réussite</th>
+            <th class="num">Gain moyen</th>
+            <th class="num">Perte moyenne</th>
+            <th class="num">Espérance</th>
+            <th class="num">Durée</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${buckets.map(b => {
+            const expClass = b.expectancy > 0.05 ? "pos" : b.expectancy < -0.05 ? "neg" : "";
+            const matureBadge = b.mature
+              ? `<span class="learn-badge learn-badge-mature">actif</span>`
+              : `<span class="learn-badge learn-badge-collecting">en collecte</span>`;
+            return `<tr class="${b.mature ? "" : "row-collecting"}">
+              <td>${safeText(b.setupType || "—")}</td>
+              <td>${safeText(b.direction || "—")}</td>
+              <td>${safeText(b.regime || "—")}</td>
+              <td>${safeText(b.assetClass || "—")}</td>
+              <td class="num">${b.n}</td>
+              <td class="num">${fmtPct(b.winrate)}</td>
+              <td class="num pos">${fmtPctSigned(b.gainAvg)}</td>
+              <td class="num neg">${fmtPctSigned(b.lossAvg)}</td>
+              <td class="num ${expClass}"><strong>${fmtPctSigned(b.expectancy)}</strong></td>
+              <td class="num muted">${fmtMinutes(b.holdingAvgMinutes)}</td>
+              <td>${matureBadge}</td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`;
   }
 
   // Onglet "Bot" unifié (PR ui-cleanup-session2) — fusionne État, Performance,
@@ -6012,6 +6155,7 @@ function openPositionsRiskView() {
     const sub = state.bot.subTab || "stats";
     const inner = sub === "performance" ? renderPerformance()
                 : sub === "health" ? renderHealth()
+                : sub === "learning" ? renderBotLearning()
                 : renderBot();
     return inner.replace('<div class="screen">', `<div class="screen">${renderBotSubTabs()}`);
   }
@@ -7203,8 +7347,24 @@ function renderMain() {
         // Charge la donnée appropriée selon le sous-onglet
         if (next === "health") loadHealth();
         else if (next === "stats") loadBot();
+        else if (next === "learning") loadLearning();
         // performance = données déjà chargées via state.trades.history (loadTradesState)
         render();
+      });
+    });
+    app.querySelectorAll("[data-learning-filter]").forEach(el => {
+      el.addEventListener("click", () => {
+        const next = String(el.getAttribute("data-learning-filter") || "all").toLowerCase();
+        if (state.bot.learning.filterMode === next) return;
+        state.bot.learning.filterMode = next;
+        haptic(5);
+        loadLearning();
+      });
+    });
+    app.querySelectorAll("[data-learning-reload]").forEach(el => {
+      el.addEventListener("click", () => {
+        haptic(10);
+        loadLearning();
       });
     });
     app.querySelectorAll(".bot-params-card").forEach(el => {
