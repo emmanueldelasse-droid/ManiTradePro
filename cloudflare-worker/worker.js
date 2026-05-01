@@ -1901,7 +1901,56 @@ function buildPlanFromConfiguration(detected, validation, quote, baseScore) {
 // ============================================================
 // SCORE ENGINE V2
 // ============================================================
-function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8) {
+// Calcule un malus à appliquer au score quand un bucket d'historique est
+// négatif et mature. Lecture seule sur les stats déjà calculées par
+// computeLearningStats — n'effectue aucune requête réseau.
+//
+// Garde-fous (PR C — boucle adaptative) :
+//   - bucket non mature (n < LEARNING_BUCKET_MIN_TRADES) → malus = 0
+//   - espérance positive ou nulle → malus = 0
+//   - sinon malus proportionnel, capped entre 2 et 8 points
+//
+// Volontairement asymétrique : on ne donne JAMAIS de bonus pour un
+// bucket gagnant (ce serait du surapprentissage). On filtre uniquement
+// vers le bas, pour éviter de répéter les buckets perdants.
+function computeLearningMalus(stats) {
+  if (!stats || !stats.mature) return { malus: 0, reason: null };
+  const e = Number(stats.expectancy);
+  if (!Number.isFinite(e) || e >= 0) return { malus: 0, reason: null };
+  const absExp = Math.abs(e);
+  // exemple : -0,5 % → -2 pts ; -1 % → -4 pts ; -2 % → -8 pts (cap)
+  const malus = Math.min(8, Math.max(2, Math.round(absExp * 4)));
+  const winratePct = (Number(stats.winrate) * 100).toFixed(0);
+  const expPct = (e * 100).toFixed(2);
+  return {
+    malus,
+    reason: `historique perdant ${stats.n} trades · réussite ${winratePct}% · espérance ${expPct}%`
+  };
+}
+
+// Pré-fetch des stats d'apprentissage au début d'un cycle/scan. À appeler
+// une seule fois par caller, le résultat est passé en paramètre à
+// calcDetailScore via le champ learningContext. Si learning_enabled = false
+// dans les settings, on retourne un contexte désactivé qui no-op.
+async function loadLearningContextForScan(env) {
+  try {
+    const settings = await getTrainingSettings(env).catch(() => null);
+    const enabled = !!(settings?.learning_enabled);
+    if (!enabled || !supabaseConfigured(env)) {
+      return { enabled: false, statsByBucket: new Map() };
+    }
+    const stats = await computeLearningStats(env, { mode: "all", limit: 5000 }).catch(() => null);
+    const map = new Map();
+    for (const b of stats?.buckets || []) {
+      if (b?.bucketKey) map.set(b.bucketKey, b);
+    }
+    return { enabled: true, statsByBucket: map };
+  } catch {
+    return { enabled: false, statsByBucket: new Map() };
+  }
+}
+
+function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8, learningContext = null) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
 
   if (closes.length < 30 || quote.price == null) {
@@ -2058,7 +2107,24 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
   const newsBonus = newsMod.newsBonus;
   const newsBonusReason = newsMod.newsBonusReason;
 
-  const score = clamp(Math.round(raw) - regimeMalus + regimeBonus + newsBonus, 0, 100);
+  // Apprentissage adaptatif (PR C) — applique un malus si le bucket
+  // setup × direction × régime × asset_class a un historique perdant ET
+  // mature (≥ 20 trades). Lecture seule sur learningContext pré-fetché par
+  // le caller — n'effectue aucune requête réseau ici.
+  let learningMalus = 0;
+  let learningReason = null;
+  if (learningContext?.enabled && learningContext.statsByBucket && detectedConfig.config !== "AUCUNE" && regime?.regime && quote?.assetClass) {
+    const setupForBucket = String(detectedConfig.config).toLowerCase();
+    const bucketKey = makeBucketKey(setupForBucket, direction, regime.regime, quote.assetClass);
+    const bucketStats = learningContext.statsByBucket.get(bucketKey) || null;
+    if (bucketStats) {
+      const lm = computeLearningMalus(bucketStats);
+      learningMalus = lm.malus;
+      learningReason = lm.reason;
+    }
+  }
+
+  const score = clamp(Math.round(raw) - regimeMalus + regimeBonus + newsBonus - learningMalus, 0, 100);
 
   // Bonus de configuration détectée (long + miroirs short)
   let configBonus = 0;
@@ -2098,6 +2164,8 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
     regimeBonusReason,
     newsBonus,
     newsBonusReason,
+    learningMalus,
+    learningReason,
     newsContext: newsContext ? {
       source: newsContext.source,
       sentiment: newsContext.sentiment,
@@ -2544,7 +2612,11 @@ async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true,
     let newsContext = await resolveSymbolNewsContext(env, clean, quote?.assetClass).catch(() => null);
     if (newsContext) newsContext = await enrichNewsContextWithClaude(env, newsContext).catch(() => newsContext);
     const claudeWeight = await getClaudeNewsKillSwitchWeight(env).catch(() => 8);
-    const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight);
+    // PR C — apprentissage adaptatif. Si options.learningContext est fourni
+    // par le caller (batch scan / cron), on le réutilise pour éviter de
+    // refaire le calcul. Sinon on le pré-charge ici (cas d'un appel unitaire).
+    const learningContext = options?.learningContext || await loadLearningContextForScan(env);
+    const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight, learningContext);
     return buildStablePayload(clean, quote, candles || [], scored, regime);
   } catch (e) {
     if (quote && Number.isFinite(Number(quote.price))) {
@@ -2831,6 +2903,9 @@ async function handleOpportunities(_url, env) {
   const regimeIndicators = await fetchRegimeIndicators(env);
   // PR #7 Phase 2 — pré-fetch le tier Claude (cache 1 h, 1 query Supabase).
   const claudeWeight = await getClaudeNewsKillSwitchWeight(env).catch(() => 8);
+  // PR C — pré-charger une seule fois le contexte d'apprentissage pour
+  // tout le batch (évite N appels redondants à computeLearningStats).
+  const learningContext = await loadLearningContextForScan(env);
   const rows = [];
   for (const symbol of allSymbols) {
     let quote = quotesMap[symbol] || getMemoryCache(`market:snapshot:${symbol}`);
@@ -2854,7 +2929,7 @@ async function handleOpportunities(_url, env) {
       // PR #7 Phase 2 — news context (cache 3h crypto / 6h stocks, coût quota sous contrôle)
       let newsContext = await resolveSymbolNewsContext(env, symbol, quote?.assetClass).catch(() => null);
       if (newsContext) newsContext = await enrichNewsContextWithClaude(env, newsContext).catch(() => newsContext);
-      const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight);
+      const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight, learningContext);
       const payload = buildStablePayload(symbol, quote, candles || [], scored, regime);
       rows.push(toOpportunityRow(payload));
     } catch (e) {
@@ -3001,6 +3076,12 @@ function getTrainingDefaults() {
     // (mtp_positions.mode, mtp_trades.mode) pour permettre au module
     // d'apprentissage d'agréger séparément les deux populations.
     bot_mode: "exploration",
+    // Toggle de la boucle adaptative (PR C). Si false, calcDetailScore
+    // ignore les stats d'apprentissage et fonctionne comme avant — utile
+    // pour couper en 2 secondes si une stat se retourne contre nous.
+    // Default false : opt-in volontaire pour ne pas changer le comportement
+    // sans intervention explicite de l'utilisateur.
+    learning_enabled: false,
     is_enabled: false,               // master switch — user toggle
     auto_open_enabled: true,
     auto_close_enabled: true,
@@ -3509,6 +3590,7 @@ function normalizeTrainingSettingsRow(row) {
   return {
     mode: "training",
     bot_mode: coerceBotMode(safe.bot_mode, base.bot_mode),
+    learning_enabled: coerceBoolean(safe.learning_enabled, base.learning_enabled),
     is_enabled: coerceBoolean(safe.is_enabled, base.is_enabled),
     auto_open_enabled: coerceBoolean(safe.auto_open_enabled, base.auto_open_enabled),
     auto_close_enabled: coerceBoolean(safe.auto_close_enabled, base.auto_close_enabled),
@@ -4275,10 +4357,13 @@ async function buildOpportunityRowsForTraining(env) {
   // Scan complet si rien en cache
   const regime = await kvGet("market:regime", env);
   const ctx = createBudgetContext("training_scan");
+  // PR C — pré-charger une seule fois le contexte d'apprentissage pour tout
+  // le batch (évite N appels redondants à computeLearningStats).
+  const learningContext = await loadLearningContextForScan(env);
   const results = await mapWithConcurrency(
     LIGHT_SYMBOLS,
     OPPORTUNITIES_CONCURRENCY,
-    async (symbol) => buildStableMarketPayload(symbol, env, ctx, true, regime, { allowAlphaFallback: false })
+    async (symbol) => buildStableMarketPayload(symbol, env, ctx, true, regime, { allowAlphaFallback: false, learningContext })
   );
   const rows = results.map((result, index) =>
     result instanceof Error ? toOpportunityRow(buildUnavailablePayload(LIGHT_SYMBOLS[index], result.message)) : toOpportunityRow(result)

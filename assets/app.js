@@ -117,7 +117,7 @@
     userAssetsLoading: false,
     userAssetsError: null,
     addAssetForm: { open: false, symbol: "", name: "", assetClass: "crypto", loading: false, error: null },
-    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false, subTab: "stats", learning: { stats: null, loading: false, error: null, filterMode: "all", lastLoadedAt: 0 } },
+    bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false, subTab: "stats", learning: { stats: null, loading: false, error: null, filterMode: "all", lastLoadedAt: 0, showUnknown: false } },
     health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 },
     reports: { list: [], loading: false, error: null, openId: null, generating: false },   // PR #9 Phase 2 — rapports hebdo
     tradeFeedback: {} // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
@@ -2048,6 +2048,8 @@ async function confirmTradeFromModal() {
     const out = { ...d };
     // Coerce bot_mode strict : "exploration" ou "core", défaut "exploration".
     out.bot_mode = String(out.bot_mode || "").toLowerCase() === "core" ? "core" : "exploration";
+    // Coerce learning_enabled strict (boolean).
+    out.learning_enabled = !!out.learning_enabled;
     const pctKeys = [
       ["risk_per_trade_pct_display", "risk_per_trade_pct", 100],
       ["allocation_per_trade_pct_display", "allocation_per_trade_pct", 100],
@@ -6057,9 +6059,15 @@ function openPositionsRiskView() {
           </div>
         </div>`;
     }
-    const learning = state.bot.learning || { stats: null, loading: false, error: null, filterMode: "all" };
+    const learning = state.bot.learning || { stats: null, loading: false, error: null, filterMode: "all", showUnknown: false };
     const stats = learning.stats;
-    const buckets = Array.isArray(stats?.buckets) ? stats.buckets : [];
+    const allBuckets = Array.isArray(stats?.buckets) ? stats.buckets : [];
+    const showUnknown = !!learning.showUnknown;
+    const isUnknownBucket = (b) => (b.setupType === "unknown" || b.setupType === "aucun" || b.setupType === "no_structural_setup")
+      && (b.regime === "unknown" || b.regime === "UNKNOWN");
+    const buckets = showUnknown ? allBuckets : allBuckets.filter(b => !isUnknownBucket(b));
+    const hiddenUnknownCount = allBuckets.length - buckets.length;
+    const allAreUnknown = allBuckets.length > 0 && buckets.length === 0;
     const totals = stats?.totals || null;
     const filterMode = learning.filterMode || "all";
 
@@ -6087,12 +6095,28 @@ function openPositionsRiskView() {
             <div class="learning-totals">
               <div class="learning-total"><div class="learning-total-label">Trades pris en compte</div><div class="learning-total-value">${totals.tradesTotal ?? 0}</div></div>
               <div class="learning-total"><div class="learning-total-label">Combinaisons matures</div><div class="learning-total-value">${totals.bucketsMature ?? 0} <span class="muted">/ ${totals.bucketsTotal ?? 0}</span></div></div>
-              <div class="learning-total"><div class="learning-total-label">Combinaisons gagnantes</div><div class="learning-total-value pos">${totals.bucketsPositive ?? 0}</div></div>
-              <div class="learning-total"><div class="learning-total-label">Combinaisons perdantes</div><div class="learning-total-value neg">${totals.bucketsNegative ?? 0}</div></div>
+              <div class="learning-total"><div class="learning-total-label">Gagnantes (matures)</div><div class="learning-total-value pos">${totals.bucketsPositive ?? 0}</div></div>
+              <div class="learning-total"><div class="learning-total-label">Perdantes (matures)</div><div class="learning-total-value neg">${totals.bucketsNegative ?? 0}</div></div>
             </div>
-            <div class="muted" style="font-size:.78rem;margin-top:8px">Une combinaison est dite « mature » à partir de ${totals.minTradesForMaturity ?? 20} trades — en dessous on collecte encore.</div>
+            <div class="muted" style="font-size:.78rem;margin-top:8px">Une combinaison est dite « mature » à partir de ${totals.minTradesForMaturity ?? 20} trades. Les compteurs « gagnantes / perdantes » ne comptent que les matures — en dessous on collecte encore.</div>
           ` : ""}
         </div>
+
+        ${allAreUnknown ? `
+          <div class="card" style="margin-top:14px">
+            <div class="muted" style="line-height:1.4">
+              <strong>Tes trades ont été clos avant le tracking complet.</strong> Ils n'ont pas le setup et le régime mémorisés, donc ils sortent en « unknown ». Les nouveaux trades clos auront toutes les infos dès qu'ils tomberont. Tu peux les afficher temporairement avec le bouton ci-dessous.
+            </div>
+            <div style="margin-top:10px">
+              <button type="button" class="btn btn-secondary" data-learning-toggle-unknown>Afficher les anciens trades sans tracking</button>
+            </div>
+          </div>
+        ` : hiddenUnknownCount > 0 ? `
+          <div class="muted" style="font-size:.78rem;margin-top:8px;padding:0 4px">
+            ${hiddenUnknownCount} ancienne${hiddenUnknownCount > 1 ? "s" : ""} ligne${hiddenUnknownCount > 1 ? "s" : ""} sans tracking masquée${hiddenUnknownCount > 1 ? "s" : ""}.
+            <button type="button" class="learning-link-btn" data-learning-toggle-unknown>${showUnknown ? "Masquer" : "Afficher"}</button>
+          </div>
+        ` : ""}
 
         <div class="card learning-table-card">
           ${learning.loading && buckets.length === 0
@@ -6442,12 +6466,18 @@ function openPositionsRiskView() {
     const modeHint = botMode === "core"
       ? "Le bot ouvre peu de trades, seulement les meilleurs."
       : "Le bot ouvre plus de trades pour apprendre, capital réduit.";
+    const learningOn = !!settings?.learning_enabled;
     return `
       <div class="bot-params" style="margin-top:8px">
         <div class="bot-mode-badge bot-mode-${botMode === "core" ? "core" : "exploration"}" style="margin-bottom:10px">
           <div class="bot-mode-label">Mode du bot</div>
           <div class="bot-mode-value">${modeLabel}</div>
           <div class="bot-mode-hint muted">${modeHint}</div>
+        </div>
+        <div class="bot-mode-badge bot-learning-badge bot-learning-${learningOn ? "on" : "off"}" style="margin-bottom:10px">
+          <div class="bot-mode-label">Apprentissage</div>
+          <div class="bot-mode-value">${learningOn ? "Actif" : "Inactif"}</div>
+          <div class="bot-mode-hint muted">${learningOn ? "Le bot pénalise les combinaisons à historique perdant." : "Le bot ignore l'historique et fonctionne en mode neutre."}</div>
         </div>
         <div class="kv">
           <div class="muted">Capital base</div><div>${priceDisplay(capitalBase)}</div>
@@ -6491,6 +6521,9 @@ function openPositionsRiskView() {
               <div class="bot-mode-btn-hint">Peu de trades, seulement les meilleurs.</div>
             </button>
           </div>
+        </div>
+        <div class="bot-learning-toggle">
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="learning_enabled" ${d.learning_enabled ? "checked" : ""}><span><strong>Apprentissage actif</strong> — le bot pénalise les combinaisons à historique perdant (≥ 20 trades). Décoche pour tout couper et revenir au comportement neutre.</span></label>
         </div>
         <div class="bot-field-grid">
           <label class="bot-field"><span>Capital base ($)</span><input type="number" inputmode="decimal" min="100" step="100" data-bot-field="capital_base" value="${Number(d.capital_base || 10000)}"></label>
@@ -7365,6 +7398,13 @@ function renderMain() {
       el.addEventListener("click", () => {
         haptic(10);
         loadLearning();
+      });
+    });
+    app.querySelectorAll("[data-learning-toggle-unknown]").forEach(el => {
+      el.addEventListener("click", () => {
+        state.bot.learning.showUnknown = !state.bot.learning.showUnknown;
+        haptic(5);
+        render();
       });
     });
     app.querySelectorAll(".bot-params-card").forEach(el => {
