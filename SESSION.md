@@ -65,6 +65,62 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Système adaptatif — PR C (2026-05-01)
+
+Boucle adaptative branchée. Le bot pénalise désormais automatiquement les
+combinaisons à historique perdant et mature (≥ 20 trades par bucket).
+**Désactivé par défaut** — il faut cocher "Apprentissage actif" dans
+Réglages → Bot → Édition pour l'enclencher.
+
+### Ce qui change
+1. **Helper `computeLearningMalus(stats)`** dans le worker. Asymétrique :
+   - Bucket non mature → malus = 0
+   - Espérance ≥ 0 → malus = 0
+   - Espérance < 0 → malus 2 à 8 points proportionnel à |espérance|
+   - **Jamais de bonus** pour un bucket gagnant (anti-surapprentissage).
+2. **Pré-fetch `loadLearningContextForScan(env)`** au début de
+   `handleOpportunities` et `buildOpportunityRowsForTraining`. Calculé une
+   seule fois par cycle, partagé sur tous les symboles → 0 coût supplémentaire
+   par opportunité.
+3. **Injection dans `calcDetailScore`** via un nouveau paramètre optionnel
+   `learningContext`. La formule devient :
+   `score = raw - regimeMalus + regimeBonus + newsBonus - learningMalus`
+   Renvoie aussi `learningMalus` et `learningReason` dans l'objet de sortie
+   pour traçabilité.
+4. **Toggle "Apprentissage actif"** (champ `learning_enabled` dans
+   `mtp_training_settings`, default `false`) dans Réglages → Bot → Édition.
+   Coupe immédiate possible si une stat se retourne contre nous.
+5. **3 micro-UX page Apprentissage** :
+   - Libellés compteurs : "Gagnantes (matures)" / "Perdantes (matures)"
+     pour clarifier qu'on ne compte que les buckets ≥ 20 trades.
+   - Bandeau d'info quand toutes les lignes sont "unknown" (anciens trades
+     pré-PR A).
+   - Lignes "unknown" masquées par défaut, avec toggle pour les afficher.
+
+### Migration SQL Supabase requise
+À exécuter dans le dashboard SQL :
+
+```sql
+alter table public.mtp_training_settings
+  add column if not exists learning_enabled boolean not null default false;
+```
+
+Voir aussi `cloudflare-worker/migrations/012_learning_enabled.sql`.
+
+Sans la migration, le toggle marche dans l'UI mais le worker retombe
+toujours sur false (comportement neutre identique à avant PR C).
+
+### Garde-fous
+- **Default opt-in** : `learning_enabled = false` par défaut. Aucune
+  modification de comportement tant que tu n'actives pas explicitement.
+- **Min 20 trades par bucket** avant qu'un malus soit appliqué.
+- **Cap à 8 points** sur le malus, même pour des buckets très négatifs.
+- **Toggle de désactivation** dans les Réglages : 1 clic pour tout couper.
+- **Cache 5 min** sur `computeLearningStats` : si un bucket bascule, ça met
+  jusqu'à 5 min pour se propager (acceptable).
+
+---
+
 ## Système adaptatif — PR B (2026-05-01)
 
 Module d'apprentissage en lecture seule. **Aucune décision moteur n'est encore

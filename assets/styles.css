@@ -1265,6 +1265,19 @@ details[open] > .bot-collapsible-summary::after{transform:rotate(180deg)}
 .app-shell.theme-light .bot-mode-btn.active{background:rgba(138,163,255,.10);border-color:var(--accent)}
 .app-shell.theme-light .bot-mode-badge{background:#ffffff;border-color:rgba(15,23,42,.12)}
 
+/* Apprentissage — toggle on/off badge (PR C) */
+.bot-learning-badge.bot-learning-on{border-left:3px solid #3aaf6e}
+.bot-learning-badge.bot-learning-off{border-left:3px solid var(--text-secondary)}
+.bot-learning-toggle{padding:10px 12px;border-radius:10px;border:1px dashed var(--border-subtle);margin-top:14px}
+.bot-learning-toggle .bot-sub-toggle{align-items:flex-start}
+.bot-learning-toggle .bot-sub-toggle span{line-height:1.4}
+.app-shell:not(.theme-light) .bot-learning-toggle{background:rgba(14,19,35,.4)}
+.app-shell.theme-light .bot-learning-toggle{background:#fafbfd}
+
+/* Apprentissage — bouton lien inline (toggle unknown) */
+.learning-link-btn{background:transparent;border:none;color:var(--accent);font-family:inherit;font-size:inherit;cursor:pointer;padding:2px 0;min-height:44px;vertical-align:middle;text-decoration:underline;font-weight:600}
+.learning-link-btn:hover{opacity:.8}
+
 /* Apprentissage — page lecture seule (PR B système adaptatif) */
 .learning-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
 .learning-filter{display:flex;gap:6px;flex-wrap:wrap}
