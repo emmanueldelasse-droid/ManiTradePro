@@ -65,6 +65,45 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Système adaptatif — PR B (2026-05-01)
+
+Module d'apprentissage en lecture seule. **Aucune décision moteur n'est encore
+modifiée** — c'est PR C qui branchera le câble. PR B sert à voir ce que le
+bot a appris.
+
+### Ce qui change
+1. **Endpoint worker `GET /api/learning/stats`** (auth admin) qui agrège
+   `mtp_trade_feedback` par bucket `setup × direction × régime × classe d'actif`
+   et calcule pour chaque bucket : `winrate`, `gainAvg`, `lossAvg`,
+   **`expectancy = winrate × gainAvg − (1 − winrate) × |lossAvg|`**, durée
+   moyenne, et un drapeau `mature` (≥ 20 trades).
+2. **Cache mémoire 5 min** côté worker (pas de table dérivée — calcul à la
+   volée). Si la perf devient un souci au-delà de 50k trades, on ajoutera
+   une table cache.
+3. **Filtre par mode** : `?mode=all|exploration|core|training`. Joint
+   `mtp_trades.mode` via `trade_id` pour catégoriser chaque feedback.
+4. **Sous-onglet "Apprentissage"** dans Bot (à côté de État / Performance /
+   Santé). Tableau des combinaisons triées par maturité puis par espérance,
+   avec badges "actif" / "en collecte". Filtres par mode bot.
+
+### Décisions de design (à modifier en PR C si besoin)
+- **Maturité = 20 trades par bucket** (et non par mode global). Un bucket
+  comme `pullback × RISK_ON × crypto` mûrit indépendamment de
+  `breakdown × RANGE × stock`. Plus lent à activer mais plus juste.
+- **Lecture seule volontairement** : la page n'a aucun bouton qui modifie
+  le moteur. Si on voit un bucket "perdant", on l'observe — on ne le
+  bloque pas encore. Le blocage automatique vient en PR C avec un toggle
+  global "Apprentissage actif : oui / non" pour pouvoir tout couper en
+  2 secondes si une stat se retourne contre nous.
+
+### Migration SQL Supabase
+Aucune migration spécifique à PR B — la table `mtp_trade_feedback` existe
+déjà depuis la migration 006. Si la migration 011 (`bot_mode`) de PR A
+n'a pas encore été exécutée, le filtre mode dans la page Apprentissage
+catégorisera tous les trades comme `training` (rétrocompat).
+
+---
+
 ## Système adaptatif — PR A (2026-05-01)
 
 Première brique du système d'apprentissage par feedback réel. **Aucune logique
