@@ -1,9 +1,14 @@
 name: Snapshot bot stats
 
 # Fetch /api/public/bot-stats depuis un runner GitHub (que Cloudflare ne bloque
-# pas comme il bloque le sandbox WebFetch de Claude) et persiste le JSON sur la
-# branche dédiée `bot-stats-data`. Une session Claude future lit le fichier via
+# pas comme il bloque le sandbox WebFetch de Claude) et persiste le JSON sur
+# main dans data/bot-stats.json. Une session Claude future lit le fichier via
 # le MCP GitHub pour répondre à "où en est le bot ?" sans PIN.
+#
+# Le commit utilise [skip ci] dans le message pour ne pas relancer d'autres
+# workflows. Les pushs du GITHUB_TOKEN ne déclenchent de toute façon pas
+# d'événements `push` (sécurité GH Actions native), mais on garde la ceinture
+# ET les bretelles.
 
 on:
   schedule:
@@ -24,10 +29,8 @@ jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout data branch
+      - name: Checkout main
         uses: actions/checkout@v4
-        with:
-          ref: bot-stats-data
 
       - name: Fetch bot stats
         run: |
@@ -46,5 +49,5 @@ jobs:
             echo "Pas de changement."
             exit 0
           fi
-          git commit -m "snapshot: bot-stats $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push
+          git commit -m "snapshot: bot-stats $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push origin HEAD:main
