@@ -1,0 +1,249 @@
+{
+  "configured": true,
+  "settings": {
+    "botMode": "exploration",
+    "learningEnabled": true,
+    "isEnabled": true,
+    "autoOpenEnabled": true,
+    "autoCloseEnabled": true,
+    "allowLong": true,
+    "allowShort": true,
+    "maxOpenPositions": 15,
+    "capitalBase": 10000,
+    "minActionabilityScore": 60,
+    "minDossierScore": 60
+  },
+  "stats": {
+    "totalCount": 39,
+    "winCount": 4,
+    "lossCount": 31,
+    "winRate": 0.10256410256410256,
+    "totalPnl": -890.6916112791882,
+    "avgWin": 18.024579231392046,
+    "avgLoss": 31.057739619508272,
+    "expectancy": -26.023655634800548,
+    "rrActual": 0.5803570849718336,
+    "openCount": 7,
+    "bySetup": [
+      {
+        "setup": "autre",
+        "count": 26,
+        "wins": 3,
+        "pnl": -472.362598361583,
+        "winRate": 0.11538461538461539
+      },
+      {
+        "setup": "continuation",
+        "count": 13,
+        "wins": 1,
+        "pnl": -418.32901291760516,
+        "winRate": 0.07692307692307693
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 35,
+        "wins": 4,
+        "pnl": -774.146990390519,
+        "winRate": 0.11428571428571428
+      },
+      {
+        "class": "crypto",
+        "count": 4,
+        "wins": 0,
+        "pnl": -116.54462088866927,
+        "winRate": 0
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "NVDA",
+        "count": 3,
+        "pnl": 19.654827232777848,
+        "wins": 1
+      },
+      {
+        "symbol": "AMD",
+        "count": 2,
+        "pnl": 0,
+        "wins": 0
+      },
+      {
+        "symbol": "SPY",
+        "count": 1,
+        "pnl": -12.738908000000038,
+        "wins": 0
+      },
+      {
+        "symbol": "JPM",
+        "count": 2,
+        "pnl": -30.68585930102264,
+        "wins": 0
+      },
+      {
+        "symbol": "LINK",
+        "count": 2,
+        "pnl": -53.605420214602404,
+        "wins": 0
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "META",
+        "count": 8,
+        "pnl": -252.94508453835348,
+        "wins": 0
+      },
+      {
+        "symbol": "BTC",
+        "count": 7,
+        "pnl": -223.86985117399544,
+        "wins": 1
+      },
+      {
+        "symbol": "MSFT",
+        "count": 3,
+        "pnl": -125.70906655875598,
+        "wins": 0
+      },
+      {
+        "symbol": "AAPL",
+        "count": 6,
+        "pnl": -106.07341117025408,
+        "wins": 1
+      },
+      {
+        "symbol": "ETH",
+        "count": 5,
+        "pnl": -104.71883755498179,
+        "wins": 1
+      }
+    ]
+  },
+  "stats7d": {
+    "totalCount": 0,
+    "winCount": 0,
+    "lossCount": 0,
+    "winRate": null,
+    "totalPnl": 0,
+    "avgWin": 0,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
+    "openCount": 0,
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
+    "bottomSymbols": []
+  },
+  "stats30d": {
+    "totalCount": 36,
+    "winCount": 4,
+    "lossCount": 31,
+    "winRate": 0.1111111111111111,
+    "totalPnl": -890.6916112791882,
+    "avgWin": 18.024579231392046,
+    "avgLoss": 31.057739619508272,
+    "expectancy": -25.604148636074903,
+    "rrActual": 0.5803570849718336,
+    "openCount": 0,
+    "bySetup": [
+      {
+        "setup": "autre",
+        "count": 23,
+        "wins": 3,
+        "pnl": -472.362598361583,
+        "winRate": 0.13043478260869565
+      },
+      {
+        "setup": "continuation",
+        "count": 13,
+        "wins": 1,
+        "pnl": -418.32901291760516,
+        "winRate": 0.07692307692307693
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 32,
+        "wins": 4,
+        "pnl": -774.146990390519,
+        "winRate": 0.125
+      },
+      {
+        "class": "crypto",
+        "count": 4,
+        "wins": 0,
+        "pnl": -116.54462088866927,
+        "winRate": 0
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "NVDA",
+        "count": 3,
+        "pnl": 19.654827232777848,
+        "wins": 1
+      },
+      {
+        "symbol": "SPY",
+        "count": 1,
+        "pnl": -12.738908000000038,
+        "wins": 0
+      },
+      {
+        "symbol": "JPM",
+        "count": 2,
+        "pnl": -30.68585930102264,
+        "wins": 0
+      },
+      {
+        "symbol": "LINK",
+        "count": 2,
+        "pnl": -53.605420214602404,
+        "wins": 0
+      },
+      {
+        "symbol": "ETH",
+        "count": 4,
+        "pnl": -104.71883755498179,
+        "wins": 1
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "META",
+        "count": 8,
+        "pnl": -252.94508453835348,
+        "wins": 0
+      },
+      {
+        "symbol": "BTC",
+        "count": 7,
+        "pnl": -223.86985117399544,
+        "wins": 1
+      },
+      {
+        "symbol": "MSFT",
+        "count": 3,
+        "pnl": -125.70906655875598,
+        "wins": 0
+      },
+      {
+        "symbol": "AAPL",
+        "count": 6,
+        "pnl": -106.07341117025408,
+        "wins": 1
+      },
+      {
+        "symbol": "ETH",
+        "count": 4,
+        "pnl": -104.71883755498179,
+        "wins": 1
+      }
+    ]
+  },
+  "lastClosedAt": "2026-04-28T14:30:30.118Z"
+}
