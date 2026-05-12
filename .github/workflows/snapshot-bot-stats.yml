@@ -1,0 +1,47 @@
+name: Snapshot bot stats
+
+# Fetch /api/public/bot-stats depuis un runner GitHub (que Cloudflare ne bloque
+# pas comme il bloque le sandbox WebFetch de Claude) et persiste le JSON sur la
+# branche dédiée `bot-stats-data`. Une session Claude future lit le fichier via
+# le MCP GitHub pour répondre à "où en est le bot ?" sans PIN.
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snapshot-bot-stats
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout data branch
+        uses: actions/checkout@v4
+        with:
+          ref: bot-stats-data
+
+      - name: Fetch bot stats
+        run: |
+          mkdir -p data
+          curl --fail --show-error --silent \
+            -H 'User-Agent: ManiTradeProSnapshot/1.0' \
+            https://manitradepro.emmanueldelasse.workers.dev/api/public/bot-stats \
+            | jq '.data // empty' > data/bot-stats.json
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/bot-stats.json
+          if git diff --cached --quiet; then
+            echo "Pas de changement."
+            exit 0
+          fi
+          git commit -m "snapshot: bot-stats $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push
