@@ -3234,16 +3234,39 @@ async function handleTrainingAutoCycle(env) {
         try {
           let liveQuote = null;
           let detailPayload = null;
-          try { liveQuote = await withTimeout(resolveUnifiedMarketQuote(symbol, env, null), 6000, `quote:${symbol}`); } catch {}
+          let quoteError = null;
+          try { liveQuote = await withTimeout(resolveUnifiedMarketQuote(symbol, env, null), 6000, `quote:${symbol}`); }
+          catch (e) { quoteError = e?.message || "quote_failed"; }
           try { detailPayload = await withTimeout(buildStableMarketPayload(symbol, env, null, true), 8000, `detail:${symbol}`); } catch {}
 
+          // Prix effectif pour le check stop/TP : on chaîne les sources pour
+          // éviter qu'une indispo de quote provider gèle silencieusement les
+          // fermetures (bug observé : positions stop-touché qui restent ouvertes
+          // pendant 10+ jours car resolveUnifiedMarketQuote échoue cycle après
+          // cycle sans laisser de trace).
+          const effectivePrice = finiteOrNull(liveQuote?.price)
+            ?? finiteOrNull(detailPayload?.price)
+            ?? null;
+
           // PR #5 Phase 2 — tracker MAE/MFE en continu, même si pas de clôture ce cycle
-          const excursion = updatePositionIntraExcursion(position, liveQuote?.price ?? null);
+          const excursion = updatePositionIntraExcursion(position, effectivePrice);
           if (excursion.changed) {
             await persistPositionIntraExcursion(env, position, excursion);
           }
 
-          const trigger = trainingCloseTrigger(position, liveQuote?.price ?? null, detailPayload, settings);
+          if (effectivePrice == null) {
+            // Aucune source de prix dispo → on logge pour que ça remonte dans
+            // mtp_training_events au lieu de skip silencieux.
+            await logTrainingEvent(env, "close_skipped_no_price", {
+              symbol,
+              position_id: position?.id || null,
+              quote_error: quoteError,
+              has_detail: !!detailPayload
+            }).catch(() => {});
+            continue;
+          }
+
+          const trigger = trainingCloseTrigger(position, effectivePrice, detailPayload, settings);
           if (!trigger) continue;
 
           const closed = await withTimeout(
