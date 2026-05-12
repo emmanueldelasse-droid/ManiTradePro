@@ -4510,6 +4510,62 @@ function computeTrainingStats(closed, open) {
   };
 }
 
+// Endpoint public en lecture seule : agrégats de perf du bot pour permettre
+// une analyse externe (notamment Claude Code session-to-session) sans exposer
+// le PIN admin. Ne renvoie QUE des chiffres agrégés — aucune position ouverte
+// individuelle, aucun réglage modifiable, aucune action déclenchable. Cache
+// 5 min côté worker pour borner le coût si scrapé.
+async function handlePublicBotStats(env) {
+  if (!supabaseConfigured(env)) {
+    return okCached({ configured: false, stats: null, settings: null }, "worker_public", nowIso(), "recent", "Supabase non configure", 300);
+  }
+  try {
+    const [closedRaw, openRaw, settings] = await Promise.all([
+      getClosedTrainingTradesRaw(env, 1000).catch(() => []),
+      getOpenTrainingPositionsRaw(env).catch(() => []),
+      getTrainingSettings(env).catch(() => null)
+    ]);
+    const closed = normalizeTrainingTrades(closedRaw);
+    const open = normalizeTrainingPositions(openRaw);
+    const stats = computeTrainingStats(closed, open);
+
+    const sevenDaysAgo = Date.now() - 7 * 24 * 3600 * 1000;
+    const thirtyDaysAgo = Date.now() - 30 * 24 * 3600 * 1000;
+    const closedAtMs = (t) => new Date(t.closedAt ?? t.closed_at ?? 0).getTime();
+    const recent7 = closed.filter(t => closedAtMs(t) >= sevenDaysAgo);
+    const recent30 = closed.filter(t => closedAtMs(t) >= thirtyDaysAgo);
+    const stats7d = computeTrainingStats(recent7, []);
+    const stats30d = computeTrainingStats(recent30, []);
+
+    const lastClosedAt = closed.length ? new Date(closedAtMs(closed[0])).toISOString() : null;
+
+    const publicSettings = settings ? {
+      botMode: settings.bot_mode,
+      learningEnabled: !!settings.learning_enabled,
+      isEnabled: !!settings.is_enabled,
+      autoOpenEnabled: !!settings.auto_open_enabled,
+      autoCloseEnabled: !!settings.auto_close_enabled,
+      allowLong: !!settings.allow_long,
+      allowShort: !!settings.allow_short,
+      maxOpenPositions: settings.max_open_positions,
+      capitalBase: settings.capital_base,
+      minActionabilityScore: settings.min_actionability_score,
+      minDossierScore: settings.min_dossier_score
+    } : null;
+
+    return okCached({
+      configured: true,
+      settings: publicSettings,
+      stats,
+      stats7d,
+      stats30d,
+      lastClosedAt
+    }, "worker_public", nowIso(), "recent", null, 300);
+  } catch (e) {
+    return fail(`Erreur public stats : ${e.message || "supabase"}`, "error", 500);
+  }
+}
+
 // ============================================================
 // TRADES SYNC
 // ============================================================
@@ -8283,6 +8339,7 @@ async function handleRequest(request, env) {
       return safeRoute(() => handleSignals(url, env));
     }
     if (url.pathname === "/" || url.pathname === "/health") return safeRoute(() => handleHealth(request, env));
+    if (url.pathname === "/api/public/bot-stats") return safeRoute(() => handlePublicBotStats(env));
     if (url.pathname === "/api/quotes") return safeRoute(() => handleQuotes(url, env));
     if (url.pathname.startsWith("/api/quotes/")) return safeRoute(() => handleQuotes(url, env));
     if (url.pathname.startsWith("/api/market-snapshot/")) return safeRoute(() => handleMarketSnapshot(decodeURIComponent(url.pathname.replace("/api/market-snapshot/","")), env));

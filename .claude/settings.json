@@ -1,4 +1,12 @@
 {
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:manitradepro.emmanueldelasse.workers.dev)",
+      "Bash(curl -sS https://manitradepro.emmanueldelasse.workers.dev/api/public/bot-stats*)",
+      "Bash(curl -sS https://manitradepro.emmanueldelasse.workers.dev/api/health)",
+      "Bash(curl -sS https://manitradepro.emmanueldelasse.workers.dev/health)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
