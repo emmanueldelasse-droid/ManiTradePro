@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-01 (PR A — système adaptatif : modes Exploration/Core + capture régime à l'ouverture) |
+| **Dernière mise à jour** | 2026-05-12 (PR #105 — workflow snapshot bot-stats pour lecture sans PIN) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/adaptive-trading-system-ocCkY` |
+| **Branche active** | `claude/resume-work-Hizc5` (mergée via PR #105) |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -62,6 +62,43 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Snapshot bot-stats lisible par Claude (2026-05-12 — PR #105)
+
+PR #103 avait ouvert `/api/public/bot-stats` sans auth pour qu'une session
+Claude puisse répondre à "où en est le bot ?" sans PIN. Au premier essai :
+**403 Forbidden** depuis le WebFetch sandbox — Cloudflare (Browser Integrity
+Check sur workers.dev) bloque les fetchs non-navigateur **avant** le worker.
+Confirmé en testant `/health` qui n'a aucune auth côté code : même 403.
+Pas un bug du worker, pas un problème de config — limitation gratuite de
+workers.dev sur laquelle on n'a pas la main.
+
+### Solution livrée
+Workflow `.github/workflows/snapshot-bot-stats.yml` (cron `*/30 * * * *` +
+`workflow_dispatch`). Un runner GitHub Actions Ubuntu fetch l'endpoint
+(que Cloudflare laisse passer), `jq '.data // empty'` pour drop l'`asOf`
+qui changerait à chaque run, commit-only-if-changed sur la branche dédiée
+**`bot-stats-data`** (créée orpheline de main, ne pollue pas l'historique).
+
+### Comment Claude consomme
+```
+mcp__github__get_file_contents(
+  owner="emmanueldelasse-droid", repo="manitradepro",
+  path="data/bot-stats.json", ref="bot-stats-data"
+)
+```
+Fichier mis à jour ~30 min de lag max, contient `configured`, `settings`
+(mode, learningEnabled, allowLong/Short, maxOpenPositions, capitalBase,
+seuils), `stats` global, `stats7d`, `stats30d`, `lastClosedAt`.
+
+### Validation post-merge requise
+1. Onglet *Actions* → **Snapshot bot stats** → **Run workflow** une fois
+   pour amorcer (sinon attendre que le cron fire dans les 30 min).
+2. Vérifier qu'un commit apparaît sur `bot-stats-data` avec
+   `data/bot-stats.json`.
+3. Lors de la prochaine session Claude : tester la lecture via MCP.
 
 ---
 
