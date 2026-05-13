@@ -890,7 +890,11 @@ async function getYahooBatchQuotes(symbols) {
           freshness: "recent"
         };
       }
-      recordSuccess("yahoo");
+      // On ne reset le compteur d'echecs que si Yahoo a renvoyé au moins
+      // une cotation. Sinon (réponse 200 vide, typique des tickers EU sur
+      // l'endpoint v7 neutralise par Yahoo) on laisse le circuit suivre les
+      // echecs reels du chart v8 pour pouvoir s'ouvrir si Yahoo tombe vraiment.
+      if (Object.keys(out).length) recordSuccess("yahoo");
       return out;
     } catch (e) {
       recordFailure("yahoo");
@@ -904,7 +908,11 @@ async function getYahooQuote(symbol) {
   try {
     const rows = await getYahooBatchQuotes([symbol]);
     if (rows[symbol]) return rows[symbol];
-  } catch {} // on tente le v8 chart en secours
+  } catch (e) {
+    // Si le circuit est déjà ouvert, inutile de tenter v8 (qui retesterait
+    // puis throw aussi). On remonte l'erreur pour éviter un fetch perdu.
+    if (e instanceof Error && e.message === "yahoo_circuit_open") throw e;
+  }
   // 2. Fallback chart v8 — Yahoo a neutralisé v7 pour les tickers EU
   // (MC.PA, SAP.DE, NESN.SW…) qui reviennent vides en 200 OK. Le v8 chart
   // reste fiable et expose meta.regularMarketPrice.
