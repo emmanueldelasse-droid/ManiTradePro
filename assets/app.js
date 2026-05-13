@@ -129,7 +129,6 @@
     ["opportunities", "Opportunites", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`],
     ["alerts", "Alertes", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`],
     ["portfolio", "Mes trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
-    ["news", "News", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><line x1="8" y1="9" x2="16" y2="9"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="12" y2="17"/></svg>`],
     ["bot", "Bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`],
     ["reports", "Rapports hebdo", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
@@ -138,7 +137,7 @@
   // Mobile bottom-nav : 4 items principaux + "Plus" (News + Bot + Rapports + Réglages).
   // Bot inclut maintenant Santé et Performance comme sous-onglets internes.
   const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
-  const MORE_NAV_ROUTES = ["news", "bot", "reports", "settings"];
+  const MORE_NAV_ROUTES = ["bot", "reports", "settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
@@ -3095,7 +3094,6 @@ function dashboardTopPick(opps) {
                   <div class="muted">${safeText((item.assets || []).join(" · ") || "Aucun actif cible")} · ${safeNewsDate(item.publishedAt)}</div>
                   <div class="legend">
                     <a class="btn" href="${safeText(item.link)}" target="_blank" rel="noreferrer noopener">Ouvrir la source</a>
-                    <button class="btn" data-route="news">Voir tout</button>
                   </div>
                 </div>
               </div>
@@ -3142,6 +3140,19 @@ function dashboardTopPick(opps) {
     } catch {
       return "Source";
     }
+  }
+
+  // Filtre les news pour ne garder que les 7 derniers jours glissants, triées
+  // par date desc. Utilisé par la section "Actualités" du dashboard (la page
+  // News dédiée a été fusionnée dans Accueil en PR fusion onglets).
+  function recentNews(items, days = 7) {
+    const cutoffMs = Date.now() - days * 24 * 60 * 60 * 1000;
+    return (Array.isArray(items) ? items : [])
+      .filter(item => {
+        const t = Date.parse(item?.publishedAt || "");
+        return Number.isFinite(t) && t >= cutoffMs;
+      })
+      .sort((a, b) => Date.parse(b?.publishedAt || 0) - Date.parse(a?.publishedAt || 0));
   }
 
   function renderNewsList(items, limit = 8) {
@@ -3629,6 +3640,23 @@ function renderDashboard() {
           <div class="section-title"><span>Priorites classees</span><span>${topRows.length}</span></div>
           ${topRows.length ? topRows.map((item, index) => renderOppRow(item, index + 1)).join("") : `<div class="empty-state">Aucune opportunite a afficher.</div>`}
         </div>
+
+        ${(() => {
+          // Section Actualités : 7 derniers jours glissants, tri par date desc.
+          // Anciennement onglet News dédié, fusionné dans Accueil suite à
+          // refonte UI (PR fusion onglets).
+          const weekItems = recentNews(state.news?.items || [], 7);
+          return `
+            <div class="card" style="margin-top:18px">
+              <div class="section-title">
+                <span>Actualités (7 derniers jours)</span>
+                <span>${weekItems.length}</span>
+              </div>
+              ${state.news?.asOf ? `<div class="muted" style="margin-bottom:12px">Dernière mise à jour : ${safeNewsDate(state.news.asOf)}</div>` : ""}
+              ${renderNewsList(weekItems, 10)}
+            </div>
+          `;
+        })()}
       </div>
     `;
   }
@@ -6682,7 +6710,6 @@ function renderMain() {
     switch (state.route) {
       case "dashboard": return renderDashboard();
       case "opportunities": return renderOpportunities();
-      case "news": return renderNews();
       case "asset-detail": return renderDetail();
       case "portfolio": return renderPortfolio();
       case "alerts": return renderAlerts();
@@ -7393,7 +7420,7 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
     await loadDashboard();
     render();
     setInterval(() => {
-      if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio", "alerts"].includes(state.route)) {
+      if (["dashboard", "opportunities", "asset-detail", "settings", "portfolio", "alerts"].includes(state.route)) {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
         }
