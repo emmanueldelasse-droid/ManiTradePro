@@ -3244,14 +3244,23 @@ async function handleTrainingAutoCycle(env) {
           catch (e) { quoteError = e?.message || "quote_failed"; }
           try { detailPayload = await withTimeout(buildStableMarketPayload(symbol, env, null, true), 8000, `detail:${symbol}`); } catch {}
 
-          // Prix effectif pour le check stop/TP : on chaîne les sources pour
+          // Prix effectif pour le check stop/TP : chaîne 3 niveaux pour
           // éviter qu'une indispo de quote provider gèle silencieusement les
-          // fermetures (bug observé : positions stop-touché qui restent ouvertes
-          // pendant 10+ jours car resolveUnifiedMarketQuote échoue cycle après
-          // cycle sans laisser de trace).
+          // fermetures (bug observé : V opened 02/05 stop touché, mais
+          // Twelve+Yahoo+Alpha tous KO sur ce symbole, position bloquée 10+
+          // jours). 3e niveau = dernier prix capturé en intra-cycle dans
+          // position.live.lastPrice (peut être stale de quelques heures, mais
+          // si le stop est touché à ce prix, on ferme — c'est plus juste qu'une
+          // position éternelle).
+          const stalePrice = finiteOrNull(position?.live?.lastPrice);
           const effectivePrice = finiteOrNull(liveQuote?.price)
             ?? finiteOrNull(detailPayload?.price)
+            ?? stalePrice
             ?? null;
+          const priceSource = Number.isFinite(liveQuote?.price) ? "live"
+            : Number.isFinite(detailPayload?.price) ? "detail"
+            : Number.isFinite(stalePrice) ? "stale"
+            : null;
 
           // PR #5 Phase 2 — tracker MAE/MFE en continu, même si pas de clôture ce cycle
           const excursion = updatePositionIntraExcursion(position, effectivePrice);
@@ -3278,7 +3287,7 @@ async function handleTrainingAutoCycle(env) {
             closeTrainingPosition(env, position, trigger.exitPrice, trigger.type, detailPayload),
             8000, `close:${symbol}`
           );
-          log.closed.push({ symbol, trade_id: closed.id, close_type: trigger.type, exit_price: closed.exit_price, pnl: closed.pnl, pnl_pct: closed.pnl_pct });
+          log.closed.push({ symbol, trade_id: closed.id, close_type: trigger.type, exit_price: closed.exit_price, pnl: closed.pnl, pnl_pct: closed.pnl_pct, price_source: priceSource });
         } catch (e) {
           log.errors.push({ phase: "close", symbol, error: e.message });
           // continue — les autres fermetures ne sont pas bloquées (Promise.all
