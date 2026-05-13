@@ -3199,6 +3199,23 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   if ((row.plan?.side || "") === "short" && !settings.allow_short) return false;
   if ((row.plan?.side || "") === "long" && !settings.allow_long) return false;
 
+  // Heures de marché — bloquer l'ouverture de stocks/ETF hors session NYSE.
+  // Bug observé 13/05/2026 11:30 CEST (= 09:30 UTC) : V (Visa) ouverte en
+  // pré-marché, prix saute de -5 % en 16 min sur la volatilité illiquide,
+  // stop touché immédiatement. NYSE regular hours = 13:30-20:00 UTC lun-ven
+  // (DST appliquée 8 mois sur 12). On simplifie à 13-20 UTC. Crypto trade
+  // 24/7 → pas de filtre. handleScheduledCycle calcule déjà isUSMarketOpen
+  // pour son mode "crypto+actions" vs "crypto-only", mais ne l'utilisait
+  // pas comme garde-fou de candidat. assetClass est déjà déclaré plus haut
+  // dans cette fonction (line ~3143) pour le bucket_key.
+  if (assetClass === "stock" || assetClass === "etf") {
+    const nowUtc = new Date();
+    const utcDay = nowUtc.getUTCDay();
+    const utcHour = nowUtc.getUTCHours();
+    const isUSMarketOpen = utcDay >= 1 && utcDay <= 5 && utcHour >= 13 && utcHour < 20;
+    if (!isUSMarketOpen) return false;
+  }
+
   // Symboles autorisés
   const allowedList = Array.isArray(settings.allowed_symbols) ? settings.allowed_symbols : [];
   if (allowedList.length && !allowedList.includes(parseSymbol(row.symbol))) return false;
