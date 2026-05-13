@@ -3129,12 +3129,25 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   // Le newsWindow est pré-fetché en amont du cycle training pour éviter un appel par candidat.
   if (newsWindow && newsWindow.blocked) return false;
 
-  // Setup autorisé ?
+  // Setup structurel obligatoire (Bug #3 strict, post-mortem 28/04 — option 1).
+  // Sans setup détecté, WR observé = 11 % vs 31 % breakeven théorique pour RR 2.2.
+  // 26 trades sur 39 du dataset 12/05 étaient en setupType="autre" → tous perdus
+  // ou quasi. On préfère 3× moins de trades de qualité que d'empiler du bruit.
+  // Le mode Exploration garde sa philosophie : seuils larges, mais setup requis.
   const setupType = String(row.plan?.setupType || row.setupType || "").toLowerCase();
-  const allowedSetups = Array.isArray(settings.allowed_setups) ? settings.allowed_setups : ["pullback","breakout","continuation"];
-  if (setupType && setupType !== "aucun" && !allowedSetups.includes(setupType)) return false;
+  const VALID_SETUPS = new Set([
+    "pullback", "breakout", "continuation",
+    "pullback_short", "breakdown", "continuation_short",
+    "mean_reversion"
+  ]);
+  if (!VALID_SETUPS.has(setupType)) return false;
 
-  // Mean reversion bloquée
+  // Setup activé par l'utilisateur dans Réglages → Bot ?
+  const allowedSetups = Array.isArray(settings.allowed_setups) ? settings.allowed_setups : ["pullback","breakout","continuation"];
+  if (!allowedSetups.includes(setupType)) return false;
+
+  // Mean reversion : toggle dédié pour pouvoir la désactiver vite sans
+  // toucher les autres setups dans allowed_setups.
   if (setupType === "mean_reversion" && !settings.mean_reversion_enabled) return false;
 
   // PR #6 Phase 2 — bucket_key du candidat
