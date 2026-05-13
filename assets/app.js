@@ -5647,18 +5647,18 @@ function openPositionsRiskView() {
       </div>`;
   }
 
-  // Paramètres du bot — replié par défaut. Réutilise les renderers existants.
+  // Paramètres du bot — replié par défaut. Réutilise les renderers existants
+  // ET les classes CSS existantes (.bot-params-card + .bot-collapsible-summary)
+  // pour avoir le bon padding interne, le caret ▾ et le styling thème dark/light.
   function renderBotParamsSection() {
     const acc = state.bot.account;
     if (!acc) return "";
     const settings = acc.settings || {};
     const capitalBase = Number(acc.capitalBase || settings.capital_base || 0);
     return `
-      <details class="card" style="margin-top:18px">
-        <summary style="cursor:pointer;font-weight:600;padding:6px 0">Paramètres du bot</summary>
-        <div style="margin-top:10px">
-          ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
-        </div>
+      <details class="card bot-params-card">
+        <summary class="bot-collapsible-summary"><span>Paramètres du bot</span></summary>
+        ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
       </details>`;
   }
 
@@ -5671,9 +5671,9 @@ function openPositionsRiskView() {
       ? `Rapport hebdo Claude — semaine du ${safeText(latest.week_start || "?")}`
       : `Rapport hebdo Claude`;
     return `
-      <details class="card" style="margin-top:18px">
-        <summary style="cursor:pointer;font-weight:600;padding:6px 0">${summary}</summary>
-        <div style="margin-top:10px">
+      <details class="card bot-params-card">
+        <summary class="bot-collapsible-summary"><span>${summary}</span></summary>
+        <div>
           ${latest
             ? `<div class="report-markdown">${renderMarkdown(latest.report_markdown || "")}</div>`
             : `<div class="muted">Aucun rapport pour l'instant. Le bot en produit un chaque lundi à 8h (heure de Paris) si au moins un trade a été clos dans la semaine.</div>`}
