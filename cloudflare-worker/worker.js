@@ -679,15 +679,27 @@ function normalizeBinanceSymbol(symbol) {
   return map[symbol] || `${symbol}USDT`;
 }
 function normalizeYahooSymbol(symbol) {
+  // Mapping vers les tickers Yahoo (= bourse de cotation). Sans ce mapping,
+  // Yahoo cherche "LVMH" comme ticker US et renvoie "no data" → l'action
+  // EU est filtrée par le statut "partial" en sortie de scan.
+  // ATTENTION : LVMH sur Euronext Paris = ticker "MC", pas "LVMH".
   const map = {
-    AIR:"AIR.PA",
+    AIR:"AIR.PA", LVMH:"MC.PA", TTE:"TTE.PA", RMS:"RMS.PA",
+    SAP:"SAP.DE", SIE:"SIE.DE",
+    NESN:"NESN.SW",
     EURUSD:"EURUSD=X",GBPUSD:"GBPUSD=X",USDJPY:"USDJPY=X",
     USDCHF:"USDCHF=X",AUDUSD:"AUDUSD=X",GOLD:"GC=F",SILVER:"SI=F",OIL:"CL=F"
   };
   return map[symbol] || symbol;
 }
 function getAlphaSymbol(symbol) {
-  const map = { AIR:"AIR.PA" };
+  // Alpha Vantage prend les mêmes suffixes que Yahoo pour Paris/Francfort,
+  // sauf LVMH qui reste sous "LVMH.PA" sur Alpha (ticker historique).
+  const map = {
+    AIR:"AIR.PA", LVMH:"LVMH.PA", TTE:"TTE.PA", RMS:"RMS.PA",
+    SAP:"SAP.DE", SIE:"SIE.DE",
+    NESN:"NESN.SW"
+  };
   return map[symbol] || symbol;
 }
 function getTwelveKeys(env) {
