@@ -128,16 +128,14 @@
     ["dashboard", "Accueil", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`],
     ["opportunities", "Opportunites", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`],
     ["alerts", "Alertes", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`],
-    ["portfolio", "Mes trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
-    ["bot", "Bot", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><circle cx="12" cy="5" r="2"/><path d="M12 7v4"/><line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/></svg>`],
-    ["reports", "Rapports hebdo", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>`],
+    ["portfolio", "Trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
 
   // Mobile bottom-nav : 4 items principaux + "Plus" (News + Bot + Rapports + Réglages).
   // Bot inclut maintenant Santé et Performance comme sous-onglets internes.
   const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
-  const MORE_NAV_ROUTES = ["bot", "reports", "settings"];
+  const MORE_NAV_ROUTES = ["settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
   // =========================
@@ -2602,16 +2600,13 @@ function applyFilter() {
       if (route === "settings" && isSessionValid()) {
         loadUserAssets().catch(() => {});
       }
-      // Anciens chemins "health" et "performance" — redirige vers Bot avec
-      // le sous-onglet correspondant pré-sélectionné (la fonction render
-      // affichera Santé ou Performance via renderBotUnified).
-      if ((route === "bot" || route === "health" || route === "performance") && isSessionValid()) {
-        if (route === "health") state.bot.subTab = "health";
-        else if (route === "performance") state.bot.subTab = "performance";
-        const sub = state.bot.subTab || "stats";
-        if (sub === "health") loadHealth().catch(() => {});
-        else if (sub === "stats") loadBot().catch(() => {});
-        // performance : utilise les données déjà chargées
+      // Portfolio = onglet Trades fusionné (PR fusion onglets). Au load on
+      // tire bot account + reports en parallèle pour que les sections
+      // intégrées (Bot d'entrainement, Paramètres bot, Rapport hebdo) aient
+      // leurs données fraîches.
+      if (route === "portfolio" && isSessionValid()) {
+        loadBot().catch(() => {});
+        loadReports().catch(() => {});
       }
     }
   }
@@ -5508,7 +5503,7 @@ function openPositionsRiskView() {
     return `
       <div class="screen">
         <div class="screen-header">
-          <div class="screen-title">Mes trades</div>
+          <div class="screen-title">Trades</div>
           <div class="screen-subtitle muted">${meta?.updatedAt ? `Sauvegarde ${new Date(meta.updatedAt).toLocaleTimeString("fr-FR", {hour:"2-digit",minute:"2-digit"})}` : ""} · ${safeText(remoteStatusText())}</div>
         </div>
 
@@ -5609,8 +5604,81 @@ function openPositionsRiskView() {
           ${history.length ? renderJournalAnalysisCard() : ""}
 
           ${state.settings.showAlgoJournal ? `<div style="margin-top:8px">${renderJournalMoteurCard()}</div>` : ""}
+
+          <!-- FUSION onglets (PR #119+) — sections bot et rapport hebdo intégrées
+               dans la page Trades pour éviter les doublons d'info entre 3 onglets. -->
+          ${renderBotMiniSection()}
+          ${renderBotParamsSection()}
+          ${renderWeeklyReportSection()}
         `}
       </div>`;
+  }
+
+  // Section bot compacte : état Actif + dernier cycle + bouton "Lancer un cycle".
+  // Volontairement minimaliste : les stats détaillées (positions, capital, P&L,
+  // equity) sont déjà dans la wallet-strip plus haut.
+  function renderBotMiniSection() {
+    const acc = state.bot.account;
+    if (!acc) return "";
+    const settings = acc.settings || {};
+    const enabled = !!settings.is_enabled;
+    const lastCycleAt = acc.lastCycleAt || settings.last_cycle_at || null;
+    const lastCycleMode = acc.lastCycleMode || settings.last_cycle_mode || null;
+    let lastCycleText = "Aucun cycle enregistré";
+    if (lastCycleAt) {
+      const ms = Date.now() - new Date(lastCycleAt).getTime();
+      const min = Math.max(0, Math.round(ms / 60000));
+      const modePart = lastCycleMode ? ` · ${lastCycleMode}` : "";
+      lastCycleText = min < 1 ? `Dernier cycle à l'instant${modePart}` : `Dernier cycle il y a ${min} min${modePart}`;
+    }
+    return `
+      <div class="card" style="margin-top:18px">
+        <div class="section-title">
+          <span>Bot d'entrainement</span>
+          <label class="bot-toggle-big" title="${enabled ? "Désactiver le bot" : "Activer le bot"}">
+            <input type="checkbox" data-bot-toggle="is_enabled" ${enabled ? "checked" : ""}>
+            <span class="bot-toggle-slider"></span>
+          </label>
+        </div>
+        <div class="muted" style="margin-top:6px">${safeText(lastCycleText)}</div>
+        <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-primary" data-bot-force-cycle ${state.bot.forcingCycle ? "disabled" : ""}>${state.bot.forcingCycle ? "Cycle en cours…" : "Lancer un cycle"}</button>
+        </div>
+      </div>`;
+  }
+
+  // Paramètres du bot — replié par défaut. Réutilise les renderers existants
+  // ET les classes CSS existantes (.bot-params-card + .bot-collapsible-summary)
+  // pour avoir le bon padding interne, le caret ▾ et le styling thème dark/light.
+  function renderBotParamsSection() {
+    const acc = state.bot.account;
+    if (!acc) return "";
+    const settings = acc.settings || {};
+    const capitalBase = Number(acc.capitalBase || settings.capital_base || 0);
+    return `
+      <details class="card bot-params-card">
+        <summary class="bot-collapsible-summary"><span>Paramètres du bot</span></summary>
+        ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
+      </details>`;
+  }
+
+  // Rapport hebdo Claude — affiche le dernier rapport en markdown si dispo,
+  // sinon un message expliquant la mise à jour hebdomadaire (lundi 8h CEST).
+  function renderWeeklyReportSection() {
+    const list = Array.isArray(state.reports?.list) ? state.reports.list : [];
+    const latest = list[0] || null;
+    const summary = latest
+      ? `Rapport hebdo Claude — semaine du ${safeText(latest.week_start || "?")}`
+      : `Rapport hebdo Claude`;
+    return `
+      <details class="card bot-params-card">
+        <summary class="bot-collapsible-summary"><span>${summary}</span></summary>
+        <div>
+          ${latest
+            ? `<div class="report-markdown">${renderMarkdown(latest.report_markdown || "")}</div>`
+            : `<div class="muted">Aucun rapport pour l'instant. Le bot en produit un chaque lundi à 8h (heure de Paris) si au moins un trade a été clos dans la semaine.</div>`}
+        </div>
+      </details>`;
   }
 
   function renderAlerts() {
@@ -6714,16 +6782,10 @@ function renderMain() {
       case "portfolio": return renderPortfolio();
       case "alerts": return renderAlerts();
       case "settings": return renderSettings();
-      case "bot": return renderBotUnified();
-      // Anciennes routes "health" et "performance" — redirigées vers Bot
-      // (sous-onglets Santé / Performance) pour rétrocompatibilité des liens.
-      case "health":
-        state.bot.subTab = "health";
-        return renderBotUnified();
-      case "performance":
-        state.bot.subTab = "performance";
-        return renderBotUnified();
-      case "reports": return renderReports();
+      // Routes legacy /bot /health /performance /reports : fusionnées dans
+      // l'onglet Trades (= route portfolio). Suppression brute (choix user) :
+      // fallback au default = renderDashboard. Anciens bookmarks affichent
+      // la home, pas grave.
       default: return renderDashboard();
     }
   }
@@ -7513,15 +7575,13 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
     switch (state.route) {
       case "dashboard": return () => loadDashboard();
       case "opportunities": return () => loadOpportunities(true);
-      case "portfolio": return () => refreshOpenTradesLive(true);
+      // Trades (ex portfolio) : recharge positions live + bot + rapports en parallèle
+      case "portfolio": return () => Promise.all([
+        refreshOpenTradesLive(true),
+        loadBot().catch(() => {}),
+        loadReports().catch(() => {})
+      ]);
       case "alerts": return () => loadDashboard();
-      case "reports": return () => loadReports();
-      case "bot": return () => {
-        const sub = state.bot.subTab || "stats";
-        if (sub === "health") return loadHealth();
-        if (sub === "performance") return refreshOpenTradesLive(true);
-        return loadBot();
-      };
       default: return null;
     }
   }
