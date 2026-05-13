@@ -3248,18 +3248,25 @@ async function handleTrainingAutoCycle(env) {
           // éviter qu'une indispo de quote provider gèle silencieusement les
           // fermetures (bug observé : V opened 02/05 stop touché, mais
           // Twelve+Yahoo+Alpha tous KO sur ce symbole, position bloquée 10+
-          // jours). 3e niveau = dernier prix capturé en intra-cycle dans
-          // position.live.lastPrice (peut être stale de quelques heures, mais
-          // si le stop est touché à ce prix, on ferme — c'est plus juste qu'une
-          // position éternelle).
+          // jours).
+          //
+          // Ordre IMPORTANT : stalePrice (= position.live.lastPrice, dernier
+          // fetch temps réel réussi, vieux de quelques heures au pire) passe
+          // AVANT detailPayload.price (qui fallback sur getStoredDailyQuoteFallback
+          // = bougie daily stockée, potentiellement vieille de plusieurs jours
+          // et donc moins représentative du prix intra-day actuel).
+          //
+          // Cas V : stalePrice=309,94 (hier soir 20:46), detailPayload.price=~328
+          // (close daily du 02/05). 309,94 < stop 311,84 → close. 328 > stop →
+          // pas de close. L'ordre détermine si V se ferme ou pas.
           const stalePrice = finiteOrNull(position?.live?.lastPrice);
           const effectivePrice = finiteOrNull(liveQuote?.price)
-            ?? finiteOrNull(detailPayload?.price)
             ?? stalePrice
+            ?? finiteOrNull(detailPayload?.price)
             ?? null;
           const priceSource = Number.isFinite(liveQuote?.price) ? "live"
-            : Number.isFinite(detailPayload?.price) ? "detail"
             : Number.isFinite(stalePrice) ? "stale"
+            : Number.isFinite(detailPayload?.price) ? "detail"
             : null;
 
           // PR #5 Phase 2 — tracker MAE/MFE en continu, même si pas de clôture ce cycle
