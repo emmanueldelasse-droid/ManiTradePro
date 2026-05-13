@@ -7420,7 +7420,7 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
     await loadDashboard();
     render();
     setInterval(() => {
-      if (["dashboard", "opportunities", "news", "asset-detail", "settings", "portfolio", "alerts"].includes(state.route)) {
+      if (["dashboard", "opportunities", "asset-detail", "settings", "portfolio", "alerts"].includes(state.route)) {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
         }
