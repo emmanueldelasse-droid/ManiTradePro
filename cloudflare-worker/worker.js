@@ -3202,18 +3202,31 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   // Heures de marché — bloquer l'ouverture de stocks/ETF hors session NYSE.
   // Bug observé 13/05/2026 11:30 CEST (= 09:30 UTC) : V (Visa) ouverte en
   // pré-marché, prix saute de -5 % en 16 min sur la volatilité illiquide,
-  // stop touché immédiatement. NYSE regular hours = 13:30-20:00 UTC lun-ven
-  // (DST appliquée 8 mois sur 12). On simplifie à 13-20 UTC. Crypto trade
-  // 24/7 → pas de filtre. handleScheduledCycle calcule déjà isUSMarketOpen
-  // pour son mode "crypto+actions" vs "crypto-only", mais ne l'utilisait
-  // pas comme garde-fou de candidat. assetClass est déjà déclaré plus haut
-  // dans cette fonction (line ~3143) pour le bucket_key.
+  // stop touché immédiatement. assetClass est déjà déclaré plus haut dans
+  // cette fonction (line ~3143) pour le bucket_key.
+  //
+  // NYSE regular hours :
+  //   Été (EDT, mars-novembre) : 13:30-20:00 UTC lun-ven
+  //   Hiver (EST, novembre-mars) : 14:30-21:00 UTC lun-ven
+  //
+  // On détecte le DST US (2e dimanche de mars → 1er dimanche de novembre)
+  // pour caler la fenêtre exactement, sinon une simplification à 13-20 UTC
+  // laisserait passer 30 min de pré-marché en été et serait incohérente en
+  // hiver. Crypto trade 24/7 → pas de filtre.
   if (assetClass === "stock" || assetClass === "etf") {
     const nowUtc = new Date();
     const utcDay = nowUtc.getUTCDay();
-    const utcHour = nowUtc.getUTCHours();
-    const isUSMarketOpen = utcDay >= 1 && utcDay <= 5 && utcHour >= 13 && utcHour < 20;
-    if (!isUSMarketOpen) return false;
+    if (utcDay < 1 || utcDay > 5) return false; // weekend
+    const utcMin = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
+    const y = nowUtc.getUTCFullYear();
+    const marchFirst = new Date(Date.UTC(y, 2, 1));
+    const dstStart = new Date(Date.UTC(y, 2, 1 + ((7 - marchFirst.getUTCDay()) % 7) + 7));
+    const novFirst = new Date(Date.UTC(y, 10, 1));
+    const dstEnd = new Date(Date.UTC(y, 10, 1 + ((7 - novFirst.getUTCDay()) % 7)));
+    const inDst = nowUtc >= dstStart && nowUtc < dstEnd;
+    const openMin = inDst ? (13 * 60 + 30) : (14 * 60 + 30);  // 13:30 ou 14:30 UTC
+    const closeMin = inDst ? (20 * 60) : (21 * 60);            // 20:00 ou 21:00 UTC
+    if (utcMin < openMin || utcMin >= closeMin) return false;
   }
 
   // Symboles autorisés
