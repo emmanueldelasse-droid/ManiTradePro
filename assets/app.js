@@ -6727,7 +6727,7 @@ function openPositionsRiskView() {
         <details class="card bot-params-card">
           <summary class="bot-collapsible-summary">
             <span>Alertes & notifications</span>
-            <span class="muted" style="font-weight:400;font-size:.85rem">${activeAlerts.length} active${activeAlerts.length !== 1 ? "s" : ""}</span>
+            <span class="muted" style="font-weight:400;font-size:.85rem;flex-shrink:0">${activeAlerts.length} active${activeAlerts.length !== 1 ? "s" : ""}</span>
           </summary>
           <div>
             ${notifStatus !== "granted" ? `
@@ -6784,7 +6784,7 @@ function openPositionsRiskView() {
         <details class="card bot-params-card">
           <summary class="bot-collapsible-summary">
             <span>Actifs & données</span>
-            <span class="muted" style="font-weight:400;font-size:.85rem">${state.userAssets.length}/50 personnalisés</span>
+            <span class="muted" style="font-weight:400;font-size:.85rem;flex-shrink:0">${state.userAssets.length}/50 personnalisés</span>
           </summary>
           <div>
             <div class="setting-desc" style="margin-bottom:12px">
@@ -6831,7 +6831,7 @@ function openPositionsRiskView() {
             <div class="setting-row">
               <div>
                 <div class="setting-title">Version &amp; code source</div>
-                <div class="setting-desc">PWA ManiTradePro · <a href="https://github.com/emmanueldelasse-droid/ManiTradePro" target="_blank" rel="noopener">repo GitHub</a></div>
+                <div class="setting-desc">PWA ManiTradePro · <a href="https://github.com/emmanueldelasse-droid/ManiTradePro" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">repo GitHub</a></div>
               </div>
             </div>
           </div>
