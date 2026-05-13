@@ -4772,6 +4772,9 @@ async function handleTradesWipe(request, env) {
     if (wipeAll) {
       let deletedTrades = 0;
       let deletedPositions = 0;
+      let deletedFeedback = 0;
+      let deletedEvents = 0;
+      let deletedAdjustments = 0;
       const tradesRes = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed`, {
         method: "DELETE",
         headers: { Prefer: "return=representation", Accept: "application/json" }
@@ -4783,8 +4786,53 @@ async function handleTradesWipe(request, env) {
           headers: { Prefer: "return=representation", Accept: "application/json" }
         });
         deletedPositions = Array.isArray(posRes) ? posRes.length : 0;
+
+        // Deep reset : on nettoie aussi les tables dérivées pour vraiment
+        // repartir de zéro côté apprentissage / events / ajustements.
+        // Sinon on garde des feedbacks orphelins (références à des trade_id
+        // qui n'existent plus) qui polluent la page Apprentissage et
+        // empêchent les buckets de redémarrer proprement.
+        // On filtre sur created_at=not.is.null (= match all) plutôt que sur
+        // id : mtp_training_events.id est text (`event_type:timestamp:rand`),
+        // donc un filtre id=gte.0 ne marche pas. created_at est toujours set
+        // dans les 3 tables.
+        try {
+          const fbRes = await supabaseFetch(env, `${TRADE_FEEDBACK_TABLE}?created_at=not.is.null`, {
+            method: "DELETE",
+            headers: { Prefer: "return=representation", Accept: "application/json" }
+          });
+          deletedFeedback = Array.isArray(fbRes) ? fbRes.length : 0;
+        } catch (e) { console.error("wipe feedback failed:", e.message); }
+        try {
+          const evRes = await supabaseFetch(env, `${TRAINING_EVENTS_TABLE}?created_at=not.is.null`, {
+            method: "DELETE",
+            headers: { Prefer: "return=representation", Accept: "application/json" }
+          });
+          deletedEvents = Array.isArray(evRes) ? evRes.length : 0;
+        } catch (e) { console.error("wipe events failed:", e.message); }
+        try {
+          const adjRes = await supabaseFetch(env, `${ENGINE_ADJUSTMENTS_TABLE}?created_at=not.is.null`, {
+            method: "DELETE",
+            headers: { Prefer: "return=representation", Accept: "application/json" }
+          });
+          deletedAdjustments = Array.isArray(adjRes) ? adjRes.length : 0;
+        } catch (e) { console.error("wipe adjustments failed:", e.message); }
+
+        // Reset last_cycle_at pour que le prochain cycle redémarre proprement
+        // sans être bloqué par l'idempotence ou pollué par l'historique.
+        try {
+          await supabaseFetch(env, `${TRAINING_SETTINGS_TABLE}?mode=eq.training`, {
+            method: "PATCH",
+            body: JSON.stringify({
+              last_cycle_at: null,
+              last_cycle_mode: null,
+              last_cycle_summary: {},
+              updated_at: nowIso()
+            })
+          });
+        } catch (e) { console.error("wipe settings reset failed:", e.message); }
       }
-      return ok({ deletedTrades, deletedPositions, mode: "wipe_all" });
+      return ok({ deletedTrades, deletedPositions, deletedFeedback, deletedEvents, deletedAdjustments, mode: "wipe_all" });
     }
 
     // Cas 2 — par source (manual/algo) : SELECT minimal + DELETE chunked.
