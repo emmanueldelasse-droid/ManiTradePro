@@ -127,14 +127,12 @@
   const navItems = [
     ["dashboard", "Accueil", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>`],
     ["opportunities", "Opportunites", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>`],
-    ["alerts", "Alertes", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>`],
     ["portfolio", "Trades", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`],
     ["settings", "Reglages", `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>`]
   ];
 
-  // Mobile bottom-nav : 4 items principaux + "Plus" (News + Bot + Rapports + Réglages).
-  // Bot inclut maintenant Santé et Performance comme sous-onglets internes.
-  const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "alerts", "portfolio"];
+  // Mobile bottom-nav : 3 items principaux + "Plus" (Réglages).
+  const PRIMARY_NAV_ROUTES = ["dashboard", "opportunities", "portfolio"];
   const MORE_NAV_ROUTES = ["settings"];
   const MORE_ICON = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/></svg>`;
 
@@ -6615,71 +6613,57 @@ function openPositionsRiskView() {
   }
 
   function renderSettings() {
+    // 4 sections en accordéon. Section 1 ouverte par défaut (la plus utilisée).
+    // Pour la cohérence visuelle : mêmes classes .card.bot-params-card +
+    // .bot-collapsible-summary que les <details> de l'onglet Trades.
+
+    // === Données pour la section Alertes & Notifications (fusion ex-onglet Alertes) ===
+    const activeAlerts = state.priceAlerts.filter(a => a.active);
+    const triggeredAlerts = state.priceAlerts.filter(a => !a.active);
+    const notifStatus = "Notification" in window ? Notification.permission : "unsupported";
+
+    function alertRow(a) {
+      const dir = a.condition === "above" ? "Au-dessus de" : "En-dessous de";
+      const ago = a.triggeredAt
+        ? `Declenche ${Math.round((Date.now() - a.triggeredAt) / 60000)} min`
+        : `Cree ${Math.round((Date.now() - a.createdAt) / 60000)} min ago`;
+      return `
+        <div class="alert-row ${a.active ? "" : "alert-triggered"}">
+          <div class="alert-row-info">
+            <div class="alert-symbol">${safeText(a.symbol)}</div>
+            <div class="alert-cond">${dir} ${priceDisplay(a.targetPrice)}</div>
+            <div class="alert-meta">${safeText(a.name)} · ${ago}</div>
+          </div>
+          ${a.active ? `<button class="btn btn-secondary alert-remove-btn" data-remove-alert="${a.id}">Suppr.</button>` : `<span class="badge badge-positive">OK</span>`}
+        </div>`;
+    }
+
     return `
       <div class="screen">
         <div class="screen-header">
-          <div class="screen-title">Reglages</div>
-          <div class="screen-subtitle">Ces reglages servent juste a rendre l'app plus claire.</div>
+          <div class="screen-title">Réglages</div>
+          <div class="screen-subtitle">Personnalise l'app selon tes préférences.</div>
         </div>
 
-        <div class="card">
+        <!-- ====== 1. COMPTE + APPARENCE ====== -->
+        <details class="card bot-params-card" open>
+          <summary class="bot-collapsible-summary"><span>Compte & apparence</span></summary>
           <div class="setting-list">
-            <label class="setting-row">
+            <div class="setting-row">
               <div>
-                <div class="setting-title">Rafraichir les opportunites</div>
-                <div class="setting-desc">Recharge automatiquement la liste quand le delai minimum Twelve est termine.</div>
+                <div class="setting-title">Session Worker</div>
+                <div class="setting-desc">${isSessionValid()
+                  ? `connecté · expire le ${new Date(state.session.expiresAt * 1000).toLocaleString("fr-FR")}`
+                  : "aucune session active"}</div>
               </div>
-              <input type="checkbox" data-setting-toggle="autoRefreshOpportunities" ${state.settings.autoRefreshOpportunities ? "checked" : ""}>
-            </label>
+              ${isSessionValid()
+                ? `<button class="btn btn-secondary" data-session-logout style="min-width:90px">Déconnecter</button>`
+                : `<button class="btn btn-primary" data-open-pin style="min-width:90px">Se connecter</button>`}
+            </div>
 
             <label class="setting-row">
               <div>
-                <div class="setting-title">Scan auto — intervalle</div>
-                <div class="setting-desc">Frequence de relance automatique du scan des opportunites.</div>
-              </div>
-              <select class="setting-select" data-setting-select="autoScanIntervalMin">
-                <option value="3" ${Number(state.settings.autoScanIntervalMin) === 3 ? "selected" : ""}>3 min</option>
-                <option value="5" ${Number(state.settings.autoScanIntervalMin) === 5 || !state.settings.autoScanIntervalMin ? "selected" : ""}>5 min</option>
-                <option value="10" ${Number(state.settings.autoScanIntervalMin) === 10 ? "selected" : ""}>10 min</option>
-                <option value="15" ${Number(state.settings.autoScanIntervalMin) === 15 ? "selected" : ""}>15 min</option>
-              </select>
-            </label>
-
-            <label class="setting-row">
-              <div>
-                <div class="setting-title">Alertes signaux algo</div>
-                <div class="setting-desc">Notif push quand un actif passe en "Trade propose" apres un scan.</div>
-              </div>
-              <input type="checkbox" data-setting-toggle="algoSignalNotifs" ${state.settings.algoSignalNotifs ? "checked" : ""}>
-            </label>
-
-            <label class="setting-row">
-              <div>
-                <div class="setting-title">Afficher source et mise a jour</div>
-                <div class="setting-desc">Montre les badges fournisseur et fraicheur sur les cartes.</div>
-              </div>
-              <input type="checkbox" data-setting-toggle="showSourceBadges" ${state.settings.showSourceBadges ? "checked" : ""}>
-            </label>
-
-            <label class="setting-row">
-              <div>
-                <div class="setting-title">Afficher le detail du signal</div>
-                <div class="setting-desc">Affiche les sous-composants du score detaille dans la fiche actif.</div>
-              </div>
-              <input type="checkbox" data-setting-toggle="showScoreBreakdown" ${state.settings.showScoreBreakdown ? "checked" : ""}>
-            </label>
-
-            <label class="setting-row">
-              <div>
-                <div class="setting-title">Cartes plus compactes</div>
-                <div class="setting-desc">Resserre un peu les cartes opportunites.</div>
-              </div>
-              <input type="checkbox" data-setting-toggle="compactCards" ${state.settings.compactCards ? "checked" : ""}>
-            </label>
-
-            <label class="setting-row">
-              <div>
-                <div class="setting-title">Suivre le theme systeme</div>
+                <div class="setting-title">Suivre le thème système</div>
                 <div class="setting-desc">L'app bascule automatiquement clair/sombre selon ton iPhone.</div>
               </div>
               <input type="checkbox" data-setting-toggle="autoTheme" ${state.settings.autoTheme ? "checked" : ""}>
@@ -6687,18 +6671,10 @@ function openPositionsRiskView() {
 
             <label class="setting-row ${state.settings.autoTheme ? "setting-row--disabled" : ""}">
               <div>
-                <div class="setting-title">Activer le theme clair</div>
-                <div class="setting-desc">${state.settings.autoTheme ? "Suivi systeme actif — ce reglage est ignore." : "Passe l'app sur un rendu clair, plus doux en journee."}</div>
+                <div class="setting-title">Activer le thème clair</div>
+                <div class="setting-desc">${state.settings.autoTheme ? "Suivi système actif — ce réglage est ignoré." : "Passe l'app sur un rendu clair, plus doux en journée."}</div>
               </div>
               <input type="checkbox" data-setting-toggle="lightTheme" ${state.settings.autoTheme ? "disabled" : ""} ${state.settings.lightTheme ? "checked" : ""}>
-            </label>
-
-            <label class="setting-row">
-              <div>
-                <div class="setting-title">Afficher le journal moteur</div>
-                <div class="setting-desc">Montre les dernieres decisions du moteur dans l'accueil et Mes trades.</div>
-              </div>
-              <input type="checkbox" data-setting-toggle="showAlgoJournal" ${state.settings.showAlgoJournal ? "checked" : ""}>
             </label>
 
             <label class="setting-row">
@@ -6712,61 +6688,154 @@ function openPositionsRiskView() {
                 <option value="EUR_PLUS_USD" ${state.settings.displayCurrency === "EUR_PLUS_USD" ? "selected" : ""}>Euro + dollar</option>
               </select>
             </label>
-          </div>
-        </div>
 
-        <div class="card" style="margin-top:16px">
-          <div class="section-title"><span>Actifs surveillés</span><span>${state.userAssets.length}/50 custom</span></div>
-          <div class="setting-desc" style="margin-bottom:12px">
-            Ajoute tes propres actifs (crypto, actions, ETF…) au scan du bot. Les 35 actifs de base restent toujours inclus.
-          </div>
-          ${!isSessionValid() ? `
-            <div class="info-box">Connecte-toi avec ton PIN pour gérer les actifs personnalisés.</div>
-          ` : `
-            ${state.userAssetsError ? `<div class="error-box" style="margin-bottom:10px">${safeText(state.userAssetsError)}</div>` : ""}
-            ${state.userAssetsLoading ? `<div class="muted">Chargement…</div>` : ""}
-            ${state.userAssets.length ? `
-              <div class="user-assets-list">
-                ${state.userAssets.map(a => renderUserAssetRow(a)).join("")}
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Cartes plus compactes</div>
+                <div class="setting-desc">Resserre un peu les cartes opportunités.</div>
               </div>
-            ` : !state.userAssetsLoading && !state.userAssetsError ? `<div class="empty-state" style="padding:18px">Aucun actif personnalisé. Clique sur "Ajouter" ci-dessous.</div>` : ""}
-            <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-              ${state.addAssetForm.open ? "" : `<button class="btn btn-primary" data-open-add-asset>+ Ajouter un actif</button>`}
-              <button class="btn btn-secondary" data-load-user-assets>Recharger</button>
-            </div>
-            ${state.addAssetForm.open ? renderAddAssetForm() : ""}
-          `}
-        </div>
+              <input type="checkbox" data-setting-toggle="compactCards" ${state.settings.compactCards ? "checked" : ""}>
+            </label>
 
-        <div class="card" style="margin-top:16px">
-          <div class="section-title">Supabase trades</div>
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Afficher source et mise à jour</div>
+                <div class="setting-desc">Montre les badges fournisseur et fraîcheur sur les cartes.</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="showSourceBadges" ${state.settings.showSourceBadges ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Afficher le détail du signal</div>
+                <div class="setting-desc">Affiche les sous-composants du score détaillé dans la fiche actif.</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="showScoreBreakdown" ${state.settings.showScoreBreakdown ? "checked" : ""}>
+            </label>
+
+            <label class="setting-row">
+              <div>
+                <div class="setting-title">Afficher le journal moteur</div>
+                <div class="setting-desc">Montre les dernières décisions du moteur dans l'accueil et Trades.</div>
+              </div>
+              <input type="checkbox" data-setting-toggle="showAlgoJournal" ${state.settings.showAlgoJournal ? "checked" : ""}>
+            </label>
+          </div>
+        </details>
+
+        <!-- ====== 2. ALERTES & NOTIFICATIONS ====== -->
+        <details class="card bot-params-card">
+          <summary class="bot-collapsible-summary">
+            <span>Alertes & notifications</span>
+            <span class="muted" style="font-weight:400;font-size:.85rem;flex-shrink:0">${activeAlerts.length} active${activeAlerts.length !== 1 ? "s" : ""}</span>
+          </summary>
+          <div>
+            ${notifStatus !== "granted" ? `
+              <div class="info-box" style="margin-bottom:14px">
+                ${notifStatus === "denied"
+                  ? "Notifications bloquées par le navigateur. Autorise-les dans les réglages de ton navigateur pour recevoir les alertes."
+                  : "Active les notifications pour recevoir une alerte même si l'appli est en arrière-plan."}
+                ${notifStatus === "default" ? `<button class="btn btn-primary" style="margin-top:8px" data-request-notif-perm>Activer les notifications</button>` : ""}
+              </div>` : ""}
+
+            <div class="setting-list">
+              <label class="setting-row">
+                <div>
+                  <div class="setting-title">Alertes signaux algo</div>
+                  <div class="setting-desc">Notif push quand un actif passe en "Trade proposé" après un scan.</div>
+                </div>
+                <input type="checkbox" data-setting-toggle="algoSignalNotifs" ${state.settings.algoSignalNotifs ? "checked" : ""}>
+              </label>
+
+              <label class="setting-row">
+                <div>
+                  <div class="setting-title">Rafraîchir les opportunités</div>
+                  <div class="setting-desc">Recharge automatiquement la liste quand le délai minimum Twelve est terminé.</div>
+                </div>
+                <input type="checkbox" data-setting-toggle="autoRefreshOpportunities" ${state.settings.autoRefreshOpportunities ? "checked" : ""}>
+              </label>
+
+              <label class="setting-row">
+                <div>
+                  <div class="setting-title">Scan auto — intervalle</div>
+                  <div class="setting-desc">Fréquence de relance automatique du scan des opportunités.</div>
+                </div>
+                <select class="setting-select" data-setting-select="autoScanIntervalMin">
+                  <option value="3" ${Number(state.settings.autoScanIntervalMin) === 3 ? "selected" : ""}>3 min</option>
+                  <option value="5" ${Number(state.settings.autoScanIntervalMin) === 5 || !state.settings.autoScanIntervalMin ? "selected" : ""}>5 min</option>
+                  <option value="10" ${Number(state.settings.autoScanIntervalMin) === 10 ? "selected" : ""}>10 min</option>
+                  <option value="15" ${Number(state.settings.autoScanIntervalMin) === 15 ? "selected" : ""}>15 min</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="section-title" style="margin-top:18px"><span>Alertes de prix actives</span><span>${activeAlerts.length}</span></div>
+            ${activeAlerts.length ? activeAlerts.map(alertRow).join("") : `<div class="empty-state">Aucune alerte active. Ouvre la fiche d'un actif pour en créer une.</div>`}
+
+            ${triggeredAlerts.length ? `
+              <div class="section-title" style="margin-top:18px"><span>Historique des alertes</span><span>${triggeredAlerts.length}</span></div>
+              ${triggeredAlerts.map(alertRow).join("")}
+              <button class="btn btn-secondary" style="margin-top:12px;width:100%" data-clear-triggered-alerts>Effacer l'historique</button>
+            ` : ""}
+          </div>
+        </details>
+
+        <!-- ====== 3. ACTIFS & DONNÉES ====== -->
+        <details class="card bot-params-card">
+          <summary class="bot-collapsible-summary">
+            <span>Actifs & données</span>
+            <span class="muted" style="font-weight:400;font-size:.85rem;flex-shrink:0">${state.userAssets.length}/50 personnalisés</span>
+          </summary>
+          <div>
+            <div class="setting-desc" style="margin-bottom:12px">
+              Ajoute tes propres actifs (crypto, actions, ETF…) au scan du bot. Les 35 actifs de base restent toujours inclus.
+            </div>
+            ${!isSessionValid() ? `
+              <div class="info-box">Connecte-toi avec ton PIN pour gérer les actifs personnalisés.</div>
+            ` : `
+              ${state.userAssetsError ? `<div class="error-box" style="margin-bottom:10px">${safeText(state.userAssetsError)}</div>` : ""}
+              ${state.userAssetsLoading ? `<div class="muted">Chargement…</div>` : ""}
+              ${state.userAssets.length ? `
+                <div class="user-assets-list">
+                  ${state.userAssets.map(a => renderUserAssetRow(a)).join("")}
+                </div>
+              ` : !state.userAssetsLoading && !state.userAssetsError ? `<div class="empty-state" style="padding:18px">Aucun actif personnalisé. Clique sur "Ajouter" ci-dessous.</div>` : ""}
+              <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+                ${state.addAssetForm.open ? "" : `<button class="btn btn-primary" data-open-add-asset>+ Ajouter un actif</button>`}
+                <button class="btn btn-secondary" data-load-user-assets>Recharger</button>
+              </div>
+              ${state.addAssetForm.open ? renderAddAssetForm() : ""}
+            `}
+            <div class="muted" style="margin-top:14px;font-size:.85rem">
+              Pour vider l'historique ou réinitialiser le capital d'entrainement, utilise les boutons sur la page Trades.
+            </div>
+          </div>
+        </details>
+
+        <!-- ====== 4. À PROPOS / AVANCÉ ====== -->
+        <details class="card bot-params-card">
+          <summary class="bot-collapsible-summary"><span>À propos / Avancé</span></summary>
           <div class="setting-list">
             <div class="setting-row">
               <div>
-                <div class="setting-title">Connexion automatique via Worker Cloudflare</div>
-                <div class="setting-desc">Les trades passent maintenant par le Worker. Tu n'as plus besoin de saisir l'URL ni la cle Supabase dans l'app.</div>
-              </div>
-            </div>
-            <div class="setting-row">
-              <div>
-                <div class="setting-title">Etat distant</div>
+                <div class="setting-title">État distant</div>
                 <div class="setting-desc">${safeText(remoteStatusText())}</div>
               </div>
             </div>
             <div class="setting-row">
               <div>
-                <div class="setting-title">Session Worker</div>
-                <div class="setting-desc">${isSessionValid()
-                  ? `connecte · expire le ${new Date(state.session.expiresAt * 1000).toLocaleString("fr-FR")}`
-                  : "aucune session active"}</div>
+                <div class="setting-title">Connexion Supabase</div>
+                <div class="setting-desc">Les trades passent par le Worker Cloudflare. Secrets attendus côté Worker : SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_API_TOKEN, ADMIN_PIN.</div>
               </div>
-              ${isSessionValid()
-                ? `<button class="btn btn-secondary" data-session-logout style="min-width:90px">Deconnecter</button>`
-                : `<button class="btn btn-primary" data-open-pin style="min-width:90px">Se connecter</button>`}
             </div>
-            <div class="muted">Secrets attendus dans Cloudflare : SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_API_TOKEN et ADMIN_PIN pour activer la protection complete.</div>
+            <div class="setting-row">
+              <div>
+                <div class="setting-title">Version &amp; code source</div>
+                <div class="setting-desc">PWA ManiTradePro · <a href="https://github.com/emmanueldelasse-droid/ManiTradePro" target="_blank" rel="noopener" style="color:var(--accent);text-decoration:underline">repo GitHub</a></div>
+              </div>
+            </div>
           </div>
-        </div>
+        </details>
       </div>`;
   }
 
@@ -6780,7 +6849,6 @@ function renderMain() {
       case "opportunities": return renderOpportunities();
       case "asset-detail": return renderDetail();
       case "portfolio": return renderPortfolio();
-      case "alerts": return renderAlerts();
       case "settings": return renderSettings();
       // Routes legacy /bot /health /performance /reports : fusionnées dans
       // l'onglet Trades (= route portfolio). Suppression brute (choix user) :
@@ -7482,7 +7550,7 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
     await loadDashboard();
     render();
     setInterval(() => {
-      if (["dashboard", "opportunities", "asset-detail", "settings", "portfolio", "alerts"].includes(state.route)) {
+      if (["dashboard", "opportunities", "asset-detail", "settings", "portfolio"].includes(state.route)) {
         if (state.route === "portfolio") {
           refreshOpenTradesLive().catch(() => {});
         }
@@ -7581,7 +7649,6 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
         loadBot().catch(() => {}),
         loadReports().catch(() => {})
       ]);
-      case "alerts": return () => loadDashboard();
       default: return null;
     }
   }
