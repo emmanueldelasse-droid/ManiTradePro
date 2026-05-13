@@ -890,7 +890,11 @@ async function getYahooBatchQuotes(symbols) {
           freshness: "recent"
         };
       }
-      recordSuccess("yahoo");
+      // On ne reset le compteur d'echecs que si Yahoo a renvoyé au moins
+      // une cotation. Sinon (réponse 200 vide, typique des tickers EU sur
+      // l'endpoint v7 neutralise par Yahoo) on laisse le circuit suivre les
+      // echecs reels du chart v8 pour pouvoir s'ouvrir si Yahoo tombe vraiment.
+      if (Object.keys(out).length) recordSuccess("yahoo");
       return out;
     } catch (e) {
       recordFailure("yahoo");
@@ -900,9 +904,108 @@ async function getYahooBatchQuotes(symbols) {
 }
 
 async function getYahooQuote(symbol) {
-  const rows = await getYahooBatchQuotes([symbol]);
-  if (!rows[symbol]) throw new Error("Yahoo quote unavailable");
-  return rows[symbol];
+  // 1. Essai batch v7 — rapide et toujours bon pour les actions US.
+  try {
+    const rows = await getYahooBatchQuotes([symbol]);
+    if (rows[symbol]) return rows[symbol];
+  } catch (e) {
+    // Si le circuit est déjà ouvert, inutile de tenter v8 (qui retesterait
+    // puis throw aussi). On remonte l'erreur pour éviter un fetch perdu.
+    if (e instanceof Error && e.message === "yahoo_circuit_open") throw e;
+  }
+  // 2. Fallback chart v8 — Yahoo a neutralisé v7 pour les tickers EU
+  // (MC.PA, SAP.DE, NESN.SW…) qui reviennent vides en 200 OK. Le v8 chart
+  // reste fiable et expose meta.regularMarketPrice.
+  return getYahooQuoteFromChart(symbol);
+}
+
+async function getYahooQuoteFromChart(symbol) {
+  if (circuitIsOpen("yahoo")) throw new Error("yahoo_circuit_open");
+  const ticker = normalizeYahooSymbol(symbol);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
+  try {
+    const res = await fetchWithRetry(
+      url,
+      { headers: { Accept: "application/json" } },
+      { timeoutMs: 8000, maxRetries: 2, backoffMs: 500 }
+    );
+    if (!res.ok) throw new Error(`Yahoo chart HTTP ${res.status}`);
+    const payload = await res.json();
+    const result = payload?.chart?.result?.[0];
+    const meta = result?.meta;
+    const price = Number(meta?.regularMarketPrice);
+    if (!result || !Number.isFinite(price)) throw new Error("Yahoo chart sans prix");
+    const prevClose = Number(meta?.chartPreviousClose ?? meta?.previousClose);
+    const change = Number.isFinite(prevClose) && prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : null;
+    recordSuccess("yahoo");
+    return {
+      symbol,
+      name: meta.shortName || meta.longName || getDisplayName(symbol),
+      assetClass: getAssetClass(symbol),
+      price,
+      change24hPct: Number.isFinite(change) ? change : null,
+      volume24h: Number.isFinite(Number(meta?.regularMarketVolume)) ? Number(meta?.regularMarketVolume) : null,
+      currency: meta.currency || (isForex(symbol) ? symbol.slice(3, 6) : "USD"),
+      sourceUsed: "yahoo",
+      freshness: "recent"
+    };
+  } catch (e) {
+    recordFailure("yahoo");
+    throw e;
+  }
+}
+
+// Bougies Yahoo — fallback quand TwelveData rejette le ticker (typiquement
+// actions EU sur tier gratuit). Yahoo expose le chart v8 sans clé API.
+// On ne sert que 1d et 1w : Yahoo limite 60m à 60 jours et n'a pas de 4h natif,
+// donc pour 1h/4h on laisse l'erreur Twelve remonter.
+async function getYahooCandles(symbol, timeframe = "1d", limit = 90) {
+  if (circuitIsOpen("yahoo")) throw new Error("yahoo_circuit_open");
+  let interval = "1d";
+  let range = "6mo";
+  if (timeframe === "1w") { interval = "1wk"; range = "2y"; }
+  else if (timeframe !== "1d") throw new Error(`Yahoo candles: timeframe ${timeframe} non supporté`);
+
+  const ticker = normalizeYahooSymbol(symbol);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`;
+  try {
+    const res = await fetchWithRetry(
+      url,
+      { headers: { Accept: "application/json" } },
+      { timeoutMs: 8000, maxRetries: 2, backoffMs: 500 }
+    );
+    if (!res.ok) throw new Error(`Yahoo chart HTTP ${res.status}`);
+    const payload = await res.json();
+    const result = payload?.chart?.result?.[0];
+    if (!result) throw new Error("Yahoo chart vide");
+    const timestamps = Array.isArray(result.timestamp) ? result.timestamp : [];
+    const q = result.indicators?.quote?.[0] || {};
+    const opens = Array.isArray(q.open) ? q.open : [];
+    const highs = Array.isArray(q.high) ? q.high : [];
+    const lows = Array.isArray(q.low) ? q.low : [];
+    const closes = Array.isArray(q.close) ? q.close : [];
+    const volumes = Array.isArray(q.volume) ? q.volume : [];
+    const rows = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const o = Number(opens[i]);
+      const h = Number(highs[i]);
+      const l = Number(lows[i]);
+      const c = Number(closes[i]);
+      if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c)) continue;
+      rows.push({
+        time: new Date(Number(timestamps[i]) * 1000).toISOString(),
+        open: o, high: h, low: l, close: c,
+        volume: Number.isFinite(Number(volumes[i])) ? Number(volumes[i]) : null
+      });
+    }
+    if (!rows.length) throw new Error("Yahoo chart sans bougies");
+    recordSuccess("yahoo");
+    const max = Math.max(1, Number(limit) || 90);
+    return rows.length > max ? rows.slice(-max) : rows;
+  } catch (e) {
+    recordFailure("yahoo");
+    throw e;
+  }
 }
 
 // Bougies Yahoo — fallback quand TwelveData rejette le ticker (typiquement
