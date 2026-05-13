@@ -265,6 +265,19 @@ function getAssetClass(symbol) {
   if (isEtf(symbol)) return "etf";
   return "stock";
 }
+
+// Actions européennes surveillées (LIGHT_SYMBOLS). Mapping vers leur place
+// boursière dans normalizeTwelveSymbol : .PA = Paris, .DE = Xetra, .SW = SIX.
+// Toutes ont une session 09:00-17:30 CET/CEST = 07:00-15:30 UTC en été,
+// 08:00-16:30 UTC en hiver. Utilisé par isTrainingCandidateAllowed pour ne
+// pas leur appliquer la fenêtre NYSE 13:30-20:00 UTC (qui les bloquerait
+// pendant la majorité de leur propre session).
+const EURO_STOCK_SYMBOLS = new Set([
+  "RMS", "LVMH", "TTE", "AIR", "ASML", "SAP", "NESN", "SIE"
+]);
+function isEuroStock(symbol) {
+  return EURO_STOCK_SYMBOLS.has(String(symbol || "").toUpperCase());
+}
 function getDisplayName(symbol) { return NAME_MAP[symbol] || symbol; }
 function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
 function pctChange(a, b) {
@@ -3199,34 +3212,49 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   if ((row.plan?.side || "") === "short" && !settings.allow_short) return false;
   if ((row.plan?.side || "") === "long" && !settings.allow_long) return false;
 
-  // Heures de marché — bloquer l'ouverture de stocks/ETF hors session NYSE.
-  // Bug observé 13/05/2026 11:30 CEST (= 09:30 UTC) : V (Visa) ouverte en
-  // pré-marché, prix saute de -5 % en 16 min sur la volatilité illiquide,
-  // stop touché immédiatement. assetClass est déjà déclaré plus haut dans
-  // cette fonction (line ~3143) pour le bucket_key.
+  // Heures de marché — bloquer l'ouverture hors session de la bourse de
+  // l'actif. Bug observé 13/05/2026 11:30 CEST (= 09:30 UTC) : V (Visa)
+  // ouverte en pré-marché US, -5 % en 16 min, stop touché immédiatement.
+  // assetClass est déjà déclaré plus haut dans cette fonction (~line 3143).
   //
-  // NYSE regular hours :
-  //   Été (EDT, mars-novembre) : 13:30-20:00 UTC lun-ven
-  //   Hiver (EST, novembre-mars) : 14:30-21:00 UTC lun-ven
-  //
-  // On détecte le DST US (2e dimanche de mars → 1er dimanche de novembre)
-  // pour caler la fenêtre exactement, sinon une simplification à 13-20 UTC
-  // laisserait passer 30 min de pré-marché en été et serait incohérente en
-  // hiver. Crypto trade 24/7 → pas de filtre.
+  // Sessions :
+  //   US stock + ETF (NYSE/Nasdaq) :
+  //     Été (EDT, 2e dim mars → 1er dim novembre) : 13:30-20:00 UTC lun-ven
+  //     Hiver (EST) : 14:30-21:00 UTC lun-ven
+  //   EU stock (Euronext / Xetra / SIX) :
+  //     Été (CEST, dernier dim mars → dernier dim octobre) : 07:00-15:30 UTC
+  //     Hiver (CET) : 08:00-16:30 UTC
+  //   Crypto : 24/7 (pas de filtre)
+  //   Forex / commodity : non filtré pour l'instant
   if (assetClass === "stock" || assetClass === "etf") {
     const nowUtc = new Date();
     const utcDay = nowUtc.getUTCDay();
-    if (utcDay < 1 || utcDay > 5) return false; // weekend
+    if (utcDay < 1 || utcDay > 5) return false; // weekend (toutes bourses fermées)
     const utcMin = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
     const y = nowUtc.getUTCFullYear();
-    const marchFirst = new Date(Date.UTC(y, 2, 1));
-    const dstStart = new Date(Date.UTC(y, 2, 1 + ((7 - marchFirst.getUTCDay()) % 7) + 7));
-    const novFirst = new Date(Date.UTC(y, 10, 1));
-    const dstEnd = new Date(Date.UTC(y, 10, 1 + ((7 - novFirst.getUTCDay()) % 7)));
-    const inDst = nowUtc >= dstStart && nowUtc < dstEnd;
-    const openMin = inDst ? (13 * 60 + 30) : (14 * 60 + 30);  // 13:30 ou 14:30 UTC
-    const closeMin = inDst ? (20 * 60) : (21 * 60);            // 20:00 ou 21:00 UTC
-    if (utcMin < openMin || utcMin >= closeMin) return false;
+    const sym = parseSymbol(row.symbol || "");
+
+    if (isEuroStock(sym)) {
+      // EU DST : dernier dimanche de mars → dernier dimanche d'octobre
+      const lastMarch = new Date(Date.UTC(y, 2, 31));
+      const dstStartEu = new Date(Date.UTC(y, 2, 31 - lastMarch.getUTCDay()));
+      const lastOct = new Date(Date.UTC(y, 9, 31));
+      const dstEndEu = new Date(Date.UTC(y, 9, 31 - lastOct.getUTCDay()));
+      const inDstEu = nowUtc >= dstStartEu && nowUtc < dstEndEu;
+      const openMinEu = inDstEu ? (7 * 60) : (8 * 60);          // 07:00 ou 08:00 UTC
+      const closeMinEu = inDstEu ? (15 * 60 + 30) : (16 * 60 + 30); // 15:30 ou 16:30 UTC
+      if (utcMin < openMinEu || utcMin >= closeMinEu) return false;
+    } else {
+      // US DST : 2e dimanche de mars → 1er dimanche de novembre
+      const marchFirst = new Date(Date.UTC(y, 2, 1));
+      const dstStartUs = new Date(Date.UTC(y, 2, 1 + ((7 - marchFirst.getUTCDay()) % 7) + 7));
+      const novFirst = new Date(Date.UTC(y, 10, 1));
+      const dstEndUs = new Date(Date.UTC(y, 10, 1 + ((7 - novFirst.getUTCDay()) % 7)));
+      const inDstUs = nowUtc >= dstStartUs && nowUtc < dstEndUs;
+      const openMinUs = inDstUs ? (13 * 60 + 30) : (14 * 60 + 30);
+      const closeMinUs = inDstUs ? (20 * 60) : (21 * 60);
+      if (utcMin < openMinUs || utcMin >= closeMinUs) return false;
+    }
   }
 
   // Symboles autorisés
