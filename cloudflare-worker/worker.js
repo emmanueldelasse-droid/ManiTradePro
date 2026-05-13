@@ -276,7 +276,12 @@ const EURO_STOCK_SYMBOLS = new Set([
   "RMS", "LVMH", "TTE", "AIR", "ASML", "SAP", "NESN", "SIE"
 ]);
 function isEuroStock(symbol) {
-  return EURO_STOCK_SYMBOLS.has(String(symbol || "").toUpperCase());
+  // On strip le suffixe de place boursière (.PA, .DE, .SW, .AS) au cas où
+  // un row Supabase stocke le symbole déjà normalisé pour Twelve Data.
+  // En interne LIGHT_SYMBOLS utilise toujours le format court (RMS, LVMH),
+  // mais on blinde contre toute migration future.
+  const base = String(symbol || "").toUpperCase().split(".")[0];
+  return EURO_STOCK_SYMBOLS.has(base);
 }
 function getDisplayName(symbol) { return NAME_MAP[symbol] || symbol; }
 function clamp(val, min, max) { return Math.max(min, Math.min(max, val)); }
