@@ -905,6 +905,59 @@ async function getYahooQuote(symbol) {
   return rows[symbol];
 }
 
+// Bougies Yahoo — fallback quand TwelveData rejette le ticker (typiquement
+// actions EU sur tier gratuit). Yahoo expose le chart v8 sans clé API.
+// On ne sert que 1d et 1w : Yahoo limite 60m à 60 jours et n'a pas de 4h natif,
+// donc pour 1h/4h on laisse l'erreur Twelve remonter.
+async function getYahooCandles(symbol, timeframe = "1d", limit = 90) {
+  if (circuitIsOpen("yahoo")) throw new Error("yahoo_circuit_open");
+  let interval = "1d";
+  let range = "6mo";
+  if (timeframe === "1w") { interval = "1wk"; range = "2y"; }
+  else if (timeframe !== "1d") throw new Error(`Yahoo candles: timeframe ${timeframe} non supporté`);
+
+  const ticker = normalizeYahooSymbol(symbol);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`;
+  try {
+    const res = await fetchWithRetry(
+      url,
+      { headers: { Accept: "application/json" } },
+      { timeoutMs: 8000, maxRetries: 2, backoffMs: 500 }
+    );
+    if (!res.ok) throw new Error(`Yahoo chart HTTP ${res.status}`);
+    const payload = await res.json();
+    const result = payload?.chart?.result?.[0];
+    if (!result) throw new Error("Yahoo chart vide");
+    const timestamps = Array.isArray(result.timestamp) ? result.timestamp : [];
+    const q = result.indicators?.quote?.[0] || {};
+    const opens = Array.isArray(q.open) ? q.open : [];
+    const highs = Array.isArray(q.high) ? q.high : [];
+    const lows = Array.isArray(q.low) ? q.low : [];
+    const closes = Array.isArray(q.close) ? q.close : [];
+    const volumes = Array.isArray(q.volume) ? q.volume : [];
+    const rows = [];
+    for (let i = 0; i < timestamps.length; i++) {
+      const o = Number(opens[i]);
+      const h = Number(highs[i]);
+      const l = Number(lows[i]);
+      const c = Number(closes[i]);
+      if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c)) continue;
+      rows.push({
+        time: new Date(Number(timestamps[i]) * 1000).toISOString(),
+        open: o, high: h, low: l, close: c,
+        volume: Number.isFinite(Number(volumes[i])) ? Number(volumes[i]) : null
+      });
+    }
+    if (!rows.length) throw new Error("Yahoo chart sans bougies");
+    recordSuccess("yahoo");
+    const max = Math.max(1, Number(limit) || 90);
+    return rows.length > max ? rows.slice(-max) : rows;
+  } catch (e) {
+    recordFailure("yahoo");
+    throw e;
+  }
+}
+
 // ============================================================
 // EURUSD RATE — pour conversion front
 // ============================================================
@@ -1402,7 +1455,21 @@ async function getStoredDailyQuoteFallback(symbol, env) {
 
 async function getCandlesBySymbol(symbol, timeframe, limit, env, ctx = null) {
   if (isCrypto(symbol)) return getCryptoCandlesTf(symbol, timeframe, limit);
-  return getTwelveCandlesWithKV(symbol, timeframe, limit, env, ctx);
+  try {
+    return await getTwelveCandlesWithKV(symbol, timeframe, limit, env, ctx);
+  } catch (e) {
+    // Fallback Yahoo : indispensable pour les actions EU (LVMH/TTE/SAP/NESN/
+    // RMS/SIE) que TwelveData free tier ne couvre pas pour les bougies. Sans
+    // ce fallback, la ligne sort en status='partial' et est filtrée par
+    // publicRows.filter, donc l'action disparaît de l'onglet Opportunités.
+    if (timeframe !== "1d" && timeframe !== "1w") throw e;
+    if (circuitIsOpen("yahoo")) throw e;
+    const candles = await getYahooCandles(symbol, timeframe, limit);
+    const kvKey = `candles:twelve:${symbol}:${timeframe}`;
+    const kvTtl = timeframe === "1d" ? KV_TTL.candlesDaily : KV_TTL.candles4h;
+    try { await kvSet(kvKey, candles, kvTtl, env); } catch {}
+    return candles;
+  }
 }
 
 // ============================================================
