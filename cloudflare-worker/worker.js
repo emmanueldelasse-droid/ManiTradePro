@@ -3226,11 +3226,16 @@ async function handleTrainingAutoCycle(env) {
     let riskState = buildTrainingRiskState(settings, openRows, closedRows);
     log.riskState = riskState;
 
-    // PHASE FERMETURE — chaque position indépendante
+    // PHASE FERMETURE — toutes les positions checkées en parallèle pour
+    // tenir dans le budget 25 s de handleScheduledCycle. Avec un loop
+    // séquentiel, 7 positions × 14 s/position au pire = 98 s, on hit
+    // le timeout outer et les dernières positions ne sont jamais checkées
+    // (bug observé : V opened_at=02/05 jamais fermée car les 28/04 passent
+    // d'abord et bouffent le budget). En parallèle, total ≈ 14 s max.
     if (settings.auto_close_enabled) {
-      for (const position of openRows) {
+      await Promise.all(openRows.map(async (position) => {
         const symbol = parseSymbol(position?.symbol || "");
-        if (!symbol) continue;
+        if (!symbol) return;
         try {
           let liveQuote = null;
           let detailPayload = null;
@@ -3263,11 +3268,11 @@ async function handleTrainingAutoCycle(env) {
               quote_error: quoteError,
               has_detail: !!detailPayload
             }).catch(() => {});
-            continue;
+            return;
           }
 
           const trigger = trainingCloseTrigger(position, effectivePrice, detailPayload, settings);
-          if (!trigger) continue;
+          if (!trigger) return;
 
           const closed = await withTimeout(
             closeTrainingPosition(env, position, trigger.exitPrice, trigger.type, detailPayload),
@@ -3276,9 +3281,10 @@ async function handleTrainingAutoCycle(env) {
           log.closed.push({ symbol, trade_id: closed.id, close_type: trigger.type, exit_price: closed.exit_price, pnl: closed.pnl, pnl_pct: closed.pnl_pct });
         } catch (e) {
           log.errors.push({ phase: "close", symbol, error: e.message });
-          // continue — les autres fermetures ne sont pas bloquées
+          // continue — les autres fermetures ne sont pas bloquées (Promise.all
+          // les exécute déjà en parallèle, ce catch isole juste les erreurs)
         }
-      }
+      }));
 
       // Rafraîchir la liste des positions ouvertes
       try {
