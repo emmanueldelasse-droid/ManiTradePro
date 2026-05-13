@@ -900,9 +900,51 @@ async function getYahooBatchQuotes(symbols) {
 }
 
 async function getYahooQuote(symbol) {
-  const rows = await getYahooBatchQuotes([symbol]);
-  if (!rows[symbol]) throw new Error("Yahoo quote unavailable");
-  return rows[symbol];
+  // 1. Essai batch v7 — rapide et toujours bon pour les actions US.
+  try {
+    const rows = await getYahooBatchQuotes([symbol]);
+    if (rows[symbol]) return rows[symbol];
+  } catch {} // on tente le v8 chart en secours
+  // 2. Fallback chart v8 — Yahoo a neutralisé v7 pour les tickers EU
+  // (MC.PA, SAP.DE, NESN.SW…) qui reviennent vides en 200 OK. Le v8 chart
+  // reste fiable et expose meta.regularMarketPrice.
+  return getYahooQuoteFromChart(symbol);
+}
+
+async function getYahooQuoteFromChart(symbol) {
+  if (circuitIsOpen("yahoo")) throw new Error("yahoo_circuit_open");
+  const ticker = normalizeYahooSymbol(symbol);
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=5d`;
+  try {
+    const res = await fetchWithRetry(
+      url,
+      { headers: { Accept: "application/json" } },
+      { timeoutMs: 8000, maxRetries: 2, backoffMs: 500 }
+    );
+    if (!res.ok) throw new Error(`Yahoo chart HTTP ${res.status}`);
+    const payload = await res.json();
+    const result = payload?.chart?.result?.[0];
+    const meta = result?.meta;
+    const price = Number(meta?.regularMarketPrice);
+    if (!result || !Number.isFinite(price)) throw new Error("Yahoo chart sans prix");
+    const prevClose = Number(meta?.chartPreviousClose ?? meta?.previousClose);
+    const change = Number.isFinite(prevClose) && prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : null;
+    recordSuccess("yahoo");
+    return {
+      symbol,
+      name: meta.shortName || meta.longName || getDisplayName(symbol),
+      assetClass: getAssetClass(symbol),
+      price,
+      change24hPct: Number.isFinite(change) ? change : null,
+      volume24h: Number.isFinite(Number(meta?.regularMarketVolume)) ? Number(meta?.regularMarketVolume) : null,
+      currency: meta.currency || (isForex(symbol) ? symbol.slice(3, 6) : "USD"),
+      sourceUsed: "yahoo",
+      freshness: "recent"
+    };
+  } catch (e) {
+    recordFailure("yahoo");
+    throw e;
+  }
 }
 
 // Bougies Yahoo — fallback quand TwelveData rejette le ticker (typiquement
