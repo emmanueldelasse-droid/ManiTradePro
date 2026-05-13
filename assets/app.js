@@ -34,7 +34,7 @@
     lightTheme: false,
     displayCurrency: "EUR_PLUS_USD",
     workerAdminToken: "",
-    showAlgoJournal: true,
+    showAlgoJournal: false,
     supabaseEnabled: false,
     supabaseUrl: "",
     supabaseAnonKey: ""
@@ -2046,8 +2046,10 @@ async function confirmTradeFromModal() {
   }
   function normalizeBotDraftForSave(d) {
     const out = { ...d };
-    // Coerce bot_mode strict : "exploration" ou "core", défaut "exploration".
-    out.bot_mode = String(out.bot_mode || "").toLowerCase() === "core" ? "core" : "exploration";
+    // Mode Core retiré de l'UI (2026-05-13) : tout le monde tourne en
+    // exploration. On garde la colonne bot_mode en base (rétrocompat avec
+    // les anciens trades) mais elle est figée à "exploration" à chaque save.
+    out.bot_mode = "exploration";
     // Coerce learning_enabled strict (boolean).
     out.learning_enabled = !!out.learning_enabled;
     const pctKeys = [
@@ -2090,39 +2092,6 @@ async function confirmTradeFromModal() {
       render();
     }
   }
-  async function applyBotTrainingPreset() {
-    if (!confirm("Appliquer le mode entraînement permissif ?\n\nShort activé, seuils relâchés (60/60), max positions 15, mean reversion ON, weekly/consecutive loss désactivés.")) return;
-    const preset = {
-      allow_long: true,
-      allow_short: true,
-      max_open_positions: 15,
-      max_positions_per_symbol: 1,
-      min_actionability_score: 60,
-      min_dossier_score: 60,
-      allocation_per_trade_pct: 0.08,
-      allowed_setups: ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"],
-      mean_reversion_enabled: true,
-      max_daily_loss_pct: 0.30,
-      max_weekly_loss_pct: 1.0,
-      max_consecutive_losses: 999
-    };
-    state.bot.savingDraft = true;
-    haptic([20, 40, 20]);
-    render();
-    try {
-      await apiPost("/api/training/settings", preset);
-      state.bot.editDraft = null;
-      await loadBot();
-      showAlertToast("Bot", "Mode entraînement permissif appliqué.");
-    } catch (e) {
-      alert(`Erreur : ${e.message || "preset impossible"}`);
-    } finally {
-      state.bot.savingDraft = false;
-      render();
-    }
-  }
-
-
   async function loadDashboard() {
     try {
       const [portfolio, news, newsWindow] = await Promise.all([
@@ -5608,8 +5577,8 @@ function openPositionsRiskView() {
             </div>
           `}
 
-          <!-- IA OUTILS -->
-          ${renderJournalAnalysisCard()}
+          <!-- IA OUTILS : seulement utile s'il y a des trades à analyser -->
+          ${history.length ? renderJournalAnalysisCard() : ""}
 
           ${state.settings.showAlgoJournal ? `<div style="margin-top:8px">${renderJournalMoteurCard()}</div>` : ""}
         `}
@@ -6469,43 +6438,37 @@ function openPositionsRiskView() {
   }
 
   function renderBotParamsReadonly(settings, capitalBase) {
-    const botMode = String(settings?.bot_mode || "exploration").toLowerCase();
-    const modeLabel = botMode === "core" ? "Core (sélection stricte)" : "Exploration (apprentissage)";
-    const modeHint = botMode === "core"
-      ? "Le bot ouvre peu de trades, seulement les meilleurs."
-      : "Le bot ouvre plus de trades pour apprendre, capital réduit.";
     const learningOn = !!settings?.learning_enabled;
     return `
       <div class="bot-params" style="margin-top:8px">
-        <div class="bot-mode-badge bot-mode-${botMode === "core" ? "core" : "exploration"}" style="margin-bottom:10px">
-          <div class="bot-mode-label">Mode du bot</div>
-          <div class="bot-mode-value">${modeLabel}</div>
-          <div class="bot-mode-hint muted">${modeHint}</div>
-        </div>
         <div class="bot-mode-badge bot-learning-badge bot-learning-${learningOn ? "on" : "off"}" style="margin-bottom:10px">
           <div class="bot-mode-label">Apprentissage</div>
           <div class="bot-mode-value">${learningOn ? "Actif" : "Inactif"}</div>
           <div class="bot-mode-hint muted">${learningOn ? "Le bot pénalise les combinaisons à historique perdant." : "Le bot ignore l'historique et fonctionne en mode neutre."}</div>
         </div>
         <div class="kv">
-          <div class="muted">Capital base</div><div>${priceDisplay(capitalBase)}</div>
-          <div class="muted">Risk par trade</div><div>${Math.round((settings.risk_per_trade_pct || 0) * 100)}%</div>
-          <div class="muted">Allocation par trade</div><div>${Math.round((settings.allocation_per_trade_pct || 0) * 100)}%</div>
-          <div class="muted">Max positions</div><div>${settings.max_open_positions || 10}</div>
-          <div class="muted">Max / symbole</div><div>${settings.max_positions_per_symbol || 1}</div>
-          <div class="muted">Horizon max</div><div>${settings.max_holding_hours || 240} h</div>
-          <div class="muted">Score actionabilité min</div><div>${settings.min_actionability_score ?? 60}</div>
-          <div class="muted">Score dossier min</div><div>${settings.min_dossier_score ?? 60}</div>
           <div class="muted">Setups autorisés</div><div>${Array.isArray(settings.allowed_setups) ? settings.allowed_setups.join(", ") : "—"}</div>
           <div class="muted">Long / Short</div><div>${settings.allow_long ? "Long" : ""}${settings.allow_long && settings.allow_short ? " + " : ""}${settings.allow_short ? "Short" : ""}${!settings.allow_long && !settings.allow_short ? "—" : ""}</div>
           <div class="muted">Mean reversion</div><div>${settings.mean_reversion_enabled ? "Oui" : "Non"}</div>
-          <div class="muted">Daily loss max</div><div>${Math.round((settings.max_daily_loss_pct || 0) * 100)}%</div>
-          <div class="muted">Weekly loss max</div><div>${(settings.max_weekly_loss_pct || 0) >= 1 ? "désactivé" : Math.round((settings.max_weekly_loss_pct || 0) * 100) + "%"}</div>
-          <div class="muted">Pertes conséc. max</div><div>${(settings.max_consecutive_losses || 0) >= 100 ? "désactivé" : (settings.max_consecutive_losses || 3)}</div>
         </div>
+        <details class="bot-advanced" style="margin-top:10px">
+          <summary style="cursor:pointer;font-size:.85rem;padding:6px 0">Paramètres avancés</summary>
+          <div class="kv" style="margin-top:6px">
+            <div class="muted">Capital base</div><div>${priceDisplay(capitalBase)}</div>
+            <div class="muted">Risk par trade</div><div>${Math.round((settings.risk_per_trade_pct || 0) * 100)}%</div>
+            <div class="muted">Allocation par trade</div><div>${Math.round((settings.allocation_per_trade_pct || 0) * 100)}%</div>
+            <div class="muted">Max positions</div><div>${settings.max_open_positions || 10}</div>
+            <div class="muted">Max / symbole</div><div>${settings.max_positions_per_symbol || 1}</div>
+            <div class="muted">Horizon max</div><div>${settings.max_holding_hours || 240} h</div>
+            <div class="muted">Score actionabilité min</div><div>${settings.min_actionability_score ?? 60}</div>
+            <div class="muted">Score dossier min</div><div>${settings.min_dossier_score ?? 60}</div>
+            <div class="muted">Daily loss max</div><div>${Math.round((settings.max_daily_loss_pct || 0) * 100)}%</div>
+            <div class="muted">Weekly loss max</div><div>${(settings.max_weekly_loss_pct || 0) >= 1 ? "désactivé" : Math.round((settings.max_weekly_loss_pct || 0) * 100) + "%"}</div>
+            <div class="muted">Pertes conséc. max</div><div>${(settings.max_consecutive_losses || 0) >= 100 ? "désactivé" : (settings.max_consecutive_losses || 3)}</div>
+          </div>
+        </details>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" data-bot-edit-open>Éditer</button>
-          <button class="btn btn-secondary" data-bot-preset-training>Mode entraînement permissif</button>
         </div>
       </div>`;
   }
@@ -6514,37 +6477,10 @@ function openPositionsRiskView() {
     const d = state.bot.editDraft || {};
     const allowedSetupsAll = ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"];
     const currentSetups = Array.isArray(d.allowed_setups) ? d.allowed_setups : ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short"];
-    const botMode = String(d.bot_mode || "exploration").toLowerCase() === "core" ? "core" : "exploration";
     return `
       <div class="bot-params-form" style="margin-top:8px">
-        <div class="bot-mode-picker" style="margin-bottom:14px">
-          <div class="muted" style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Mode du bot</div>
-          <div class="bot-mode-row">
-            <button type="button" class="bot-mode-btn ${botMode === "exploration" ? "active" : ""}" data-bot-field-mode="exploration">
-              <div class="bot-mode-btn-title">Exploration</div>
-              <div class="bot-mode-btn-hint">Plus de trades, capital réduit. Le bot apprend.</div>
-            </button>
-            <button type="button" class="bot-mode-btn ${botMode === "core" ? "active" : ""}" data-bot-field-mode="core">
-              <div class="bot-mode-btn-title">Core</div>
-              <div class="bot-mode-btn-hint">Peu de trades, seulement les meilleurs.</div>
-            </button>
-          </div>
-        </div>
         <div class="bot-learning-toggle">
           <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="learning_enabled" ${d.learning_enabled ? "checked" : ""}><span><strong>Apprentissage actif</strong> — le bot pénalise les combinaisons à historique perdant (≥ 20 trades). Décoche pour tout couper et revenir au comportement neutre.</span></label>
-        </div>
-        <div class="bot-field-grid">
-          <label class="bot-field"><span>Capital base ($)</span><input type="number" inputmode="decimal" min="100" step="100" data-bot-field="capital_base" value="${Number(d.capital_base || 10000)}"></label>
-          <label class="bot-field"><span>Risk / trade (%)</span><input type="number" inputmode="decimal" min="0.1" max="20" step="0.1" data-bot-field="risk_per_trade_pct_display" value="${(Number(d.risk_per_trade_pct || 0.02) * 100).toFixed(1)}"></label>
-          <label class="bot-field"><span>Allocation / trade (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="allocation_per_trade_pct_display" value="${Math.round(Number(d.allocation_per_trade_pct || 0.08) * 100)}"></label>
-          <label class="bot-field"><span>Max positions</span><input type="number" inputmode="numeric" min="1" max="50" step="1" data-bot-field="max_open_positions" value="${Number(d.max_open_positions || 15)}"></label>
-          <label class="bot-field"><span>Max / symbole</span><input type="number" inputmode="numeric" min="1" max="10" step="1" data-bot-field="max_positions_per_symbol" value="${Number(d.max_positions_per_symbol || 1)}"></label>
-          <label class="bot-field"><span>Horizon max (h)</span><input type="number" inputmode="numeric" min="1" max="1000" step="1" data-bot-field="max_holding_hours" value="${Number(d.max_holding_hours || 240)}"></label>
-          <label class="bot-field"><span>Score actionabilité min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_actionability_score" value="${Number(d.min_actionability_score ?? 60)}"></label>
-          <label class="bot-field"><span>Score dossier min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_dossier_score" value="${Number(d.min_dossier_score ?? 60)}"></label>
-          <label class="bot-field"><span>Daily loss max (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_daily_loss_pct_display" value="${Math.round(Number(d.max_daily_loss_pct || 0.30) * 100)}"></label>
-          <label class="bot-field"><span>Weekly loss max (%) — 100 = OFF</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_weekly_loss_pct_display" value="${Math.round(Number(d.max_weekly_loss_pct || 1.0) * 100)}"></label>
-          <label class="bot-field"><span>Pertes conséc. max — 999 = OFF</span><input type="number" inputmode="numeric" min="1" max="999" step="1" data-bot-field="max_consecutive_losses" value="${Number(d.max_consecutive_losses || 999)}"></label>
         </div>
         <div class="bot-field-toggles">
           <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="allow_long" ${d.allow_long ? "checked" : ""}><span>Long autorisé</span></label>
@@ -6559,10 +6495,25 @@ function openPositionsRiskView() {
             `).join("")}
           </div>
         </div>
+        <details class="bot-advanced" style="margin-top:14px">
+          <summary style="cursor:pointer;font-size:.85rem;padding:6px 0">Paramètres avancés</summary>
+          <div class="bot-field-grid" style="margin-top:6px">
+            <label class="bot-field"><span>Capital base ($)</span><input type="number" inputmode="decimal" min="100" step="100" data-bot-field="capital_base" value="${Number(d.capital_base || 10000)}"></label>
+            <label class="bot-field"><span>Risk / trade (%)</span><input type="number" inputmode="decimal" min="0.1" max="20" step="0.1" data-bot-field="risk_per_trade_pct_display" value="${(Number(d.risk_per_trade_pct || 0.02) * 100).toFixed(1)}"></label>
+            <label class="bot-field"><span>Allocation / trade (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="allocation_per_trade_pct_display" value="${Math.round(Number(d.allocation_per_trade_pct || 0.08) * 100)}"></label>
+            <label class="bot-field"><span>Max positions</span><input type="number" inputmode="numeric" min="1" max="50" step="1" data-bot-field="max_open_positions" value="${Number(d.max_open_positions || 15)}"></label>
+            <label class="bot-field"><span>Max / symbole</span><input type="number" inputmode="numeric" min="1" max="10" step="1" data-bot-field="max_positions_per_symbol" value="${Number(d.max_positions_per_symbol || 1)}"></label>
+            <label class="bot-field"><span>Horizon max (h)</span><input type="number" inputmode="numeric" min="1" max="1000" step="1" data-bot-field="max_holding_hours" value="${Number(d.max_holding_hours || 240)}"></label>
+            <label class="bot-field"><span>Score actionabilité min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_actionability_score" value="${Number(d.min_actionability_score ?? 60)}"></label>
+            <label class="bot-field"><span>Score dossier min</span><input type="number" inputmode="numeric" min="0" max="100" step="1" data-bot-field="min_dossier_score" value="${Number(d.min_dossier_score ?? 60)}"></label>
+            <label class="bot-field"><span>Daily loss max (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_daily_loss_pct_display" value="${Math.round(Number(d.max_daily_loss_pct || 0.30) * 100)}"></label>
+            <label class="bot-field"><span>Weekly loss max (%) — 100 = OFF</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_weekly_loss_pct_display" value="${Math.round(Number(d.max_weekly_loss_pct || 1.0) * 100)}"></label>
+            <label class="bot-field"><span>Pertes conséc. max — 999 = OFF</span><input type="number" inputmode="numeric" min="1" max="999" step="1" data-bot-field="max_consecutive_losses" value="${Number(d.max_consecutive_losses || 999)}"></label>
+          </div>
+        </details>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" data-bot-edit-save ${state.bot.savingDraft ? "disabled" : ""}>${state.bot.savingDraft ? "Enregistrement…" : "Enregistrer"}</button>
           <button class="btn" data-bot-edit-cancel>Annuler</button>
-          <button class="btn btn-secondary" data-bot-preset-training>Mode entraînement permissif</button>
         </div>
       </div>`;
   }
@@ -7346,10 +7297,7 @@ function renderMain() {
     app.querySelectorAll("[data-bot-edit-save]").forEach(el => {
       el.addEventListener("click", () => { saveBotDraft(); });
     });
-    app.querySelectorAll("[data-bot-preset-training]").forEach(el => {
-      el.addEventListener("click", () => { applyBotTrainingPreset(); });
-    });
-    app.querySelectorAll("[data-bot-field]").forEach(el => {
+app.querySelectorAll("[data-bot-field]").forEach(el => {
       const evt = el.type === "checkbox" ? "change" : "input";
       el.addEventListener(evt, () => {
         const key = el.getAttribute("data-bot-field");
@@ -7362,16 +7310,7 @@ function renderMain() {
         toggleBotDraftSetup(el.getAttribute("data-bot-field-setup"), el.checked);
       });
     });
-    app.querySelectorAll("[data-bot-field-mode]").forEach(el => {
-      el.addEventListener("click", () => {
-        const next = String(el.getAttribute("data-bot-field-mode") || "exploration").toLowerCase();
-        const value = next === "core" ? "core" : "exploration";
-        updateBotDraftField("bot_mode", value);
-        haptic(10);
-        render();
-      });
-    });
-    app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
+app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
       el.addEventListener("click", () => {
         state.bot.statsTab = el.getAttribute("data-bot-stats-tab") || "setup";
         haptic(5);
