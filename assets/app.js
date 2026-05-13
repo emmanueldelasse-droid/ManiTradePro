@@ -6201,7 +6201,15 @@ function openPositionsRiskView() {
     const enabled = !!settings.is_enabled;
     const autoOpen = settings.auto_open_enabled !== false;
     const autoClose = settings.auto_close_enabled !== false;
-    const openCount = Number(acc?.openCount || 0);
+    // openCount = nombre de positions taggées "algo" (= celles que le bot a
+    // ouvertes lui-même). On utilise le MÊME filtre que la liste rendue plus
+    // bas (botPositions, line ~6434), pour que le compteur "X/15" affiché en
+    // haut corresponde toujours au nombre de cartes visibles dans
+    // "Positions ouvertes du bot". Sinon Supabase peut avoir des positions
+    // manuelles qui inflate le compteur mais ne s'affichent pas dans le panel
+    // bot, ce qui donne un compteur incohérent.
+    const allOpenPositions = Array.isArray(state.trades.positions) ? state.trades.positions : [];
+    const openCount = allOpenPositions.filter(p => tradeSource(p) === "algo").length;
     const maxOpen = Number(settings.max_open_positions || 10);
     const capitalBase = Number(acc?.capitalBase || settings.capital_base || 0);
     const available = Number(acc?.available || 0);
