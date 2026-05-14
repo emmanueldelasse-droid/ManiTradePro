@@ -9039,12 +9039,6 @@ async function handleRequest(request, env) {
       if (denied) return denied;
       return safeRoute(() => handleBackfillPnl(env));
     }
-    if (url.pathname.startsWith("/api/admin/eodhd-probe/")) {
-      const denied = await requireAdminAccess(request, env);
-      if (denied) return denied;
-      const symbol = decodeURIComponent(url.pathname.replace("/api/admin/eodhd-probe/", ""));
-      return safeRoute(() => handleEodhdProbe(symbol, env));
-    }
     if (url.pathname === "/api/admin/backtest-run") {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
@@ -9121,6 +9115,12 @@ async function handleRequest(request, env) {
       return safeRoute(() => handleDriftDetect(env));
     }
     if (url.pathname === "/api/engine/bucket-stats") return safeRoute(() => handleBucketStats(env));
+    if (url.pathname.startsWith("/api/admin/eodhd-probe/")) {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      const symbol = decodeURIComponent(url.pathname.replace("/api/admin/eodhd-probe/", ""));
+      return safeRoute(() => handleEodhdProbe(symbol, env));
+    }
     if (url.pathname === "/api/learning/stats") {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
