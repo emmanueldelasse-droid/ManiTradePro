@@ -5767,9 +5767,12 @@ function openPositionsRiskView() {
           ${state.settings.showAlgoJournal ? `<div style="margin-top:8px">${renderJournalMoteurCard()}</div>` : ""}
 
           <!-- FUSION onglets (PR #119+) — sections bot et rapport hebdo intégrées
-               dans la page Trades pour éviter les doublons d'info entre 3 onglets. -->
+               dans la page Trades pour éviter les doublons d'info entre 3 onglets.
+               Les "Paramètres du bot" sont retirés d'ici : ils sont maintenant
+               dans l'onglet Réglages (renderBotParamsCard) pour éviter le
+               double affichage et le re-render permanent qui refermait
+               l'accordéon ici. -->
           ${renderBotMiniSection()}
-          ${renderBotParamsSection()}
           ${renderWeeklyReportSection()}
         `}
       </div>`;
@@ -5808,20 +5811,8 @@ function openPositionsRiskView() {
       </div>`;
   }
 
-  // Paramètres du bot — replié par défaut. Réutilise les renderers existants
-  // ET les classes CSS existantes (.bot-params-card + .bot-collapsible-summary)
-  // pour avoir le bon padding interne, le caret ▾ et le styling thème dark/light.
-  function renderBotParamsSection() {
-    const acc = state.bot.account;
-    if (!acc) return "";
-    const settings = acc.settings || {};
-    const capitalBase = Number(acc.capitalBase || settings.capital_base || 0);
-    return `
-      <details class="card bot-params-card">
-        <summary class="bot-collapsible-summary"><span>Paramètres du bot</span></summary>
-        ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
-      </details>`;
-  }
+  // (renderBotParamsSection retirée — la carte Paramètres du bot est
+  // maintenant dans l'onglet Réglages via renderBotParamsCard.)
 
   // Rapport hebdo Claude — affiche le dernier rapport en markdown si dispo,
   // sinon un message expliquant la mise à jour hebdomadaire (lundi 8h CEST).
