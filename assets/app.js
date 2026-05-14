@@ -7098,10 +7098,15 @@ function renderMain() {
     // Préserve la position de scroll : sans ça, chaque appel à render()
     // (notamment via l'auto-refresh 30s sur les opportunités et la fiche
     // détail) remettait la page en haut, ce qui faisait sauter l'écran
-    // sous les yeux de l'utilisateur. Le scroll est restauré après le
-    // re-render via requestAnimationFrame pour laisser le browser
-    // recalculer la hauteur avant la restauration.
-    const prevScrollY = window.scrollY;
+    // sous les yeux de l'utilisateur.
+    //
+    // Note : le scroll de l'app N'EST PAS sur window — `.app-shell` a
+    // `overflow:hidden` et c'est `.main-content` (overflow-y:auto,
+    // height:100vh) qui scrolle en interne. Lire window.scrollY renvoie
+    // toujours 0 donc la restauration ne fait rien. On lit le scrollTop
+    // de `.main-content`.
+    const prevMain = document.querySelector(".main-content");
+    const prevScrollY = prevMain ? prevMain.scrollTop : 0;
     const prevRoute = state.route;
     app.innerHTML = `
       <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${effectiveLightTheme() ? "theme-light" : ""}">
@@ -7135,11 +7140,14 @@ function renderMain() {
     document.documentElement.classList.toggle("has-modal", modalOpen);
     if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
 
-    // Restaure le scroll si la route n'a pas changé. Sur un changement
-    // de route on accepte le retour en haut — c'est ce qu'on attend
-    // après avoir navigué ailleurs.
+    // Restaure le scroll sur .main-content si la route n'a pas changé.
+    // Sur un changement de route on accepte le retour en haut — c'est
+    // ce qu'on attend après avoir navigué ailleurs.
     if (state.route === prevRoute && prevScrollY > 0) {
-      requestAnimationFrame(() => window.scrollTo(0, prevScrollY));
+      requestAnimationFrame(() => {
+        const main = document.querySelector(".main-content");
+        if (main) main.scrollTop = prevScrollY;
+      });
     }
   }
 
