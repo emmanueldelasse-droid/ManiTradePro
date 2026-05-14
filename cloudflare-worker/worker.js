@@ -1589,16 +1589,16 @@ async function getAlphaQuote(symbol, env) {
 }
 
 // ============================================================
-// RESOLVE UNIFIED QUOTE
+// RESOLVE UNIFIED QUOTE — routé par marché
 //
 // Règle utilisateur :
-//   - Crypto    → Binance (seul fournisseur temps réel gratuit).
-//   - Non-crypto → Yahoo v8 chart (endpoint temps réel gratuit) en
-//                  primaire, Twelve UNIQUEMENT en fallback si Yahoo
-//                  renvoie 429 / panne. Le badge "différé 15 min"
-//                  s'affichera côté front pour les quelques cas où
-//                  Twelve a pris le relais — l'utilisateur sait
-//                  quand le prix n'est pas live.
+//   - Crypto                → Binance (temps réel)
+//   - Actions US (.US)      → EODHD /real-time (temps réel sur plan
+//                              "All World Extended")
+//   - Actions EU + autres   → Yahoo v8 chart (temps réel gratuit,
+//                              EODHD différé 15 min sur EU)
+//   - Twelve                → filet ultime quand tout pète
+//                              (badge "différé 15 min" affiché)
 // ============================================================
 async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) {
   const clean = parseSymbol(symbol);
@@ -1611,8 +1611,6 @@ async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) 
   if (isCrypto(clean)) {
     quote = await getCryptoQuote(clean);
   } else {
-    // Routage par marché : actions US → EODHD (temps réel sur plan
-    // "All World Extended"). Actions EU et le reste → Yahoo v8 chart.
     const eodhdSym = normalizeEodhdSymbol(clean);
     const isUsListing = eodhdSym && eodhdSym.toUpperCase().endsWith(".US");
 
@@ -3301,19 +3299,15 @@ async function handleOpportunities(_url, env) {
   const ctx = createBudgetContext("opportunities");
 
   // ============================================================
-  // PHASE 1 — quotes non-crypto, routées par marché de cotation.
+  // PHASE 1 — quotes non-crypto routées par marché de cotation.
   //
   // Règle utilisateur :
-  //   - Actions US (.US sur EODHD) → EODHD /real-time batch.
-  //     Temps réel sur le plan "All World Extended", pas de rate limit.
-  //   - Actions EU (.PA, .AS, .XETRA, .SW…) → Yahoo batch v7.
-  //     Yahoo donne du temps réel gratuit sur ces bourses ;
-  //     EODHD ne servirait que du différé 15 min pour elles.
-  //   - Tout le reste (forex, commodities, ETF non mappés) →
-  //     fallback Yahoo batch puis Twelve.
-  //
-  // La FICHE DÉTAIL applique la même règle par symbole dans
-  // resolveUnifiedMarketQuote.
+  //   - Actions US (.US)         → EODHD /real-time batch (temps réel
+  //                                 sur plan "All World Extended").
+  //   - Actions EU + autres      → Yahoo batch v7 (temps réel gratuit
+  //                                 sur EU, EODHD ne sert que du
+  //                                 différé 15 min pour ces bourses).
+  //   - Filet ultime             → Twelve batch (badge différé affiché).
   // ============================================================
   const nonCryptoSymbols = allSymbols.filter(s => !isCrypto(s));
   const cryptoSymbols = allSymbols.filter(s => isCrypto(s));
@@ -3322,11 +3316,9 @@ async function handleOpportunities(_url, env) {
   let nonCryptoBatchError = "Batch indisponible";
 
   const usSymbols = [];
-  const otherSymbols = [];
   for (const s of nonCryptoSymbols) {
     const td = normalizeEodhdSymbol(s);
     if (td && td.toUpperCase().endsWith(".US")) usSymbols.push(s);
-    else otherSymbols.push(s);
   }
 
   if (usSymbols.length && eodhdConfigured(env)) {
