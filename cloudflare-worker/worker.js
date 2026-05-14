@@ -3265,7 +3265,12 @@ async function handleOpportunities(_url, env) {
   const publicRows = rows.filter(row => {
     if (!row) return false;
     if (row.status === "ok") return true;
-    if (row.status === "partial" && Number.isFinite(Number(row.price))) return true;
+    // Number(null) renvoie 0 (finite mais inutile) — on exige un prix > 0
+    // pour considérer la row partiale comme affichable.
+    if (row.status === "partial") {
+      const priceNum = Number(row.price);
+      return Number.isFinite(priceNum) && priceNum > 0;
+    }
     return false;
   });
 
