@@ -2186,6 +2186,56 @@ async function confirmTradeFromModal() {
       render();
     }
   }
+
+  // Wipe complet en un clic : désactive l'auto-ouverture le temps de
+  // l'opération (pour que le cron ne ré-injecte rien pendant qu'on wipe),
+  // puis efface trades + positions + feedbacks + events, puis réactive
+  // l'auto-ouverture si elle l'était avant. Résultat : ardoise propre et
+  // bot opérationnel sans manip supplémentaire.
+  async function wipeBotEverything() {
+    if (!confirm("Tout effacer ?\n\n- trades clos\n- positions ouvertes\n- feedbacks et événements\n\nL'auto-ouverture sera désactivée le temps du wipe puis remise comme elle l'était. Cette action est irréversible.")) return;
+    haptic([20, 30, 20]);
+    state.bot.loading = true;
+    render();
+    const wasAutoOpen = state.bot.account?.settings?.auto_open_enabled !== false;
+    try {
+      // Étape 1 : couper l'auto-ouverture si elle était active, pour qu'un
+      // cycle cron ne ré-injecte pas de nouvelles positions pendant qu'on wipe.
+      if (wasAutoOpen) {
+        await apiPost("/api/training/settings", { auto_open_enabled: false }).catch(() => {});
+      }
+
+      // Étape 2 : wipe complet côté Supabase.
+      const res = await apiPost("/api/trades/wipe", { wipeAll: true, includePositions: true });
+      const summary = res?.data || {};
+
+      // Étape 3 : reset du state front + tous les caches localStorage liés
+      // aux trades pour éviter d'afficher un fantôme depuis le cache.
+      state.trades.positions = [];
+      state.trades.history = [];
+      try {
+        for (const k of TRADE_STORAGE.positions) localStorage.removeItem(k);
+        for (const k of TRADE_STORAGE.history) localStorage.removeItem(k);
+        localStorage.removeItem(TRADE_STORAGE.positionsBackup);
+        localStorage.removeItem(TRADE_STORAGE.historyBackup);
+      } catch {}
+
+      // Étape 4 : restaure l'auto-ouverture si elle était active. Le bot
+      // repart sur une base propre et continue à trader.
+      if (wasAutoOpen) {
+        await apiPost("/api/training/settings", { auto_open_enabled: true }).catch(() => {});
+      }
+
+      await loadBot();
+
+      alert(`Effacé : ${summary.deletedTrades || 0} trades · ${summary.deletedPositions || 0} positions · ${summary.deletedFeedback || 0} feedbacks · ${summary.deletedEvents || 0} events.\nLe bot continue ${wasAutoOpen ? "à ouvrir automatiquement" : "en mode manuel (auto-ouverture toujours désactivée)"}.`);
+    } catch (e) {
+      alert(`Erreur : ${e.message || "effacement impossible"}`);
+    } finally {
+      state.bot.loading = false;
+      render();
+    }
+  }
   async function loadDashboard() {
     try {
       const [portfolio, news, newsWindow] = await Promise.all([
@@ -6530,15 +6580,22 @@ function openPositionsRiskView() {
           </details>
         ` : ""}
 
-        <!-- SECTION C — Paramètres (collapsible) -->
-        <details class="card bot-params-card" ${paramsOpen ? "open" : ""}>
-          <summary class="bot-collapsible-summary">
-            <span>Paramètres du bot</span>
-            <span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span>
-          </summary>
-          ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
-        </details>
+        <!-- SECTION C — Paramètres du bot déplacés vers l'onglet Réglages
+             (l'auto-refresh des opportunités refermait l'accordéon ici, et
+             logiquement les paramètres appartiennent aux réglages globaux). -->
       </div>`;
+  }
+
+  function renderBotParamsCard(settings, capitalBase) {
+    const paramsOpen = state.bot.editDraft ? true : !!state.bot.paramsOpen;
+    return `
+      <details class="card bot-params-card" data-bot-params-accordion ${paramsOpen ? "open" : ""}>
+        <summary class="bot-collapsible-summary">
+          <span>Paramètres du bot</span>
+          <span class="muted">${state.bot.editDraft ? "édition" : "lecture"}</span>
+        </summary>
+        ${state.bot.editDraft ? renderBotParamsForm() : renderBotParamsReadonly(settings, capitalBase)}
+      </details>`;
   }
 
   function renderBotStatsTabContent(stats, tab) {
@@ -6672,6 +6729,10 @@ function openPositionsRiskView() {
         </details>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" data-bot-edit-open>Éditer</button>
+          <button class="btn btn-secondary" data-bot-wipe-all>Tout effacer définitivement</button>
+        </div>
+        <div class="muted" style="margin-top:6px;font-size:.78rem">
+          Le bouton "Tout effacer" supprime trades clos, positions ouvertes, feedbacks et events. L'auto-ouverture est suspendue juste le temps du wipe puis remise comme elle l'était — le bot continue à trader sur une ardoise propre.
         </div>
       </div>`;
   }
@@ -6732,6 +6793,11 @@ function openPositionsRiskView() {
     const activeAlerts = state.priceAlerts.filter(a => a.active);
     const triggeredAlerts = state.priceAlerts.filter(a => !a.active);
     const notifStatus = "Notification" in window ? Notification.permission : "unsupported";
+
+    // === Données pour la section Paramètres du bot (déplacée depuis l'onglet Trades) ===
+    const botAccount = state.bot.account || {};
+    const botSettings = botAccount.settings || {};
+    const botCapitalBase = Number(botAccount.capitalBase ?? botSettings.capital_base ?? 10000);
 
     function alertRow(a) {
       const dir = a.condition === "above" ? "Au-dessus de" : "En-dessous de";
@@ -6891,7 +6957,10 @@ function openPositionsRiskView() {
           </div>
         </details>
 
-        <!-- ====== 3. ACTIFS & DONNÉES ====== -->
+        <!-- ====== 3. PARAMÈTRES DU BOT (déplacée depuis l'onglet Trades) ====== -->
+        ${renderBotParamsCard(botSettings, botCapitalBase)}
+
+        <!-- ====== 4. ACTIFS & DONNÉES ====== -->
         <details class="card bot-params-card">
           <summary class="bot-collapsible-summary">
             <span>Actifs & données</span>
@@ -7582,6 +7651,9 @@ function renderMain() {
     app.querySelectorAll("[data-bot-edit-open]").forEach(el => {
       el.addEventListener("click", () => { openBotEdit(); });
     });
+    app.querySelectorAll("[data-bot-wipe-all]").forEach(el => {
+      el.addEventListener("click", () => { wipeBotEverything(); });
+    });
     app.querySelectorAll("[data-bot-edit-cancel]").forEach(el => {
       el.addEventListener("click", () => { cancelBotEdit(); });
     });
@@ -7645,7 +7717,7 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
         render();
       });
     });
-    app.querySelectorAll(".bot-params-card").forEach(el => {
+    app.querySelectorAll("[data-bot-params-accordion]").forEach(el => {
       el.addEventListener("toggle", () => {
         state.bot.paramsOpen = el.open;
       });
