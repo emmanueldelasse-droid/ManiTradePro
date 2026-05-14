@@ -2890,6 +2890,7 @@ function buildPartialAnalysisPayload(symbol, quote, message = "Analyse technique
     assetClass: quote?.assetClass || getAssetClass(symbol),
     price: quote?.price == null ? null : finiteOrNull(quote?.price),
     change24hPct: quote?.change24hPct == null ? null : finiteOrNull(quote?.change24hPct),
+    currency: quote?.currency || getCurrencyForSymbol(symbol),
     sourceUsed: quote?.sourceUsed || null,
     freshness: quote?.freshness || "unknown",
     status: "partial",
@@ -2948,6 +2949,7 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
   const base = {
     symbol, name: quote.name, assetClass: quote.assetClass,
     price: quote.price, change24hPct: quote.change24hPct,
+    currency: quote.currency || getCurrencyForSymbol(symbol),
     sourceUsed: quote.sourceUsed, freshness: quote.freshness,
     status: scored?.score != null ? "ok" : "unavailable",
     score: scored?.score ?? null,
@@ -3035,6 +3037,7 @@ function toOpportunityRow(payload) {
     assetClass: payload.assetClass,
     price: payload.price,
     change24hPct: payload.change24hPct,
+    currency: payload.currency || getCurrencyForSymbol(payload.symbol),
     sourceUsed: payload.sourceUsed,
     freshness: payload.freshness,
     status: payload.status,
