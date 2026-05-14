@@ -3081,7 +3081,10 @@ function renderOppRow(item, rank) {
     const vm = getOpportunityCardViewModel(item);
     const top1 = rank === 1 && vm.decisionState.key === "trade_propose";
     const mobile = isPhoneLayout();
-    const mobileBadges = [vm.fidelityBadge, vm.confirmationBadge, vm.riskBadge].filter(Boolean).join("");
+    // Réduit à 1 badge principal de confiance sur mobile pour éviter le
+    // bruit visuel (avant : fidélité + confirmations + risque = 3 chips
+    // qui se neutralisent).
+    const mobileBadges = vm.confirmationBadge;
 
     if (mobile) {
       return `
@@ -3142,12 +3145,10 @@ function renderOppRow(item, rank) {
           <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
           ${quoteSourceLine(item) ? `<div class="muted opp-note" style="font-size:.7rem;font-style:italic;">${safeText(quoteSourceLine(item))}</div>` : ""}
         </div>
-        <div class="badges-col" style="display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
+        <div class="badges-col" style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;">
           ${badge(vm.assetBadge, item.assetClass || "")}
           ${renderMarketBadge(item.symbol, item.assetClass)}
-          ${vm.fidelityBadge}
           ${vm.confirmationBadge}
-          ${vm.riskBadge}
           <div style="width:100%;font-size:.72rem;color:var(--text-muted);margin-top:1px">${safeText(getMarketStatus(item.symbol, item.assetClass).detail)}</div>
         </div>
       </div>`;
@@ -6727,7 +6728,16 @@ function openPositionsRiskView() {
         </details>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-primary" data-bot-edit-open>Éditer</button>
-          <button class="btn btn-secondary" data-bot-wipe-all>Tout effacer définitivement</button>
+          <button class="btn btn-danger" data-bot-wipe-all title="Effacer tout l'historique et les positions">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;flex-shrink:0">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/>
+              <path d="M14 11v6"/>
+              <path d="M9 6V4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/>
+            </svg>
+            Tout effacer
+          </button>
         </div>
         <div class="muted" style="margin-top:6px;font-size:.78rem">
           Le bouton "Tout effacer" supprime trades clos, positions ouvertes, feedbacks et events. L'auto-ouverture est suspendue juste le temps du wipe puis remise comme elle l'était — le bot continue à trader sur une ardoise propre.
@@ -7175,6 +7185,19 @@ function renderMain() {
     const prevMain = document.querySelector(".main-content");
     const prevScrollY = prevMain ? prevMain.scrollTop : 0;
     const prevRoute = state.route;
+
+    // Capture des prix actuellement affichés pour flash visuel sur
+    // changement. Sans ça, l'utilisateur ne voit pas que le prix vient
+    // de bouger lors de l'auto-refresh.
+    const prevPrices = new Map();
+    document.querySelectorAll("[data-symbol]").forEach(card => {
+      const sym = card.dataset.symbol;
+      if (!sym) return;
+      card.querySelectorAll(".price, .pos-price-val, .detail-price").forEach((el, idx) => {
+        prevPrices.set(`${sym}|${idx}`, el.textContent.trim());
+      });
+    });
+
     app.innerHTML = `
       <div class="app-shell ${state.settings.compactCards ? "compact-ui" : ""} ${effectiveLightTheme() ? "theme-light" : ""}">
         ${renderSidebar()}
@@ -7206,6 +7229,29 @@ function renderMain() {
     const modalOpen = !!(state.tradeConfirm?.open || state.session?.pinOpen || state.alertModal?.open || state.chartFullscreen);
     document.documentElement.classList.toggle("has-modal", modalOpen);
     if (state.route === "asset-detail") requestAnimationFrame(initCandlestickChart);
+
+    // Applique le flash visuel sur les prix qui ont changé depuis le
+    // dernier render (auto-refresh ou clic sur "Actualiser"). On compare
+    // la valeur texte parsée à la valeur précédente capturée plus haut.
+    if (prevPrices.size > 0) {
+      requestAnimationFrame(() => {
+        document.querySelectorAll("[data-symbol]").forEach(card => {
+          const sym = card.dataset.symbol;
+          if (!sym) return;
+          card.querySelectorAll(".price, .pos-price-val, .detail-price").forEach((el, idx) => {
+            const prev = prevPrices.get(`${sym}|${idx}`);
+            const curr = el.textContent.trim();
+            if (!prev || prev === curr) return;
+            const oldNum = parseFloat(prev.replace(/[^\d,.-]/g, "").replace(",", "."));
+            const newNum = parseFloat(curr.replace(/[^\d,.-]/g, "").replace(",", "."));
+            if (!Number.isFinite(oldNum) || !Number.isFinite(newNum) || oldNum === newNum) return;
+            const cls = newNum > oldNum ? "price-flash-up" : "price-flash-down";
+            el.classList.add(cls);
+            setTimeout(() => el.classList.remove(cls), 850);
+          });
+        });
+      });
+    }
 
     // Restaure le scroll sur .main-content si la route n'a pas changé.
     // Sur un changement de route on accepte le retour en haut — c'est
