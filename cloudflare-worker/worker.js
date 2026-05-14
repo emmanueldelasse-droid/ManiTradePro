@@ -1533,17 +1533,16 @@ async function getAlphaQuote(symbol, env) {
 }
 
 // ============================================================
-// RESOLVE UNIFIED QUOTE — UNE SEULE SOURCE PAR ASSET CLASS
+// RESOLVE UNIFIED QUOTE
 //
-// Règle utilisateur (mai 2026) : un seul provider de quote par actif,
-// pour qu'il n'y ait JAMAIS deux prix différents entre la liste et la
-// fiche. Conséquence :
+// Règle utilisateur :
 //   - Crypto    → Binance (seul fournisseur temps réel gratuit).
-//   - Non-crypto → Yahoo v8 chart (endpoint temps réel gratuit).
-//
-// Plus de Twelve Data (différé 15 min), plus d'Alpha Vantage, plus de
-// Yahoo v7 batch (servait du cache vieux de plusieurs minutes). Si
-// Yahoo v8 tombe en panne, la quote est simplement marquée indisponible.
+//   - Non-crypto → Yahoo v8 chart (endpoint temps réel gratuit) en
+//                  primaire, Twelve UNIQUEMENT en fallback si Yahoo
+//                  renvoie 429 / panne. Le badge "différé 15 min"
+//                  s'affichera côté front pour les quelques cas où
+//                  Twelve a pris le relais — l'utilisateur sait
+//                  quand le prix n'est pas live.
 // ============================================================
 async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) {
   const clean = parseSymbol(symbol);
@@ -1556,8 +1555,20 @@ async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) 
   if (isCrypto(clean)) {
     quote = await getCryptoQuote(clean);
   } else {
-    if (circuitIsOpen("yahoo")) throw new Error("yahoo_circuit_open");
-    quote = await getYahooQuoteFromChart(clean);
+    if (!circuitIsOpen("yahoo")) {
+      try {
+        quote = await getYahooQuoteFromChart(clean);
+      } catch {
+        // Yahoo KO (429, timeout, etc.) — on tente Twelve.
+      }
+    }
+    if (!quote && !circuitIsOpen("twelvedata")) {
+      try {
+        quote = await getTwelveQuote(clean, env, ctx);
+      } catch {
+        // Twelve KO aussi → on remonte l'erreur au caller.
+      }
+    }
   }
   if (!quote) throw new Error("quote_unavailable");
 
@@ -3220,41 +3231,27 @@ async function handleOpportunities(_url, env) {
   const ctx = createBudgetContext("opportunities");
 
   // ============================================================
-  // PHASE 1 — quotes non-crypto via UNE SEULE source : Yahoo v8 chart.
-  // Identique au chemin de la fiche détail, donc liste et fiche affichent
-  // exactement le même prix. Coût : N subrequêtes (panel ~25 symboles,
-  // largement sous la limite Cloudflare). On parallèle modérément pour
-  // garder la latence basse.
+  // PHASE 1 — Yahoo batch (1 subrequête pour 25 symboles, pas de 429).
+  // Twelve UNIQUEMENT en filet pour les symboles que Yahoo n'a pas servis.
+  // La fiche détail (handleOpportunityDetail → resolveUnifiedMarketQuote)
+  // utilise Yahoo v8 chart individuel qui est temps réel — petit écart
+  // possible entre la liste (batch) et la fiche (chart) mais c'est le
+  // seul moyen de tenir la limite subrequêtes Cloudflare.
   // ============================================================
   const nonCryptoSymbols = allSymbols.filter(s => !isCrypto(s));
   const cryptoSymbols = allSymbols.filter(s => isCrypto(s));
   const quotesMap = {};
   const quoteErrors = {};
-  const nonCryptoBatchError = "Yahoo indisponible";
+  let nonCryptoBatchError = "Batch indisponible";
 
-  const yahooResults = await mapWithConcurrency(
-    nonCryptoSymbols,
-    OPPORTUNITIES_CONCURRENCY,
-    async (symbol) => {
-      try {
-        const q = await getYahooQuoteFromChart(symbol);
-        return { symbol, quote: q, error: null };
-      } catch (e) {
-        return { symbol, quote: null, error: compactProviderError(e instanceof Error ? e.message : "Yahoo KO") };
-      }
-    }
-  );
-  for (const result of yahooResults) {
-    if (result instanceof Error) continue;
-    if (result.quote) quotesMap[result.symbol] = result.quote;
-    else if (result.error) quoteErrors[result.symbol] = result.error;
+  try {
+    const yahooBatch = await getYahooBatchQuotes(nonCryptoSymbols);
+    Object.assign(quotesMap, yahooBatch);
+  } catch (e) {
+    nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : "Yahoo batch KO");
   }
 
-  // Filet Twelve Data : appelé UNIQUEMENT pour les symboles que Yahoo
-  // n'a pas pu servir (panne, ticker bloqué, etc.). Twelve free tier est
-  // différé de 15 min, donc le badge "différé 15 min" remontera côté
-  // front pour ces symboles — l'utilisateur sait au coup d'œil quand
-  // le prix n'est pas live. Yahoo reste la source canonique.
+  // Filet Twelve pour les manquants (badge "différé 15 min" affiché).
   const missingAfterYahoo = nonCryptoSymbols.filter(s => !quotesMap[s]);
   if (missingAfterYahoo.length > 0) {
     try {
