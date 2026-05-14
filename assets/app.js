@@ -7706,7 +7706,10 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
             loadDetail(state.detail.symbol).catch(() => {});
           }
         }
-        render();
+        // Pas de render() ici : loadOpportunities / loadDetail
+        // appellent déjà render() à la fin de leur fetch. Un appel
+        // additionnel toutes les 30 s recréait le DOM même quand rien
+        // n'avait changé, ce qui figeait le scroll de l'utilisateur.
       }
     }, 30000);
 
