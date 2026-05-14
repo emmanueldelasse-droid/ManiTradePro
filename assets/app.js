@@ -2189,15 +2189,19 @@ async function confirmTradeFromModal() {
 
   // Wipe complet en un clic : désactive l'auto-ouverture le temps de
   // l'opération (pour que le cron ne ré-injecte rien pendant qu'on wipe),
-  // puis efface trades + positions + feedbacks + events, puis réactive
-  // l'auto-ouverture si elle l'était avant. Résultat : ardoise propre et
-  // bot opérationnel sans manip supplémentaire.
+  // puis efface trades + positions + feedbacks + events + journal moteur,
+  // puis réactive l'auto-ouverture si elle l'était avant. Résultat :
+  // ardoise propre et bot opérationnel sans manip supplémentaire.
   async function wipeBotEverything() {
-    if (!confirm("Tout effacer ?\n\n- trades clos\n- positions ouvertes\n- feedbacks et événements\n\nL'auto-ouverture sera désactivée le temps du wipe puis remise comme elle l'était. Cette action est irréversible.")) return;
+    if (!confirm("Tout effacer ?\n\n- trades clos\n- positions ouvertes\n- feedbacks et événements\n- journal moteur\n\nL'auto-ouverture sera désactivée le temps du wipe puis remise comme elle l'était. Cette action est irréversible.")) return;
     haptic([20, 30, 20]);
     state.bot.loading = true;
     render();
-    const wasAutoOpen = state.bot.account?.settings?.auto_open_enabled !== false;
+    // Lecture explicite "=== true" : si state.bot.account est null (loadBot
+    // pas encore terminé ou en erreur), wasAutoOpen vaut false et on
+    // n'active PAS l'auto-open par erreur en sortie.
+    const wasAutoOpen = state.bot.account?.settings?.auto_open_enabled === true;
+    let wipeOk = false;
     try {
       // Étape 1 : couper l'auto-ouverture si elle était active, pour qu'un
       // cycle cron ne ré-injecte pas de nouvelles positions pendant qu'on wipe.
@@ -2208,30 +2212,33 @@ async function confirmTradeFromModal() {
       // Étape 2 : wipe complet côté Supabase.
       const res = await apiPost("/api/trades/wipe", { wipeAll: true, includePositions: true });
       const summary = res?.data || {};
+      wipeOk = true;
 
       // Étape 3 : reset du state front + tous les caches localStorage liés
       // aux trades pour éviter d'afficher un fantôme depuis le cache.
       state.trades.positions = [];
       state.trades.history = [];
+      state.algoJournal = [];
       try {
         for (const k of TRADE_STORAGE.positions) localStorage.removeItem(k);
         for (const k of TRADE_STORAGE.history) localStorage.removeItem(k);
+        for (const k of TRADE_STORAGE.algoJournal) localStorage.removeItem(k);
         localStorage.removeItem(TRADE_STORAGE.positionsBackup);
         localStorage.removeItem(TRADE_STORAGE.historyBackup);
+        localStorage.removeItem(TRADE_STORAGE.algoJournalBackup);
       } catch {}
-
-      // Étape 4 : restaure l'auto-ouverture si elle était active. Le bot
-      // repart sur une base propre et continue à trader.
-      if (wasAutoOpen) {
-        await apiPost("/api/training/settings", { auto_open_enabled: true }).catch(() => {});
-      }
 
       await loadBot();
 
       alert(`Effacé : ${summary.deletedTrades || 0} trades · ${summary.deletedPositions || 0} positions · ${summary.deletedFeedback || 0} feedbacks · ${summary.deletedEvents || 0} events.\nLe bot continue ${wasAutoOpen ? "à ouvrir automatiquement" : "en mode manuel (auto-ouverture toujours désactivée)"}.`);
     } catch (e) {
-      alert(`Erreur : ${e.message || "effacement impossible"}`);
+      alert(`Erreur : ${e.message || "effacement impossible"}${wipeOk ? "" : "\nL'auto-ouverture est restaurée même en cas d'échec."}`);
     } finally {
+      // Restaure l'auto-ouverture dans TOUS les cas (succès ou échec) pour
+      // ne jamais laisser le bot bloqué silencieusement après une erreur.
+      if (wasAutoOpen) {
+        await apiPost("/api/training/settings", { auto_open_enabled: true }).catch(() => {});
+      }
       state.bot.loading = false;
       render();
     }
