@@ -9,9 +9,9 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-12 (PR #105 — workflow snapshot bot-stats pour lecture sans PIN) |
+| **Dernière mise à jour** | 2026-05-14 (PR #10 — EODHD + stop/TP intraday + setup obligatoire + cooldown post-stop) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/resume-work-Hizc5` (mergée via PR #105) |
+| **Branche active** | `claude/resume-manitradepro-MeZLc` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -62,6 +62,108 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## PR #10 — EODHD + stop/TP intraday + setup obligatoire + cooldown (2026-05-14)
+
+Livraison de 4 évolutions structurelles vers un bot paper plus réaliste, sans
+toucher au passage en réel.
+
+### Ce qui a été ajouté
+
+**1. EODHD comme source principale historique daily non-crypto**
+- `eodhdConfigured(env)`, `normalizeEodhdSymbol(symbol)`, `getEodhdCandles(...)`,
+  `getEodhdCandlesWithKV(...)` — nouveau provider greffé dans `worker.js`
+  avant la section EURUSD.
+- Mapping symbole : US stocks/ETF → `.US`, Euronext Paris → `.PA`, XETRA →
+  `.XETRA`, SIX → `.SW`, ASML → `.AS`. Crypto/forex/commodity retournent `null`
+  → caller fallback Twelve.
+- `getCandlesBySymbol` (dispatcher) essaie EODHD en premier pour daily/weekly
+  non-crypto si `EODHD_API_KEY` est présent. Si la clé est absente ou EODHD
+  échoue, fallback transparent vers Twelve Data, puis Yahoo. Aucun crash, aucun
+  prix inventé.
+- Binance reste seul maître pour crypto (1m/1h/4h/1d). Twelve reste maître pour
+  intraday non-crypto. Yahoo reste le filet final.
+
+**2. Stop/TP intraday détectés en paper trading**
+- `trainingCloseTrigger` utilise désormais `position.live.highSinceOpen` /
+  `lowSinceOpen` (déjà tracés par PR #5) pour vérifier si stop ou TP a été
+  touché entre deux cycles.
+- Règles strictes :
+  - Long : stop touché si `low ≤ stopLoss`, TP touché si `high ≥ takeProfit`.
+  - Short : stop touché si `high ≥ stopLoss`, TP touché si `low ≤ takeProfit`.
+  - Cas ambigu (stop ET TP touchés dans la même fenêtre intra) → on considère
+    le stop d'abord (hypothèse prudente, défavorable au bot).
+    `exit_reason = "ambiguous_intraday_stop_first"`.
+- Si l'intra-tracker n'a pas encore de borne (clôture pendant le tout premier
+  cycle), fallback sur le compare scalaire historique.
+- Persistance dans `mtp_trade_feedback` : `intraday_detected`, `intraday_source`,
+  `intraday_high`, `intraday_low`, `execution_assumption`. Snapshot intraday
+  également dans `analysis_snapshot.intraday`.
+
+**3. Setup structurel obligatoire (toggle)**
+- Nouveau flag `require_structural_setup` (default `true`) dans
+  `mtp_training_settings`.
+- `isTrainingCandidateAllowed` bloque l'ouverture si le setup retourné par
+  `buildPlanFromConfiguration` n'est pas dans la liste `{pullback, breakout,
+  continuation, pullback_short, breakdown, continuation_short, mean_reversion}`.
+- Toggle dans Réglages → Bot → Édition, recommandé activé. Repasser à `false`
+  pour reprendre la collecte data brute si besoin.
+
+**4. Cooldown post-stop**
+- Nouveau champ `post_stop_cooldown_hours` (default 24, plage 0-720, 0 = OFF)
+  dans `mtp_training_settings`.
+- Nouveau helper `lookupRecentStopsForSymbol(env, hours)` — lit
+  `mtp_trades.closed_at >= cutoff & exit_reason ∈ {stop_loss,
+  ambiguous_intraday_stop_first}` et retourne un Set de symboles "interdits".
+- Pré-fetch une fois par cycle dans `handleTrainingAutoCycle`, passé à
+  `isTrainingCandidateAllowed`. 0 surcoût par candidat.
+- Le cooldown ne ferme jamais une position déjà ouverte — il bloque
+  uniquement les nouvelles entrées auto.
+- Event `cooldown_active` loggué dans `mtp_training_events` pour traçabilité.
+
+### Nettoyage de routine
+- Doublon `getYahooCandles` supprimé (l'ancienne ligne ~1015 écrasait la
+  définition L962 — code mort).
+
+### Migration SQL requise (avant `wrangler deploy`)
+`cloudflare-worker/migrations/013_setup_required_and_cooldown.sql` :
+```sql
+alter table public.mtp_training_settings
+  add column if not exists require_structural_setup boolean not null default true;
+alter table public.mtp_training_settings
+  add column if not exists post_stop_cooldown_hours integer not null default 24
+  check (post_stop_cooldown_hours >= 0 and post_stop_cooldown_hours <= 720);
+```
+Sans cette migration, le worker fonctionne quand même : les valeurs par
+défaut `getTrainingDefaults` s'appliquent en mémoire mais ne persistent pas.
+
+### Variable d'env Cloudflare à créer
+- **`EODHD_API_KEY`** : à pousser via `wrangler secret put EODHD_API_KEY`.
+  Si absente, EODHD est ignoré silencieusement et Twelve/Yahoo prennent le
+  relais — l'app ne crashe pas.
+
+### Tests à faire après déploiement
+1. Le worker démarre (`wrangler tail` clean).
+2. `/api/training/settings` retourne les deux nouveaux champs.
+3. Réglages → Bot → Édition affiche le toggle "Setup obligatoire" et le
+   champ "Cooldown post-stop (h)".
+4. Sauvegarder un draft persiste correctement les nouveaux champs en Supabase.
+5. Forcer un cycle (`POST /api/training/auto-cycle`) — sur Mac/Win avec
+   `EODHD_API_KEY` set, vérifier dans les logs qu'EODHD est appelé pour
+   un actif US (ex. AAPL) et que `sourceUsed` du front affiche EODHD.
+6. Après le premier stop sur un symbole, vérifier que `cooldown_active`
+   apparaît dans `mtp_training_events` lors du cycle suivant et que ce
+   symbole est filtré des candidats.
+7. Vérifier qu'une position long touche son stop intraday : le close se
+   déclenche dès que `low ≤ stopLoss` (et pas seulement au close daily).
+
+### Ce qui reste pour PR #11 (différée, à demander explicitement)
+- Backtest EODHD multi-année + frictions + walk-forward.
+- Audit complet des helpers Twelve doublonnés (la rotation 4 clés peut être
+  simplifiée mais c'est risqué — séparer dans une PR dédiée).
+- Badge "intraday stop" sur la ligne d'historique trade (purement cosmétique).
 
 ---
 

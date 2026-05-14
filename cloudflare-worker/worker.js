@@ -1008,57 +1008,112 @@ async function getYahooCandles(symbol, timeframe = "1d", limit = 90) {
   }
 }
 
-// Bougies Yahoo — fallback quand TwelveData rejette le ticker (typiquement
-// actions EU sur tier gratuit). Yahoo expose le chart v8 sans clé API.
-// On ne sert que 1d et 1w : Yahoo limite 60m à 60 jours et n'a pas de 4h natif,
-// donc pour 1h/4h on laisse l'erreur Twelve remonter.
-async function getYahooCandles(symbol, timeframe = "1d", limit = 90) {
-  if (circuitIsOpen("yahoo")) throw new Error("yahoo_circuit_open");
-  let interval = "1d";
-  let range = "6mo";
-  if (timeframe === "1w") { interval = "1wk"; range = "2y"; }
-  else if (timeframe !== "1d") throw new Error(`Yahoo candles: timeframe ${timeframe} non supporté`);
+// ============================================================
+// EODHD — provider historique daily pour actions / ETF / indices.
+//
+// EODHD est une API externe (eodhistoricaldata.com) qui sert des bougies EOD
+// (End Of Day) propres et longues. On l'utilise comme source PRINCIPALE pour
+// les bougies daily non-crypto (actions, ETF, indices), parce que :
+//   - le tier gratuit Twelve Data coupe certaines actions EU et limite la
+//     longueur d'historique (utile pour calculer EMA 50/100 sur 150-250 jours
+//     et faire du backtest sérieux) ;
+//   - Yahoo est notre fallback robuste mais sa qualité varie (gaps, splits) ;
+//   - EODHD facture par symbole/jour, donc un cache 12h économise tout.
+//
+// Si la clé EODHD_API_KEY est absente, getEodhdCandles throw "eodhd_disabled"
+// et le dispatcher repasse silencieusement sur Twelve puis Yahoo. AUCUN prix
+// fictif n'est jamais inventé.
+//
+// Important : EODHD ne sert que les bougies DAILY (interval=d) sur le tier
+// utilisé. Pour les 4h/1h on reste sur Twelve (intraday) ou Binance (crypto).
+// ============================================================
+function eodhdConfigured(env) {
+  return !!(env && env.EODHD_API_KEY);
+}
 
-  const ticker = normalizeYahooSymbol(symbol);
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=${interval}&range=${range}`;
-  try {
+// Mapping symbole interne -> ticker EODHD (suffixe d'exchange obligatoire).
+//   - US stocks / ETF : suffixe .US
+//   - Euronext Paris  : .PA  (AIR.PA = Airbus, MC.PA = LVMH, TTE.PA, RMS.PA)
+//   - XETRA Francfort : .XETRA  (SAP.XETRA, SIE.XETRA)
+//   - SIX Suisse      : .SW    (NESN.SW)
+//   - Indices / forex / commo : couverture partielle EODHD, on laisse passer
+//     null → caller fallback Twelve.
+function normalizeEodhdSymbol(symbol) {
+  const sym = String(symbol || "").toUpperCase();
+  if (!sym) return null;
+  const explicit = {
+    AIR:"AIR.PA", LVMH:"MC.PA", TTE:"TTE.PA", RMS:"RMS.PA",
+    SAP:"SAP.XETRA", SIE:"SIE.XETRA",
+    NESN:"NESN.SW",
+    ASML:"ASML.AS"
+  };
+  if (explicit[sym]) return explicit[sym];
+  // Si déjà suffixé (contient un point), on respecte l'input utilisateur.
+  if (sym.includes(".")) return sym;
+  // Symboles non-tradables sur EODHD (forex / commodities / indices via futures)
+  // — on retourne null pour signaler "non couvert" au dispatcher.
+  const klass = getAssetClass(sym);
+  if (klass === "crypto" || klass === "forex" || klass === "commodity") return null;
+  // Par défaut, on assume US stock / ETF.
+  return `${sym}.US`;
+}
+
+// Bougies daily EODHD. Format de sortie aligné sur Twelve/Yahoo pour rester
+// drop-in dans getCandlesBySymbol. La métadonnée `source: "eodhd"` est portée
+// par le caller via le champ `sourceUsed` du payload, pas dans la bougie
+// elle-même (cohérent avec Twelve qui ne tague pas non plus chaque bougie).
+async function getEodhdCandles(symbol, timeframe, limit, env, ctx = null) {
+  if (!eodhdConfigured(env)) throw new Error("eodhd_disabled");
+  if (timeframe !== "1d" && timeframe !== "1w") {
+    // EODHD intraday existe mais facturé séparément — non couvert tier actuel.
+    throw new Error(`eodhd_unsupported_timeframe:${timeframe}`);
+  }
+  const tdSymbol = normalizeEodhdSymbol(symbol);
+  if (!tdSymbol) throw new Error(`eodhd_no_mapping:${symbol}`);
+
+  return getCachedOrFetch(`mem:candles:eodhd:${tdSymbol}:${timeframe}:${limit}`, TTL.candlesNonCrypto, async () => {
+    const period = timeframe === "1w" ? "w" : "d";
+    // 250 bougies daily = ~1 an de trading, suffisant pour EMA 100 + marge.
+    // Sur le tier free EODHD, period=d est inclus pour les symboles supportés.
+    const max = Math.max(150, Math.min(Number(limit) || 250, 1000));
+    const url = `https://eodhistoricaldata.com/api/eod/${encodeURIComponent(tdSymbol)}?api_token=${encodeURIComponent(env.EODHD_API_KEY)}&period=${period}&fmt=json&order=a`;
     const res = await fetchWithRetry(
       url,
       { headers: { Accept: "application/json" } },
-      { timeoutMs: 8000, maxRetries: 2, backoffMs: 500 }
-    );
-    if (!res.ok) throw new Error(`Yahoo chart HTTP ${res.status}`);
+      { timeoutMs: 9000, maxRetries: 2, backoffMs: 600 }
+    ).catch((e) => { throw new Error(`eodhd_network:${e.message || e}`); });
+    if (!res.ok) {
+      // 401/403/429 EODHD — on laisse remonter sans recordFailure (pas de
+      // circuit breaker dédié, le caller fait fallback Twelve immédiat).
+      throw new Error(`eodhd_http_${res.status}`);
+    }
     const payload = await res.json();
-    const result = payload?.chart?.result?.[0];
-    if (!result) throw new Error("Yahoo chart vide");
-    const timestamps = Array.isArray(result.timestamp) ? result.timestamp : [];
-    const q = result.indicators?.quote?.[0] || {};
-    const opens = Array.isArray(q.open) ? q.open : [];
-    const highs = Array.isArray(q.high) ? q.high : [];
-    const lows = Array.isArray(q.low) ? q.low : [];
-    const closes = Array.isArray(q.close) ? q.close : [];
-    const volumes = Array.isArray(q.volume) ? q.volume : [];
+    if (!Array.isArray(payload)) throw new Error("eodhd_payload_not_array");
     const rows = [];
-    for (let i = 0; i < timestamps.length; i++) {
-      const o = Number(opens[i]);
-      const h = Number(highs[i]);
-      const l = Number(lows[i]);
-      const c = Number(closes[i]);
-      if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c)) continue;
+    for (const row of payload) {
+      const o = Number(row?.open);
+      const h = Number(row?.high);
+      const l = Number(row?.low);
+      const c = Number(row?.close);
+      if (!Number.isFinite(o) || !Number.isFinite(h) || !Number.isFinite(l) || !Number.isFinite(c) || c <= 0) continue;
+      if (!row?.date) continue;
       rows.push({
-        time: new Date(Number(timestamps[i]) * 1000).toISOString(),
+        time: new Date(`${row.date}T00:00:00Z`).toISOString(),
         open: o, high: h, low: l, close: c,
-        volume: Number.isFinite(Number(volumes[i])) ? Number(volumes[i]) : null
+        volume: Number.isFinite(Number(row?.volume)) ? Number(row.volume) : null
       });
     }
-    if (!rows.length) throw new Error("Yahoo chart sans bougies");
-    recordSuccess("yahoo");
-    const max = Math.max(1, Number(limit) || 90);
+    if (!rows.length) throw new Error("eodhd_no_candles");
     return rows.length > max ? rows.slice(-max) : rows;
-  } catch (e) {
-    recordFailure("yahoo");
-    throw e;
-  }
+  });
+}
+
+async function getEodhdCandlesWithKV(symbol, timeframe, limit, env, ctx = null) {
+  const kvKey = `candles:eodhd:${symbol}:${timeframe}`;
+  const kvTtl = timeframe === "1w" ? KV_TTL.candlesDaily * 2 : KV_TTL.candlesDaily;
+  return kvGetOrFetch(kvKey, kvTtl, async () => {
+    return getEodhdCandles(symbol, timeframe, limit, env, ctx);
+  }, env);
 }
 
 // ============================================================
@@ -1558,6 +1613,26 @@ async function getStoredDailyQuoteFallback(symbol, env) {
 
 async function getCandlesBySymbol(symbol, timeframe, limit, env, ctx = null) {
   if (isCrypto(symbol)) return getCryptoCandlesTf(symbol, timeframe, limit);
+
+  // Hiérarchie non-crypto :
+  //   1. EODHD (clé présente) pour les bougies daily/weekly — historique long
+  //      et propre, idéal pour les indicateurs swing et le backtest.
+  //   2. Twelve Data pour daily/4h/1h.
+  //   3. Yahoo en fallback final pour daily/weekly (actions EU non couvertes
+  //      par Twelve free tier).
+  //
+  // Le dispatcher ne lève pas EODHD/Twelve en silence : si EODHD répond, on
+  // s'arrête là. Sinon on retombe sur Twelve. Si Twelve fail à son tour,
+  // Yahoo prend le relais (uniquement pour daily/weekly).
+  if ((timeframe === "1d" || timeframe === "1w") && eodhdConfigured(env)) {
+    try {
+      const candles = await getEodhdCandlesWithKV(symbol, timeframe, limit, env, ctx);
+      if (Array.isArray(candles) && candles.length) return candles;
+    } catch {
+      // EODHD indisponible pour ce symbole / timeframe / clé — fallback Twelve.
+    }
+  }
+
   try {
     return await getTwelveCandlesWithKV(symbol, timeframe, limit, env, ctx);
   } catch (e) {
@@ -3298,6 +3373,18 @@ function getTrainingDefaults() {
     allowed_symbols: [],
     allowed_setups: ["pullback", "breakout", "continuation", "pullback_short", "breakdown", "continuation_short", "mean_reversion"],
     mean_reversion_enabled: true,    // setup activé en entraînement
+    // PR #10 — bloquer l'ouverture auto si aucun setup structurel détecté.
+    // Issu du post-mortem 28/04 : 67% des trades étaient "score-only" (sans
+    // pattern technique pour timer l'entrée) → WR 11% vs 31% breakeven. On
+    // préfère 3x moins de trades de qualité que d'empiler du bruit. Le toggle
+    // permet de couper en 2 clics depuis Réglages → Bot.
+    require_structural_setup: true,
+    // PR #10 — durée du blocage post-stop sur un symbole (en heures). Sans ce
+    // cooldown, le bot peut se stopper puis réouvrir le même actif 30 min plus
+    // tard sur un signal qui survit au stop (observation des "doublons" du
+    // post-mortem). 24h = laisse le temps au signal de mourir naturellement.
+    // 0 désactive le cooldown.
+    post_stop_cooldown_hours: 24,
     max_daily_loss_pct: 0.30,        // garde-fou jour uniquement (30%)
     max_weekly_loss_pct: 1.0,        // désactivé (100%)
     max_consecutive_losses: 999,     // désactivé
@@ -3319,7 +3406,51 @@ const TOXIC_BUCKETS_BACKTEST_2026_04_28 = new Set([
   "pullback_short|short|stock"        // -0.26 % net, 195 trades, WR 27.7 %
 ]);
 
-function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, newsWindow = null, activeAdjustments = null) {
+// Cooldown post-stop (PR #10). Récupère les symboles qui ont eu un trade
+// fermé par stop_loss dans la fenêtre `hours` et qui ne doivent donc pas
+// être réouverts immédiatement par le bot. Renvoie un Set de symboles
+// "interdits" (toujours en uppercase pour matcher parseSymbol).
+//
+// Implémentation : on lit la table `mtp_trades` filtrée par closed_at récent.
+// Seuls les exit_reason "stop_loss" et "ambiguous_intraday_stop_first" comptent
+// comme des stops "vrais". Les time_exit / engine_invalidation / manual ne
+// déclenchent pas de cooldown — l'utilisateur peut rouvrir s'il le souhaite.
+//
+// Le filtre côté Supabase prend `closed_at >= cutoff` puis on agrège côté
+// worker (Supabase ne supporte pas DISTINCT via PostgREST). Côté volume :
+// max 30-40 trades fermés/jour en paper, donc charge négligeable.
+async function lookupRecentStopsForSymbol(env, hours) {
+  if (!supabaseConfigured(env)) return new Set();
+  const hoursNum = Number(hours);
+  if (!Number.isFinite(hoursNum) || hoursNum <= 0) return new Set();
+  const cutoff = new Date(Date.now() - hoursNum * 3600 * 1000).toISOString();
+  try {
+    const rows = await supabaseFetch(
+      env,
+      `${TRADE_TABLES.trades}?select=symbol,closed_at,closed_execution,analysis_snapshot&mode=in.(training,exploration,core)&status=eq.closed&closed_at=gte.${encodeURIComponent(cutoff)}&order=closed_at.desc&limit=500`
+    );
+    const blocked = new Set();
+    if (!Array.isArray(rows)) return blocked;
+    for (const row of rows) {
+      const sym = parseSymbol(row?.symbol || "");
+      if (!sym) continue;
+      const closeType = String(
+        row?.closed_execution?.closeType
+        || row?.analysis_snapshot?.exitReason
+        || ""
+      ).toLowerCase();
+      if (closeType === "stop_loss" || closeType === "ambiguous_intraday_stop_first") {
+        blocked.add(sym);
+      }
+    }
+    return blocked;
+  } catch (e) {
+    console.error("lookupRecentStopsForSymbol failed:", e.message);
+    return new Set();
+  }
+}
+
+function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, newsWindow = null, activeAdjustments = null, cooldownSet = null) {
   if (!row || row.status !== "ok") return false;
   if (row.decision !== "Trade propose") return false;
   if (!row.plan?.tradeNow) return false;
@@ -3329,18 +3460,20 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   // Le newsWindow est pré-fetché en amont du cycle training pour éviter un appel par candidat.
   if (newsWindow && newsWindow.blocked) return false;
 
-  // Setup structurel obligatoire (Bug #3 strict, post-mortem 28/04 — option 1).
-  // Sans setup détecté, WR observé = 11 % vs 31 % breakeven théorique pour RR 2.2.
-  // 26 trades sur 39 du dataset 12/05 étaient en setupType="autre" → tous perdus
-  // ou quasi. On préfère 3× moins de trades de qualité que d'empiler du bruit.
-  // Le mode Exploration garde sa philosophie : seuils larges, mais setup requis.
+  // Setup structurel obligatoire — toggle `require_structural_setup` (PR #10).
+  // Issu du post-mortem 28/04 : 67% des trades étaient "score-only" (sans
+  // pattern technique pour timer l'entrée) → WR 11% vs 31% breakeven. Le mode
+  // Exploration garde sa philosophie : seuils larges, mais setup requis quand
+  // le toggle est ON. Pour reprendre la collecte data brute (rare), passer le
+  // toggle à false dans Réglages → Bot.
   const setupType = String(row.plan?.setupType || row.setupType || "").toLowerCase();
   const VALID_SETUPS = new Set([
     "pullback", "breakout", "continuation",
     "pullback_short", "breakdown", "continuation_short",
     "mean_reversion"
   ]);
-  if (!VALID_SETUPS.has(setupType)) return false;
+  const requireSetup = settings?.require_structural_setup !== false;
+  if (requireSetup && !VALID_SETUPS.has(setupType)) return false;
 
   // Setup activé par l'utilisateur dans Réglages → Bot ?
   const allowedSetups = Array.isArray(settings.allowed_setups) ? settings.allowed_setups : ["pullback","breakout","continuation"];
@@ -3455,6 +3588,14 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   // Max global
   if (openRows.length >= Number(settings.max_open_positions || 10)) return false;
 
+  // Cooldown post-stop (PR #10). Bloque toute nouvelle entrée auto sur un
+  // symbole qui vient d'être stoppé dans la fenêtre `post_stop_cooldown_hours`.
+  // Le cooldownSet est pré-calculé une fois par cycle (lookupRecentStopsForSymbol
+  // batch sur tous les symboles ouverts récemment) pour éviter N requêtes
+  // Supabase. Si cooldownSet est null (caller historique), pas de blocage —
+  // rétrocompatible.
+  if (cooldownSet && cooldownSet.has && cooldownSet.has(parseSymbol(row.symbol))) return false;
+
   return true;
 }
 
@@ -3545,14 +3686,26 @@ async function handleTrainingAutoCycle(env) {
             return;
           }
 
-          const trigger = trainingCloseTrigger(position, effectivePrice, detailPayload, settings);
+          const trigger = trainingCloseTrigger(
+            position,
+            effectivePrice,
+            detailPayload,
+            settings,
+            { source: isCrypto(symbol) ? "binance" : "twelve" }
+          );
           if (!trigger) return;
 
           const closed = await withTimeout(
-            closeTrainingPosition(env, position, trigger.exitPrice, trigger.type, detailPayload),
+            closeTrainingPosition(env, position, trigger.exitPrice, trigger.type, detailPayload, trigger),
             8000, `close:${symbol}`
           );
-          log.closed.push({ symbol, trade_id: closed.id, close_type: trigger.type, exit_price: closed.exit_price, pnl: closed.pnl, pnl_pct: closed.pnl_pct, price_source: priceSource });
+          log.closed.push({
+            symbol, trade_id: closed.id, close_type: trigger.type,
+            exit_price: closed.exit_price, pnl: closed.pnl, pnl_pct: closed.pnl_pct,
+            price_source: priceSource,
+            intraday_detected: !!trigger.intradayDetected,
+            execution_assumption: trigger.executionAssumption || null
+          });
         } catch (e) {
           log.errors.push({ phase: "close", symbol, error: e.message });
           // continue — les autres fermetures ne sont pas bloquées (Promise.all
@@ -3587,7 +3740,21 @@ async function handleTrainingAutoCycle(env) {
         const rows = await buildOpportunityRowsForTraining(env);
         // PR #6 Phase 2 — pré-fetch les ajustements actifs une fois par cycle
         const activeAdjustments = await resolveActiveAdjustments(env).catch(() => null);
-        const candidates = rows.filter(row => isTrainingCandidateAllowed(row, settings, openRows, riskState, newsWindow, activeAdjustments));
+        // PR #10 — pré-fetch les symboles en cooldown post-stop. Une seule
+        // requête Supabase pour tout le batch.
+        const cooldownHours = Number(settings?.post_stop_cooldown_hours);
+        const cooldownSet = (Number.isFinite(cooldownHours) && cooldownHours > 0)
+          ? await lookupRecentStopsForSymbol(env, cooldownHours).catch(() => new Set())
+          : new Set();
+        const candidates = rows.filter(row => isTrainingCandidateAllowed(
+          row, settings, openRows, riskState, newsWindow, activeAdjustments, cooldownSet
+        ));
+        if (cooldownSet.size > 0) {
+          await logTrainingEvent(env, "cooldown_active", {
+            hours: cooldownHours,
+            blocked_symbols: Array.from(cooldownSet).slice(0, 20)
+          }).catch(() => {});
+        }
 
         let availableCash = Number(settings.capital_base || 0) - openRows.reduce((acc, row) => acc + (Number(row?.invested || row?.execution?.invested || 0) || 0), 0);
 
@@ -3910,6 +4077,8 @@ function normalizeTrainingSettingsRow(row) {
     allowed_symbols: Array.isArray(safe.allowed_symbols) ? safe.allowed_symbols.map(x => parseSymbol(x)).filter(Boolean).slice(0, 100) : base.allowed_symbols,
     allowed_setups: Array.isArray(safe.allowed_setups) ? safe.allowed_setups : base.allowed_setups,
     mean_reversion_enabled: coerceBoolean(safe.mean_reversion_enabled, base.mean_reversion_enabled),
+    require_structural_setup: coerceBoolean(safe.require_structural_setup, base.require_structural_setup),
+    post_stop_cooldown_hours: clampInt(safe.post_stop_cooldown_hours, 0, 720, base.post_stop_cooldown_hours),
     max_daily_loss_pct: clampFloat(safe.max_daily_loss_pct, 0.001, 1.0, base.max_daily_loss_pct),
     max_weekly_loss_pct: clampFloat(safe.max_weekly_loss_pct, 0.001, 1.0, base.max_weekly_loss_pct),
     max_consecutive_losses: clampInt(safe.max_consecutive_losses, 1, 9999, base.max_consecutive_losses),
@@ -4112,16 +4281,103 @@ function chooseTrainingExecution(payload, settings, currentAvailableCash, active
   return { side, entryPrice: price, quantity, invested: quantity * price, stopLoss, takeProfit, rr };
 }
 
-function trainingCloseTrigger(position, livePrice, detailPayload, settings) {
+function trainingCloseTrigger(position, livePrice, detailPayload, settings, intradayContext = null) {
   const safePrice = finiteOrNull(livePrice);
   const side = String(position?.side || position?.direction || "").toLowerCase();
   const stopLoss = finiteOrNull(position?.stop_loss ?? position?.stopLoss ?? position?.analysis_snapshot?.stopLoss);
   const takeProfit = finiteOrNull(position?.take_profit ?? position?.takeProfit ?? position?.analysis_snapshot?.takeProfit);
   if (!Number.isFinite(safePrice) || !["long","short"].includes(side)) return null;
-  if (side === "long" && Number.isFinite(stopLoss) && safePrice <= stopLoss) return { type: "stop_loss", exitPrice: stopLoss };
-  if (side === "long" && Number.isFinite(takeProfit) && safePrice >= takeProfit) return { type: "take_profit", exitPrice: takeProfit };
-  if (side === "short" && Number.isFinite(stopLoss) && safePrice >= stopLoss) return { type: "stop_loss", exitPrice: stopLoss };
-  if (side === "short" && Number.isFinite(takeProfit) && safePrice <= takeProfit) return { type: "take_profit", exitPrice: takeProfit };
+
+  // Détection stop/TP intraday — paper trading réaliste.
+  //
+  // Avant : on comparait juste `livePrice` (snapshot du moment) avec stop/TP.
+  //         Si le prix faisait l'aller-retour entre deux cycles cron (touche
+  //         stop intra-jour puis remonte au-dessus avant le tick suivant), le
+  //         bot ratait la fermeture. En réel, un broker exécute l'ordre dès
+  //         que le prix coupe le niveau.
+  // Maintenant : on utilise `live.highSinceOpen` / `live.lowSinceOpen` qui
+  //         agrègent les bornes intraday (peuplés par updatePositionIntraExcursion
+  //         à chaque cycle). C'est l'équivalent paper d'un ordre stop/TP en
+  //         attente chez le broker.
+  //
+  // Règle prudente quand stop ET TP sont touchés dans la même fenêtre intra
+  // (donc dans la même bougie agrégée par notre tracker) :
+  //   - long  : on considère le stop touché d'abord ;
+  //   - short : on considère le stop touché d'abord ;
+  // Aucune source ne nous donne l'ordre intra-bougie de façon fiable, donc
+  // hypothèse défavorable au bot → exit_reason = "ambiguous_intraday_stop_first".
+  //
+  // Sources :
+  //   - crypto  : Binance (déjà fournit le live, donc high/low sont tracés
+  //               par updatePositionIntraExcursion).
+  //   - actions : Twelve Data / Yahoo via le même mécanisme.
+  //   - Si position.live.highSinceOpen / lowSinceOpen est absent (clôture
+  //     pendant le tout premier cycle), on retombe sur le compare scalaire
+  //     historique avec safePrice.
+  const intraHigh = finiteOrNull(position?.live?.highSinceOpen);
+  const intraLow  = finiteOrNull(position?.live?.lowSinceOpen);
+  const hasIntra = Number.isFinite(intraHigh) && Number.isFinite(intraLow);
+  const intradaySource = intradayContext?.source || position?.live?.intradaySource || (hasIntra ? "live_tracker" : null);
+
+  if (hasIntra) {
+    let stopTouched = false;
+    let tpTouched = false;
+    if (side === "long") {
+      stopTouched = Number.isFinite(stopLoss) && intraLow  <= stopLoss;
+      tpTouched   = Number.isFinite(takeProfit) && intraHigh >= takeProfit;
+    } else {
+      stopTouched = Number.isFinite(stopLoss) && intraHigh >= stopLoss;
+      tpTouched   = Number.isFinite(takeProfit) && intraLow  <= takeProfit;
+    }
+    if (stopTouched && tpTouched) {
+      // Hypothèse prudente : stop d'abord.
+      return {
+        type: "stop_loss",
+        exitPrice: stopLoss,
+        intradayDetected: true,
+        intradayHigh: intraHigh,
+        intradayLow: intraLow,
+        intradaySource,
+        executionAssumption: "ambiguous_intraday_stop_first"
+      };
+    }
+    if (stopTouched) {
+      return {
+        type: "stop_loss",
+        exitPrice: stopLoss,
+        intradayDetected: true,
+        intradayHigh: intraHigh,
+        intradayLow: intraLow,
+        intradaySource,
+        executionAssumption: "intraday_low_breach"
+      };
+    }
+    if (tpTouched) {
+      return {
+        type: "take_profit",
+        exitPrice: takeProfit,
+        intradayDetected: true,
+        intradayHigh: intraHigh,
+        intradayLow: intraLow,
+        intradaySource,
+        executionAssumption: "intraday_high_breach"
+      };
+    }
+  } else {
+    // Fallback historique (compare scalaire) si on n'a pas encore d'intra.
+    if (side === "long" && Number.isFinite(stopLoss) && safePrice <= stopLoss) {
+      return { type: "stop_loss", exitPrice: stopLoss, intradaySource: "snapshot_unavailable" };
+    }
+    if (side === "long" && Number.isFinite(takeProfit) && safePrice >= takeProfit) {
+      return { type: "take_profit", exitPrice: takeProfit, intradaySource: "snapshot_unavailable" };
+    }
+    if (side === "short" && Number.isFinite(stopLoss) && safePrice >= stopLoss) {
+      return { type: "stop_loss", exitPrice: stopLoss, intradaySource: "snapshot_unavailable" };
+    }
+    if (side === "short" && Number.isFinite(takeProfit) && safePrice <= takeProfit) {
+      return { type: "take_profit", exitPrice: takeProfit, intradaySource: "snapshot_unavailable" };
+    }
+  }
 
   const openedMs = new Date(position?.opened_at ?? position?.openedAt ?? position?.execution?.openedAt ?? 0).getTime();
   const maxHoldingMs = Math.max(1, Number(settings?.max_holding_hours || 240)) * 60 * 60 * 1000;
@@ -4227,7 +4483,7 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
   };
 }
 
-async function closeTrainingPosition(env, position, exitPrice, closeType, detailPayload) {
+async function closeTrainingPosition(env, position, exitPrice, closeType, detailPayload, triggerMeta = null) {
   const closedRow = buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload);
   // Propager intra-high/low au trade clos (utilisé par captureTradeFeedback)
   const positionLive = position?.live || {};
@@ -4236,6 +4492,26 @@ async function closeTrainingPosition(env, position, exitPrice, closeType, detail
     highSinceOpen: finiteOrNull(positionLive.highSinceOpen),
     lowSinceOpen: finiteOrNull(positionLive.lowSinceOpen)
   };
+  // Métadonnée intraday du déclencheur (stop_loss / take_profit détecté via
+  // les bornes intra-trade, vs simple snapshot). Permet à l'historique et à
+  // l'analyse post-trade de distinguer une vraie fermeture intraday d'une
+  // fermeture sur close daily.
+  if (triggerMeta && (triggerMeta.intradayDetected || triggerMeta.intradaySource || triggerMeta.executionAssumption)) {
+    const existingSnapshot = closedRow.analysis_snapshot && typeof closedRow.analysis_snapshot === "object"
+      ? closedRow.analysis_snapshot
+      : {};
+    closedRow.analysis_snapshot = {
+      ...existingSnapshot,
+      intraday: {
+        detected: !!triggerMeta.intradayDetected,
+        source: triggerMeta.intradaySource || null,
+        high: finiteOrNull(triggerMeta.intradayHigh),
+        low: finiteOrNull(triggerMeta.intradayLow),
+        executionAssumption: triggerMeta.executionAssumption || null,
+        detectedAt: nowIso()
+      }
+    };
+  }
   await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -4245,9 +4521,15 @@ async function closeTrainingPosition(env, position, exitPrice, closeType, detail
     method: "DELETE",
     headers: { Prefer: "return=minimal" }
   });
-  await logTrainingEvent(env, "trade_closed", { id: closedRow.id, trade_id: closedRow.id, symbol: closedRow.symbol, close_type: closeType, exit_price: closedRow.exit_price, pnl: closedRow.pnl, pnl_pct: closedRow.pnl_pct });
+  await logTrainingEvent(env, "trade_closed", {
+    id: closedRow.id, trade_id: closedRow.id, symbol: closedRow.symbol,
+    close_type: closeType, exit_price: closedRow.exit_price,
+    pnl: closedRow.pnl, pnl_pct: closedRow.pnl_pct,
+    intraday_detected: !!triggerMeta?.intradayDetected,
+    execution_assumption: triggerMeta?.executionAssumption || null
+  });
   try {
-    await captureTradeFeedback(env, closedRow, position, closeType);
+    await captureTradeFeedback(env, closedRow, position, closeType, triggerMeta);
   } catch (e) {
     console.error("captureTradeFeedback failed:", e.message);
   }
@@ -4344,14 +4626,20 @@ function computeTradeExcursion(closedRow, position) {
   return { maePct, mfePct };
 }
 
-function resolveExitReason(closeType) {
+function resolveExitReason(closeType, triggerMeta = null) {
   const t = String(closeType || "").toLowerCase();
+  // Cas ambigu : stop ET TP touchés dans la même fenêtre intraday → on remonte
+  // l'hypothèse prudente ("stop d'abord") jusqu'au feedback, pour pouvoir
+  // l'isoler dans l'analyse post-trade.
+  if (triggerMeta?.executionAssumption === "ambiguous_intraday_stop_first") {
+    return "ambiguous_intraday_stop_first";
+  }
   if (t === "stop_loss" || t === "take_profit" || t === "time_exit"
    || t === "engine_invalidation" || t === "manual") return t;
   return "unknown";
 }
 
-async function captureTradeFeedback(env, closedRow, position, closeType) {
+async function captureTradeFeedback(env, closedRow, position, closeType, triggerMeta = null) {
   if (!supabaseConfigured(env)) return null;
   const tradeId = String(closedRow?.id || "");
   if (!tradeId) return null;
@@ -4401,7 +4689,12 @@ async function captureTradeFeedback(env, closedRow, position, closeType) {
     direction: side === "short" ? "short" : "long",
     regime_at_open: regimeAtOpen,
     regime_at_close: regimeAtClose,
-    exit_reason: resolveExitReason(closeType ?? closedRow?.closed_execution?.closeType),
+    exit_reason: resolveExitReason(closeType ?? closedRow?.closed_execution?.closeType, triggerMeta),
+    intraday_detected: !!triggerMeta?.intradayDetected,
+    intraday_source: triggerMeta?.intradaySource || null,
+    intraday_high: finiteOrNull(triggerMeta?.intradayHigh),
+    intraday_low: finiteOrNull(triggerMeta?.intradayLow),
+    execution_assumption: triggerMeta?.executionAssumption || null,
     opened_at: openedAt,
     closed_at: closedAt,
     holding_minutes: holdingMinutes,
