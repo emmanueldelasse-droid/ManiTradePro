@@ -4741,6 +4741,7 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
     name: position?.name || parseSymbol(position?.symbol || ""),
     mode: inheritedMode, status: "closed", side: position?.side || null,
     asset_class: position?.asset_class || null,
+    currency: position?.currency || null,
     quantity: finiteOrNull(position?.quantity ?? position?.execution?.quantity),
     entry_price: finiteOrNull(position?.entry_price ?? position?.entryPrice ?? position?.execution?.entryPrice),
     exit_price: finiteOrNull(exitPrice),
