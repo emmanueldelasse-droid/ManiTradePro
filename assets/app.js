@@ -857,13 +857,50 @@
     return isValidEurusdRate(fallbackRate) ? Number(fallbackRate) : 0.92;
   }
 
-  function priceDisplay(vUsd) {
-    if (vUsd == null || Number.isNaN(vUsd)) return "Donnee indisponible";
-    const eur = vUsd * fxRateUsdToEur();
+  // Mappe le symbole vers sa devise de cotation. Miroir front du helper
+  // worker `getCurrencyForSymbol`, utilisé quand le payload ne porte pas le
+  // champ currency (positions persistées avant l'évolution multi-devises).
+  function currencyForSymbol(symbol) {
+    const sym = String(symbol || "").toUpperCase();
+    if (!sym) return "USD";
+    const explicit = {
+      AIR: "EUR", LVMH: "EUR", TTE: "EUR", RMS: "EUR",
+      SAP: "EUR", SIE: "EUR", ASML: "EUR",
+      NESN: "CHF"
+    };
+    if (explicit[sym]) return explicit[sym];
+    const suffixMap = {
+      ".PA": "EUR", ".AS": "EUR", ".MI": "EUR", ".MC": "EUR",
+      ".BR": "EUR", ".LS": "EUR", ".HE": "EUR", ".VI": "EUR",
+      ".XETRA": "EUR", ".DE": "EUR", ".F": "EUR",
+      ".SW": "CHF", ".L": "GBP",
+      ".ST": "SEK", ".OL": "NOK", ".CO": "DKK"
+    };
+    for (const [suffix, currency] of Object.entries(suffixMap)) {
+      if (sym.endsWith(suffix)) return currency;
+    }
+    return "USD";
+  }
+
+  function priceDisplay(value, currency = "USD") {
+    if (value == null || Number.isNaN(value)) return "Donnee indisponible";
     const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
-    if (mode === "EUR") return money(eur, "EUR");
-    if (mode === "USD") return money(vUsd, "USD");
-    return `${money(eur, "EUR")} <span class="muted">(${money(vUsd, "USD")})</span>`;
+    const fx = fxRateUsdToEur();
+    if (currency === "EUR") {
+      const usd = fx > 0 ? value / fx : null;
+      if (mode === "EUR") return money(value, "EUR");
+      if (mode === "USD") return usd != null ? money(usd, "USD") : money(value, "EUR");
+      return usd != null
+        ? `${money(value, "EUR")} <span class="muted">(${money(usd, "USD")})</span>`
+        : money(value, "EUR");
+    }
+    if (currency === "USD" || currency == null) {
+      const eur = value * fx;
+      if (mode === "EUR") return money(eur, "EUR");
+      if (mode === "USD") return money(value, "USD");
+      return `${money(eur, "EUR")} <span class="muted">(${money(value, "USD")})</span>`;
+    }
+    return money(value, currency);
   }
 
   function currencyLabel() {
@@ -1336,12 +1373,12 @@ function renderTradeConfirmModal() {
         <div class="kv" style="margin-top:10px">
           <div class="muted">Actif</div><div>${safeText(d?.symbol || "—")} · ${safeText(d?.name || "")}</div>
           <div class="muted">Sens</div><div>${safeText(simpleSideLabel(side || "long"))}</div>
-          <div class="muted">Entree</div><div>${entry != null ? priceDisplay(entry) : "—"}</div>
+          <div class="muted">Entree</div><div>${entry != null ? priceDisplay(entry, d?.currency) : "—"}</div>
           <div class="muted">Quantite</div><div>${quantity}</div>
-          <div class="muted">Investi</div><div>${entry != null ? priceDisplay(invested) : "—"}</div>
+          <div class="muted">Investi</div><div>${entry != null ? priceDisplay(invested, d?.currency) : "—"}</div>
           <div class="muted">Risque (1%)</div><div class="negative">~${priceDisplay(riskUsd)} USD</div>
-          <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—"}</div>
-          <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—"}</div>
+          <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss, d?.currency) : "—"}</div>
+          <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit, d?.currency) : "—"}</div>
           <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
         </div>
         <div class="plan-reason" style="margin-top:12px">${safeText(reason)}</div>
@@ -1411,6 +1448,7 @@ async function confirmTradeFromModal() {
       name: item?.name || "Nom indisponible",
       assetClass: item?.assetClass || "unknown",
       price: typeof item?.price === "number" ? item.price : null,
+      currency: typeof item?.currency === "string" && item.currency ? item.currency : "USD",
       change24hPct: typeof item?.change24hPct === "number" ? item.change24hPct : null,
       sourceUsed: item?.sourceUsed || null,
       freshness: item?.freshness || "unknown",
@@ -1554,7 +1592,8 @@ async function confirmTradeFromModal() {
   function fireAlertNotification(alert, currentPrice) {
     const dir = alert.condition === "above" ? "⬆ au-dessus de" : "⬇ en-dessous de";
     const title = `◉ Alerte prix — ${alert.symbol}`;
-    const body = `${alert.symbol} est ${dir} ${priceDisplay(alert.targetPrice)}\nActuel : ${priceDisplay(currentPrice)}`;
+    const alertCurrency = currencyForSymbol(alert.symbol);
+    const body = `${alert.symbol} est ${dir} ${priceDisplay(alert.targetPrice, alertCurrency)}\nActuel : ${priceDisplay(currentPrice, alertCurrency)}`;
     sendNotification(title, body, { tag: `alert-${alert.symbol}`, renotify: true, requireInteraction: false });
     showAlertToast(title, body);
   }
@@ -2874,7 +2913,7 @@ function getOpportunityCardViewModel(item) {
     riskBadge: plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "",
     fidelityBadge: badge(fidelityLabel(item), fidelityClass(item)),
     confirmationBadge: confirmationText ? badge(confirmationText, "neutral") : "",
-    priceHtml: item.price != null ? renderPriceStack(item.price) : "Donnee indisponible",
+    priceHtml: item.price != null ? renderPriceStack(item.price, item.currency) : "Donnee indisponible",
     changeClass: item.change24hPct > 0 ? "up" : item.change24hPct < 0 ? "down" : "",
     changeText: pct(item.change24hPct),
     scoreLine
@@ -2897,24 +2936,34 @@ function getDashboardTopViewModel(items) {
 }
 
 
-function displayPrimaryPrice(vUsd) {
-  if (vUsd == null || Number.isNaN(vUsd)) return "Donnee indisponible";
-  const eur = vUsd * fxRateUsdToEur();
+function displayPrimaryPrice(value, currency = "USD") {
+  if (value == null || Number.isNaN(value)) return "Donnee indisponible";
   const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
-  if (mode === "USD") return money(vUsd, "USD");
-  return money(eur, "EUR");
+  const fx = fxRateUsdToEur();
+  if (currency === "EUR") {
+    if (mode === "USD") return fx > 0 ? money(value / fx, "USD") : money(value, "EUR");
+    return money(value, "EUR");
+  }
+  if (currency === "USD" || currency == null) {
+    if (mode === "USD") return money(value, "USD");
+    return money(value * fx, "EUR");
+  }
+  return money(value, currency);
 }
 
-function displaySecondaryPrice(vUsd) {
-  if (vUsd == null || Number.isNaN(vUsd)) return "";
+function displaySecondaryPrice(value, currency = "USD") {
+  if (value == null || Number.isNaN(value)) return "";
   const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
   if (mode === "EUR" || mode === "USD") return "";
-  return money(vUsd, "USD");
+  const fx = fxRateUsdToEur();
+  if (currency === "EUR") return fx > 0 ? money(value / fx, "USD") : "";
+  if (currency === "USD" || currency == null) return money(value, "USD");
+  return "";
 }
 
-function renderPriceStack(vUsd) {
-  const primary = displayPrimaryPrice(vUsd);
-  const secondary = displaySecondaryPrice(vUsd);
+function renderPriceStack(value, currency = "USD") {
+  const primary = displayPrimaryPrice(value, currency);
+  const secondary = displaySecondaryPrice(value, currency);
   if (!secondary) return `<div class="price">${primary}</div>`;
   return `<div class="price-stack" style="display:flex;flex-direction:column;gap:2px;"><div class="price">${primary}</div><div class="muted" style="font-size:12px;">${secondary}</div></div>`;
 }
@@ -3489,9 +3538,9 @@ function renderTradePlanHero(detail, plan) {
       </div>
 
       <div class="grid trades-stats" style="margin-top:16px">
-        ${renderTradePlanStat("Entree", plan?.entry != null ? priceDisplay(plan.entry) : "—", `timing ${simpleTimingLabel(plan)}`)}
-        ${renderTradePlanStat("Stop", plan?.stopLoss != null ? priceDisplay(plan.stopLoss) : "—", stopPct == null ? "niveau de protection" : `${pct(stopPct)} depuis l'entree`)}
-        ${renderTradePlanStat("Objectif", plan?.takeProfit != null ? priceDisplay(plan.takeProfit) : "—", targetPct == null ? "niveau cible" : `${pct(targetPct)} depuis l'entree`)}
+        ${renderTradePlanStat("Entree", plan?.entry != null ? priceDisplay(plan.entry, detail?.currency) : "—", `timing ${simpleTimingLabel(plan)}`)}
+        ${renderTradePlanStat("Stop", plan?.stopLoss != null ? priceDisplay(plan.stopLoss, detail?.currency) : "—", stopPct == null ? "niveau de protection" : `${pct(stopPct)} depuis l'entree`)}
+        ${renderTradePlanStat("Objectif", plan?.takeProfit != null ? priceDisplay(plan.takeProfit, detail?.currency) : "—", targetPct == null ? "niveau cible" : `${pct(targetPct)} depuis l'entree`)}
         ${renderTradePlanStat("Ratio", plan?.rr != null ? safeText(num(plan.rr, 2)) : "—", setupStatus ? setupStatusLabel(setupStatus) : "qualite du setup")}
       </div>
 
@@ -3595,7 +3644,7 @@ function renderDashboard() {
                       </div>
                     </div>
                     <div class="top-pick-metrics dashboard-signal-metrics">
-                      ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price) : "—")}
+                      ${dashboardMetricLine("Prix", topVm.item.price != null ? priceDisplay(topVm.item.price, topVm.item.currency) : "—")}
                       ${dashboardMetricLine("Variation 24h", pct(topVm.item.change24hPct), topVm.changeClass)}
                       ${dashboardMetricLine("Score de surete", topVm.scoreState.score != null ? `${topVm.scoreState.score}/100` : "—", `score-${topVm.scoreState.tone}`)}
                       ${dashboardMetricLine("Source", safeText(topVm.item.sourceUsed || "—"))}
@@ -4159,7 +4208,7 @@ function detailTileValue(kind, plan, detail) {
                     </div>
                   </div>
                   <div>
-                    <div class="detail-price">${d.price != null ? priceDisplay(d.price) : "Donnee indisponible"}</div>
+                    <div class="detail-price">${d.price != null ? priceDisplay(d.price, d.currency) : "Donnee indisponible"}</div>
                     <div class="change ${d.change24hPct > 0 ? 'up' : d.change24hPct < 0 ? 'down' : ''}" style="text-align:right">${pct(d.change24hPct)}</div>
                   </div>
                 </div>
@@ -4519,6 +4568,7 @@ function renderPositionRow(position) {
   const snap = p.analysisSnapshot || {};
   const exec = p.execution || {};
   const live = p.live || {};
+  const posCurrency = p.currency || snap.currency || currencyForSymbol(p.symbol);
 
   const entryPrice = Number(exec.entryPrice ?? snap.entry ?? p.entryPrice);
   const stopPrice  = Number(snap.stopLoss ?? p.stopLoss ?? 0);
@@ -4583,12 +4633,12 @@ function renderPositionRow(position) {
     <div class="pos-prices">
       <div class="pos-price-item">
         <div class="pos-price-label">Entrée</div>
-        <div class="pos-price-val">${hasEntry ? priceDisplay(entryPrice) : "—"}</div>
+        <div class="pos-price-val">${hasEntry ? priceDisplay(entryPrice, posCurrency) : "—"}</div>
       </div>
       <div class="pos-price-arrow">${hasLive && hasEntry ? (livePrice >= entryPrice ? "↑" : "↓") : "→"}</div>
       <div class="pos-price-item">
         <div class="pos-price-label">Actuel ${lastLive ? `· ${lastLive}` : ""}</div>
-        <div class="pos-price-val ${hasLive && hasEntry ? (livePrice >= entryPrice ? "live-up" : "live-down") : ""}">${hasLive ? priceDisplay(livePrice) : "—"}</div>
+        <div class="pos-price-val ${hasLive && hasEntry ? (livePrice >= entryPrice ? "live-up" : "live-down") : ""}">${hasLive ? priceDisplay(livePrice, posCurrency) : "—"}</div>
       </div>
       <div class="pos-market-badge">${renderMarketBadge(p.symbol, p.assetClass)}</div>
     </div>
@@ -4596,7 +4646,7 @@ function renderPositionRow(position) {
     <div class="pos-levels">
       <div class="pos-level">
         <span class="pos-level-label">Stop</span>
-        <span class="pos-level-val">${hasStop ? priceDisplay(stopPrice) : "—"}</span>
+        <span class="pos-level-val">${hasStop ? priceDisplay(stopPrice, posCurrency) : "—"}</span>
         ${stopDistPct != null ? `<span class="pos-level-dist ${Math.abs(stopDistPct) < 2 ? "danger" : "warn"}">${pct(stopDistPct, 1)}</span>` : ""}
       </div>
       <div class="pos-level center">
@@ -4605,7 +4655,7 @@ function renderPositionRow(position) {
       </div>
       <div class="pos-level right">
         <span class="pos-level-label">Objectif</span>
-        <span class="pos-level-val">${hasTP ? priceDisplay(tpPrice) : "—"}</span>
+        <span class="pos-level-val">${hasTP ? priceDisplay(tpPrice, posCurrency) : "—"}</span>
         ${tpDistPct != null ? `<span class="pos-level-dist green">${pct(tpDistPct, 1)}</span>` : ""}
       </div>
     </div>
@@ -4668,6 +4718,7 @@ function renderHistoryRow(item) {
     const scoreValue = displayScoreValue(p);
     const entryPrice = displayHistoryEntryPrice(p);
     const exitPrice = displayHistoryExitPrice(p);
+    const histCurrency = p.currency || p.analysisSnapshot?.currency || currencyForSymbol(p.symbol);
     const closedAt = displayHistoryClosedAt(p);
     const openedAt = p?.execution?.openedAt || p?.openedAt || null;
     const entryMode = trainingEntryModeMeta(p);
@@ -4690,8 +4741,8 @@ function renderHistoryRow(item) {
         </div>
         <div>${badge(simpleSideLabel(p.side), p.side)}</div>
         <div>${badge(historyResultLabel(p), (pnl >= 0 ? "positive" : "negative"))}</div>
-        <div>${entryPrice == null ? "—" : priceDisplay(entryPrice)}</div>
-        <div>${exitPrice == null ? "—" : priceDisplay(exitPrice)}</div>
+        <div>${entryPrice == null ? "—" : priceDisplay(entryPrice, histCurrency)}</div>
+        <div>${exitPrice == null ? "—" : priceDisplay(exitPrice, histCurrency)}</div>
         <div class="${pnl >= 0 ? 'positive' : 'negative'}">${money(pnl * fxRateUsdToEur(), "EUR")} · ${pnlPctValue == null ? "—" : pct(pnlPctValue)}</div>
         <div>${safeText(scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`)}</div>
         <div>${safeText(displayHistorySourceOrClosure(p))}</div>
@@ -5693,7 +5744,7 @@ function openPositionsRiskView() {
         <div class="alert-row ${a.active ? "" : "alert-triggered"}">
           <div class="alert-row-info">
             <div class="alert-symbol">${safeText(a.symbol)}</div>
-            <div class="alert-cond">${dir} ${priceDisplay(a.targetPrice)}</div>
+            <div class="alert-cond">${dir} ${priceDisplay(a.targetPrice, currencyForSymbol(a.symbol))}</div>
             <div class="alert-meta">${safeText(a.name)} · ${ago}</div>
           </div>
           ${a.active ? `<button class="btn btn-secondary alert-remove-btn" data-remove-alert="${a.id}">Suppr.</button>` : `<span class="badge badge-positive">OK</span>`}
@@ -5733,12 +5784,12 @@ function openPositionsRiskView() {
       <div class="modal-overlay" id="alert-modal-overlay" data-close-modal="alert">
         <div class="modal-box pin-modal">
           <div class="modal-title">Alerte prix — ${safeText(symbol)}</div>
-          <div class="modal-desc">${safeText(name)}${currentPrice != null ? ` · Prix actuel\u00a0: ${priceDisplay(currentPrice)}` : ""}</div>
+          <div class="modal-desc">${safeText(name)}${currentPrice != null ? ` · Prix actuel\u00a0: ${priceDisplay(currentPrice, currencyForSymbol(symbol))}` : ""}</div>
           <select class="setting-input" id="alert-condition" style="margin-bottom:10px">
             <option value="above">Au-dessus de</option>
             <option value="below">En-dessous de</option>
           </select>
-          <input class="setting-input pin-input" type="number" inputmode="decimal" id="alert-target-price" placeholder="Prix cible (USD)" step="any" ${currentPrice != null ? `value="${currentPrice}"` : ""}>
+          <input class="setting-input pin-input" type="number" inputmode="decimal" id="alert-target-price" placeholder="Prix cible (${safeText(currencyForSymbol(symbol))})" step="any" ${currentPrice != null ? `value="${currentPrice}"` : ""}>
           <div class="modal-actions">
             <button class="btn btn-secondary" data-alert-cancel>Annuler</button>
             <button class="btn btn-primary" data-alert-submit>Creer l'alerte</button>
@@ -5831,7 +5882,8 @@ function openPositionsRiskView() {
       summary = `Cycle — ouvert ${o} · fermé ${c} · ignoré ${s}${er ? ` · erreurs ${er}` : ""}`;
       badgeClass = o > 0 ? "positive" : c > 0 ? "neutral" : "neutral";
     } else if (type === "trade_opened") {
-      summary = `Ouverture ${safeText(ev.symbol || "")} @ ${priceDisplay(payload.entry_price)} · stop ${priceDisplay(payload.stop_loss)} · cible ${priceDisplay(payload.take_profit)}`;
+      const evCurrency = currencyForSymbol(ev.symbol);
+      summary = `Ouverture ${safeText(ev.symbol || "")} @ ${priceDisplay(payload.entry_price, evCurrency)} · stop ${priceDisplay(payload.stop_loss, evCurrency)} · cible ${priceDisplay(payload.take_profit, evCurrency)}`;
       badgeClass = "long";
     } else if (type === "trade_closed") {
       const pnlPct = Number(payload.pnl_pct || 0);
@@ -6635,7 +6687,7 @@ function openPositionsRiskView() {
         <div class="alert-row ${a.active ? "" : "alert-triggered"}">
           <div class="alert-row-info">
             <div class="alert-symbol">${safeText(a.symbol)}</div>
-            <div class="alert-cond">${dir} ${priceDisplay(a.targetPrice)}</div>
+            <div class="alert-cond">${dir} ${priceDisplay(a.targetPrice, currencyForSymbol(a.symbol))}</div>
             <div class="alert-meta">${safeText(a.name)} · ${ago}</div>
           </div>
           ${a.active ? `<button class="btn btn-secondary alert-remove-btn" data-remove-alert="${a.id}">Suppr.</button>` : `<span class="badge badge-positive">OK</span>`}
