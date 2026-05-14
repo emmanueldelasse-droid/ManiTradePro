@@ -1116,6 +1116,53 @@ async function getEodhdCandlesWithKV(symbol, timeframe, limit, env, ctx = null) 
   }, env);
 }
 
+// Probe diagnostique EODHD. Renvoie la réponse brute pour comprendre pourquoi
+// un symbole n'est pas couvert (mapping incorrect, plan insuffisant, ticker
+// inexistant chez EODHD, etc.). Bypass total du cache.
+//
+// La clé EODHD n'est JAMAIS exposée dans la réponse — seulement les 200
+// premiers caractères du corps brut (suffisants pour voir un message d'erreur
+// JSON ou les premières bougies d'un array OK).
+async function handleEodhdProbe(symbol, env) {
+  const tdSymbol = normalizeEodhdSymbol(symbol);
+  if (!eodhdConfigured(env)) {
+    return json({ status: "error", symbol, eodhdSymbol: tdSymbol, message: "EODHD_API_KEY absent" }, 400);
+  }
+  if (!tdSymbol) {
+    return json({ status: "error", symbol, eodhdSymbol: null, message: "no_mapping" }, 400);
+  }
+  const url = `https://eodhistoricaldata.com/api/eod/${encodeURIComponent(tdSymbol)}?api_token=${encodeURIComponent(env.EODHD_API_KEY)}&period=d&fmt=json&order=a`;
+  try {
+    const res = await fetchWithRetry(
+      url,
+      { headers: { Accept: "application/json" } },
+      { timeoutMs: 9000, maxRetries: 1, backoffMs: 500 }
+    );
+    const text = await res.text();
+    let parsed = null;
+    try { parsed = JSON.parse(text); } catch {}
+    return json({
+      status: "ok",
+      symbol,
+      eodhdSymbol: tdSymbol,
+      httpStatus: res.status,
+      responseSize: text.length,
+      isArray: Array.isArray(parsed),
+      arrayLength: Array.isArray(parsed) ? parsed.length : null,
+      firstCandle: Array.isArray(parsed) && parsed.length ? parsed[0] : null,
+      lastCandle: Array.isArray(parsed) && parsed.length ? parsed[parsed.length - 1] : null,
+      errorOrShape: !Array.isArray(parsed) ? text.slice(0, 300) : null
+    });
+  } catch (e) {
+    return json({
+      status: "error",
+      symbol,
+      eodhdSymbol: tdSymbol,
+      message: String(e?.message || e)
+    });
+  }
+}
+
 // ============================================================
 // EURUSD RATE — pour conversion front
 // ============================================================
@@ -8970,6 +9017,12 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleBackfillPnl(env));
+    }
+    if (url.pathname.startsWith("/api/admin/eodhd-probe/")) {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      const symbol = decodeURIComponent(url.pathname.replace("/api/admin/eodhd-probe/", ""));
+      return safeRoute(() => handleEodhdProbe(symbol, env));
     }
     if (url.pathname === "/api/admin/backtest-run") {
       const denied = await requireAdminAccess(request, env);
