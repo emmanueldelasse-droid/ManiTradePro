@@ -1627,7 +1627,18 @@ async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) 
       try {
         quote = await getYahooQuoteFromChart(clean);
       } catch {
-        // Yahoo KO (429, timeout, etc.) — on tente Twelve.
+        // Yahoo KO (429, timeout, etc.) — on tente EODHD différé.
+      }
+    }
+    // Filet EODHD différé (15 min sur EU) — mieux qu'un snapshot EOD.
+    // Permet à AIR/RMS/LVMH d'avoir un prix live même quand Yahoo
+    // refuse les requêtes (rate-limit, panne ponctuelle).
+    if (!quote && !isUsListing && eodhdConfigured(env)) {
+      try {
+        const batch = await getEodhdRealTimeBatchQuotes([clean], env);
+        if (batch[clean]) quote = batch[clean];
+      } catch {
+        // EODHD KO aussi.
       }
     }
     if (!quote && !circuitIsOpen("twelvedata")) {
