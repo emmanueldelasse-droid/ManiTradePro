@@ -882,25 +882,39 @@
     return "USD";
   }
 
+  // Taux de conversion approximatifs vers l'euro pour les devises secondaires
+  // (CHF Nestlé, GBP actions UK, scandinaves). Valeurs proches du marché
+  // long terme — la conversion sert uniquement à présenter un ordre de
+  // grandeur cohérent en EUR primaire. Si on veut un taux exact temps réel,
+  // il faudra brancher un endpoint FX dédié.
+  const FX_TO_EUR = { EUR: 1, USD: null, CHF: 1.05, GBP: 1.17, SEK: 0.087, NOK: 0.084, DKK: 0.134 };
+
+  function toEurAndUsd(value, currency) {
+    const fx = fxRateUsdToEur();
+    if (currency === "EUR") {
+      return { eur: value, usd: fx > 0 ? value / fx : null };
+    }
+    if (currency === "USD" || currency == null) {
+      return { eur: value * fx, usd: value };
+    }
+    const r = FX_TO_EUR[currency];
+    if (r) {
+      const eur = value * r;
+      return { eur, usd: fx > 0 ? eur / fx : null };
+    }
+    return { eur: null, usd: null };
+  }
+
   function priceDisplay(value, currency = "USD") {
     if (value == null || Number.isNaN(value)) return "Donnee indisponible";
     const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
-    const fx = fxRateUsdToEur();
-    if (currency === "EUR") {
-      const usd = fx > 0 ? value / fx : null;
-      if (mode === "EUR") return money(value, "EUR");
-      if (mode === "USD") return usd != null ? money(usd, "USD") : money(value, "EUR");
-      return usd != null
-        ? `${money(value, "EUR")} <span class="muted">(${money(usd, "USD")})</span>`
-        : money(value, "EUR");
-    }
-    if (currency === "USD" || currency == null) {
-      const eur = value * fx;
-      if (mode === "EUR") return money(eur, "EUR");
-      if (mode === "USD") return money(value, "USD");
-      return `${money(eur, "EUR")} <span class="muted">(${money(value, "USD")})</span>`;
-    }
-    return money(value, currency);
+    const { eur, usd } = toEurAndUsd(value, currency);
+    if (eur == null) return money(value, currency);
+    if (mode === "EUR") return money(eur, "EUR");
+    if (mode === "USD") return usd != null ? money(usd, "USD") : money(eur, "EUR");
+    return usd != null
+      ? `${money(eur, "EUR")} <span class="muted">(${money(usd, "USD")})</span>`
+      : money(eur, "EUR");
   }
 
   function currencyLabel() {
@@ -1376,7 +1390,7 @@ function renderTradeConfirmModal() {
           <div class="muted">Entree</div><div>${entry != null ? priceDisplay(entry, d?.currency) : "—"}</div>
           <div class="muted">Quantite</div><div>${quantity}</div>
           <div class="muted">Investi</div><div>${entry != null ? priceDisplay(invested, d?.currency) : "—"}</div>
-          <div class="muted">Risque (1%)</div><div class="negative">~${priceDisplay(riskUsd)} USD</div>
+          <div class="muted">Risque (1%)</div><div class="negative">~${priceDisplay(riskUsd, "USD")}</div>
           <div class="muted">Stop</div><div>${plan?.stopLoss != null ? priceDisplay(plan.stopLoss, d?.currency) : "—"}</div>
           <div class="muted">Objectif</div><div>${plan?.takeProfit != null ? priceDisplay(plan.takeProfit, d?.currency) : "—"}</div>
           <div class="muted">Ratio</div><div>${plan?.rr != null ? num(plan.rr, 2) : "—"}</div>
@@ -2939,26 +2953,18 @@ function getDashboardTopViewModel(items) {
 function displayPrimaryPrice(value, currency = "USD") {
   if (value == null || Number.isNaN(value)) return "Donnee indisponible";
   const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
-  const fx = fxRateUsdToEur();
-  if (currency === "EUR") {
-    if (mode === "USD") return fx > 0 ? money(value / fx, "USD") : money(value, "EUR");
-    return money(value, "EUR");
-  }
-  if (currency === "USD" || currency == null) {
-    if (mode === "USD") return money(value, "USD");
-    return money(value * fx, "EUR");
-  }
-  return money(value, currency);
+  const { eur, usd } = toEurAndUsd(value, currency);
+  if (eur == null) return money(value, currency);
+  if (mode === "USD") return usd != null ? money(usd, "USD") : money(eur, "EUR");
+  return money(eur, "EUR");
 }
 
 function displaySecondaryPrice(value, currency = "USD") {
   if (value == null || Number.isNaN(value)) return "";
   const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
   if (mode === "EUR" || mode === "USD") return "";
-  const fx = fxRateUsdToEur();
-  if (currency === "EUR") return fx > 0 ? money(value / fx, "USD") : "";
-  if (currency === "USD" || currency == null) return money(value, "USD");
-  return "";
+  const { usd } = toEurAndUsd(value, currency);
+  return usd != null ? money(usd, "USD") : "";
 }
 
 function renderPriceStack(value, currency = "USD") {
@@ -4625,7 +4631,7 @@ function renderPositionRow(position) {
       <div class="pos-header-right">
         ${badge(simpleSideLabel(p.side), p.side)}
         ${pnlPct != null
-          ? `<div class="pos-pnl ${pnlPositive ? "pos" : "neg"}">${pnlEur != null ? money(pnlEur, "EUR") + " · " : ""}${pct(pnlPct)}</div>`
+          ? `<div class="pos-pnl ${pnlPositive ? "pos" : "neg"}">${pnlEur != null ? priceDisplay(pnlEur, "EUR") + " · " : ""}${pct(pnlPct)}</div>`
           : `<div class="pos-pnl neutral">P/L —</div>`}
       </div>
     </div>
@@ -4743,7 +4749,7 @@ function renderHistoryRow(item) {
         <div>${badge(historyResultLabel(p), (pnl >= 0 ? "positive" : "negative"))}</div>
         <div>${entryPrice == null ? "—" : priceDisplay(entryPrice, histCurrency)}</div>
         <div>${exitPrice == null ? "—" : priceDisplay(exitPrice, histCurrency)}</div>
-        <div class="${pnl >= 0 ? 'positive' : 'negative'}">${money(pnl * fxRateUsdToEur(), "EUR")} · ${pnlPctValue == null ? "—" : pct(pnlPctValue)}</div>
+        <div class="${pnl >= 0 ? 'positive' : 'negative'}">${priceDisplay(pnl, "USD")} · ${pnlPctValue == null ? "—" : pct(pnlPctValue)}</div>
         <div>${safeText(scoreValue == null ? "—" : `${num(scoreValue, 0)}/100`)}</div>
         <div>${safeText(displayHistorySourceOrClosure(p))}</div>
       </div>`;
@@ -5466,19 +5472,19 @@ function openPositionsRiskView() {
         </div>
 
         <div class="perf-stats-grid">
-          ${pStat("P&amp;L total", `${totalPnlEur >= 0 ? "+" : ""}${money(totalPnlEur, "EUR")}`, totalPnlEur >= 0 ? "positive" : "negative")}
+          ${pStat("P&amp;L total", `${totalPnlEur >= 0 ? "+" : ""}${priceDisplay(totalPnlEur, "EUR")}`, totalPnlEur >= 0 ? "positive" : "negative")}
           ${pStat("Win rate", winRate != null ? `${num(winRate, 1)}%` : "—", winRate != null && winRate >= 50 ? "positive" : "negative")}
           ${pStat("Trades fermés", String(closed.length))}
           ${pStat("Ratio R:R", rrRatio != null ? num(rrRatio, 2) : "—", rrRatio != null && rrRatio >= 1.5 ? "positive" : "")}
-          ${pStat("Gain moyen", avgWinUsd != null ? `+${money(avgWinUsd * fx, "EUR")}` : "—", "positive")}
-          ${pStat("Perte moyenne", avgLossUsd != null ? money(avgLossUsd * fx, "EUR") : "—", "negative")}
-          ${pStat("Espérance/trade", expectancy != null ? `${expectancy >= 0 ? "+" : ""}${money(expectancy * fx, "EUR")}` : "—", expectancy != null && expectancy >= 0 ? "positive" : "negative")}
+          ${pStat("Gain moyen", avgWinUsd != null ? `+${priceDisplay(avgWinUsd, "USD")}` : "—", "positive")}
+          ${pStat("Perte moyenne", avgLossUsd != null ? priceDisplay(avgLossUsd, "USD") : "—", "negative")}
+          ${pStat("Espérance/trade", expectancy != null ? `${expectancy >= 0 ? "+" : ""}${priceDisplay(expectancy, "USD")}` : "—", expectancy != null && expectancy >= 0 ? "positive" : "negative")}
           ${pStat("Positions ouvertes", String(positions.length))}
         </div>
 
         ${spark ? `
         <div class="card perf-curve-card">
-          <div class="section-title"><span>Courbe P&amp;L cumulatif</span><span class="${totalPnlEur >= 0 ? "positive" : "negative"}">${totalPnlEur >= 0 ? "+" : ""}${money(totalPnlEur, "EUR")}</span></div>
+          <div class="section-title"><span>Courbe P&amp;L cumulatif</span><span class="${totalPnlEur >= 0 ? "positive" : "negative"}">${totalPnlEur >= 0 ? "+" : ""}${priceDisplay(totalPnlEur, "EUR")}</span></div>
           <div class="perf-curve-wrap">
             <svg class="perf-curve-svg" viewBox="0 0 400 80" preserveAspectRatio="none" aria-hidden="true">
               <defs><linearGradient id="curveGrad" x1="0" y1="0" x2="0" y2="1">
@@ -5501,12 +5507,12 @@ function openPositionsRiskView() {
           ${best ? `<div class="card perf-extreme-card">
             <div class="perf-extreme-label">Meilleur trade</div>
             <div class="perf-extreme-sym">${safeText(best.symbol || "—")}</div>
-            <div class="perf-extreme-val positive">+${money((best.pnl || 0) * fx, "EUR")}</div>
+            <div class="perf-extreme-val positive">+${priceDisplay(best.pnl || 0, "USD")}</div>
           </div>` : ""}
           ${worst ? `<div class="card perf-extreme-card">
             <div class="perf-extreme-label">Pire trade</div>
             <div class="perf-extreme-sym">${safeText(worst.symbol || "—")}</div>
-            <div class="perf-extreme-val negative">${money((worst.pnl || 0) * fx, "EUR")}</div>
+            <div class="perf-extreme-val negative">${priceDisplay(worst.pnl || 0, "USD")}</div>
           </div>` : ""}
         </div>` : ""}
 
@@ -5515,12 +5521,12 @@ function openPositionsRiskView() {
           <div class="section-title"><span>Actifs par P&amp;L absolu</span></div>
           <div class="perf-asset-list">
             ${topAssets.map(a => {
-              const pnlEur = a.pnl * fx;
+              const pnlUsd = a.pnl || 0;
               return `<div class="perf-asset-row">
                 <span class="perf-asset-sym">${safeText(a.symbol)}</span>
                 <span class="perf-asset-name">${safeText(a.name)}</span>
                 <span class="perf-asset-count">${a.count} trade${a.count > 1 ? "s" : ""}</span>
-                <span class="perf-asset-pnl ${pnlEur >= 0 ? "positive" : "negative"}">${pnlEur >= 0 ? "+" : ""}${money(pnlEur, "EUR")}</span>
+                <span class="perf-asset-pnl ${pnlUsd >= 0 ? "positive" : "negative"}">${pnlUsd >= 0 ? "+" : ""}${priceDisplay(pnlUsd, "USD")}</span>
               </div>`;
             }).join("")}
           </div>
@@ -5572,23 +5578,23 @@ function openPositionsRiskView() {
           <div class="wallet-strip">
             <div class="wallet-item">
               <div class="wallet-label">Disponible</div>
-              <div class="wallet-val">${money(stats.wallet.availableEur, "EUR")}</div>
+              <div class="wallet-val">${priceDisplay(stats.wallet.availableEur, "EUR")}</div>
             </div>
             <div class="wallet-item">
               <div class="wallet-label">Engagé</div>
-              <div class="wallet-val">${money(stats.wallet.engagedEur, "EUR")}</div>
+              <div class="wallet-val">${priceDisplay(stats.wallet.engagedEur, "EUR")}</div>
             </div>
             <div class="wallet-item">
               <div class="wallet-label">P/L latent</div>
-              <div class="wallet-val ${stats.wallet.unrealizedEur >= 0 ? "positive" : "negative"}">${money(stats.wallet.unrealizedEur, "EUR")}</div>
+              <div class="wallet-val ${stats.wallet.unrealizedEur >= 0 ? "positive" : "negative"}">${priceDisplay(stats.wallet.unrealizedEur, "EUR")}</div>
             </div>
             <div class="wallet-item">
               <div class="wallet-label">P/L réalisé</div>
-              <div class="wallet-val ${stats.wallet.realizedEur >= 0 ? "positive" : "negative"}">${money(stats.wallet.realizedEur, "EUR")}</div>
+              <div class="wallet-val ${stats.wallet.realizedEur >= 0 ? "positive" : "negative"}">${priceDisplay(stats.wallet.realizedEur, "EUR")}</div>
             </div>
             <div class="wallet-item wallet-item-equity">
               <div class="wallet-label">Equity</div>
-              <div class="wallet-val">${money(stats.wallet.equityEur, "EUR")}</div>
+              <div class="wallet-val">${priceDisplay(stats.wallet.equityEur, "EUR")}</div>
             </div>
           </div>
 
@@ -5600,7 +5606,7 @@ function openPositionsRiskView() {
                   <span class="class-perf-dot">●</span>
                   <span class="class-perf-name">Crypto</span>
                   <span class="class-perf-trades">${cryptoStats.closedCount} trades</span>
-                  <span class="class-perf-pnl ${cryptoStats.realizedEur >= 0 ? "positive" : "negative"}">${money(cryptoStats.realizedEur, "EUR")}</span>
+                  <span class="class-perf-pnl ${cryptoStats.realizedEur >= 0 ? "positive" : "negative"}">${priceDisplay(cryptoStats.realizedEur, "EUR")}</span>
                   <span class="class-perf-wr">${cryptoStats.winRate != null ? num(cryptoStats.winRate,0)+"%" : "—"} win</span>
                 </div>
               ` : ""}
@@ -5609,7 +5615,7 @@ function openPositionsRiskView() {
                   <span class="class-perf-dot">●</span>
                   <span class="class-perf-name">Actions/ETF</span>
                   <span class="class-perf-trades">${stockStats.closedCount} trades</span>
-                  <span class="class-perf-pnl ${stockStats.realizedEur >= 0 ? "positive" : "negative"}">${money(stockStats.realizedEur, "EUR")}</span>
+                  <span class="class-perf-pnl ${stockStats.realizedEur >= 0 ? "positive" : "negative"}">${priceDisplay(stockStats.realizedEur, "EUR")}</span>
                   <span class="class-perf-wr">${stockStats.winRate != null ? num(stockStats.winRate,0)+"%" : "—"} win</span>
                 </div>
               ` : ""}
@@ -6099,7 +6105,7 @@ function openPositionsRiskView() {
           <div class="report-head">
             <div>
               <div class="report-title">Semaine ${formatDate(r.week_start)} → ${formatDate(r.week_end)}</div>
-              <div class="report-meta">${Number(stats.total) || 0} trades · ${stats.winRate != null ? Math.round(Number(stats.winRate) * 100) + "% win" : "—"} · <span class="${pnlTone}">${money(pnl, "USD")}</span>${r.corrections_applied ? ` · ${Number(r.corrections_applied) || 0} corr.` : ""} ${statusBadge}</div>
+              <div class="report-meta">${Number(stats.total) || 0} trades · ${stats.winRate != null ? Math.round(Number(stats.winRate) * 100) + "% win" : "—"} · <span class="${pnlTone}">${priceDisplay(pnl, "USD")}</span>${r.corrections_applied ? ` · ${Number(r.corrections_applied) || 0} corr.` : ""} ${statusBadge}</div>
             </div>
             <svg class="report-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="${isOpen ? "18 15 12 9 6 15" : "6 9 12 15 18 9"}"/></svg>
           </div>

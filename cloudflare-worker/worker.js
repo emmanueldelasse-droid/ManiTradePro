@@ -1513,7 +1513,7 @@ async function getAlphaQuote(symbol, env) {
       symbol, name: getDisplayName(symbol), assetClass: getAssetClass(symbol), price,
       change24hPct: row["10. change percent"] ? Number(String(row["10. change percent"]).replace("%","")) : null,
       volume24h: row["06. volume"] ? Number(row["06. volume"]) : null,
-      currency: "USD", sourceUsed: "alphavantage", freshness: "recent"
+      currency: getCurrencyForSymbol(symbol), sourceUsed: "alphavantage", freshness: "recent"
     };
   });
 }
@@ -2826,7 +2826,8 @@ function buildUnavailablePayload(symbol, message = "Source temporairement indisp
   const reason = compactProviderError(message);
   return {
     symbol, name: getDisplayName(symbol), assetClass: getAssetClass(symbol),
-    price: null, change24hPct: null, sourceUsed: null, freshness: "unknown",
+    price: null, change24hPct: null, currency: getCurrencyForSymbol(symbol),
+    sourceUsed: null, freshness: "unknown",
     status: "unavailable", score: null, scoreStatus: "unavailable",
     direction: "neutral", analysisLabel: "Source temporarily unavailable",
     confidence: "low", confidenceLabel: "faible", breakdown: null, candles: [],
