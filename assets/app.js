@@ -882,25 +882,39 @@
     return "USD";
   }
 
+  // Taux de conversion approximatifs vers l'euro pour les devises secondaires
+  // (CHF Nestlé, GBP actions UK, scandinaves). Valeurs proches du marché
+  // long terme — la conversion sert uniquement à présenter un ordre de
+  // grandeur cohérent en EUR primaire. Si on veut un taux exact temps réel,
+  // il faudra brancher un endpoint FX dédié.
+  const FX_TO_EUR = { EUR: 1, USD: null, CHF: 1.05, GBP: 1.17, SEK: 0.087, NOK: 0.084, DKK: 0.134 };
+
+  function toEurAndUsd(value, currency) {
+    const fx = fxRateUsdToEur();
+    if (currency === "EUR") {
+      return { eur: value, usd: fx > 0 ? value / fx : null };
+    }
+    if (currency === "USD" || currency == null) {
+      return { eur: value * fx, usd: value };
+    }
+    const r = FX_TO_EUR[currency];
+    if (r) {
+      const eur = value * r;
+      return { eur, usd: fx > 0 ? eur / fx : null };
+    }
+    return { eur: null, usd: null };
+  }
+
   function priceDisplay(value, currency = "USD") {
     if (value == null || Number.isNaN(value)) return "Donnee indisponible";
     const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
-    const fx = fxRateUsdToEur();
-    if (currency === "EUR") {
-      const usd = fx > 0 ? value / fx : null;
-      if (mode === "EUR") return money(value, "EUR");
-      if (mode === "USD") return usd != null ? money(usd, "USD") : money(value, "EUR");
-      return usd != null
-        ? `${money(value, "EUR")} <span class="muted">(${money(usd, "USD")})</span>`
-        : money(value, "EUR");
-    }
-    if (currency === "USD" || currency == null) {
-      const eur = value * fx;
-      if (mode === "EUR") return money(eur, "EUR");
-      if (mode === "USD") return money(value, "USD");
-      return `${money(eur, "EUR")} <span class="muted">(${money(value, "USD")})</span>`;
-    }
-    return money(value, currency);
+    const { eur, usd } = toEurAndUsd(value, currency);
+    if (eur == null) return money(value, currency);
+    if (mode === "EUR") return money(eur, "EUR");
+    if (mode === "USD") return usd != null ? money(usd, "USD") : money(eur, "EUR");
+    return usd != null
+      ? `${money(eur, "EUR")} <span class="muted">(${money(usd, "USD")})</span>`
+      : money(eur, "EUR");
   }
 
   function currencyLabel() {
@@ -2939,26 +2953,18 @@ function getDashboardTopViewModel(items) {
 function displayPrimaryPrice(value, currency = "USD") {
   if (value == null || Number.isNaN(value)) return "Donnee indisponible";
   const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
-  const fx = fxRateUsdToEur();
-  if (currency === "EUR") {
-    if (mode === "USD") return fx > 0 ? money(value / fx, "USD") : money(value, "EUR");
-    return money(value, "EUR");
-  }
-  if (currency === "USD" || currency == null) {
-    if (mode === "USD") return money(value, "USD");
-    return money(value * fx, "EUR");
-  }
-  return money(value, currency);
+  const { eur, usd } = toEurAndUsd(value, currency);
+  if (eur == null) return money(value, currency);
+  if (mode === "USD") return usd != null ? money(usd, "USD") : money(eur, "EUR");
+  return money(eur, "EUR");
 }
 
 function displaySecondaryPrice(value, currency = "USD") {
   if (value == null || Number.isNaN(value)) return "";
   const mode = state.settings.displayCurrency || "EUR_PLUS_USD";
   if (mode === "EUR" || mode === "USD") return "";
-  const fx = fxRateUsdToEur();
-  if (currency === "EUR") return fx > 0 ? money(value / fx, "USD") : "";
-  if (currency === "USD" || currency == null) return money(value, "USD");
-  return "";
+  const { usd } = toEurAndUsd(value, currency);
+  return usd != null ? money(usd, "USD") : "";
 }
 
 function renderPriceStack(value, currency = "USD") {
