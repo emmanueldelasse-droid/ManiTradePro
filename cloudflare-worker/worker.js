@@ -9439,6 +9439,15 @@ async function validateSymbolOnProviders(symbol, assetClass, env, ctx) {
         const qe = await getEodhdRealTimeBatchQuotes([s], env).catch(() => null);
         if (qe && qe[s] && qe[s].price != null) return { provider: "eodhd" };
       } catch {}
+      // Filet EOD : EODHD /real-time peut renvoyer vide pour SIX Suisse
+      // (ROG.SW) hors heures de bourse alors que l'historique EOD est
+      // bien dispo. On accepte le symbole si on a au moins une bougie
+      // daily — la fiche pourra calculer son analyse à partir des
+      // bougies KV et utiliser Yahoo ou snapshot pour le prix live.
+      try {
+        const candles = await getEodhdCandles(s, "1d", 5, env, ctx).catch(() => null);
+        if (Array.isArray(candles) && candles.length > 0) return { provider: "eodhd" };
+      } catch {}
     }
     try {
       const qy = await getYahooQuote(s).catch(() => null);
