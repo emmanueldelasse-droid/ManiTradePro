@@ -1053,7 +1053,13 @@ function normalizeEodhdSymbol(symbol) {
     ASML:"ASML.AS"
   };
   if (explicit[sym]) return explicit[sym];
-  // Si déjà suffixé (contient un point), on respecte l'input utilisateur.
+  // Si déjà suffixé : on traduit certains suffixes "courants" (Yahoo / TwelveData)
+  // vers la convention EODHD. Yahoo utilise `.DE` pour Xetra et `.L` pour London,
+  // alors qu'EODHD attend `.XETRA` et `.LSE`. Sans ça, BMW.DE et HSBA.L sont
+  // rejetés à la validation alors qu'EODHD a bien la donnée sous BMW.XETRA /
+  // HSBA.LSE.
+  if (sym.endsWith(".DE")) return sym.slice(0, -3) + ".XETRA";
+  if (sym.endsWith(".L"))  return sym.slice(0, -2) + ".LSE";
   if (sym.includes(".")) return sym;
   // Symboles non-tradables sur EODHD (forex / commodities / indices via futures)
   // — on retourne null pour signaler "non couvert" au dispatcher.
@@ -1078,7 +1084,9 @@ function getCurrencyForSymbol(symbol) {
     ".BR": "EUR", ".LS": "EUR", ".HE": "EUR", ".VI": "EUR",
     ".XETRA": "EUR", ".DE": "EUR", ".F": "EUR",
     ".SW": "CHF",
-    ".L": "GBP",
+    // `.LSE` est le suffixe EODHD pour Londres ; `.L` reste pour Yahoo
+    // (au cas où la chaîne n'est pas passée par normalizeEodhdSymbol).
+    ".LSE": "GBP", ".L": "GBP",
     ".ST": "SEK",
     ".OL": "NOK",
     ".CO": "DKK"
