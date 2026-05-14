@@ -1633,12 +1633,23 @@ async function getTwelveCandlesWithKV(symbol, timeframe, limit, env, ctx = null)
 }
 
 async function getStoredDailyQuoteFallback(symbol, env) {
-  // On essaie en cascade les caches mémoire puis KV de chaque provider connu.
-  // Bug observé 14/05 : avec EODHD comme source primaire daily, les bougies
-  // étaient écrites sous `candles:eodhd:...` mais le fallback ne lisait que
-  // `candles:twelve:...` → les EU stocks (LVMH, RMS, AIR, TTE, SAP, SIE, NESN)
-  // disparaissaient de l'onglet Opportunités hors heures de bourse. Il faut
-  // donc parcourir les deux familles de clés.
+  // On essaie en cascade :
+  //   1. caches mémoire (Twelve, EODHD)
+  //   2. caches KV (Twelve, EODHD)
+  //   3. fetch live via getCandlesBySymbol (chaîne EODHD → Twelve → Yahoo)
+  //
+  // Bug observé 14/05 : sans l'étape 3, les EU pures (LVMH, RMS, AIR, TTE,
+  // SAP, SIE, NESN) ne peuplent jamais le cache parce que :
+  //   - Twelve batch ne les ramène pas en quote (tier insuffisant pour EU)
+  //   - EODHD répond Unauthenticated si le plan utilisateur est US-only
+  //   - le scan d'opportunités fait quote-first, donc skip si pas de quote
+  //   - getCandlesBySymbol (qui appellerait Yahoo en dernier recours) n'est
+  //     jamais invoqué pour ces symboles
+  //
+  // Solution : si rien en cache, on appelle getCandlesBySymbol qui pourra
+  // tomber sur Yahoo (gratuit, supporte les EU) et ainsi reconstituer un
+  // quote depuis la dernière clôture. Coût : un appel Yahoo par symbole
+  // EU par scan, mais largement absorbé par le cache (TTL 12h).
   const eodhdSym = normalizeEodhdSymbol(symbol);
   const memSources = [
     `mem:candles:twelve:${symbol}:1d:90`,
@@ -1657,6 +1668,16 @@ async function getStoredDailyQuoteFallback(symbol, env) {
     for (const key of kvKeys) {
       const hit = await kvGet(key, env);
       if (Array.isArray(hit) && hit.length) { candles = hit; break; }
+    }
+  }
+  // Dernière chance : on tente un fetch live via la chaîne complète. Si
+  // EODHD/Twelve échouent, Yahoo prend le relais (gratuit, EU OK).
+  if (!Array.isArray(candles) || !candles.length) {
+    try {
+      const fetched = await getCandlesBySymbol(symbol, "1d", 90, env, null);
+      if (Array.isArray(fetched) && fetched.length) candles = fetched;
+    } catch {
+      // Tous les providers ont échoué — on rend null comme avant.
     }
   }
   if (!Array.isArray(candles) || !candles.length) return null;
