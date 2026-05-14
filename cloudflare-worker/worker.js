@@ -1586,17 +1586,45 @@ async function getTwelveCandlesWithKV(symbol, timeframe, limit, env, ctx = null)
 }
 
 async function getStoredDailyQuoteFallback(symbol, env) {
-  const memoryCandles = getMemoryCache(`mem:candles:twelve:${symbol}:1d:90`);
-  const kvCandles = Array.isArray(memoryCandles) && memoryCandles.length
-    ? memoryCandles
-    : await kvGet(`candles:twelve:${symbol}:1d`, env);
-  const candles = Array.isArray(kvCandles) ? kvCandles : [];
-  if (!candles.length) return null;
+  // On essaie en cascade les caches mémoire puis KV de chaque provider connu.
+  // Bug observé 14/05 : avec EODHD comme source primaire daily, les bougies
+  // étaient écrites sous `candles:eodhd:...` mais le fallback ne lisait que
+  // `candles:twelve:...` → les EU stocks (LVMH, RMS, AIR, TTE, SAP, SIE, NESN)
+  // disparaissaient de l'onglet Opportunités hors heures de bourse. Il faut
+  // donc parcourir les deux familles de clés.
+  const eodhdSym = normalizeEodhdSymbol(symbol);
+  const memSources = [
+    `mem:candles:twelve:${symbol}:1d:90`,
+    eodhdSym ? `mem:candles:eodhd:${eodhdSym}:1d:250` : null
+  ].filter(Boolean);
+  let candles = null;
+  for (const key of memSources) {
+    const hit = getMemoryCache(key);
+    if (Array.isArray(hit) && hit.length) { candles = hit; break; }
+  }
+  if (!Array.isArray(candles) || !candles.length) {
+    const kvKeys = [
+      `candles:twelve:${symbol}:1d`,
+      eodhdSym ? `candles:eodhd:${symbol}:1d` : null
+    ].filter(Boolean);
+    for (const key of kvKeys) {
+      const hit = await kvGet(key, env);
+      if (Array.isArray(hit) && hit.length) { candles = hit; break; }
+    }
+  }
+  if (!Array.isArray(candles) || !candles.length) return null;
 
   const last = candles[candles.length - 1];
   const prev = candles[candles.length - 2] || null;
   const price = finiteOrNull(last?.close);
   if (!Number.isFinite(price)) return null;
+
+  // Détermine la "fraîcheur" : si la dernière bougie est aujourd'hui (UTC),
+  // on considère "recent". Sinon "eod" (= dernière clôture, marché fermé ou
+  // weekend). Le front se base sur ce champ pour ajuster les badges.
+  const lastDateStr = String(last?.time || last?.date || "").slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const freshness = lastDateStr === todayStr ? "recent" : "eod";
 
   return {
     symbol,
@@ -1607,7 +1635,7 @@ async function getStoredDailyQuoteFallback(symbol, env) {
     volume24h: finiteOrNull(last?.volume),
     currency: isForex(symbol) ? symbol.slice(3, 6) : "USD",
     sourceUsed: "snapshot",
-    freshness: "recent"
+    freshness
   };
 }
 
@@ -3226,7 +3254,20 @@ async function handleOpportunities(_url, env) {
     row.regime = regime || row.regime || null;
     row.fxUsdToEur = Number.isFinite(Number(eurusdRate)) ? Number(eurusdRate) : null;
   });
-  const publicRows = rows.filter(row => row?.status !== "partial");
+  // Filtre relâché : on garde les rows `ok` ET les rows `partial` qui ont au
+  // moins un prix valide. Sans ça, les actions EU (LVMH, RMS, AIR, TTE, SAP,
+  // SIE, NESN) disparaissaient de l'onglet Opportunités hors heures de bourse
+  // — comportement frustrant côté UX : l'utilisateur ne pouvait pas préparer
+  // sa journée du lendemain le soir. Les rows partial gardent leur status,
+  // donc le front peut afficher un badge "Donnée EOD" / "Marché fermé"
+  // (déjà fait via la pastille marketStatus calculée côté client à partir
+  // de l'assetClass + heure locale).
+  const publicRows = rows.filter(row => {
+    if (!row) return false;
+    if (row.status === "ok") return true;
+    if (row.status === "partial" && Number.isFinite(Number(row.price))) return true;
+    return false;
+  });
 
   // Stocker en cache
   setMemoryCache("route:opportunities:data", TTL.opportunitiesNonCrypto, cloneJsonPayload(publicRows));
