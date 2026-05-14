@@ -890,7 +890,8 @@ async function getYahooBatchQuotes(symbols) {
           currency: row.currency || "USD",
           eurusdRate: null, // sera rempli si disponible
           sourceUsed: "yahoo",
-          freshness: "recent"
+          freshness: "live",
+          quotedAt: nowIso()
         };
       }
       // On ne reset le compteur d'echecs que si Yahoo a renvoyé au moins
@@ -950,7 +951,8 @@ async function getYahooQuoteFromChart(symbol) {
       volume24h: Number.isFinite(Number(meta?.regularMarketVolume)) ? Number(meta?.regularMarketVolume) : null,
       currency: meta.currency || (isForex(symbol) ? symbol.slice(3, 6) : "USD"),
       sourceUsed: "yahoo",
-      freshness: "recent"
+      freshness: "live",
+      quotedAt: nowIso()
     };
   } catch (e) {
     recordFailure("yahoo");
@@ -1241,7 +1243,8 @@ async function getCryptoQuote(symbol) {
         price: Number(priceData.price),
         change24hPct: statsData.priceChangePercent != null ? Number(statsData.priceChangePercent) : null,
         volume24h: statsData.quoteVolume != null ? Number(statsData.quoteVolume) : null,
-        currency: "USD", sourceUsed: "binance", freshness: "live"
+        currency: "USD", sourceUsed: "binance", freshness: "live",
+        quotedAt: nowIso()
       };
     } catch (e) {
       recordFailure("binance");
@@ -1265,7 +1268,13 @@ async function getTwelveQuote(symbol, env, ctx = null) {
       symbol, name: q.name || getDisplayName(symbol), assetClass: getAssetClass(symbol), price,
       change24hPct: q.percent_change != null ? Number(q.percent_change) : null,
       volume24h: q.volume != null ? Number(q.volume) : null,
-      currency: q.currency || "USD", sourceUsed: "twelvedata", freshness: "live"
+      currency: q.currency || "USD", sourceUsed: "twelvedata",
+      // Twelve free tier renvoie les quotes décalées de ~15 min. On tag
+      // explicitement la freshness pour que le front affiche un badge
+      // "Données différées" — l'utilisateur ne doit jamais penser qu'un
+      // prix Twelve est temps réel.
+      freshness: "delayed_15m",
+      quotedAt: nowIso()
     };
   });
 }
@@ -1288,7 +1297,8 @@ function parseTwelveQuoteRow(q, symbol) {
     volume24h: q.volume != null ? Number(q.volume) : null,
     currency: q.currency || "USD",
     sourceUsed: "twelvedata",
-    freshness: "live"
+    freshness: "delayed_15m",
+    quotedAt: nowIso()
   };
 }
 
@@ -1501,7 +1511,7 @@ async function getAlphaQuote(symbol, env) {
       if (!row) throw new Error("Invalid Alpha forex payload");
       const price = Number(row["5. Exchange Rate"]);
       if (!Number.isFinite(price)) throw new Error("Invalid Alpha forex price");
-      return { symbol, name: getDisplayName(symbol), assetClass: "forex", price, change24hPct: null, volume24h: null, currency: to, sourceUsed: "alphavantage", freshness: "recent" };
+      return { symbol, name: getDisplayName(symbol), assetClass: "forex", price, change24hPct: null, volume24h: null, currency: to, sourceUsed: "alphavantage", freshness: "recent", quotedAt: nowIso() };
     }
     const alphaSymbol = getAlphaSymbol(symbol);
     const result = await callAlphaVantageJson(
@@ -1516,7 +1526,8 @@ async function getAlphaQuote(symbol, env) {
       symbol, name: getDisplayName(symbol), assetClass: getAssetClass(symbol), price,
       change24hPct: row["10. change percent"] ? Number(String(row["10. change percent"]).replace("%","")) : null,
       volume24h: row["06. volume"] ? Number(row["06. volume"]) : null,
-      currency: getCurrencyForSymbol(symbol), sourceUsed: "alphavantage", freshness: "recent"
+      currency: getCurrencyForSymbol(symbol), sourceUsed: "alphavantage", freshness: "recent",
+      quotedAt: nowIso()
     };
   });
 }
@@ -1738,6 +1749,7 @@ async function getStoredDailyQuoteFallback(symbol, env) {
     volume24h: finiteOrNull(last?.volume),
     currency: getCurrencyForSymbol(symbol),
     sourceUsed: "snapshot",
+    quotedAt: nowIso(),
     freshness
   };
 }
@@ -2901,6 +2913,7 @@ function buildPartialAnalysisPayload(symbol, quote, message = "Analyse technique
     change24hPct: quote?.change24hPct == null ? null : finiteOrNull(quote?.change24hPct),
     currency: quote?.currency || getCurrencyForSymbol(symbol),
     sourceUsed: quote?.sourceUsed || null,
+    quotedAt: quote?.quotedAt || null,
     freshness: quote?.freshness || "unknown",
     status: "partial",
     score: null,
@@ -2960,6 +2973,7 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
     price: quote.price, change24hPct: quote.change24hPct,
     currency: quote.currency || getCurrencyForSymbol(symbol),
     sourceUsed: quote.sourceUsed, freshness: quote.freshness,
+    quotedAt: quote.quotedAt || null,
     status: scored?.score != null ? "ok" : "unavailable",
     score: scored?.score ?? null,
     scoreStatus: scored?.scoreStatus || "unavailable",
@@ -3048,6 +3062,7 @@ function toOpportunityRow(payload) {
     change24hPct: payload.change24hPct,
     currency: payload.currency || getCurrencyForSymbol(payload.symbol),
     sourceUsed: payload.sourceUsed,
+    quotedAt: payload.quotedAt || null,
     freshness: payload.freshness,
     status: payload.status,
     score: payload.score,
@@ -3247,6 +3262,23 @@ async function handleOpportunities(_url, env) {
     Object.assign(quotesMap, yahooBatch);
   } catch (e) {
     nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : "Batch Yahoo indisponible");
+  }
+
+  // Yahoo v7 batch sert parfois des prix cachés / vieux de plusieurs minutes
+  // sur certains tickers (NVDA observé à 208 alors que v8 chart renvoyait 235).
+  // Pour les symboles manquants OU dont la quote v7 est suspecte, on retombe
+  // sur getYahooQuote individuel qui passe par v8 chart (temps réel garanti).
+  // Coût : 1 subrequête par symbole manquant, négligeable (< 5 cas usuels).
+  const missingAfterYahooBatch = nonCryptoSymbols.filter(s => !quotesMap[s]);
+  if (missingAfterYahooBatch.length > 0) {
+    for (const symbol of missingAfterYahooBatch) {
+      try {
+        const q = await getYahooQuote(symbol);
+        if (q) quotesMap[symbol] = q;
+      } catch (e) {
+        quoteErrors[symbol] = compactProviderError(e instanceof Error ? e.message : "Yahoo individuel KO");
+      }
+    }
   }
 
   const missingAfterYahoo = nonCryptoSymbols.filter(s => !quotesMap[s]);

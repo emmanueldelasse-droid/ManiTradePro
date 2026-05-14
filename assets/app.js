@@ -939,8 +939,45 @@
 
   function simpleFreshnessLabel(value) {
     if (value === "live") return "en direct";
-    if (value === "recent") return "recent";
+    if (value === "delayed_15m") return "différé 15 min";
+    if (value === "eod") return "dernière clôture";
+    if (value === "recent") return "récent";
     return "inconnu";
+  }
+
+  function relativeTimeFr(iso) {
+    if (!iso) return null;
+    const ts = Date.parse(iso);
+    if (!Number.isFinite(ts)) return null;
+    const diffSec = Math.max(0, Math.round((Date.now() - ts) / 1000));
+    if (diffSec < 60) return "à l'instant";
+    const diffMin = Math.round(diffSec / 60);
+    if (diffMin < 60) return `il y a ${diffMin} min`;
+    const diffH = Math.round(diffMin / 60);
+    if (diffH < 24) return `il y a ${diffH} h`;
+    return `il y a ${Math.round(diffH / 24)} j`;
+  }
+
+  function quoteSourceLine(item) {
+    if (!item) return "";
+    const src = String(item.sourceUsed || "").toLowerCase();
+    const at = relativeTimeFr(item.quotedAt);
+    if (src === "twelvedata") {
+      return `Données Twelve Data (différé 15 min)${at ? ` · mis à jour ${at}` : ""}`;
+    }
+    if (src === "yahoo") {
+      return `Données Yahoo (temps réel)${at ? ` · mis à jour ${at}` : ""}`;
+    }
+    if (src === "binance") {
+      return `Données Binance (temps réel)${at ? ` · mis à jour ${at}` : ""}`;
+    }
+    if (src === "snapshot") {
+      return `Données archivées (dernière clôture)${at ? ` · ${at}` : ""}`;
+    }
+    if (src === "alphavantage") {
+      return `Données Alpha Vantage${at ? ` · mis à jour ${at}` : ""}`;
+    }
+    return at ? `Mis à jour ${at}` : "";
   }
 
   function simpleScoreStatusLabel(value) {
@@ -1466,6 +1503,7 @@ async function confirmTradeFromModal() {
       change24hPct: typeof item?.change24hPct === "number" ? item.change24hPct : null,
       sourceUsed: item?.sourceUsed || null,
       freshness: item?.freshness || "unknown",
+      quotedAt: item?.quotedAt || null,
       status: item?.status || (item?.price != null ? "ok" : "unavailable"),
       score: typeof item?.score === "number" ? item.score : null,
       officialScore: Number.isFinite(officialScore) ? Math.max(0, Math.min(100, Math.round(officialScore))) : null,
@@ -1528,7 +1566,8 @@ async function confirmTradeFromModal() {
       plan: current.plan || stored.plan || null,
       status: current.status || stored.status || null,
       freshness: current.freshness || stored.freshness || "unknown",
-      currency: current.currency || stored.currency || "USD"
+      currency: current.currency || stored.currency || "USD",
+      quotedAt: current.quotedAt || stored.quotedAt || null
     });
   }
 
@@ -3010,6 +3049,7 @@ function renderOppRow(item, rank) {
               <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
               <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
               <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
+              ${quoteSourceLine(item) ? `<div class="muted opp-note" style="font-size:.7rem;font-style:italic;">${safeText(quoteSourceLine(item))}</div>` : ""}
             </div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
@@ -3043,6 +3083,7 @@ function renderOppRow(item, rank) {
           <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
           <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
           <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
+          ${quoteSourceLine(item) ? `<div class="muted opp-note" style="font-size:.7rem;font-style:italic;">${safeText(quoteSourceLine(item))}</div>` : ""}
         </div>
         <div class="badges-col" style="display:flex;flex-wrap:wrap;gap:8px;align-content:flex-start;">
           ${badge(vm.assetBadge, item.assetClass || "")}
@@ -4235,6 +4276,7 @@ function detailTileValue(kind, plan, detail) {
                   ${state.settings.showSourceBadges ? badge(simpleFreshnessLabel(d.freshness || "unknown"), d.freshness || "") : ""}
                 </div>
                 <div style="font-size:.78rem;color:var(--text-muted);margin-top:6px">${safeText(getMarketStatus(d.symbol, d.assetClass).detail)}</div>
+                ${quoteSourceLine(d) ? `<div class="quote-source-line" style="font-size:.78rem;color:var(--text-muted);margin-top:4px">${safeText(quoteSourceLine(d))}</div>` : ""}
                 <div style="margin-top:10px">
                   <button class="btn btn-secondary" style="font-size:.8rem" data-open-alert-modal="${safeText(d.symbol)}" data-alert-name="${safeText(d.name || d.symbol)}" data-alert-price="${d.price != null ? d.price : ""}">+ Alerte prix</button>
                 </div>
