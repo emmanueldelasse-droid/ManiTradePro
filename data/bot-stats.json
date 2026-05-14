@@ -14,16 +14,16 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 42,
+    "totalCount": 44,
     "winCount": 4,
-    "lossCount": 34,
-    "winRate": 0.09523809523809523,
-    "totalPnl": -972.9421467483692,
+    "lossCount": 36,
+    "winRate": 0.09090909090909091,
+    "totalPnl": -1021.806658435219,
     "avgWin": 18.024579231392046,
-    "avgLoss": 30.73648422570403,
-    "expectancy": -26.092573420266305,
-    "rrActual": 0.5864229330535669,
-    "openCount": 2,
+    "avgLoss": 30.38624931557742,
+    "expectancy": -25.98526490221656,
+    "rrActual": 0.5931821016867587,
+    "openCount": 1,
     "bySetup": [
       {
         "setup": "autre",
@@ -34,19 +34,19 @@
       },
       {
         "setup": "continuation",
-        "count": 16,
+        "count": 18,
         "wins": 1,
-        "pnl": -500.579548386786,
-        "winRate": 0.0625
+        "pnl": -549.444060073636,
+        "winRate": 0.05555555555555555
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 38,
+        "count": 40,
         "wins": 4,
-        "pnl": -856.3975258597,
-        "winRate": 0.10526315789473684
+        "pnl": -905.2620375465501,
+        "winRate": 0.1
       },
       {
         "class": "crypto",
@@ -77,8 +77,8 @@
       },
       {
         "symbol": "V",
-        "count": 1,
-        "pnl": -15.34006036033281,
+        "count": 2,
+        "pnl": -24.898298213405624,
         "wins": 0
       },
       {
@@ -122,45 +122,51 @@
     ]
   },
   "stats7d": {
-    "totalCount": 3,
+    "totalCount": 5,
     "winCount": 0,
-    "lossCount": 3,
+    "lossCount": 5,
     "winRate": 0,
-    "totalPnl": -82.25053546918087,
+    "totalPnl": -131.1150471560311,
     "avgWin": 0,
-    "avgLoss": 27.416845156393624,
-    "expectancy": -27.416845156393624,
+    "avgLoss": 26.22300943120622,
+    "expectancy": -26.22300943120622,
     "rrActual": 0,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 3,
+        "count": 5,
         "wins": 0,
-        "pnl": -82.25053546918087,
+        "pnl": -131.1150471560311,
         "winRate": 0
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 3,
+        "count": 5,
         "wins": 0,
-        "pnl": -82.25053546918087,
+        "pnl": -131.1150471560311,
         "winRate": 0
       }
     ],
     "topSymbols": [
       {
         "symbol": "V",
-        "count": 1,
-        "pnl": -15.34006036033281,
+        "count": 2,
+        "pnl": -24.898298213405624,
         "wins": 0
       },
       {
         "symbol": "MSFT",
         "count": 1,
         "pnl": -25.94972594972588,
+        "wins": 0
+      },
+      {
+        "symbol": "ASML",
+        "count": 1,
+        "pnl": -39.30627383377743,
         "wins": 0
       },
       {
@@ -178,6 +184,12 @@
         "wins": 0
       },
       {
+        "symbol": "ASML",
+        "count": 1,
+        "pnl": -39.30627383377743,
+        "wins": 0
+      },
+      {
         "symbol": "MSFT",
         "count": 1,
         "pnl": -25.94972594972588,
@@ -185,46 +197,46 @@
       },
       {
         "symbol": "V",
-        "count": 1,
-        "pnl": -15.34006036033281,
+        "count": 2,
+        "pnl": -24.898298213405624,
         "wins": 0
       }
     ]
   },
   "stats30d": {
-    "totalCount": 33,
+    "totalCount": 35,
     "winCount": 2,
-    "lossCount": 31,
-    "winRate": 0.06060606060606061,
-    "totalPnl": -793.1092406643501,
+    "lossCount": 33,
+    "winRate": 0.05714285714285714,
+    "totalPnl": -841.9737523512,
     "avgWin": 34.09007459492636,
-    "avgLoss": 27.783528704974277,
-    "expectancy": -24.03361335346515,
-    "rrActual": 1.226988657809437,
+    "avgLoss": 27.58042125881978,
+    "expectancy": -24.05639292432,
+    "rrActual": 1.236024434689332,
     "openCount": 0,
     "bySetup": [
+      {
+        "setup": "continuation",
+        "count": 18,
+        "wins": 1,
+        "pnl": -549.444060073636,
+        "winRate": 0.05555555555555555
+      },
       {
         "setup": "autre",
         "count": 17,
         "wins": 1,
         "pnl": -292.529692277564,
         "winRate": 0.058823529411764705
-      },
-      {
-        "setup": "continuation",
-        "count": 16,
-        "wins": 1,
-        "pnl": -500.579548386786,
-        "winRate": 0.0625
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 29,
+        "count": 31,
         "wins": 2,
-        "pnl": -676.5646197756809,
-        "winRate": 0.06896551724137931
+        "pnl": -725.429131462531,
+        "winRate": 0.06451612903225806
       },
       {
         "class": "crypto",
@@ -249,8 +261,8 @@
       },
       {
         "symbol": "V",
-        "count": 1,
-        "pnl": -15.34006036033281,
+        "count": 2,
+        "pnl": -24.898298213405624,
         "wins": 0
       },
       {
@@ -299,5 +311,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-05-14T18:22:41.099Z"
+  "lastClosedAt": "2026-05-14T20:45:46.396Z"
 }
