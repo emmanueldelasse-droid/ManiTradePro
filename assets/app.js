@@ -2060,12 +2060,12 @@ async function confirmTradeFromModal() {
       }
       delete out[src];
     }
-    const numericKeys = ["capital_base", "max_open_positions", "max_positions_per_symbol", "max_holding_hours", "min_actionability_score", "min_dossier_score", "max_consecutive_losses"];
+    const numericKeys = ["capital_base", "max_open_positions", "max_positions_per_symbol", "max_holding_hours", "min_actionability_score", "min_dossier_score", "max_consecutive_losses", "post_stop_cooldown_hours"];
     for (const k of numericKeys) {
       if (out[k] != null && out[k] !== "") out[k] = Number(out[k]);
     }
     // Booleans explicites
-    for (const k of ["allow_long", "allow_short", "mean_reversion_enabled"]) {
+    for (const k of ["allow_long", "allow_short", "mean_reversion_enabled", "require_structural_setup"]) {
       out[k] = !!out[k];
     }
     return out;
@@ -6544,6 +6544,8 @@ function openPositionsRiskView() {
           <div class="muted">Setups autorisés</div><div>${Array.isArray(settings.allowed_setups) ? settings.allowed_setups.join(", ") : "—"}</div>
           <div class="muted">Long / Short</div><div>${settings.allow_long ? "Long" : ""}${settings.allow_long && settings.allow_short ? " + " : ""}${settings.allow_short ? "Short" : ""}${!settings.allow_long && !settings.allow_short ? "—" : ""}</div>
           <div class="muted">Mean reversion</div><div>${settings.mean_reversion_enabled ? "Oui" : "Non"}</div>
+          <div class="muted">Setup obligatoire</div><div>${settings.require_structural_setup === false ? "Non" : "Oui"}</div>
+          <div class="muted">Cooldown après stop</div><div>${Number(settings.post_stop_cooldown_hours) > 0 ? `${Number(settings.post_stop_cooldown_hours)} h` : "désactivé"}</div>
         </div>
         <details class="bot-advanced" style="margin-top:10px">
           <summary style="cursor:pointer;font-size:.85rem;padding:6px 0">Paramètres avancés</summary>
@@ -6580,6 +6582,7 @@ function openPositionsRiskView() {
           <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="allow_long" ${d.allow_long ? "checked" : ""}><span>Long autorisé</span></label>
           <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="allow_short" ${d.allow_short ? "checked" : ""}><span>Short autorisé</span></label>
           <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="mean_reversion_enabled" ${d.mean_reversion_enabled ? "checked" : ""}><span>Mean reversion</span></label>
+          <label class="bot-sub-toggle"><input type="checkbox" data-bot-field="require_structural_setup" ${d.require_structural_setup === false ? "" : "checked"}><span>Setup obligatoire — n'ouvre que sur pattern technique (pullback / breakout / etc.). Recommandé.</span></label>
         </div>
         <div class="bot-field-setups">
           <div class="muted" style="font-size:.78rem;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Setups autorisés</div>
@@ -6603,6 +6606,7 @@ function openPositionsRiskView() {
             <label class="bot-field"><span>Daily loss max (%)</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_daily_loss_pct_display" value="${Math.round(Number(d.max_daily_loss_pct || 0.30) * 100)}"></label>
             <label class="bot-field"><span>Weekly loss max (%) — 100 = OFF</span><input type="number" inputmode="decimal" min="1" max="100" step="1" data-bot-field="max_weekly_loss_pct_display" value="${Math.round(Number(d.max_weekly_loss_pct || 1.0) * 100)}"></label>
             <label class="bot-field"><span>Pertes conséc. max — 999 = OFF</span><input type="number" inputmode="numeric" min="1" max="999" step="1" data-bot-field="max_consecutive_losses" value="${Number(d.max_consecutive_losses || 999)}"></label>
+            <label class="bot-field"><span>Cooldown post-stop (h) — 0 = OFF</span><input type="number" inputmode="numeric" min="0" max="720" step="1" data-bot-field="post_stop_cooldown_hours" value="${Number(d.post_stop_cooldown_hours ?? 24)}"></label>
           </div>
         </details>
         <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
