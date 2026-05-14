@@ -1058,6 +1058,33 @@ function normalizeEodhdSymbol(symbol) {
   return `${sym}.US`;
 }
 
+// Devise de cotation par bourse, dérivée du suffixe EODHD.
+// Sans cette fonction, le worker codait en dur `currency: "USD"` pour toutes
+// les actions non-forex, et le front faisait une conversion USD→EUR sur
+// LVMH/RMS/AIR/etc. → prix divisé par 0,92 (RMS affiché 1466 € au lieu de
+// 1593 €). On retourne la devise locale de la place de cotation, pas la
+// devise de présentation côté utilisateur.
+function getCurrencyForSymbol(symbol) {
+  if (isForex(symbol)) return String(symbol).slice(3, 6) || "USD";
+  const eodhdSym = normalizeEodhdSymbol(symbol);
+  if (!eodhdSym) return "USD";
+  const suffixMap = {
+    ".PA": "EUR", ".AS": "EUR", ".MI": "EUR", ".MC": "EUR",
+    ".BR": "EUR", ".LS": "EUR", ".HE": "EUR", ".VI": "EUR",
+    ".XETRA": "EUR", ".DE": "EUR", ".F": "EUR",
+    ".SW": "CHF",
+    ".L": "GBP",
+    ".ST": "SEK",
+    ".OL": "NOK",
+    ".CO": "DKK"
+  };
+  const upper = eodhdSym.toUpperCase();
+  for (const [suffix, currency] of Object.entries(suffixMap)) {
+    if (upper.endsWith(suffix)) return currency;
+  }
+  return "USD";
+}
+
 // Bougies daily EODHD. Format de sortie aligné sur Twelve/Yahoo pour rester
 // drop-in dans getCandlesBySymbol. La métadonnée `source: "eodhd"` est portée
 // par le caller via le champ `sourceUsed` du payload, pas dans la bougie
@@ -1701,7 +1728,7 @@ async function getStoredDailyQuoteFallback(symbol, env) {
     price,
     change24hPct: prev ? pctChange(price, prev?.close) : null,
     volume24h: finiteOrNull(last?.volume),
-    currency: isForex(symbol) ? symbol.slice(3, 6) : "USD",
+    currency: getCurrencyForSymbol(symbol),
     sourceUsed: "snapshot",
     freshness
   };
@@ -2902,7 +2929,7 @@ function buildPartialPlaceholderQuote(symbol) {
     price: null,
     change24hPct: null,
     volume24h: null,
-    currency: isForex(symbol) ? symbol.slice(3, 6) : "USD",
+    currency: getCurrencyForSymbol(symbol),
     sourceUsed: null,
     freshness: "unknown"
   };
