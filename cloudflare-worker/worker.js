@@ -41,17 +41,20 @@ const KV_TTL = {
   candlesDaily:  43200,     // 12h
   candles4h:     7200,      // 2h
   candles1h:     1800,      // 30min
-  opportunities: 900,       // 15min
+  opportunities: 300,       // 5min — était 15min, réduit pour rester proche du marché temps réel
   news:          900,       // 15min
 };
 
-// TTL en ms pour memoryCache (quotes — trop fréquents pour KV)
+// TTL en ms pour memoryCache (quotes — trop fréquents pour KV).
+// Les TTL quote/detail étaient à 1h, ce qui faisait dévier le prix
+// affiché de plus de 10 $ sur NVDA entre la liste et la fiche. Ramené
+// à 2 min pour les quotes individuelles et 3 min pour la fiche détail.
 const TTL = {
-  opportunitiesNonCrypto: 15 * 60 * 1000,
+  opportunitiesNonCrypto: 5 * 60 * 1000,
   quoteCrypto:            30 * 1000,
-  quoteNonCrypto:         60 * 60 * 1000,
+  quoteNonCrypto:         2 * 60 * 1000,
   detailCrypto:           60 * 1000,
-  detailNonCrypto:        60 * 60 * 1000,
+  detailNonCrypto:        3 * 60 * 1000,
   candlesCrypto:          5 * 60 * 1000,
   candlesNonCrypto:       12 * 60 * 60 * 1000,
   fearGreed:              300000,
@@ -1538,21 +1541,26 @@ async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) 
     // Crypto → Binance uniquement
     quote = await getCryptoQuote(clean);
   } else {
-    // Non-crypto → TwelveData en premier (API officielle, fiable)
-    if (!skipTwelveData && !circuitIsOpen("twelvedata")) {
-      try {
-        quote = await getTwelveQuote(clean, env, ctx);
-      } catch (e) {
-        errors.push(`twelve:${e.message}`);
-      }
-    }
-
-    // Fallback Yahoo
-    if (!quote && !circuitIsOpen("yahoo")) {
+    // Non-crypto → Yahoo en premier. Yahoo expose les quotes EN TEMPS REEL
+    // gratuitement via v8 chart, alors que TwelveData free tier renvoie les
+    // données décalées de ~15 min. L'utilisateur voyait NVDA à 208 dans la
+    // liste vs 235 sur Google Finance — la différence venait du décalage
+    // Twelve. On garde Twelve en fallback parce que sa batch reste utile
+    // côté opportunités quand Yahoo a un trou.
+    if (!circuitIsOpen("yahoo")) {
       try {
         quote = await getYahooQuote(clean);
       } catch (e) {
         errors.push(`yahoo:${e.message}`);
+      }
+    }
+
+    // Fallback Twelve
+    if (!quote && !skipTwelveData && !circuitIsOpen("twelvedata")) {
+      try {
+        quote = await getTwelveQuote(clean, env, ctx);
+      } catch (e) {
+        errors.push(`twelve:${e.message}`);
       }
     }
 
@@ -3223,20 +3231,32 @@ async function handleOpportunities(_url, env) {
   const ctx = createBudgetContext("opportunities");
 
   // ============================================================
-  // PHASE 1 — 1 seul appel TwelveData batch pour toutes les quotes non-crypto
-  // Réduit de ~25 subrequetes à 1 seule pour les quotes
+  // PHASE 1 — batch quotes non-crypto.
+  // Yahoo en premier (temps réel, gratuit). Twelve seulement pour combler
+  // les symboles que Yahoo n'a pas répondus (rare sur le panel US, plus
+  // courant sur EU si v7 a expiré pour ces tickers).
   // ============================================================
   const nonCryptoSymbols = allSymbols.filter(s => !isCrypto(s));
   const cryptoSymbols = allSymbols.filter(s => isCrypto(s));
   const quotesMap = {};
   const quoteErrors = {};
-  let nonCryptoBatchError = "Batch TwelveData indisponible";
+  let nonCryptoBatchError = "Batch indisponible";
 
   try {
-    const batchQuotes = await getTwelveBatchQuotes(nonCryptoSymbols, env, ctx);
-    Object.assign(quotesMap, batchQuotes);
+    const yahooBatch = await getYahooBatchQuotes(nonCryptoSymbols);
+    Object.assign(quotesMap, yahooBatch);
   } catch (e) {
-    nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : "Batch TwelveData indisponible");
+    nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : "Batch Yahoo indisponible");
+  }
+
+  const missingAfterYahoo = nonCryptoSymbols.filter(s => !quotesMap[s]);
+  if (missingAfterYahoo.length > 0) {
+    try {
+      const twelveBatch = await getTwelveBatchQuotes(missingAfterYahoo, env, ctx);
+      Object.assign(quotesMap, twelveBatch);
+    } catch (e) {
+      nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : nonCryptoBatchError);
+    }
   }
 
   // Quotes crypto — Binance, 1 appel par actif mais gratuit

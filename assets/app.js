@@ -1506,22 +1506,29 @@ async function confirmTradeFromModal() {
 
   function mergeOpportunityWithStored(current, stored) {
     if (!stored) return current;
+    // Le fresh (`current`) gagne toujours sur le snapshot (`stored`).
+    // L'ancienne logique préférait stored.price ?? current.price, ce qui
+    // figeait le prix affiché sur la valeur localStorage de la dernière
+    // session — NVDA pouvait montrer 208 $ alors que l'API renvoyait 235 $.
+    // Le snapshot ne sert plus que pour combler les champs absents
+    // (typiquement l'analyse complète si l'API a renvoyé `partial`).
     return normalizeOpportunity({
-      ...current,
       ...stored,
-      price: stored.price ?? current.price,
-      change24hPct: stored.change24hPct ?? current.change24hPct,
-      score: stored.score ?? current.score,
-      officialScore: stored.officialScore ?? current.officialScore,
-      decision: stored.decision || current.decision || null,
-      officialDecision: stored.officialDecision || current.officialDecision || null,
-      trendLabel: stored.trendLabel || current.trendLabel || null,
-      officialTrendLabel: stored.officialTrendLabel || current.officialTrendLabel || null,
-      officialWaitFor: stored.officialWaitFor || current.officialWaitFor || null,
-      reasonShort: stored.reasonShort || current.reasonShort || null,
-      plan: stored.plan || current.plan || null,
-      status: stored.status || current.status || null,
-      freshness: stored.freshness || current.freshness || "unknown"
+      ...current,
+      price: current.price ?? stored.price,
+      change24hPct: current.change24hPct ?? stored.change24hPct,
+      score: current.score ?? stored.score,
+      officialScore: current.officialScore ?? stored.officialScore,
+      decision: current.decision || stored.decision || null,
+      officialDecision: current.officialDecision || stored.officialDecision || null,
+      trendLabel: current.trendLabel || stored.trendLabel || null,
+      officialTrendLabel: current.officialTrendLabel || stored.officialTrendLabel || null,
+      officialWaitFor: current.officialWaitFor || stored.officialWaitFor || null,
+      reasonShort: current.reasonShort || stored.reasonShort || null,
+      plan: current.plan || stored.plan || null,
+      status: current.status || stored.status || null,
+      freshness: current.freshness || stored.freshness || "unknown",
+      currency: current.currency || stored.currency || "USD"
     });
   }
 
@@ -7617,15 +7624,38 @@ app.querySelectorAll("[data-bot-stats-tab]").forEach(el => {
           refreshOpenTradesLive().catch(() => {});
         }
         if (state.settings.autoRefreshOpportunities && !state.opportunitiesRefreshing) {
+          // Intervalle réduit : 1 min marché ouvert (anciennement 5 min)
+          // pour rester proche du temps réel maintenant que le worker
+          // s'appuie sur Yahoo (gratuit, live). 10 min marché fermé.
           const stockOpen = isStockMarketOpen();
-          const intervalMin = stockOpen ? Number(state.settings.autoScanIntervalMin || 5) : 15;
+          const intervalMin = stockOpen ? Number(state.settings.autoScanIntervalMin || 1) : 10;
           if (Date.now() - (state.opportunitiesLastGoodAt || 0) >= intervalMin * 60 * 1000) {
             loadOpportunities(false).catch(() => {});
+          }
+        }
+        // Rafraîchit le détail si on est sur la fiche (sinon le prix
+        // d'entrée affiché traînait jusqu'à 1 h sur l'ancien TTL).
+        if (state.route === "asset-detail" && state.detail?.symbol && !state.loadingDetail) {
+          const lastDetailFetch = Number(state.detailRequestStartedAt || 0);
+          if (Date.now() - lastDetailFetch >= 60 * 1000) {
+            loadDetail(state.detail.symbol).catch(() => {});
           }
         }
         render();
       }
     }, 30000);
+
+    // Refetch immédiat quand l'onglet revient au premier plan
+    // (l'utilisateur veut voir le prix actuel, pas celui d'il y a 5 min).
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState !== "visible") return;
+      if (state.route === "opportunities" || state.route === "dashboard") {
+        loadOpportunities(true).catch(() => {});
+      }
+      if (state.route === "asset-detail" && state.detail?.symbol) {
+        loadDetail(state.detail.symbol).catch(() => {});
+      }
+    });
   }
 
   if ("serviceWorker" in navigator) {
