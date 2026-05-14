@@ -9423,13 +9423,22 @@ async function validateSymbolOnProviders(symbol, assetClass, env, ctx) {
   if (!sym) return { ok: false, error: "Symbole vide" };
 
   async function tryNonCrypto(s) {
-    try {
-      const qt = await getTwelveQuote(s, env, ctx).catch(() => null);
-      if (qt && qt.price != null) return { provider: "twelvedata" };
-    } catch {}
+    // EODHD en premier : couvre US + EU + LSE + Suisse temps réel ou différé,
+    // et c'est notre source canonique pour les bougies. Si EODHD répond, le
+    // symbole est forcément utilisable côté scan/fiche.
+    if (eodhdConfigured(env)) {
+      try {
+        const qe = await getEodhdRealTimeBatchQuotes([s], env).catch(() => null);
+        if (qe && qe[s] && qe[s].price != null) return { provider: "eodhd" };
+      } catch {}
+    }
     try {
       const qy = await getYahooQuote(s).catch(() => null);
       if (qy && qy.price != null) return { provider: "yahoo" };
+    } catch {}
+    try {
+      const qt = await getTwelveQuote(s, env, ctx).catch(() => null);
+      if (qt && qt.price != null) return { provider: "twelvedata" };
     } catch {}
     return null;
   }
