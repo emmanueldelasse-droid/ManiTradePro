@@ -3914,8 +3914,23 @@ async function handleTrainingAutoCycle(env) {
             : Number.isFinite(detailPayload?.price) ? "detail"
             : null;
 
-          // PR #5 Phase 2 — tracker MAE/MFE en continu, même si pas de clôture ce cycle
-          const excursion = updatePositionIntraExcursion(position, effectivePrice);
+          // Devise du live : nécessaire pour éviter de mélanger les devises
+          // dans le tracker intra-trade. Le worker peut basculer de provider
+          // (Yahoo USD → Twelve EUR par ex.) entre deux cycles ; sans ce tag
+          // on enregistrerait silencieusement un prix EUR dans une position
+          // ouverte en USD et le stop sauterait à tort.
+          const livePriceCurrency = String(liveQuote?.currency || "").toUpperCase();
+          const positionEntryCurrency = String(position?.currency || "").toUpperCase();
+          const currencyMatches = !positionEntryCurrency || !livePriceCurrency
+            || positionEntryCurrency === livePriceCurrency;
+
+          // PR #5 Phase 2 — tracker MAE/MFE en continu, même si pas de clôture ce cycle.
+          // On ne met à jour le tracker QUE si la devise correspond — sinon
+          // on injecterait un prix dans une autre devise dans highSinceOpen /
+          // lowSinceOpen, ce qui pollue ensuite le check stop.
+          const excursion = currencyMatches
+            ? updatePositionIntraExcursion(position, effectivePrice)
+            : { changed: false };
           if (excursion.changed) {
             await persistPositionIntraExcursion(env, position, excursion);
           }
@@ -3937,7 +3952,10 @@ async function handleTrainingAutoCycle(env) {
             effectivePrice,
             detailPayload,
             settings,
-            { source: isCrypto(symbol) ? "binance" : "twelve" }
+            {
+              source: isCrypto(symbol) ? "binance" : (liveQuote?.sourceUsed || "twelve"),
+              currency: livePriceCurrency || null
+            }
           );
           if (!trigger) return;
 
@@ -4534,6 +4552,17 @@ function trainingCloseTrigger(position, livePrice, detailPayload, settings, intr
   const takeProfit = finiteOrNull(position?.take_profit ?? position?.takeProfit ?? position?.analysis_snapshot?.takeProfit);
   if (!Number.isFinite(safePrice) || !["long","short"].includes(side)) return null;
 
+  // Garde-fou devise : refuse la comparaison stop/TP si la quote live
+  // est dans une autre devise que celle de l'entry. Sans ça, le tracker
+  // pouvait comparer 1367 EUR (Twelve renvoyant ASML.AS) à un stop 1456
+  // USD (Nasdaq) et déclencher un faux stop. On skip ce cycle, le tracker
+  // reprendra dès que le bon provider répondra.
+  const positionCurrency = String(position?.currency || "").toUpperCase();
+  const liveCurrency = String(intradayContext?.currency || "").toUpperCase();
+  if (positionCurrency && liveCurrency && positionCurrency !== liveCurrency) {
+    return null;
+  }
+
   // Détection stop/TP intraday — paper trading réaliste.
   //
   // Avant : on comparait juste `livePrice` (snapshot du moment) avec stop/TP.
@@ -4658,12 +4687,21 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings) {
     botMode
   });
   const id = `${parseSymbol(payload?.symbol)}:${botMode}:${Date.now()}`;
+  const cleanSymbol = parseSymbol(payload?.symbol);
+  // Devise de cotation à l'ouverture. Sans ce champ, on ne peut pas
+  // détecter si un live quote ultérieur vient d'un provider qui retourne
+  // dans une autre devise (cas ASML : entry Nasdaq USD, live update
+  // Twelve qui renvoie EUR → faux stop déclenché en comparant 1367 EUR
+  // à 1456 USD comme s'ils étaient identiques). On préfère le tag explicite
+  // du payload (worker) ; à défaut on dérive du symbole.
+  const positionCurrency = payload?.currency || getCurrencyForSymbol(cleanSymbol);
   return {
-    id, symbol: parseSymbol(payload?.symbol), name: payload?.name || parseSymbol(payload?.symbol),
+    id, symbol: cleanSymbol, name: payload?.name || cleanSymbol,
     mode: botMode, status: "open", side: execution.side,
-    asset_class: payload?.assetClass || getAssetClass(parseSymbol(payload?.symbol)),
+    asset_class: payload?.assetClass || getAssetClass(cleanSymbol),
     quantity: execution.quantity, entry_price: execution.entryPrice, invested: execution.invested,
     stop_loss: execution.stopLoss, take_profit: execution.takeProfit,
+    currency: positionCurrency,
     score: finiteOrNull(payload?.score),
     trend_label: payload?.trendLabel || payload?.plan?.trendLabel || null,
     trade_decision: payload?.decision || payload?.plan?.decision || null,
