@@ -3250,6 +3250,21 @@ async function handleOpportunities(_url, env) {
     else if (result.error) quoteErrors[result.symbol] = result.error;
   }
 
+  // Filet Twelve Data : appelé UNIQUEMENT pour les symboles que Yahoo
+  // n'a pas pu servir (panne, ticker bloqué, etc.). Twelve free tier est
+  // différé de 15 min, donc le badge "différé 15 min" remontera côté
+  // front pour ces symboles — l'utilisateur sait au coup d'œil quand
+  // le prix n'est pas live. Yahoo reste la source canonique.
+  const missingAfterYahoo = nonCryptoSymbols.filter(s => !quotesMap[s]);
+  if (missingAfterYahoo.length > 0) {
+    try {
+      const twelveBatch = await getTwelveBatchQuotes(missingAfterYahoo, env, ctx);
+      Object.assign(quotesMap, twelveBatch);
+    } catch {
+      // Twelve KO aussi → symboles sortent en partial / unavailable.
+    }
+  }
+
   // Quotes crypto — Binance, seul fournisseur temps réel pour le crypto.
   for (const symbol of cryptoSymbols) {
     try {
@@ -7916,7 +7931,7 @@ async function handleCandles(symbol, url, env) {
   try {
     const ctx = createBudgetContext("candles");
     const candles = await getCandlesBySymbol(clean, timeframe, limit, env, ctx);
-    return attachBudgetHeaders(ok(candles, isCrypto(clean) ? "binance" : "twelvedata", nowIso(), "recent", null), ctx);
+    return attachBudgetHeaders(ok(candles, isCrypto(clean) ? "binance" : "yahoo", nowIso(), "recent", null), ctx);
   } catch (error) { return fail(compactProviderError(error instanceof Error ? error.message : "unavailable"), "unavailable", 503); }
 }
 
