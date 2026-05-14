@@ -138,23 +138,23 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 32,
+    "totalCount": 30,
     "winCount": 2,
-    "lossCount": 30,
-    "winRate": 0.0625,
-    "totalPnl": -846.2622019198914,
+    "lossCount": 28,
+    "winRate": 0.06666666666666667,
+    "totalPnl": -710.8587051951691,
     "avgWin": 34.09007459492636,
-    "avgLoss": 30.481411703658136,
-    "expectancy": -26.445693809996605,
-    "rrActual": 1.118388968540953,
+    "avgLoss": 27.822816228036494,
+    "expectancy": -23.695290173172303,
+    "rrActual": 1.2252560745656822,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "autre",
-        "count": 19,
+        "count": 17,
         "wins": 1,
-        "pnl": -427.9331890022862,
-        "winRate": 0.05263157894736842
+        "pnl": -292.529692277564,
+        "winRate": 0.058823529411764705
       },
       {
         "setup": "continuation",
@@ -167,10 +167,10 @@
     "byClass": [
       {
         "class": "stock",
-        "count": 28,
+        "count": 26,
         "wins": 2,
-        "pnl": -729.7175810312222,
-        "winRate": 0.07142857142857142
+        "pnl": -594.3140843064999,
+        "winRate": 0.07692307692307693
       },
       {
         "class": "crypto",
@@ -194,6 +194,12 @@
         "wins": 0
       },
       {
+        "symbol": "ETH",
+        "count": 2,
+        "pnl": -28.080554664956512,
+        "wins": 0
+      },
+      {
         "symbol": "JPM",
         "count": 2,
         "pnl": -30.68585930102264,
@@ -204,12 +210,6 @@
         "count": 2,
         "pnl": -53.605420214602404,
         "wins": 0
-      },
-      {
-        "symbol": "AAPL",
-        "count": 6,
-        "pnl": -106.07341117025408,
-        "wins": 1
       }
     ],
     "bottomSymbols": [
@@ -221,8 +221,8 @@
       },
       {
         "symbol": "BTC",
-        "count": 6,
-        "pnl": -225.58448883683533,
+        "count": 5,
+        "pnl": -169.022805075014,
         "wins": 0
       },
       {
@@ -232,16 +232,16 @@
         "wins": 0
       },
       {
-        "symbol": "ETH",
-        "count": 3,
-        "pnl": -106.92236762785738,
-        "wins": 0
-      },
-      {
         "symbol": "AAPL",
         "count": 6,
         "pnl": -106.07341117025408,
         "wins": 1
+      },
+      {
+        "symbol": "LINK",
+        "count": 2,
+        "pnl": -53.605420214602404,
+        "wins": 0
       }
     ]
   },
