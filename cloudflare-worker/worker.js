@@ -3264,6 +3264,23 @@ async function handleOpportunities(_url, env) {
     nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : "Batch Yahoo indisponible");
   }
 
+  // Yahoo v7 batch sert parfois des prix cachés / vieux de plusieurs minutes
+  // sur certains tickers (NVDA observé à 208 alors que v8 chart renvoyait 235).
+  // Pour les symboles manquants OU dont la quote v7 est suspecte, on retombe
+  // sur getYahooQuote individuel qui passe par v8 chart (temps réel garanti).
+  // Coût : 1 subrequête par symbole manquant, négligeable (< 5 cas usuels).
+  const missingAfterYahooBatch = nonCryptoSymbols.filter(s => !quotesMap[s]);
+  if (missingAfterYahooBatch.length > 0) {
+    for (const symbol of missingAfterYahooBatch) {
+      try {
+        const q = await getYahooQuote(symbol);
+        if (q) quotesMap[symbol] = q;
+      } catch (e) {
+        quoteErrors[symbol] = compactProviderError(e instanceof Error ? e.message : "Yahoo individuel KO");
+      }
+    }
+  }
+
   const missingAfterYahoo = nonCryptoSymbols.filter(s => !quotesMap[s]);
   if (missingAfterYahoo.length > 0) {
     try {
@@ -3470,21 +3487,6 @@ async function handleOpportunityDetail(symbol, env, url = null) {
   let regime = await kvGet("market:regime", env);
 
   const snapshotRow = getOpportunityRowFromSnapshot(clean);
-
-  // Si le snapshot opportunités est encore frais (< 60 s) et que ce n'est
-  // pas un forceFresh, on le réutilise directement. Garantit que le prix
-  // affiché en liste et en fiche soit STRICTEMENT identique au lieu de
-  // dériver d'un appel provider à l'autre.
-  if (!forceFresh && snapshotRow && snapshotRow.status === "ok" && snapshotRow.quotedAt) {
-    const ageMs = Date.now() - Date.parse(snapshotRow.quotedAt);
-    if (Number.isFinite(ageMs) && ageMs < 60_000) {
-      setMemoryCache(cacheKey, detailTtl, cloneJsonPayload(snapshotRow));
-      return attachBudgetHeaders(
-        ok(snapshotRow, snapshotRow.sourceUsed || "worker-v2", nowIso(), snapshotRow.freshness || "recent", null),
-        ctx
-      );
-    }
-  }
 
   try {
     let payload = await withTimeout(
