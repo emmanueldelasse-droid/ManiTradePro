@@ -1140,6 +1140,62 @@ async function getEodhdCandles(symbol, timeframe, limit, env, ctx = null) {
   });
 }
 
+// Quote EODHD via /real-time. Le plan "All World Extended" sert US en
+// temps réel et EU avec un décalage de 15-20 min. C'est volontairement
+// utilisé sur la LISTE d'opportunités (1 appel batch pour 25 symboles,
+// pas de 429) tandis que la FICHE de détail tape Yahoo v8 chart par
+// symbole pour avoir le vrai temps réel partout.
+async function getEodhdRealTimeBatchQuotes(symbols, env) {
+  if (!eodhdConfigured(env)) throw new Error("eodhd_disabled");
+  if (!Array.isArray(symbols) || !symbols.length) return {};
+  const mapped = symbols
+    .map((s) => ({ orig: s, td: normalizeEodhdSymbol(s) }))
+    .filter((m) => m.td);
+  if (!mapped.length) return {};
+  const tdByOrig = Object.fromEntries(mapped.map((m) => [m.td.toUpperCase(), m.orig]));
+  const head = mapped[0].td;
+  const tail = mapped.slice(1).map((m) => m.td);
+  const sParam = tail.length ? `&s=${encodeURIComponent(tail.join(","))}` : "";
+  const url = `https://eodhd.com/api/real-time/${encodeURIComponent(head)}?api_token=${encodeURIComponent(env.EODHD_API_KEY)}&fmt=json${sParam}`;
+  const res = await fetchWithRetry(
+    url,
+    { headers: { Accept: "application/json" } },
+    { timeoutMs: 9000, maxRetries: 1, backoffMs: 600 }
+  ).catch((e) => { throw new Error(`eodhd_rt_batch_network:${e.message || e}`); });
+  if (!res.ok) throw new Error(`eodhd_rt_batch_http_${res.status}`);
+  const payload = await res.json();
+  const rows = Array.isArray(payload) ? payload : (payload && typeof payload === "object" ? [payload] : []);
+  const nowSec = Math.floor(Date.now() / 1000);
+  const out = {};
+  for (const row of rows) {
+    const code = String(row?.code || "").toUpperCase();
+    const orig = tdByOrig[code];
+    if (!orig) continue;
+    const price = Number(row.close);
+    if (!Number.isFinite(price) || price <= 0) continue;
+    const tsSec = Number(row.timestamp);
+    const ageSec = Number.isFinite(tsSec) ? nowSec - tsSec : null;
+    const quotedAt = Number.isFinite(tsSec) ? new Date(tsSec * 1000).toISOString() : nowIso();
+    // EU stocks via EODHD sont différés 15-20 min. On tag freshness en
+    // conséquence si la dernière quote a > 5 min — le front affichera
+    // le badge approprié.
+    const freshness = (ageSec != null && ageSec > 300) ? "delayed_15m" : "live";
+    out[orig] = {
+      symbol: orig,
+      name: getDisplayName(orig),
+      assetClass: getAssetClass(orig),
+      price,
+      change24hPct: Number.isFinite(Number(row.change_p)) ? Number(row.change_p) : null,
+      volume24h: Number.isFinite(Number(row.volume)) ? Number(row.volume) : null,
+      currency: getCurrencyForSymbol(orig),
+      sourceUsed: "eodhd",
+      freshness,
+      quotedAt
+    };
+  }
+  return out;
+}
+
 async function getEodhdCandlesWithKV(symbol, timeframe, limit, env, ctx = null) {
   const kvKey = `candles:eodhd:${symbol}:${timeframe}`;
   const kvTtl = timeframe === "1w" ? KV_TTL.candlesDaily * 2 : KV_TTL.candlesDaily;
@@ -1533,17 +1589,16 @@ async function getAlphaQuote(symbol, env) {
 }
 
 // ============================================================
-// RESOLVE UNIFIED QUOTE — UNE SEULE SOURCE PAR ASSET CLASS
+// RESOLVE UNIFIED QUOTE — routé par marché
 //
-// Règle utilisateur (mai 2026) : un seul provider de quote par actif,
-// pour qu'il n'y ait JAMAIS deux prix différents entre la liste et la
-// fiche. Conséquence :
-//   - Crypto    → Binance (seul fournisseur temps réel gratuit).
-//   - Non-crypto → Yahoo v8 chart (endpoint temps réel gratuit).
-//
-// Plus de Twelve Data (différé 15 min), plus d'Alpha Vantage, plus de
-// Yahoo v7 batch (servait du cache vieux de plusieurs minutes). Si
-// Yahoo v8 tombe en panne, la quote est simplement marquée indisponible.
+// Règle utilisateur :
+//   - Crypto                → Binance (temps réel)
+//   - Actions US (.US)      → EODHD /real-time (temps réel sur plan
+//                              "All World Extended")
+//   - Actions EU + autres   → Yahoo v8 chart (temps réel gratuit,
+//                              EODHD différé 15 min sur EU)
+//   - Twelve                → filet ultime quand tout pète
+//                              (badge "différé 15 min" affiché)
 // ============================================================
 async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) {
   const clean = parseSymbol(symbol);
@@ -1556,8 +1611,32 @@ async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) 
   if (isCrypto(clean)) {
     quote = await getCryptoQuote(clean);
   } else {
-    if (circuitIsOpen("yahoo")) throw new Error("yahoo_circuit_open");
-    quote = await getYahooQuoteFromChart(clean);
+    const eodhdSym = normalizeEodhdSymbol(clean);
+    const isUsListing = eodhdSym && eodhdSym.toUpperCase().endsWith(".US");
+
+    if (isUsListing && eodhdConfigured(env)) {
+      try {
+        const batch = await getEodhdRealTimeBatchQuotes([clean], env);
+        if (batch[clean]) quote = batch[clean];
+      } catch {
+        // EODHD KO → on bascule sur Yahoo plus bas.
+      }
+    }
+
+    if (!quote && !circuitIsOpen("yahoo")) {
+      try {
+        quote = await getYahooQuoteFromChart(clean);
+      } catch {
+        // Yahoo KO (429, timeout, etc.) — on tente Twelve.
+      }
+    }
+    if (!quote && !circuitIsOpen("twelvedata")) {
+      try {
+        quote = await getTwelveQuote(clean, env, ctx);
+      } catch {
+        // Twelve KO aussi → on remonte l'erreur au caller.
+      }
+    }
   }
   if (!quote) throw new Error("quote_unavailable");
 
@@ -3220,41 +3299,49 @@ async function handleOpportunities(_url, env) {
   const ctx = createBudgetContext("opportunities");
 
   // ============================================================
-  // PHASE 1 — quotes non-crypto via UNE SEULE source : Yahoo v8 chart.
-  // Identique au chemin de la fiche détail, donc liste et fiche affichent
-  // exactement le même prix. Coût : N subrequêtes (panel ~25 symboles,
-  // largement sous la limite Cloudflare). On parallèle modérément pour
-  // garder la latence basse.
+  // PHASE 1 — quotes non-crypto routées par marché de cotation.
+  //
+  // Règle utilisateur :
+  //   - Actions US (.US)         → EODHD /real-time batch (temps réel
+  //                                 sur plan "All World Extended").
+  //   - Actions EU + autres      → Yahoo batch v7 (temps réel gratuit
+  //                                 sur EU, EODHD ne sert que du
+  //                                 différé 15 min pour ces bourses).
+  //   - Filet ultime             → Twelve batch (badge différé affiché).
   // ============================================================
   const nonCryptoSymbols = allSymbols.filter(s => !isCrypto(s));
   const cryptoSymbols = allSymbols.filter(s => isCrypto(s));
   const quotesMap = {};
   const quoteErrors = {};
-  const nonCryptoBatchError = "Yahoo indisponible";
+  let nonCryptoBatchError = "Batch indisponible";
 
-  const yahooResults = await mapWithConcurrency(
-    nonCryptoSymbols,
-    OPPORTUNITIES_CONCURRENCY,
-    async (symbol) => {
-      try {
-        const q = await getYahooQuoteFromChart(symbol);
-        return { symbol, quote: q, error: null };
-      } catch (e) {
-        return { symbol, quote: null, error: compactProviderError(e instanceof Error ? e.message : "Yahoo KO") };
-      }
-    }
-  );
-  for (const result of yahooResults) {
-    if (result instanceof Error) continue;
-    if (result.quote) quotesMap[result.symbol] = result.quote;
-    else if (result.error) quoteErrors[result.symbol] = result.error;
+  const usSymbols = [];
+  for (const s of nonCryptoSymbols) {
+    const td = normalizeEodhdSymbol(s);
+    if (td && td.toUpperCase().endsWith(".US")) usSymbols.push(s);
   }
 
-  // Filet Twelve Data : appelé UNIQUEMENT pour les symboles que Yahoo
-  // n'a pas pu servir (panne, ticker bloqué, etc.). Twelve free tier est
-  // différé de 15 min, donc le badge "différé 15 min" remontera côté
-  // front pour ces symboles — l'utilisateur sait au coup d'œil quand
-  // le prix n'est pas live. Yahoo reste la source canonique.
+  if (usSymbols.length && eodhdConfigured(env)) {
+    try {
+      const eodhdBatch = await getEodhdRealTimeBatchQuotes(usSymbols, env);
+      Object.assign(quotesMap, eodhdBatch);
+    } catch (e) {
+      nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : "EODHD batch KO");
+    }
+  }
+
+  // Yahoo batch pour les EU + filet pour les US qui n'ont pas répondu EODHD.
+  const needYahoo = nonCryptoSymbols.filter(s => !quotesMap[s]);
+  if (needYahoo.length > 0) {
+    try {
+      const yahooBatch = await getYahooBatchQuotes(needYahoo);
+      Object.assign(quotesMap, yahooBatch);
+    } catch (e) {
+      nonCryptoBatchError = compactProviderError(e instanceof Error ? e.message : nonCryptoBatchError);
+    }
+  }
+
+  // Dernier filet : Twelve batch (différé 15 min, badge affiché côté front).
   const missingAfterYahoo = nonCryptoSymbols.filter(s => !quotesMap[s]);
   if (missingAfterYahoo.length > 0) {
     try {
