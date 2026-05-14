@@ -9,11 +9,11 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-14 (PR #10 — EODHD + stop/TP intraday + setup obligatoire + cooldown post-stop) |
+| **Dernière mise à jour** | 2026-05-14 (PR #147 — dedup Paramètres du bot) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
 | **Branche active** | `claude/resume-manitradepro-MeZLc` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
-| **Déployé sur** | GitHub Pages + Cloudflare Worker |
+| **Déployé sur** | GitHub Pages + Cloudflare Worker (auto-deploy GitHub Actions) |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
 
 ---
@@ -62,6 +62,137 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-14 (suite) — PRs #131 → #147
+
+Longue session sur deux gros chantiers : **fiabiliser les sources de prix**
+(NVDA affiché à 3 prix différents, ASML fermé par faux stop) et **fixer les
+ennuis UX** (page qui remonte toute seule, scroll qui freeze).
+
+### Sources de prix — architecture finale
+
+| Donnée | Provider primaire | Pourquoi |
+|---|---|---|
+| Bougies daily/weekly | **EODHD** `/eod` (US + EU + UK + Suisse) | Plan All World Extended payé, historique long et propre |
+| Quote temps réel — actions US (`.US`) | **EODHD** `/real-time` | Temps réel sur ce plan |
+| Quote temps réel — actions EU/UK/CH | **Yahoo v8 chart** | Temps réel gratuit, EODHD différé 15 min sur EU |
+| Quote crypto | **Binance** | Seule source temps réel gratuite |
+| Filet ultime | Twelve | Différé 15 min, badge "différé 15 min" affiché |
+
+Conventions de suffixe traduites automatiquement dans `normalizeEodhdSymbol` :
+- Yahoo `.DE` → EODHD `.XETRA`
+- Yahoo `.L` → EODHD `.LSE`
+
+Filet EOD ajouté dans `validateSymbolOnProviders` : si `/real-time` renvoie
+vide (cas SIX Suisse hors heures pour ROG.SW), on accepte le symbole tant que
+`getEodhdCandles` retourne au moins une bougie daily.
+
+### Bug devise mixée (anti faux stop)
+
+Cas réel ASML : position ouverte 1531.44 $US Nasdaq, fermée par stop "intraday_low_breach"
+avec `intraday_low=1367` venant de Twelve (1367 EUR sur ASML.AS Amsterdam, pas
+Nasdaq USD). Le tracker a comparé 1367 EUR à 1456 USD comme s'ils étaient
+identiques → faux stop, position fermée -36 € à tort alors qu'elle était à +11 %.
+
+Fix triple :
+1. `buildTrainingPositionRowFromSignal` stocke maintenant `currency` à l'ouverture.
+2. Cron close-check : `updatePositionIntraExcursion` n'est appelé QUE si la devise
+   du live correspond à celle de l'entry — sinon le cycle est skip.
+3. `trainingCloseTrigger` : garde-fou en tête qui retourne `null` si les devises
+   diffèrent. Compatible legacy : skip si l'un des deux tags est vide.
+4. `buildClosedTradeRowFromPosition` propage `currency` vers `mtp_trades`.
+
+Migration SQL `015_positions_currency.sql` : ajoute la colonne `currency` sur
+`mtp_positions` et `mtp_trades` avec backfill (EUR pour Paris/Xetra/Amsterdam,
+CHF pour SIX, USD pour le reste).
+
+### UX — bot params dans Réglages + bouton "Tout effacer"
+
+- La carte "Paramètres du bot" passe de l'onglet **Trades** à l'onglet **Réglages** :
+  l'auto-refresh des opportunités refermait l'accordéon en permanence quand
+  elle était dans Trades. Sur Réglages, plus de re-render automatique.
+- Bouton **"Tout effacer définitivement"** dans la carte. Un clic :
+  désactive l'auto-ouverture → wipe trades + positions + feedbacks + events +
+  journal moteur → réactive l'auto-ouverture si elle l'était (dans `finally`
+  pour gérer le cas où le wipe rate). Plus besoin de désactiver à la main.
+- 3 corrections d'audit appliquées : `wasAutoOpen === true` (safe quand
+  `state.bot.account` null), restauration dans `finally`, cleanup `algoJournal`.
+- Dedup à la PR #147 : la version Trades de la carte existait encore en
+  parallèle de la version Settings. La version Trades a été retirée.
+
+### UX — scroll préservé entre re-renders
+
+L'app remontait en haut toutes les 30 s + freeze de scroll. Trois fixes en
+cascade (sans ironie) :
+1. PR #140 : sauvegarde `window.scrollY` avant re-render → ne marche pas car
+   le scroll est sur `.main-content`, pas sur `window`.
+2. PR #141 : corrigé pour utiliser `.main-content.scrollTop`.
+3. PR #142 : suppression du `render()` inconditionnel dans le `setInterval`
+   d'auto-refresh — `loadOpportunities`/`loadDetail` rappellent déjà `render()`
+   à la fin du fetch, le render externe créait juste un re-render inutile qui
+   freezait le scroll.
+
+### EU/UK stocks ajoutables via /api/user-assets
+
+11 actions ajoutées par script F12 dans la watchlist utilisateur :
+
+| Bourse | Tickers |
+|---|---|
+| Paris | OR.PA, BNP.PA, STMPA.PA |
+| Xetra | BMW.DE, BAS.DE |
+| Amsterdam | PHIA.AS |
+| SIX Suisse | ROG.SW, UBSG.SW |
+| Londres | HSBA.L, ULVR.L |
+| Nasdaq US | RACE (Ferrari) |
+
+Cas spéciaux : EODHD n'a pas Ferrari sur Milan (`RACE.MI` vide), il faut
+passer par `RACE` (NYSE). Idem STMicro : `STM.MI` vide, passer par `STMPA.PA`
+(Paris) ou `STM` (NYSE).
+
+### PRs de cette session
+
+| PR | Apport |
+|---|---|
+| #131 | Route `/api/admin/eodhd-probe/:symbol` déplacée POST → GET |
+| #132 | Currency-aware price display (EU stocks affichés en EUR) |
+| #133 | Propagation du champ `currency` dans la chaîne payload (`buildStable` etc.) |
+| #134 | Tous les `priceDisplay` callers passent `currency` |
+| #135 | Live prices everywhere (Yahoo primary, TTL courts, refresh 1 min) |
+| #136 | Badge source + ancienneté ("Données Yahoo · mis à jour il y a 30 s") |
+| #137 | Single source par asset class (revert plus tard) |
+| #138 | Opp scan via Yahoo batch (v8 individual = 429) |
+| #139 | EODHD différé en filet pour EU stocks quand Yahoo 429 |
+| #140 | 1ère tentative fix scroll (window.scrollY — faux) |
+| #141 | Vrai fix scroll sur `.main-content` |
+| #142 | Suppression `render()` redondant dans interval 30 s |
+| #143 | Currency guard (anti faux stop) + bot params dans Settings + wipe button |
+| #144 | EODHD en premier dans `validateSymbolOnProviders` |
+| #145 | Traduit `.DE → .XETRA` et `.L → .LSE` pour EODHD |
+| #146 | Filet EOD dans validation (ROG.SW hors heures SIX) |
+| #147 | Dedup carte Paramètres du bot (Trades en double) |
+
+### Migration SQL 015 à appliquer
+
+```sql
+alter table public.mtp_positions add column if not exists currency text;
+alter table public.mtp_trades add column if not exists currency text;
+update public.mtp_positions set currency = 'EUR' where currency is null and symbol in ('LVMH','RMS','AIR','TTE','SAP','SIE');
+update public.mtp_positions set currency = 'CHF' where currency is null and symbol = 'NESN';
+update public.mtp_positions set currency = 'USD' where currency is null;
+update public.mtp_trades set currency = 'EUR' where currency is null and symbol in ('LVMH','RMS','AIR','TTE','SAP','SIE');
+update public.mtp_trades set currency = 'CHF' where currency is null and symbol = 'NESN';
+update public.mtp_trades set currency = 'USD' where currency is null;
+```
+
+### Points encore à creuser
+
+- **Refonte UI/UX** : l'utilisateur a demandé un audit visuel complet via le
+  skill `ui-ux-pro-max`. À faire en début de session suivante.
+- **Plan EODHD Real-Time Plus** : si l'utilisateur veut du vrai temps réel sur
+  les EU (et plus dépendre de Yahoo qui rate-limite), c'est l'add-on payant à
+  envisager.
 
 ---
 
