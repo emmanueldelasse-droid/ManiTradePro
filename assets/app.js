@@ -1156,8 +1156,13 @@
     const c = 2 * Math.PI * r;
     const dash = (value / 100) * c;
     const color = scoreColor(score, tone);
+    // Glow subtil sur le ring : tonalité légère pour les scores actionnables
+    // (proposed / >= 80). Pour les scores neutres ou bas, pas de glow pour
+    // ne pas attirer l'œil sur du bruit.
+    const isHot = (tone === "proposed" || (score != null && score >= 80));
+    const glowClass = isHot ? " score-ring--hot" : "";
     return `
-      <div class="score-ring">
+      <div class="score-ring${glowClass}" style="--ring-color:${color}">
         <svg viewBox="0 0 48 48" aria-hidden="true">
           <circle cx="24" cy="24" r="${r}" fill="none" stroke="var(--bg-elevated)" stroke-width="4"></circle>
           <circle cx="24" cy="24" r="${r}" fill="none" stroke="${color}" stroke-width="4"
@@ -3088,7 +3093,7 @@ function renderOppRow(item, rank) {
 
     if (mobile) {
       return `
-        <div class="opp-row mobile-card ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="display:block;padding:14px 14px 16px;border-radius:22px;${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
+        <div class="opp-row mobile-card ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="display:block;padding:14px 14px 16px;border-radius:22px;${top1 ? "border:1px solid rgba(0,229,160,.55); box-shadow:0 0 0 1px rgba(0,229,160,.18) inset, 0 8px 28px -8px rgba(0,229,160,.32); background:linear-gradient(135deg, rgba(0,229,160,.06) 0%, transparent 38%);" : ""}">
           <div style="display:flex;gap:12px;align-items:flex-start;">
             <div class="opp-rank" style="min-width:36px;">#${rank}</div>
             <div class="asset-icon">${safeText((item.symbol || "").slice(0, 4))}</div>
@@ -3121,7 +3126,7 @@ function renderOppRow(item, rank) {
     }
 
     return `
-      <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="${top1 ? "border:1px solid rgba(94,234,212,.45); box-shadow:0 0 0 1px rgba(94,234,212,.12) inset;" : ""}">
+      <div class="opp-row ${state.settings.compactCards ? "compact" : ""}" data-symbol="${safeText(item.symbol)}" style="${top1 ? "border:1px solid rgba(0,229,160,.55); box-shadow:0 0 0 1px rgba(0,229,160,.18) inset, 0 8px 28px -8px rgba(0,229,160,.32); background:linear-gradient(135deg, rgba(0,229,160,.06) 0%, transparent 38%);" : ""}">
         <div class="opp-rank">#${rank}</div>
         <div class="asset-main">
           <div class="asset-icon">${safeText((item.symbol || "").slice(0, 4))}</div>
@@ -4295,12 +4300,61 @@ function detailTileValue(kind, plan, detail) {
     return chips.length ? `<div class="modulator-chips">${chips.join("")}</div>` : "";
   }
 
+  // Skeletons : placeholders animés pendant les fetchs. Reproduit
+  // grossièrement la structure finale pour éviter le layout shift
+  // quand la donnée arrive.
+  function renderDetailSkeleton() {
+    return `
+      <div class="skeleton-card" style="margin-bottom:18px" aria-busy="true" aria-label="Chargement de la fiche">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:14px">
+          <div style="flex:1;min-width:0">
+            <span class="skeleton skeleton-line tall" style="width:35%"></span>
+            <span class="skeleton skeleton-line short"></span>
+          </div>
+          <div style="flex:0 0 auto;text-align:right">
+            <span class="skeleton skeleton-line huge"></span>
+            <span class="skeleton skeleton-line short" style="margin-left:auto"></span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+          <span class="skeleton" style="width:78px;height:22px;border-radius:999px"></span>
+          <span class="skeleton" style="width:96px;height:22px;border-radius:999px"></span>
+          <span class="skeleton" style="width:64px;height:22px;border-radius:999px"></span>
+        </div>
+        <span class="skeleton skeleton-line"></span>
+        <span class="skeleton skeleton-line"></span>
+        <span class="skeleton skeleton-line short"></span>
+      </div>
+      <div class="skeleton-card" aria-busy="true">
+        <span class="skeleton skeleton-line tall" style="width:30%;margin-bottom:14px"></span>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <span class="skeleton" style="height:62px"></span>
+          <span class="skeleton" style="height:62px"></span>
+          <span class="skeleton" style="height:62px"></span>
+          <span class="skeleton" style="height:62px"></span>
+        </div>
+      </div>`;
+  }
+
+  function renderAiReviewSkeleton() {
+    return `
+      <div aria-busy="true" aria-label="Analyse IA en cours" style="margin-top:8px">
+        <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+          <span class="skeleton" style="width:90px;height:22px;border-radius:999px"></span>
+          <span class="skeleton" style="width:110px;height:22px;border-radius:999px"></span>
+        </div>
+        <span class="skeleton skeleton-line"></span>
+        <span class="skeleton skeleton-line"></span>
+        <span class="skeleton skeleton-line short"></span>
+      </div>`;
+  }
+
   function renderDetail() {
     const d = state.detail;
     return `
       <div class="screen">
         <div class="section-title"><button class="btn" data-route="opportunities">← Retour</button><span>Fiche actif</span></div>
-        ${state.loadingDetail ? `<div class="loading-state">Chargement du detail...</div>` : ""}
+        ${state.loadingDetail ? renderDetailSkeleton() : ""}
         ${state.error ? `<div class="error-box">${safeText(state.error)}</div>` : ""}
         ${d ? `<div class="countdown-item">
                 <span class="countdown-dot"></span>
@@ -4343,7 +4397,7 @@ function detailTileValue(kind, plan, detail) {
 
               <div class="card" style="margin-bottom:18px">
                 <div class="section-title"><span>Lecture complementaire</span><span>${state.loadingAiReview ? "analyse..." : safeText((state.aiReview?.provider === "moteur_local") ? "lecture moteur seule" : (state.aiReview?.externalAiUsed ? "Claude" : "fallback local"))}</span></div>
-                ${state.loadingAiReview ? `<div class="loading-state">Analyse IA en cours...</div>` : state.aiReview ? `
+                ${state.loadingAiReview ? renderAiReviewSkeleton() : state.aiReview ? `
                   <div class="ai-review-box">
                     <div class="legend">
                       ${badge(state.aiReview.decision || "—", decisionBadgeClass(state.aiReview.decision || ""))}

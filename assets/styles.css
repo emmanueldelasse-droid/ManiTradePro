@@ -265,7 +265,12 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);cursor:poi
 .score-box{display:flex;align-items:center;gap:10px}
 .score-ring{position:relative;width:48px;height:48px;flex:none}
 .score-ring svg{width:48px;height:48px;display:block}
-.score-ring-text{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-mono);font-size:.82rem;font-weight:700}
+.score-ring-text{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-mono);font-size:.82rem;font-weight:700;font-variant-numeric:var(--num-features)}
+/* Glow subtil sur les scores chauds (>= 80 ou tone "proposed") :
+   un halo derrière le ring pour attirer l'œil sur ce qui est
+   actionnable, sans bruit visuel sur les scores neutres. */
+.score-ring--hot::before{content:"";position:absolute;inset:-4px;border-radius:50%;background:radial-gradient(circle,var(--ring-color,var(--accent)) 0%,transparent 65%);opacity:.22;filter:blur(6px);pointer-events:none;z-index:0}
+.score-ring--hot svg,.score-ring--hot .score-ring-text{position:relative;z-index:1}
 .score-meta{display:flex;flex-direction:column;gap:5px}
 .price-col{text-align:right}
 .price{font-family:var(--font-mono);font-weight:700;font-variant-numeric:var(--num-features);letter-spacing:-0.005em}
@@ -273,6 +278,24 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);cursor:poi
 .change.up{color:var(--profit)} .change.down{color:var(--loss)}
 .meta-col{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
 .empty-state,.loading-state{padding:34px 20px;text-align:center;color:var(--text-secondary);background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:14px}
+
+/* =====================================================
+   Skeletons — placeholders animés pendant les fetchs.
+   Plus propre qu'un "Chargement..." plat parce que ça donne
+   une idée de la structure finale et évite le layout shift.
+   ===================================================== */
+@keyframes skeletonPulse{
+  0%,100%{opacity:.55}
+  50%{opacity:.95}
+}
+.skeleton{display:block;background:linear-gradient(90deg,var(--bg-elevated) 0%,var(--bg-card-hover) 50%,var(--bg-elevated) 100%);background-size:200% 100%;border-radius:6px;animation:skeletonPulse 1.4s ease-in-out infinite;will-change:opacity}
+.skeleton-line{height:.85rem;margin:8px 0;width:100%}
+.skeleton-line.short{width:40%}
+.skeleton-line.tall{height:1.4rem}
+.skeleton-line.huge{height:2.2rem;width:55%}
+.skeleton-card{padding:18px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius)}
+.app-shell.theme-light .skeleton{background:linear-gradient(90deg,#eef0f5 0%,#f7f8fa 50%,#eef0f5 100%);background-size:200% 100%}
+.app-shell.theme-light .skeleton-card{background:#fff;border-color:#e2e6ef}
 .detail-layout{display:grid;grid-template-columns:1.25fr .9fr;gap:18px}
 .detail-head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .detail-title-wrap{display:flex;gap:14px;align-items:center}
