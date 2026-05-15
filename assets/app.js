@@ -1020,6 +1020,133 @@
     return at ? `Mis à jour ${at}` : "";
   }
 
+  // === Vague B.8 — diagnostic prix live (FRONT UNIQUEMENT) ============
+  // Helpers d'affichage de liveContext.quoteQuality. Lit, formatte,
+  // n'a aucun calcul métier (le moteur reste seul juge — cf. PROJECT_RULES R4).
+
+  function quoteQualityFor(item) {
+    return item?.liveContext?.quoteQuality || null;
+  }
+
+  function quoteSourceShortLabel(sourceUsed) {
+    const src = String(sourceUsed || "").toLowerCase();
+    if (src === "twelvedata") return "Twelve Data";
+    if (src === "yahoo") return "Yahoo";
+    if (src === "binance") return "Binance";
+    if (src === "eodhd" || src === "eod") return "EODHD";
+    if (src === "snapshot") return "Snapshot EOD";
+    if (src === "alphavantage" || src === "alpha") return "Alpha Vantage";
+    if (src === "coingecko") return "CoinGecko";
+    if (src === "finnhub") return "Finnhub";
+    if (!src) return "Source ?";
+    return sourceUsed;
+  }
+
+  // freshness brut → label court pour badge / chip ("live" → "live",
+  // "delayed_15m" → "différé 15 min"). Distinct de simpleFreshnessLabel
+  // (qui est verbeux pour le bloc "Mise a jour").
+  function freshnessChipLabel(value) {
+    const v = String(value || "").toLowerCase();
+    if (v === "live") return "live";
+    if (v === "delayed_15m") return "différé 15 min";
+    if (v === "recent") return "récent";
+    if (v === "eod") return "snapshot EOD";
+    if (v === "stale") return "périmé";
+    return "fraîcheur ?";
+  }
+
+  // État compact pour l'icône + ton du badge sur la carte opp.
+  // Priorité : currency_mismatch > stale > unsafe > abnormal_spread >
+  //            no_price > snapshot EOD > marketClosed > delayed > live ok.
+  // Renvoie {label, tone} où tone ∈ {"positive","neutral","warn","negative"}.
+  function quoteQualityState(item) {
+    const qq = quoteQualityFor(item);
+    const src = String(item?.sourceUsed || "").toLowerCase();
+    const fresh = String(item?.freshness || "").toLowerCase();
+    if (qq) {
+      if (qq.currencyMismatch) return { label: "Devise incohérente", tone: "negative" };
+      if (qq.stale) return { label: "Prix périmé", tone: "negative" };
+      if (qq.providerConfidence === "unsafe" || qq.validationStatus === "unsafe") {
+        return { label: "Prix non fiable", tone: "negative" };
+      }
+      if (qq.abnormalSpread) return { label: "Écart anormal", tone: "negative" };
+      if (!Number.isFinite(Number(item?.price))) return { label: "Prix indisponible", tone: "negative" };
+      if (src === "snapshot" || fresh === "eod") return { label: "Dernier prix dispo", tone: "warn" };
+      if (qq.marketClosed) return { label: "Marché fermé", tone: "neutral" };
+      if (qq.delayed) return { label: "Différé · fiable", tone: "neutral" };
+      if (qq.executionSafe) return { label: "Live fiable", tone: "positive" };
+      return { label: "OK", tone: "neutral" };
+    }
+    // Pas de quoteQuality → on retombe sur freshness brut.
+    if (src === "snapshot" || fresh === "eod") return { label: "Dernier prix dispo", tone: "warn" };
+    if (fresh === "stale") return { label: "Prix périmé", tone: "negative" };
+    if (fresh === "delayed_15m") return { label: "Différé · fiable", tone: "neutral" };
+    if (fresh === "live") return { label: "Live fiable", tone: "positive" };
+    return { label: "Qualité ?", tone: "neutral" };
+  }
+
+  // Ligne unique compacte pour la carte opp.
+  // Ex : "EODHD · différé 15 min · fiable" / "Snapshot EOD · dernier recours".
+  function quoteQualitySummaryLine(item) {
+    if (!item) return "";
+    const src = quoteSourceShortLabel(item.sourceUsed);
+    const fresh = freshnessChipLabel(item.freshness);
+    const qq = quoteQualityFor(item);
+    const srcLow = String(item.sourceUsed || "").toLowerCase();
+    if (srcLow === "snapshot" || String(item.freshness || "").toLowerCase() === "eod") {
+      return `Snapshot EOD · dernier prix disponible`;
+    }
+    let tail = "";
+    if (qq) {
+      if (qq.currencyMismatch) tail = "devise incohérente";
+      else if (qq.stale) tail = "périmé · ne pas utiliser";
+      else if (qq.providerConfidence === "unsafe") tail = "non fiable";
+      else if (qq.abnormalSpread) tail = "écart anormal";
+      else if (qq.marketClosed) tail = "marché fermé";
+      else if (qq.executionSafe) tail = "fiable";
+    }
+    return tail ? `${src} · ${fresh} · ${tail}` : `${src} · ${fresh}`;
+  }
+
+  // Date FR lisible "15/05/2026 17:42" pour la fiche actif.
+  function formatQuotedAtFr(iso) {
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (!Number.isFinite(d.getTime())) return "—";
+    const dd = String(d.getDate()).padStart(2, "0");
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const yyyy = d.getFullYear();
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mi = String(d.getMinutes()).padStart(2, "0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  }
+
+  function validationStatusLabel(value) {
+    const v = String(value || "").toLowerCase();
+    if (v === "valid") return "valide";
+    if (v === "delayed") return "différé";
+    if (v === "market_closed") return "marché fermé";
+    if (v === "stale") return "périmé";
+    if (v === "unsafe") return "non fiable";
+    if (v === "currency_mismatch") return "devise incohérente";
+    if (v === "abnormal_spread") return "écart anormal";
+    return value || "—";
+  }
+
+  function reasonLabel(value) {
+    const v = String(value || "").toLowerCase();
+    if (v === "delayed") return "différé légalement";
+    if (v === "market_closed") return "marché fermé";
+    if (v === "stale") return "quote périmée";
+    if (v === "no_price") return "prix absent";
+    if (v === "currency_mismatch") return "devise incohérente";
+    if (v === "provider_unsafe") return "fournisseur non fiable";
+    if (v.startsWith("abnormal_spread")) return v.replace("abnormal_spread:", "écart ");
+    if (v.startsWith("stale:")) return v.replace("stale:", "périmé · ");
+    return v;
+  }
+  // === fin helpers vague B.8 =========================================
+
   function simpleScoreStatusLabel(value) {
     if (value === "complete") return "complet";
     if (value === "partial") return "partiel";
@@ -1657,6 +1784,10 @@ async function confirmTradeFromModal() {
       newsBonus: Number.isFinite(Number(item?.newsBonus)) ? Number(item.newsBonus) : 0,
       newsBonusReason: item?.newsBonusReason || null,
       newsContext: item?.newsContext || null,
+      // Diagnostic prix live (vague B.8). Préservé tel quel depuis le worker
+      // (objet liveContext.quoteQuality construit par quoteQualityEngine).
+      liveContext: item?.liveContext || null,
+      snapshotId: item?.snapshotId || null,
       error: compactError(item?.error || item?.reasonShort || null)
     };
   }
@@ -3239,12 +3370,13 @@ function renderOppRow(item, rank) {
               <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
               <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
               <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
-              ${quoteSourceLine(item) ? `<div class="muted opp-note" style="font-size:.7rem;font-style:italic;">${safeText(quoteSourceLine(item))}</div>` : ""}
+              ${(() => { const s = quoteQualityState(item); return `<div class="qq-summary qq-tone-${s.tone}" title="${safeText(quoteSourceLine(item))}">${safeText(quoteQualitySummaryLine(item))}</div>`; })()}
             </div>
           </div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;">
             ${mobileBadges}
             ${renderMarketBadge(item.symbol, item.assetClass)}
+            ${(() => { const s = quoteQualityState(item); return `<span class="qq-badge qq-tone-${s.tone}">${safeText(s.label)}</span>`; })()}
           </div>
           <div style="font-size:.72rem;color:var(--text-muted);margin-top:6px">${safeText(getMarketStatus(item.symbol, item.assetClass).detail)}</div>
         </div>`;
@@ -3273,11 +3405,12 @@ function renderOppRow(item, rank) {
           <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
           <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
           <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
-          ${quoteSourceLine(item) ? `<div class="muted opp-note" style="font-size:.7rem;font-style:italic;">${safeText(quoteSourceLine(item))}</div>` : ""}
+          ${(() => { const s = quoteQualityState(item); return `<div class="qq-summary qq-tone-${s.tone}" title="${safeText(quoteSourceLine(item))}">${safeText(quoteQualitySummaryLine(item))}</div>`; })()}
         </div>
         <div class="badges-col" style="display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start;">
           ${badge(vm.assetBadge, item.assetClass || "")}
           ${renderMarketBadge(item.symbol, item.assetClass)}
+          ${(() => { const s = quoteQualityState(item); return `<span class="qq-badge qq-tone-${s.tone}">${safeText(s.label)}</span>`; })()}
           ${vm.confirmationBadge}
           <div style="width:100%;font-size:.72rem;color:var(--text-muted);margin-top:1px">${safeText(getMarketStatus(item.symbol, item.assetClass).detail)}</div>
         </div>
@@ -4620,9 +4753,39 @@ function detailTileValue(kind, plan, detail) {
                   <div class="muted">Type</div><div>${safeText(simpleAssetClassLabel(d.assetClass || "—"))}</div>
                 </div>
               </div>
+
+              ${renderQuoteQualityCard(d)}
             </div>
           </div>
         ` : (!state.loadingDetail ? `<div class="empty-state">Aucun detail charge.</div>` : "")}
+      </div>`;
+  }
+
+  // Vague B.8 — bloc "Qualité du prix" sur la fiche actif. FRONT UNIQUEMENT :
+  // lit les champs de liveContext.quoteQuality déjà calculés par le worker.
+  function renderQuoteQualityCard(d) {
+    if (!d) return "";
+    const qq = quoteQualityFor(d);
+    const state = quoteQualityState(d);
+    const reasons = Array.isArray(qq?.reasons) ? qq.reasons.filter((r) => r && !String(r).startsWith("stale:")) : [];
+    const trust = Number.isFinite(Number(qq?.trustScore)) ? Math.round(Number(qq.trustScore)) : null;
+    const usable = qq ? (qq.executionSafe ? "oui" : "non") : "—";
+    const usableTone = qq ? (qq.executionSafe ? "qq-tone-positive" : "qq-tone-negative") : "qq-tone-neutral";
+    const validation = qq ? validationStatusLabel(qq.validationStatus) : "—";
+
+    return `
+      <div class="card" style="margin-top:18px">
+        <div class="section-title"><span>Qualité du prix</span><span class="qq-badge ${state.tone ? "qq-tone-" + state.tone : ""}">${safeText(state.label)}</span></div>
+        <div class="kv qq-kv">
+          <div class="muted">Source</div><div>${safeText(quoteSourceShortLabel(d.sourceUsed))}</div>
+          <div class="muted">Fraîcheur</div><div>${safeText(freshnessChipLabel(d.freshness))}</div>
+          <div class="muted">Heure quote</div><div>${safeText(formatQuotedAtFr(d.quotedAt))}</div>
+          <div class="muted">Qualité</div><div>${trust != null ? `${trust}/100` : "—"}</div>
+          <div class="muted">Utilisable</div><div><span class="qq-badge ${usableTone}">${safeText(usable)}</span></div>
+          <div class="muted">Statut</div><div>${safeText(validation)}</div>
+        </div>
+        ${reasons.length ? `<div class="qq-reasons"><span class="muted">Détail :</span> ${reasons.map((r) => `<span class="qq-reason-chip">${safeText(reasonLabel(r))}</span>`).join("")}</div>` : ""}
+        <div class="qq-footnote muted">Différé = prix légalement retardé (non bloquant). Snapshot EOD = dernier prix disponible (clôture précédente).</div>
       </div>`;
   }
 

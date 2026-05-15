@@ -313,6 +313,29 @@ liveContext.quoteQuality = {
 - Tri opportunités : `safetyScore > dossierScore > actionScore` (helper `sorter` dans `assets/app.js`)
 - **Adaptation front à venir** (PR séparée) : afficher `strategicAnalysis.score` à côté du composite pour montrer la valeur stable + un badge "Impact live" basé sur `liveContext.scoreImpact.delta`.
 
+### Affichage diagnostic prix live (vague B.8, mai 2026)
+
+Le front lit (sans recalculer) `liveContext.quoteQuality` + `sourceUsed` / `freshness` / `quotedAt` pour rendre visible la qualité de la quote :
+
+**Liste opportunités** :
+- Une ligne courte sous le prix (`quoteQualitySummaryLine(item)`) : `EODHD · différé 15 min · fiable`, `Snapshot EOD · dernier prix disponible`, `Twelve Data · live · périmé · ne pas utiliser`, etc.
+- Un badge dans la zone de tags (`quoteQualityState(item)`) : « Live fiable » / « Différé · fiable » / « Marché fermé » / « Dernier prix dispo » / « Prix périmé » / « Prix non fiable » / « Devise incohérente » / « Écart anormal » / « Prix indisponible ».
+
+**Fiche actif** : carte « Qualité du prix » (`renderQuoteQualityCard`) — Source, Fraîcheur, Heure quote (FR `JJ/MM/AAAA HH:mm`), Qualité (`trustScore`/100), Utilisable (`executionSafe`), Statut (`validationStatus` traduit), chips `reasons[]` si présentes.
+
+**Tons de couleur (priorité décroissante)** :
+1. `currencyMismatch` → rouge
+2. `stale` → rouge
+3. `providerConfidence === "unsafe"` → rouge
+4. `abnormalSpread` → rouge
+5. `price` absent → rouge
+6. `sourceUsed === "snapshot"` ou `freshness === "eod"` → orange (warn) → libellé « Snapshot EOD » ou « Dernier prix dispo », jamais "live"
+7. `marketClosed` → neutre/informatif
+8. `delayed` → neutre/informatif (NON présenté comme erreur)
+9. `executionSafe === true` → vert
+
+**Règle absolue** : le front lit, formatte, n'a jamais de logique métier ni de calcul de score. Toute la matrice de décision reste dans `quoteQualityEngine` côté worker (vague B.6 / B.6.1).
+
 ---
 
 ## Régime macro

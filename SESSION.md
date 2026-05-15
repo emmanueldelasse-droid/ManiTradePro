@@ -27,9 +27,9 @@ Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-15 (passe de fiabilisation documentaire) |
+| **Dernière mise à jour** | 2026-05-15 (vague B.8 — affichage diagnostic prix live) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/resume-manitradepro-MeZLc` |
+| **Branche active** | `claude/display-price-diagnostics-Udvpb` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker (auto-deploy GitHub Actions) |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -80,6 +80,71 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-15 — Vague B.8 : affichage diagnostic prix live (FRONT)
+
+PR front strict. Les vagues B.6 / B.7 / B.7.1 ont rendu le moteur capable de juger la qualité d'une quote live (`liveContext.quoteQuality` : `trustScore`, `executionSafe`, `validationStatus`, `reasons`, etc.). L'utilisateur voit enfin cette info dans l'interface.
+
+### Apport
+
+**Liste opportunités** :
+- Une ligne discrète sous le prix : `EODHD · différé 15 min · fiable`, `Snapshot EOD · dernier prix disponible`, `Yahoo · live · fiable`, `Twelve Data · live · périmé · ne pas utiliser`, etc. (helper `quoteQualitySummaryLine`).
+- Un badge court à côté des autres : "Live fiable" / "Différé · fiable" / "Marché fermé" / "Dernier prix dispo" / "Prix périmé" / "Prix non fiable" / "Devise incohérente" (helper `quoteQualityState`).
+- Tons : vert / neutre / orange / rouge selon priorité (cf. `quoteQualityState`).
+
+**Fiche actif** : nouveau bloc « Qualité du prix » (helper `renderQuoteQualityCard`) :
+- Source : EODHD / Yahoo / Binance / Snapshot EOD / Twelve Data / etc.
+- Fraîcheur : live / différé 15 min / récent / snapshot EOD / périmé.
+- Heure quote : `15/05/2026 17:42` (formattage FR).
+- Qualité : `trustScore`/100.
+- Utilisable : oui/non (badge selon `executionSafe`).
+- Statut : `validationStatus` traduit (différé / marché fermé / périmé / devise incohérente / écart anormal / non fiable).
+- `reasons[]` affichées en chips si présent.
+- Footnote rappel : « Différé = prix légalement retardé (non bloquant). Snapshot EOD = dernier prix disponible. »
+
+### Périmètre strict respecté (FRONT UNIQUEMENT)
+
+- Aucune modification du worker (`cloudflare-worker/worker.js` intact).
+- Aucune modification de `resolveLiveQuote`, `quoteQualityEngine`, `calcDetailScore`, scoring, RR, learning, paper trading, providers.
+- Aucun calcul recalculé côté front : seuls `liveContext.quoteQuality.*`, `sourceUsed`, `freshness`, `quotedAt` sont LUS et formattés.
+- Aucune nouvelle dépendance externe.
+- Aucun appel API supplémentaire.
+
+### Fichiers touchés
+
+| Fichier | Changements |
+|---|---|
+| `assets/app.js` | +1 champ `liveContext` préservé dans `normalizeOpportunity` (sinon `quoteQuality` était dropé). +9 helpers de format (~140 lignes). +1 `renderQuoteQualityCard` (~30 lignes). 2 cartes opp (mobile + desktop) : remplacent l'ancienne `quoteSourceLine` par `quoteQualitySummaryLine` + un badge `quoteQualityState`. |
+| `assets/styles.css` | +1 section `Vague B.8` (~80 lignes) : `.qq-summary`, `.qq-badge.qq-tone-*`, `.qq-kv`, `.qq-reasons`, `.qq-reason-chip`, `.qq-footnote`, plus 6 overrides `.app-shell.theme-light` pour rester lisible en clair. |
+| `SESSION.md` | cette section. |
+| `ARCHITECTURE.md` | helper `quoteQualityState` / `renderQuoteQualityCard` documentés. |
+| `DATA_PIPELINE.md` | section "Affichage front" enrichie (carte opp + bloc fiche actif). |
+
+### Conventions UX
+
+- `delayed` = informatif, pas une erreur. Ton neutre sur badge.
+- `marketClosed` = informatif. Ton neutre.
+- `snapshot` / `freshness === "eod"` = orange (warn). Présenté comme "dernier prix disponible", jamais "live".
+- `stale`, `currencyMismatch`, `abnormalSpread`, `providerConfidence === "unsafe"` = rouge.
+- `executionSafe === true` & quote live = vert.
+
+### Tests effectués
+
+- ✅ Aucun fichier worker modifié (`git diff --stat origin/main -- cloudflare-worker`).
+- ✅ Aucun score recalculé côté front (helpers en lecture seule).
+- ✅ `node --check assets/app.js` PASS.
+- ✅ Carte opp mobile : `.qq-summary` a `overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%` → pas d'écrasement vertical iPhone (cf. bug-hunter classe #2).
+- ✅ Couleurs CSS via vars + overrides explicites pour le light theme (cf. bug-hunter classe #1).
+- ✅ Aucun nouveau `data-action` ou `style="background:rgba(9,14,28,...)"` non scopé.
+- ⚠️ Tests UI iPhone réels non exécutables ici (sandbox sans navigateur). À valider visuellement après merge.
+
+### Limites restantes
+
+- Le moteur (`worker.js`) ne bloque toujours pas l'auto-cycle sur `executionSafe === false` (chantier futur — cf. SESSION B.6 « limites restantes »).
+- Le badge ne s'affiche pas dans les vues "Trades ouverts" / "Trades clos" — les positions stockent leur propre `analysisSnapshot.liveContext`, mais l'UI trades n'a pas été touchée par cette PR (hors scope).
+- Les chips `reasons` sont affichées telles quelles (1 chip = 1 raison brute traduite via `reasonLabel`). Pas de regroupement contextuel.
 
 ---
 
