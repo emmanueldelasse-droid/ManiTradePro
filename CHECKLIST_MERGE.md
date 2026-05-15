@@ -90,6 +90,9 @@ Demander une validation explicite si :
 - [ ] La PR **fait dépendre `strategicAnalysis` de `quoteQuality`** (interdit par construction — `quoteQuality` est purement live, `strategicAnalysis` purement analytique).
 - [ ] La PR **introduit un nouvel appel direct à un provider de quote** (`getYahooQuote`, `getEodhdRealTimeBatchQuotes`, `getTwelveQuote`, `getCryptoQuote`, `resolveUnifiedMarketQuote`) dans un handler d'affichage. Tout affichage prix doit passer par `resolveLiveQuote` (cf. PROJECT_RULES.md R4).
 - [ ] La PR **modifie `resolveLiveQuote`** (cascade, TTL, écriture KV). Escalade obligatoire — c'est le point d'entrée unique pour tous les écrans de prix.
+- [ ] La PR **modifie `evaluateExecutionSafety`** (helper safety gate B.9 — décision blocage auto sur quote unsafe). Toute modif change la décision d'exécution automatique → escalade obligatoire.
+- [ ] La PR **ajoute un nouveau point d'exécution automatique** (auto-cycle alternatif, futur broker réel, handler manuel transformé en auto) **sans** appeler `evaluateExecutionSafety` au préalable. Cf. PROJECT_RULES.md R3-ter.
+- [ ] La PR **élargit le safety gate à `delayed` ou `marketClosed`** comme blocants (interdit par construction — ces champs sont informatifs, cf. règles B.6 / R3-bis).
 
 ---
 

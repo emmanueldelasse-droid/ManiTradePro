@@ -2864,6 +2864,65 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   };
 }
 
+// ============================================================
+// SAFETY GATE EXECUTION — vague B.9
+// ============================================================
+// Lit `payload.liveContext.quoteQuality` (deja calcule par quoteQualityEngine,
+// vague B.6) et decide si l'auto-cycle a le droit d'agir sur cette quote.
+//
+// REGLE ABSOLUE (cf. PROJECT_RULES R5) :
+// Aucune action automatique (ouverture, validation entree, declench TP/SL,
+// preparation exec broker) ne doit s'executer si la quote est jugee unsafe.
+// Le scoring strategique reste inchange — l'opportunite peut toujours etre
+// "Trade propose" cote utilisateur, mais le bot ne tirera pas la gachette
+// tant que la quote n'est pas fiable.
+//
+// Entrees : un payload qui expose `liveContext.quoteQuality`. Accepte
+//           opportunity row, detail payload, position snapshot, etc.
+//
+// Sortie : { safe: bool, code: string, human: string, missing: bool }
+//   - safe    : true uniquement si quoteQuality.executionSafe === true
+//   - code    : machine-readable ("quote_unsafe", "quote_quality_missing",
+//               "stale", "currency_mismatch", "abnormal_spread", "no_price",
+//               "provider_unsafe")
+//   - human   : message FR lisible pour journal / payload de skipped
+//   - missing : true si quoteQuality absent → bloque par prudence (pas
+//               de "benefice du doute" sur les quotes non instrumentees)
+function evaluateExecutionSafety(payload) {
+  const qq = payload?.liveContext?.quoteQuality ?? null;
+  if (!qq || typeof qq !== "object") {
+    return {
+      safe: false,
+      code: "quote_quality_missing",
+      human: "Diagnostic quote indisponible — blocage par prudence",
+      missing: true
+    };
+  }
+  if (qq.executionSafe === true) {
+    return { safe: true, code: "ok", human: null, missing: false };
+  }
+  // executionSafe === false : on remonte la cause la plus grave en premier
+  // pour que le journal soit lisible. L'ordre suit validationStatus de
+  // quoteQualityEngine (cf. worker.js:2827-2834).
+  if (qq.currencyMismatch === true) {
+    return { safe: false, code: "currency_mismatch", human: "Devise incohérente — blocage exécution", missing: false };
+  }
+  if (qq.stale === true) {
+    return { safe: false, code: "stale", human: "Prix live périmé — blocage exécution", missing: false };
+  }
+  if (qq.abnormalSpread === true) {
+    return { safe: false, code: "abnormal_spread", human: "Écart anormal vs dernière clôture — blocage exécution", missing: false };
+  }
+  if (qq.providerConfidence === "unsafe") {
+    return { safe: false, code: "provider_unsafe", human: "Fournisseur de prix non fiable — blocage exécution", missing: false };
+  }
+  if (Array.isArray(qq.reasons) && qq.reasons.includes("no_price")) {
+    return { safe: false, code: "no_price", human: "Prix absent — blocage exécution", missing: false };
+  }
+  // Fallback générique : executionSafe=false sans drapeau spécifique connu.
+  return { safe: false, code: "quote_unsafe", human: "Prix live non fiable — blocage exécution", missing: false };
+}
+
 function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8, learningContext = null) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
 
@@ -4610,6 +4669,30 @@ async function handleTrainingAutoCycle(env) {
             return;
           }
 
+          // Vague B.9 — safety gate execution (cote fermeture). Bloque
+          // l'auto-close si la quote sur laquelle on baserait la decision
+          // n'est pas fiable. Mieux vaut differer le declench TP/SL d'un
+          // cycle que d'executer sur une quote periemee / currency mismatch /
+          // ecart anormal. La position reste OPEN, le tracker MAE/MFE continue
+          // d'etre mis a jour au-dessus (avec le check currencyMatches), et le
+          // prochain cycle reverifiera. Aucune perte de signal : si le stop
+          // etait deja touche en intraday, position.live.lowSinceOpen aura
+          // garde la trace et le close se declenchera au cycle suivant des
+          // que la quote redevient fiable.
+          const closeSafety = evaluateExecutionSafety(detailPayload);
+          if (!closeSafety.safe) {
+            await logTrainingEvent(env, "auto_close_blocked_unsafe", {
+              symbol,
+              position_id: position?.id || null,
+              code: closeSafety.code,
+              human: closeSafety.human,
+              missing_quote_quality: closeSafety.missing === true,
+              effective_price: effectivePrice,
+              price_source: priceSource
+            }).catch(() => {});
+            return;
+          }
+
           const trigger = trainingCloseTrigger(
             position,
             effectivePrice,
@@ -4687,6 +4770,30 @@ async function handleTrainingAutoCycle(env) {
 
         for (const row of candidates) {
           if (openRows.length >= Number(settings.max_open_positions || 10)) break;
+          // Vague B.9 — safety gate execution. Bloque l'auto-open si la quote
+          // n'est pas reputee fiable (executionSafe=false) ou si le diagnostic
+          // est absent (par prudence). N'affecte pas le scoring : l'opportunite
+          // reste "Trade propose" pour l'utilisateur, seul l'auto-cycle est
+          // bloque. La fermeture des positions existantes garde son propre gate
+          // dans la phase fermeture (cf. trainingCloseTrigger wrapper).
+          const safety = evaluateExecutionSafety(row);
+          if (!safety.safe) {
+            log.skipped.push({
+              symbol: row.symbol,
+              reason: `quote_unsafe: ${safety.code}`,
+              human: safety.human
+            });
+            await logTrainingEvent(env, "auto_open_blocked_unsafe", {
+              symbol: row.symbol,
+              code: safety.code,
+              human: safety.human,
+              missing_quote_quality: safety.missing === true,
+              source_used: row?.sourceUsed || null,
+              freshness: row?.freshness || null,
+              quoted_at: row?.quotedAt || null
+            }).catch(() => {});
+            continue;
+          }
           try {
             const opened = await withTimeout(
               openTrainingPositionFromRow(env, row, settings, availableCash, activeAdjustments),

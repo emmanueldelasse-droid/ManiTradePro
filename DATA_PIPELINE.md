@@ -289,8 +289,32 @@ liveContext.quoteQuality = {
 
 **Ce que `quoteQualityEngine` N'EST PAS** :
 - Ne décide pas du scoring stratégique (séparé)
-- Ne pilote pas encore le paper trading
-- Ne bloque pas encore l'auto-cycle (à brancher dans une PR future)
+- ~~Ne pilote pas encore le paper trading~~ → **branché dans l'auto-cycle depuis la vague B.9** via `evaluateExecutionSafety` (cf. section ci-dessous)
+- ~~Ne bloque pas encore l'auto-cycle (à brancher dans une PR future)~~ → **fait depuis B.9**
+
+### Safety gate execution (vague B.9, mai 2026)
+
+`evaluateExecutionSafety(payload)` — helper synchrone qui consomme `payload.liveContext.quoteQuality` et retourne `{safe, code, human, missing}`. Utilisé par `handleTrainingAutoCycle` pour bloquer toute action automatique sur une quote unsafe.
+
+**Règle de décision** :
+```
+quoteQuality absent ou non-objet  → safe=false, code="quote_quality_missing", missing=true
+quoteQuality.executionSafe===true → safe=true,  code="ok"
+currencyMismatch                  → safe=false, code="currency_mismatch"
+stale                             → safe=false, code="stale"
+abnormalSpread                    → safe=false, code="abnormal_spread"
+providerConfidence==="unsafe"     → safe=false, code="provider_unsafe"
+reasons.includes("no_price")      → safe=false, code="no_price"
+executionSafe===false (fallback)  → safe=false, code="quote_unsafe"
+```
+
+`delayed` et `marketClosed` ne déclenchent JAMAIS de blocage par eux-mêmes — c'est conforme à la règle B.6 (informatifs, pas bloquants).
+
+**Points d'application dans `handleTrainingAutoCycle`** :
+1. **Phase ouverture** (avant `openTrainingPositionFromRow`) : si `!safe` → skip candidat, log `auto_open_blocked_unsafe`, `log.skipped.push({reason: "quote_unsafe:<code>", human})`
+2. **Phase fermeture** (avant `trainingCloseTrigger`) : si `!safe` → skip position pour ce cycle, log `auto_close_blocked_unsafe`. Le tracker MAE/MFE (`position.live.highSinceOpen/lowSinceOpen`) continue d'être mis à jour, donc l'info de breach intraday n'est pas perdue ; le close se rejoue au cycle suivant dès que la quote redevient fiable.
+
+**Périmètre** : aucune autre modif (scoring, RR, providers, learning, strategicAnalysis intacts). Aucun front modifié. Le mode manuel UI (futur ou existant) n'est PAS gated par défaut — l'utilisateur reste souverain.
 - N'est pas une logique de comparaison inter-providers (un seul provider par quote)
 
 **Périmètre** : injecté dans `liveContext.quoteQuality` à 3 endroits :

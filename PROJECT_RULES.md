@@ -46,6 +46,15 @@ Ce fichier-ci porte les règles **techniques structurelles** qui ne rentrent dan
 - `quoteQualityEngine` est synchrone (cohérent avec `calcDetailScore`). Pas d'I/O, pas d'`await` dedans.
 - Si une nouvelle source de validation live est ajoutée, elle doit être un champ supplémentaire du `quoteQuality`, pas une modif du moteur de score.
 
+### R3-ter. Safety gate execution — `evaluateExecutionSafety` (vague B.9)
+
+- **Toute action automatique** (auto-open, validation entrée, déclench TP/SL automatique, future exécution broker réel) **DOIT** être précédée d'un check `evaluateExecutionSafety(payload).safe === true`.
+- Si `safe === false` ou `quoteQuality` absent (`missing === true`) → l'action est **bloquée**. Le scoring stratégique et la décision UI ne sont PAS modifiés.
+- **Interdit** d'utiliser `evaluateExecutionSafety` pour modifier un score, une `decision`, un `trendLabel`, un `confidence`, un `plan.*`. C'est un garde-fou d'exécution, pas un input d'analyse.
+- **Interdit** d'élargir la gate à `delayed` ou `marketClosed` seuls — ils sont volontairement informatifs (cf. R3-bis et règles B.6). Seuls `stale`, `currencyMismatch`, `abnormalSpread`, `providerConfidence === "unsafe"`, `no_price`, `executionSafe === false` (générique) déclenchent un blocage.
+- Tout nouveau point d'exécution automatique (futur broker, futurs handlers manuels gated, etc.) **doit** appeler `evaluateExecutionSafety` et écrire un événement dans `mtp_training_events` (event_type style `auto_<action>_blocked_unsafe` avec `{symbol, code, human, missing_quote_quality, ...}`).
+- Le mode manuel UI (action utilisateur explicite) **n'est PAS** gated par défaut — l'utilisateur reste souverain. Le front affiche déjà l'état via le bloc B.8 "Qualité du prix".
+
 ### R4. Prix live unique — `resolveLiveQuote` (vague B.7)
 
 - **Un même actif ne doit jamais afficher deux prix différents entre la liste opportunités et la fiche actif.**
