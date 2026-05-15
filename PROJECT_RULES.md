@@ -58,6 +58,14 @@ Ce fichier-ci porte les règles **techniques structurelles** qui ne rentrent dan
 - **Aucun prix périmé ne doit être affiché comme actuel**. Si `quoteQuality.executionSafe === false` (`stale`, `currency_mismatch`, etc.), le payload signale le problème via `validationStatus` et `reasons[]`. Le consommateur a la responsabilité de respecter ce signal.
 - Exception **volontaire** : `validateSymbolOnProviders` (validation à l'ajout d'un actif) court-circuite `resolveLiveQuote` pour tester chaque provider individuellement. Pas d'affichage. Documenté dans `KNOWN_ISSUES.md`.
 
+#### ⚠️ Dépendance d'infrastructure critique — binding KV `MTP_CACHE`
+
+La cohérence prix cross-worker de R4 **dépend du binding KV `MTP_CACHE`** côté Cloudflare Worker.
+- Si `MTP_CACHE` est **présent** (config normale, `wrangler.toml [[kv_namespaces]]` + dashboard CF) : `kv:livequote:${symbol}` est écrit/lu par toutes les instances → cohérence garantie.
+- Si `MTP_CACHE` est **absent** ou mal configuré : `kvGet`/`kvSet` retournent silencieusement `null`/`false`. **Le code ne plante pas, mais le bug cross-worker revient** (deux prix possibles entre opp et fiche). Aucune alerte n'est levée.
+
+**Vérification recommandée** avant toute mise en prod : `wrangler kv:namespace list` et confirmer que `MTP_CACHE` est bindé dans `wrangler.toml`. Un futur chantier (PR séparée) pourra ajouter une alerte si `writeLiveQuoteToKv` échoue de manière répétée.
+
 ### R4. Champs legacy préservés (additif uniquement)
 
 - Toute évolution du payload `/api/opportunities` ou `/api/opportunity-detail/:symbol` doit être **additive**.
