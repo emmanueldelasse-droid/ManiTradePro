@@ -64,7 +64,39 @@ Puis appliqué : `- regimeMalus + regimeBonus + newsBonus - learningMalus`.
 
 **Rôle** : valider le sens (long/short) du trade.
 
-**Volatilité** : haute. Le `momentum` et le `risk` intègrent `quote.change24hPct` → bouge avec le prix live. **Problème documenté** (cf. `KNOWN_ISSUES.md` #1, vague A.1 à venir).
+**Volatilité** : haute. Le `momentum` et le `risk` intègrent `quote.change24hPct` → bouge avec le prix live. **Pour la version stable, lire `strategicAnalysis.score`** (cf. ci-dessous).
+
+### `strategicAnalysis.score` (0–100, **stable**)
+
+Vague A.1 (mai 2026) — exposé par `calcDetailScore` à côté du `score` legacy.
+
+Recalculé en retirant **toutes** les contributions live :
+- `momentum` strategic = momentum composite − contribution `change24hPct`
+- `risk` strategic = risk composite + contribution `change24hPct` − contribution `volume24h`
+- `context` strategic = context composite − contribution `volume24h`
+- `participation` strategic = participation composite − contribution `change24hPct` − bascule baseline `volume24h`
+- `dataQuality` strategic = constante 80 (les bougies clôturées sont reliables par définition)
+- **PAS** de `regimeBonus` (F&G/VIX recalculés en live toutes les 5 min)
+- **PAS** de `newsBonus` (cache 3-6 h mais la news en elle-même est volatile)
+- **OUI** `regimeMalus` (validité config ↔ régime, stable par batch)
+- **OUI** `learningMalus` (bucket histoire, stable)
+
+**Rôle** : score conçu pour rester stable entre deux clôtures de bougies sur les entrées live directes (prix, volume, freshness). Utilisé pour l'analyse stratégique, le diagnostic de régression, et l'affichage front "score stable" (à venir). Ne pilote PAS encore le paper trading (le `plan.safetyScore` continue d'utiliser le score composite).
+
+**Limites de stabilité** (pas une garantie absolue) :
+- `regimeMalus` peut changer si le régime macro est rafraîchi (cache KV 1 h)
+- `learningMalus` peut changer si un nouveau trade clos publie ses stats dans le bucket
+- `detectConfiguration` reçoit `quote` mais ne lit aucun champ live (paramètre dead, vérifié) — donc stable
+- La dernière bougie daily peut être encore ouverte selon le provider et le fuseau
+- `snapshotId` n'est pas encore propagé (vague B.4) → deux requêtes successives peuvent voir des candles différentes
+
+Cf. `DATA_PIPELINE.md` pour la structure du payload.
+
+### `liveContext` (objet, **volatile**)
+
+Container exposé à côté de `strategicAnalysis`. Contient `change24hPct`, `volume24h`, `freshness`, `quotedAt`, `price`, `regimeBonus`, `newsBonus`, et un objet `scoreImpact: { strategicScore, compositeScore, delta }` qui mesure l'écart entre les deux versions.
+
+**Rôle** : isole tout ce qui change avec le prix live, pour l'affichage temps réel, la validation d'entrée, le calcul TP/SL, le PnL paper et l'exécution réelle future.
 
 ### `exploitabilityScore` (0–100)
 

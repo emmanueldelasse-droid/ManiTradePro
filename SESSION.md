@@ -83,6 +83,54 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-15 — Vague A.1 livrée : séparation strategicAnalysis / liveContext
+
+Le chantier le plus sensible de la refonte : isoler le **score stratégique stable** (basé uniquement sur bougies clôturées + modulateurs stables) du **contexte live volatile** (prix, volume, freshness, F&G/VIX, news).
+
+### Apport
+
+`calcDetailScore` (`cloudflare-worker/worker.js`) retourne désormais **deux nouveaux objets** à côté du payload composite legacy :
+
+- **`strategicAnalysis`** = score recalculé sans `change24hPct`, sans `volume24h`, sans `regimeBonus`, sans `newsBonus`, avec `dataQuality` neutralisé à 80. Applique uniquement `regimeMalus` (stable par batch) et `learningMalus` (bucket histoire). **Conçu pour être stable** entre deux clôtures de bougies sur les entrées live directes — pas une garantie absolue tant que `regimeMalus`, `learningMalus`, le cache régime KV (1 h) ou la dernière bougie daily peuvent évoluer indépendamment. `snapshotId` (vague B.4) sera nécessaire pour fermer ces angles.
+- **`liveContext`** = container pour `change24hPct`, `volume24h`, `freshness`, `quotedAt`, `price`, `regimeBonus`, `newsBonus` + un `scoreImpact: { strategicScore, compositeScore, delta }` pour mesurer l'écart.
+
+Plomberie additive (zéro champ supprimé/renommé) :
+- `calcDetailScore` (worker.js, ~ligne 2499) — calcul + retour des deux objets
+- `buildStablePayload` — propage dans le payload de fiche
+- `toOpportunityRow` — propage dans chaque row de `/api/opportunities`
+- `buildPartialAnalysisPayload` — renvoie `strategicAnalysis: null` + `liveContext` minimal pour le cas données insuffisantes
+
+### Ce qui ne change PAS
+
+- `score`, `breakdown`, `plan`, `plan.safetyScore`, `plan.exploitabilityScore`, `plan.decisionScore`, `plan.finalScore` — **inchangés**
+- `buildWorkerPlan` et `computeTradeSafetyScore` — inchangés (continuent à consommer le composite)
+- Paper trading, TP/SL, PnL, fermeture — inchangés
+- Apprentissage et filtres qualité — inchangés
+- `assets/app.js`, `styles.css`, `index.html`, `sw.js` — **zéro modification front** dans cette PR
+
+### Tests
+
+- ✅ Syntaxe JS valide (`node --check`)
+- ✅ 5 patches présents (vérification regex)
+- ✅ Validation logique : `strategicMomentum = clamp(momentum - liveMomentumDelta)` → toute variation de `change24hPct` est mathématiquement annulée par construction
+- ⏳ Tests live à faire après déploiement Worker : `curl /api/opportunity-detail/NESN.SW` deux fois à 30 s d'écart → `strategicAnalysis.score` doit être identique, `liveContext.change24hPct` peut bouger
+- ⏳ Vérifier que `plan.safetyScore` reste cohérent avec avant sur 3 symboles
+- ✅ `bug-hunter` lancé en parallèle sur les 6 classes UI : zéro hit
+
+### Doc mise à jour
+
+- `KNOWN_ISSUES.md` #1 marqué résolu, ajouté au tableau "Issues résolues récemment"
+- `TRADING_LOGIC.md` : nouvelles sections `strategicAnalysis.score` et `liveContext`
+- `DATA_PIPELINE.md` : nouvelle section "Séparation strategicAnalysis / liveContext (vague A.1)" avec structure du payload
+- `ARCHITECTURE.md` : ligne `calcDetailScore` mise à jour, "Non encore fait" marque la séparation comme livrée
+
+### Reste à faire (PR séparée)
+
+- Adaptation front : afficher `strategicAnalysis.score` à côté du composite, badge "Impact live" basé sur `liveContext.scoreImpact.delta`
+- Décider si on bascule `plan.safetyScore` sur le strategic (ce qui figerait la décision auto-cycle entre deux bougies) — discussion à avoir avec l'utilisateur
+
+---
+
 ## Session 2026-05-15 (fin) — BOT_OBJECTIVE.md, constitution officielle du projet
 
 L'utilisateur a demandé la création d'un fichier permanent **`BOT_OBJECTIVE.md`** qui devient la **constitution officielle** du projet : objectif réel du bot, priorité absolue (préserver le capital), 10 règles absolues, rôle de l'IA, conditions de passage en argent réel.

@@ -115,16 +115,54 @@ Aujourd'hui (mai 2026), cette séparation **n'est pas encore stricte côté work
 ### Flux actuel
 
 1. `calcDetailScore(quote, candles, regime, env, regimeIndicators, newsContext, claudeWeight, learningContext)` dans `cloudflare-worker/worker.js`
-2. Calcul 6 composantes pondérées :
+2. Calcul 6 composantes pondérées (composite, intègre le live) :
    - structure 24 %
    - momentum 20 % (inclut `quote.change24hPct` → **LIVE**)
    - timing 20 %
    - risk 18 % (inclut `quote.change24hPct` → **LIVE**)
    - context 10 %
-   - dataQuality 8 %
+   - dataQuality 8 % (basé sur `quote.freshness` → **LIVE**)
 3. Applique modulateurs : `-regimeMalus +regimeBonus +newsBonus -learningMalus`
 4. Si `aiContextReview` actif : applique `aiModifier.delta`
 5. `safetyScore` recompose via `computeTradeSafetyScore` : 0.34×decision + 0.24×exploitability + 0.14×entry + 0.14×risk + 0.08×context + 0.06×dataQuality
+
+### Séparation strategicAnalysis / liveContext (vague A.1, mai 2026)
+
+Depuis la vague A.1, `calcDetailScore` retourne **deux objets supplémentaires** à côté du payload composite legacy :
+
+```
+{
+  // legacy (composite, intègre live) — inchangé pour back-compat
+  score, breakdown, plan, ...,
+
+  // NOUVEAU — vague A.1
+  strategicAnalysis: {
+    score,                  // recalculé sans change24hPct ni volume24h ni regimeBonus ni newsBonus
+    direction,
+    confidence,
+    setupType,
+    configuration,
+    hardFilters: { passed, flags },
+    breakdown: { trend, momentum, timing, risk, context, participation, dataQuality:80 },
+    regimeMalus,            // appliqué (stable par batch)
+    learningMalus,          // appliqué (stable)
+    learningReason
+  },
+  liveContext: {
+    change24hPct, volume24h, freshness, quotedAt, price,
+    regimeBonus, regimeBonusReason,
+    newsBonus, newsBonusReason,
+    scoreImpact: { strategicScore, compositeScore, delta }
+  }
+}
+```
+
+`strategicAnalysis.score` est **conçu pour être stable** entre deux clôtures de bougies sur les entrées live directes (prix, volume, freshness). Ce n'est pas une garantie absolue : il peut bouger si le régime macro est rafraîchi (cache KV 1 h, modifie `regimeMalus`), si un nouveau trade clos publie ses stats (modifie `learningMalus`), ou si la dernière bougie daily est encore ouverte côté provider. `snapshotId` (vague B.4) sera nécessaire pour figer ces dépendances. `liveContext` est la source de vérité unique pour les valeurs volatiles directes.
+
+Plumberie :
+- `buildStablePayload` (`cloudflare-worker/worker.js`) propage `strategicAnalysis` et `liveContext` du `scored` au payload de fiche.
+- `toOpportunityRow` (`cloudflare-worker/worker.js`) propage les deux objets dans chaque row de `/api/opportunities`.
+- `buildPartialAnalysisPayload` (cas données insuffisantes) renvoie `strategicAnalysis: null` + un `liveContext` minimal (sans `scoreImpact`).
 
 ### Stockage
 
@@ -132,11 +170,14 @@ Aujourd'hui (mai 2026), cette séparation **n'est pas encore stricte côté work
 - Trade clos : `mtp_trades.score` + `mtp_trades.analysis_snapshot`
 - Feedback bucket : `mtp_trade_feedback.bucket_key` = `${setup}|${direction}|${regime}|${asset_class}`
 
+`analysis_snapshot` contient désormais `strategicAnalysis` et `liveContext` (additif, ne casse pas l'existant).
+
 ### Affichage front
 
-- Carte opportunités : ring = `safetyScoreFrom(item)` → `plan.safetyScore` brut
-- Fiche détail : `plan.safetyScore`, `plan.exploitabilityScore`, `plan.finalScore`
+- Carte opportunités : ring = `safetyScoreFrom(item)` → `plan.safetyScore` brut (composite, inchangé)
+- Fiche détail : `plan.safetyScore`, `plan.exploitabilityScore`, `plan.finalScore` (composite, inchangé)
 - Tri opportunités : `safetyScore > dossierScore > actionScore` (helper `sorter` dans `assets/app.js`)
+- **Adaptation front à venir** (PR séparée) : afficher `strategicAnalysis.score` à côté du composite pour montrer la valeur stable + un badge "Impact live" basé sur `liveContext.scoreImpact.delta`.
 
 ---
 
