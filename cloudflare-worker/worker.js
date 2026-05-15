@@ -2644,23 +2644,27 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   const marketClosed = isMarketLikelyClosed(sym, cls, expectedCurrency || quoteCurrency, now);
   const ageSec = quoteAgeSeconds(quote?.quotedAt, now);
 
+  // DELAYED — distinct de stale. Provider legalement differe (ex. EODHD EU).
+  // Calcule AVANT stale (vague B.6.1) pour permettre au seuil stale de
+  // s'adapter : une quote delayed_15m a par construction un age > 900 s,
+  // ce qui ne signifie PAS qu'elle est stale (cf. brief B.6).
+  let delayed = false;
+  if (freshness.includes("delayed") || freshness === "recent") delayed = true;
+  if (sourceUsed === "alphavantage" || sourceUsed === "alpha") delayed = true;
+
   // STALE — quote trop vieille en heures de marche.
   // - crypto : > 120 s
-  // - autre : > 600 s (10 min) si marche ouvert. Hors marche, marketClosed
-  //   gere ; on ne marque PAS stale par defaut.
+  // - delayed : > 1800 s (30 min, tolere 15 min de retard legal + marge)
+  // - live    : > 600 s (10 min)
+  // Hors marche (marketClosed), on ne marque PAS stale par defaut.
   // - freshness === "stale" => stale direct (provider l'a signale).
   let stale = false;
   const staleReasons = [];
   if (freshness === "stale") { stale = true; staleReasons.push("freshness=stale"); }
   if (!marketClosed && Number.isFinite(ageSec)) {
-    const maxAge = cls === "crypto" ? 120 : 600;
+    const maxAge = cls === "crypto" ? 120 : delayed ? 1800 : 600;
     if (ageSec > maxAge) { stale = true; staleReasons.push(`age=${ageSec}s > ${maxAge}s`); }
   }
-
-  // DELAYED — distinct de stale. Provider legalement differe (ex. EODHD EU).
-  let delayed = false;
-  if (freshness.includes("delayed") || freshness === "recent") delayed = true;
-  if (sourceUsed === "alphavantage" || sourceUsed === "alpha") delayed = true;
 
   // CURRENCY MISMATCH — devise quote != devise attendue (ou absente).
   let currencyMismatch = false;

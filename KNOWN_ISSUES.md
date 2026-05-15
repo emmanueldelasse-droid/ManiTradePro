@@ -115,7 +115,7 @@ Ces timestamps sont strictement analytiques, **ne contiennent aucun input live**
 
 ---
 
-### #6 ✅ `quoteQualityEngine` — livré vague B.6 (mai 2026)
+### #6 ✅ `quoteQualityEngine` — livré vague B.6 (mai 2026) + B.6.1 (correctif stale ≠ delayed)
 
 **Description initiale**
 Aucune validation systématique de l'âge des quotes, écart inter-providers, ou devise explicite.
@@ -123,7 +123,7 @@ Aucune validation systématique de l'âge des quotes, écart inter-providers, ou
 **Solution livrée (vague B.6)**
 Nouveau moteur `quoteQualityEngine(quote, candles, options)` synchrone qui produit un objet `quoteQuality` dans `liveContext` :
 - `trustScore` 0-100 — agrégat indicatif
-- `stale` — quote trop vieille en heures de marché (crypto > 120 s, autre > 600 s)
+- `stale` — quote trop vieille en heures de marché (crypto > 120 s, delayed > 1800 s, live > 600 s — vague B.6.1)
 - `delayed` — provider légalement différé (EODHD EU, Alpha Vantage)
 - `marketClosed` — marché fermé (week-end, hors fenêtre par devise, jour férié)
 - `abnormalSpread` — `|livePrice - lastClose| / ATR > 3` (5 pour crypto)
@@ -141,6 +141,16 @@ Nouveau moteur `quoteQualityEngine(quote, candles, options)` synchrone qui produ
 - Comparaison inter-providers non encore implémentée (un seul provider par quote)
 - Heures de marché synchrones approximatives (USD 13:00-21:30 UTC, EUR/CHF/GBP 07:00-16:30 UTC) — large pour tolérer DST, peut donner un faux positif `marketClosed` à la marge
 - `executionSafe` ne consulte pas encore `getMarketStatus` complet (front uniquement)
+
+**Vague B.6.1 — correctif faux positif stale sur delayed quotes (mai 2026)**
+
+Faux positif observé en runtime sur les quotes EODHD `delayed_15m` (NESN.SW, ASML.AS, AAPL via Alpha) : `stale: true` à cause de `ageSec > 600 s`, alors que la quote est juste différée de 15 min (comportement normal). Le brief B.6 disait pourtant : *"Le système doit distinguer stale ET delayed. Ce n'est PAS la même chose."*
+
+**Fix livré** :
+- Ordre inversé dans `quoteQualityEngine` : `delayed` calculé AVANT `stale`
+- Seuil `maxAge` adapté : crypto 120 s, **delayed 1800 s** (30 min = 15 min légal + marge), live 600 s
+- Une quote `delayed_15m` reste `stale: false` jusqu'à 30 min d'âge ; au-delà, elle devient effectivement stale (provider qui ne refresh plus)
+- Aucun autre champ touché, aucun seuil critique modifié
 
 ---
 

@@ -230,8 +230,8 @@ liveContext.quoteQuality = {
 
 | Flag | Règle |
 |---|---|
-| `stale` | crypto : âge > 120 s ; autre marché ouvert : âge > 600 s ; OU `freshness === "stale"` |
-| `delayed` | `freshness` contient "delayed" ou "recent" ; OU `sourceUsed` ∈ {alphavantage} |
+| `stale` | crypto : âge > 120 s ; quote `delayed` : âge > 1800 s ; quote live : âge > 600 s ; OU `freshness === "stale"`. **(B.6.1 — `delayed` calculé AVANT `stale` pour adapter le seuil)** |
+| `delayed` | `freshness` contient "delayed" ou "recent" ; OU `sourceUsed` ∈ {alphavantage} (calculé en premier depuis B.6.1) |
 | `marketClosed` | crypto → jamais ; forex → fermé week-end UTC ; stock/etf → week-end OU jour férié OU hors fenêtre UTC par devise (USD 13:00-21:30, EUR/CHF/GBP 07:00-16:30) |
 | `abnormalSpread` | `|livePrice - lastClose| / ATR > 3` (5 pour crypto) sur 14 bougies |
 | `currencyMismatch` | `quote.currency` absent OU ≠ `getCurrencyForSymbol(symbol)` |
