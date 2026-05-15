@@ -14,290 +14,52 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 42,
-    "winCount": 4,
-    "lossCount": 34,
-    "winRate": 0.09523809523809523,
-    "totalPnl": -971.2666819384349,
-    "avgWin": 18.024579231392046,
-    "avgLoss": 30.687205848941257,
-    "expectancy": -26.04798822224285,
-    "rrActual": 0.587364627464573,
+    "totalCount": 0,
+    "winCount": 0,
+    "lossCount": 0,
+    "winRate": null,
+    "totalPnl": 0,
+    "avgWin": 0,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
     "openCount": 0,
-    "bySetup": [
-      {
-        "setup": "autre",
-        "count": 26,
-        "wins": 3,
-        "pnl": -472.362598361583,
-        "winRate": 0.11538461538461539
-      },
-      {
-        "setup": "continuation",
-        "count": 16,
-        "wins": 1,
-        "pnl": -498.9040835768518,
-        "winRate": 0.0625
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 38,
-        "wins": 4,
-        "pnl": -854.7220610497659,
-        "winRate": 0.10526315789473684
-      },
-      {
-        "class": "crypto",
-        "count": 4,
-        "wins": 0,
-        "pnl": -116.54462088866927,
-        "winRate": 0
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "NVDA",
-        "count": 3,
-        "pnl": 19.654827232777848,
-        "wins": 1
-      },
-      {
-        "symbol": "AMD",
-        "count": 2,
-        "pnl": 0,
-        "wins": 0
-      },
-      {
-        "symbol": "SPY",
-        "count": 1,
-        "pnl": -12.738908000000038,
-        "wins": 0
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -13.437795323598431,
-        "wins": 0
-      },
-      {
-        "symbol": "JPM",
-        "count": 2,
-        "pnl": -30.68585930102264,
-        "wins": 0
-      }
-    ],
-    "bottomSymbols": [
-      {
-        "symbol": "META",
-        "count": 9,
-        "pnl": -293.90583369747566,
-        "wins": 0
-      },
-      {
-        "symbol": "BTC",
-        "count": 7,
-        "pnl": -223.86985117399544,
-        "wins": 1
-      },
-      {
-        "symbol": "MSFT",
-        "count": 4,
-        "pnl": -151.8855927352821,
-        "wins": 0
-      },
-      {
-        "symbol": "AAPL",
-        "count": 6,
-        "pnl": -106.07341117025408,
-        "wins": 1
-      },
-      {
-        "symbol": "ETH",
-        "count": 5,
-        "pnl": -104.71883755498179,
-        "wins": 1
-      }
-    ]
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
+    "bottomSymbols": []
   },
   "stats7d": {
-    "totalCount": 3,
+    "totalCount": 0,
     "winCount": 0,
-    "lossCount": 3,
-    "winRate": 0,
-    "totalPnl": -80.57507065924672,
+    "lossCount": 0,
+    "winRate": null,
+    "totalPnl": 0,
     "avgWin": 0,
-    "avgLoss": 26.858356886415574,
-    "expectancy": -26.858356886415574,
-    "rrActual": 0,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
     "openCount": 0,
-    "bySetup": [
-      {
-        "setup": "continuation",
-        "count": 3,
-        "wins": 0,
-        "pnl": -80.57507065924672,
-        "winRate": 0
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 3,
-        "wins": 0,
-        "pnl": -80.57507065924672,
-        "winRate": 0
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -13.437795323598431,
-        "wins": 0
-      },
-      {
-        "symbol": "MSFT",
-        "count": 1,
-        "pnl": -26.176526176526114,
-        "wins": 0
-      },
-      {
-        "symbol": "META",
-        "count": 1,
-        "pnl": -40.96074915912217,
-        "wins": 0
-      }
-    ],
-    "bottomSymbols": [
-      {
-        "symbol": "META",
-        "count": 1,
-        "pnl": -40.96074915912217,
-        "wins": 0
-      },
-      {
-        "symbol": "MSFT",
-        "count": 1,
-        "pnl": -26.176526176526114,
-        "wins": 0
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -13.437795323598431,
-        "wins": 0
-      }
-    ]
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
+    "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 33,
-    "winCount": 2,
-    "lossCount": 31,
-    "winRate": 0.06060606060606061,
-    "totalPnl": -791.4337758544158,
-    "avgWin": 34.09007459492636,
-    "avgLoss": 27.72948145304091,
-    "expectancy": -23.982841692558047,
-    "rrActual": 1.229380168996558,
+    "totalCount": 0,
+    "winCount": 0,
+    "lossCount": 0,
+    "winRate": null,
+    "totalPnl": 0,
+    "avgWin": 0,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
     "openCount": 0,
-    "bySetup": [
-      {
-        "setup": "autre",
-        "count": 17,
-        "wins": 1,
-        "pnl": -292.529692277564,
-        "winRate": 0.058823529411764705
-      },
-      {
-        "setup": "continuation",
-        "count": 16,
-        "wins": 1,
-        "pnl": -498.9040835768518,
-        "winRate": 0.0625
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 29,
-        "wins": 2,
-        "pnl": -674.8891549657468,
-        "winRate": 0.06896551724137931
-      },
-      {
-        "class": "crypto",
-        "count": 4,
-        "wins": 0,
-        "pnl": -116.54462088866927,
-        "winRate": 0
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": 68.00240432779013,
-        "wins": 1
-      },
-      {
-        "symbol": "SPY",
-        "count": 1,
-        "pnl": -12.738908000000038,
-        "wins": 0
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -13.437795323598431,
-        "wins": 0
-      },
-      {
-        "symbol": "ETH",
-        "count": 2,
-        "pnl": -28.080554664956512,
-        "wins": 0
-      },
-      {
-        "symbol": "JPM",
-        "count": 2,
-        "pnl": -30.68585930102264,
-        "wins": 0
-      }
-    ],
-    "bottomSymbols": [
-      {
-        "symbol": "META",
-        "count": 9,
-        "pnl": -293.90583369747566,
-        "wins": 0
-      },
-      {
-        "symbol": "BTC",
-        "count": 5,
-        "pnl": -169.022805075014,
-        "wins": 0
-      },
-      {
-        "symbol": "MSFT",
-        "count": 4,
-        "pnl": -151.8855927352821,
-        "wins": 0
-      },
-      {
-        "symbol": "AAPL",
-        "count": 6,
-        "pnl": -106.07341117025408,
-        "wins": 1
-      },
-      {
-        "symbol": "LINK",
-        "count": 2,
-        "pnl": -53.605420214602404,
-        "wins": 0
-      }
-    ]
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
+    "bottomSymbols": []
   },
-  "lastClosedAt": "2026-05-15T07:46:03.993Z"
+  "lastClosedAt": null
 }
