@@ -10,6 +10,7 @@ Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce
 > ⚠️ **RÈGLE IMPÉRATIVE — DOCUMENTATION PERMANENTE (mai 2026)**
 >
 > À CHAQUE merge, mettre à jour AVANT le merge :
+> - `BOT_OBJECTIVE.md` — **constitution officielle du projet** (objectif réel + 10 règles absolues). À lire en premier de toute session.
 > - `SESSION.md` (ce fichier) — état du projet
 > - `ARCHITECTURE.md` — code après merge
 > - `DATA_PIPELINE.md` — flux de données
@@ -79,6 +80,20 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-15 (fin) — BOT_OBJECTIVE.md, constitution officielle du projet
+
+L'utilisateur a demandé la création d'un fichier permanent **`BOT_OBJECTIVE.md`** qui devient la **constitution officielle** du projet : objectif réel du bot, priorité absolue (préserver le capital), 10 règles absolues, rôle de l'IA, conditions de passage en argent réel.
+
+### Apport
+
+- Nouveau fichier `BOT_OBJECTIVE.md` (11 sections numérotées en français simple, sans jargon)
+- Ajouté en tête de la liste **documentation permanente** dans `CLAUDE.md` et dans le bandeau ⚠️ de ce fichier
+- À lire en premier de toute session IA avant toute modification
+
+Aucun changement de code, aucune migration. PR additive uniquement.
 
 ---
 
