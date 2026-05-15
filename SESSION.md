@@ -83,6 +83,38 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-15 — PWA cache bump (mini-PR post-B.8)
+
+Bump `CACHE_VERSION` dans `sw.js` : `manitradepro-v8.0` → `manitradepro-v8.1`.
+
+### Pourquoi
+
+Test runtime post-merge B.8 sur iPhone : la carte BMW.DE affichait "Snapshot EOD · 76,38 € · il y a 2h" alors que le worker (verifie via Invoke-RestMethod sur les 17 actifs EU/UK/CH du commit B.7.1) renvoyait coherent `eodhd/delayed_15m/74,40 €` sur liste ET fiche.
+
+Cause : le PWA servait un `localStorage` snapshot (`mtp_opportunities_snapshot_v1`) date d'avant le deploy B.7.1 (15:26Z, alors que B.7.1 a merge a 17:06Z). Le service worker (sw.js) a probablement servi des assets en cache lors du `state.opportunities` fetch failed → fallback localStorage stale.
+
+Le bloc B.8 a fait son boulot : il a affiche "Snapshot EOD · dernier prix disponible" en orange, ce qui a rendu la divergence visible au lieu de l'enterrer silencieusement.
+
+### Quoi
+
+1 ligne dans `sw.js` ligne 1. La logique d'activation existante (`sw.js:25-35`) purge automatiquement tous les caches qui ne sont pas le `STATIC_CACHE` / `RUNTIME_CACHE` de la version courante → les anciens caches `manitradepro-v8.0-*` seront supprimes a l'activate du nouveau SW.
+
+### Perimetre strict
+
+- 1 fichier : `sw.js` (+1 / -1 ligne).
+- SESSION.md mis a jour (cette section).
+- Aucune modification de la strategie reseau/cache, des routes, du worker, du front, du scoring, des providers.
+- Aucune nouvelle dependance.
+- `node --check sw.js` PASS.
+
+### Impact
+
+A l'ouverture suivante du PWA, le navigateur detecte le nouveau SW, l'installe en parallele, l'active, supprime les caches `manitradepro-v8.0-*`, et force le re-fetch des assets (app.js, styles.css, index.html). Les iPhones qui avaient un `localStorage` snapshot pre-B.7.1 le verront ecrase par le fetch reseau (network-first sur les assets depuis le commit 176524d).
+
+L'utilisateur peut aussi hard-reload manuellement (Safari → effacer historique site) si le SW ne se met pas a jour automatiquement.
+
+---
+
 ## Session 2026-05-15 — Vague B.8 : affichage diagnostic prix live (FRONT)
 
 PR front strict. Les vagues B.6 / B.7 / B.7.1 ont rendu le moteur capable de juger la qualité d'une quote live (`liveContext.quoteQuality` : `trustScore`, `executionSafe`, `validationStatus`, `reasons`, etc.). L'utilisateur voit enfin cette info dans l'interface.
