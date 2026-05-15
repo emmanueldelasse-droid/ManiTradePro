@@ -6,6 +6,7 @@
 ## Documentation permanente (IMPÉRATIVE — mai 2026)
 
 À chaque session, **lire AVANT toute modif** :
+- `BOT_OBJECTIVE.md` — **constitution officielle du projet** : objectif réel, règles absolues, ce que le bot est et n'est pas. À lire en premier.
 - `SESSION.md` — état du projet
 - `ARCHITECTURE.md` — structure code après merge
 - `DATA_PIPELINE.md` — flux de données par écran
