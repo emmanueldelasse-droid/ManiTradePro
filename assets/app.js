@@ -1040,6 +1040,31 @@
     return { day: map[weekday] ?? 0, mins: hour * 60 + minute };
   }
 
+  // Convertit une heure locale d'une bourse (ex. 09:30 NY) en heure Paris
+  // formatée "HH:MM". Géré via Intl pour les DST (NYSE en été = -6h
+  // Paris, en hiver = -6h aussi en pratique car les DST sont alignés).
+  function localHourToParis(srcTz, localH, localM) {
+    const now = new Date();
+    const dateFmt = new Intl.DateTimeFormat("en-CA", {
+      timeZone: srcTz, year: "numeric", month: "2-digit", day: "2-digit"
+    });
+    const [y, m, d] = dateFmt.format(now).split("-").map(Number);
+    // On part d'une date UTC à l'heure locale demandée puis on ajuste
+    // l'offset pour que, lue dans srcTz, elle affiche bien localH:localM.
+    const guess = new Date(Date.UTC(y, m - 1, d, localH, localM));
+    const checkFmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: srcTz, hour: "2-digit", minute: "2-digit", hour12: false
+    });
+    const parts = checkFmt.formatToParts(guess);
+    const gotH = parseInt(parts.find(p => p.type === "hour").value, 10);
+    const gotM = parseInt(parts.find(p => p.type === "minute").value, 10);
+    const diffMin = (localH * 60 + localM) - (gotH * 60 + gotM);
+    const corrected = new Date(guess.getTime() + diffMin * 60 * 1000);
+    return corrected.toLocaleTimeString("fr-FR", {
+      hour: "2-digit", minute: "2-digit", timeZone: "Europe/Paris"
+    });
+  }
+
   function getMarketStatus(symbol, assetClass) {
     const cls = inferAssetClass(symbol, assetClass);
     const now = new Date();
@@ -1075,11 +1100,15 @@
     }
 
     // stock / etf — horaires routés par bourse via la devise du symbole.
+    // L'ouverture/fermeture est calculée dans le fuseau de la bourse (pour
+    // savoir si elle est ouverte en ce moment), mais les heures affichées
+    // sont CONVERTIES EN HEURE PARIS pour que l'utilisateur les lise dans
+    // son propre fuseau (ex. NYSE 09:30 NY → 15:30 Paris).
     const ex = getExchangeInfo(symbol);
     const { day, mins } = nowInTz(ex.tz);
     const openMins = ex.openH * 60 + ex.openM;
     const closeMins = ex.closeH * 60 + ex.closeM;
-    const hoursLabel = `${pad(ex.openH)}:${pad(ex.openM)}–${pad(ex.closeH)}:${pad(ex.closeM)}`;
+    const hoursLabel = `${localHourToParis(ex.tz, ex.openH, ex.openM)}–${localHourToParis(ex.tz, ex.closeH, ex.closeM)}`;
     const isUS = ex.label === "NYSE";
 
     if (day === 0 || day === 6) {
