@@ -1009,6 +1009,37 @@
     return "stock";
   }
 
+  // Horaires de bourse par devise — chaque exchange a ses heures locales
+  // et son fuseau. Avant ce helper, getMarketStatus traitait TOUTES les
+  // actions comme NYSE (14:30–21:00 UTC) — donc NESN.SW affichait
+  // "16:30–23:00" alors que SIX Zurich ouvre en réalité 09:00–17:30 CET.
+  function getExchangeInfo(symbol) {
+    const ccy = (typeof currencyForSymbol === "function") ? currencyForSymbol(symbol) : "USD";
+    if (ccy === "EUR") return { tz: "Europe/Paris", label: "EU", openH: 9, openM: 0, closeH: 17, closeM: 30 };
+    if (ccy === "CHF") return { tz: "Europe/Zurich", label: "SIX", openH: 9, openM: 0, closeH: 17, closeM: 30 };
+    if (ccy === "GBP") return { tz: "Europe/London", label: "LSE", openH: 8, openM: 0, closeH: 16, closeM: 30 };
+    if (ccy === "SEK") return { tz: "Europe/Stockholm", label: "OMX", openH: 9, openM: 0, closeH: 17, closeM: 30 };
+    if (ccy === "NOK") return { tz: "Europe/Oslo", label: "Oslo", openH: 9, openM: 0, closeH: 16, closeM: 30 };
+    if (ccy === "DKK") return { tz: "Europe/Copenhagen", label: "CPH", openH: 9, openM: 0, closeH: 17, closeM: 0 };
+    return { tz: "America/New_York", label: "NYSE", openH: 9, openM: 30, closeH: 16, closeM: 0 };
+  }
+
+  // Renvoie {day, mins} = jour de la semaine (0=dim … 6=sam) et minutes
+  // depuis minuit, dans le fuseau passé en argument. Utilise Intl pour
+  // gérer DST automatiquement (CET vs CEST, GMT vs BST, EST vs EDT).
+  function nowInTz(tz) {
+    const fmt = new Intl.DateTimeFormat("en-GB", {
+      timeZone: tz, weekday: "short",
+      hour: "2-digit", minute: "2-digit", hour12: false
+    });
+    const parts = fmt.formatToParts(new Date());
+    const weekday = parts.find(p => p.type === "weekday").value;
+    const hour = parseInt(parts.find(p => p.type === "hour").value, 10);
+    const minute = parseInt(parts.find(p => p.type === "minute").value, 10);
+    const map = { Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6, Sun: 0 };
+    return { day: map[weekday] ?? 0, mins: hour * 60 + minute };
+  }
+
   function getMarketStatus(symbol, assetClass) {
     const cls = inferAssetClass(symbol, assetClass);
     const now = new Date();
@@ -1023,6 +1054,7 @@
       const h = Math.floor(totalMins / 60), m = totalMins % 60;
       return h > 0 ? `${h}h${m > 0 ? String(m).padStart(2,"0") : ""}` : `${m}min`;
     }
+    function pad(n) { return String(n).padStart(2, "0"); }
 
     if (cls === "crypto") {
       return { open: true, status: "open", label: "Ouvert", detail: "24h/24 · 7j/7" };
@@ -1042,24 +1074,35 @@
       return { open: true, status: "open", label: "Ouvert", detail: `${fmtH(23)}–${fmtH(22)} · Lun–Ven (CME)` };
     }
 
-    // stock / etf — NYSE/NASDAQ
-    if (utcDay === 0 || utcDay === 6) {
-      return { open: false, status: "closed", label: "Ferme", detail: `Lun–Ven ${fmtH(14,30)}–${fmtH(21)} (NYSE)` };
+    // stock / etf — horaires routés par bourse via la devise du symbole.
+    const ex = getExchangeInfo(symbol);
+    const { day, mins } = nowInTz(ex.tz);
+    const openMins = ex.openH * 60 + ex.openM;
+    const closeMins = ex.closeH * 60 + ex.closeM;
+    const hoursLabel = `${pad(ex.openH)}:${pad(ex.openM)}–${pad(ex.closeH)}:${pad(ex.closeM)}`;
+    const isUS = ex.label === "NYSE";
+
+    if (day === 0 || day === 6) {
+      return { open: false, status: "closed", label: "Ferme", detail: `Lun–Ven ${hoursLabel} (${ex.label})` };
     }
-    const PRE = 9 * 60, REG = 14 * 60 + 30, CLOSE = 21 * 60;
-    if (utcMins >= REG && utcMins < CLOSE) {
-      return { open: true, status: "open", label: "Ouvert", detail: `Ferme dans ${countdown(CLOSE - utcMins)} · ${fmtH(14,30)}–${fmtH(21)}` };
+    if (mins >= openMins && mins < closeMins) {
+      return { open: true, status: "open", label: "Ouvert", detail: `Ferme dans ${countdown(closeMins - mins)} · ${hoursLabel} (${ex.label})` };
     }
-    if (utcMins >= PRE && utcMins < REG) {
-      return { open: false, status: "premarket", label: "Pre-marche", detail: `Ouvre dans ${countdown(REG - utcMins)} · ${fmtH(14,30)}–${fmtH(21)}` };
+    // Pré-marché US uniquement (4h avant ouverture régulière).
+    if (isUS && mins >= openMins - 5 * 60 && mins < openMins) {
+      return { open: false, status: "premarket", label: "Pre-marche", detail: `Ouvre dans ${countdown(openMins - mins)} · ${hoursLabel} (${ex.label})` };
     }
-    if (utcMins >= CLOSE && utcMins < CLOSE + 4 * 60 && utcDay <= 4) {
-      return { open: false, status: "afterhours", label: "Apres-bourse", detail: `Seance terminee · ${fmtH(14,30)}–${fmtH(21)} demain` };
+    // Après-bourse US uniquement (4h après clôture).
+    if (isUS && mins >= closeMins && mins < closeMins + 4 * 60 && day <= 4) {
+      return { open: false, status: "afterhours", label: "Apres-bourse", detail: `Seance terminee · ${hoursLabel} demain (${ex.label})` };
     }
-    if (utcMins < PRE) {
-      return { open: false, status: "closed", label: "Ferme", detail: `Pre-marche dans ${countdown(PRE - utcMins)} · ${fmtH(14,30)}–${fmtH(21)}` };
+    if (mins < openMins) {
+      return { open: false, status: "closed", label: "Ferme", detail: `Ouvre dans ${countdown(openMins - mins)} · ${hoursLabel} (${ex.label})` };
     }
-    return { open: false, status: "closed", label: "Ferme", detail: `${fmtH(14,30)}–${fmtH(21)} · reprise lundi` };
+    if (day === 5) {
+      return { open: false, status: "closed", label: "Ferme", detail: `${hoursLabel} · reprise lundi (${ex.label})` };
+    }
+    return { open: false, status: "afterhours", label: "Apres-bourse", detail: `Seance terminee · ${hoursLabel} demain (${ex.label})` };
   }
 
   function renderMarketBadge(symbol, assetClass) {
