@@ -83,6 +83,62 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-15 (fin) — Vague B.7.1 : inversion ordre fallback live / EOD
+
+Mini-PR corrective. Le test runtime de B.7 sur les 45 actifs a révélé que **17 actions EU/UK/CH** (BMW.DE, ASML, LVMH, NESN, BAS.DE, HSBA.L, ULVR.L, RMS, AIR, TTE, SIE, UBSG.SW, BNP.PA, OR.PA, SAP, STMPA.PA, PHIA.AS) restaient incohérentes entre la liste opportunités et la fiche actif :
+- Liste : `sourceUsed: "snapshot"`, `freshness: "eod"` (prix EOD de la veille)
+- Fiche : `sourceUsed: "eodhd"`, `freshness: "delayed_15m"` (vrai prix delayed 15 min)
+
+### Cause
+
+Dans `handleOpportunities` Phase 2 (`cloudflare-worker/worker.js`), `getStoredDailyQuoteFallback` (snapshot EOD veille) était appelé **AVANT** `resolveLiveQuote`. Quand Phase 1 batch (Yahoo) échouait sur les actions EU, le code tombait immédiatement sur le snapshot EOD au lieu de tenter EODHD différé via `resolveLiveQuote`. Le bug B.7 résolvait le cas générique mais ne couvrait pas ce chemin de fallback prioritaire.
+
+### Fix livré
+
+Inversion de l'ordre des fallbacks dans Phase 2 :
+
+| Ordre AVANT B.7.1 | Ordre APRÈS B.7.1 |
+|---|---|
+| 1. `quotesMap[symbol]` | 1. `quotesMap[symbol]` |
+| 2. `getMemoryCache` | 2. `getMemoryCache` |
+| 3. `getStoredDailyQuoteFallback` ← **trop tôt** | 3. `resolveLiveQuote` (cascade mémoire / KV / providers) |
+| 4. `resolveLiveQuote` ← jamais atteint | 4. `getStoredDailyQuoteFallback` (filet ultime EOD) |
+| 5. partial/unavailable | 5. partial/unavailable |
+
+`resolveLiveQuote` entouré d'un try/catch pour ne pas bloquer le scan si tous providers KO — le filet EOD prend le relais.
+
+### Périmètre strict
+
+- 1 fichier : `cloudflare-worker/worker.js` (Phase 2 de `handleOpportunities` uniquement)
+- Aucune autre modif : `getStoredDailyQuoteFallback` reste utilisée (juste reléguée au filet ultime), `calcDetailScore` / `buildWorkerPlan` / `computeTradeSafetyScore` intacts, `resolveLiveQuote` / `quoteQualityEngine` / `buildSnapshotId` inchangés
+- Zéro modification front
+- Aucune migration SQL
+
+### Tests (21/21 checks PASS)
+
+- ✅ `resolveLiveQuote` appelé avant `getStoredDailyQuoteFallback` (idx 1021 < 1309 dans Phase 2)
+- ✅ `resolveLiveQuote` entouré d'un try/catch
+- ✅ `getStoredDailyQuoteFallback` toujours conditionné par `(!isCrypto && !quote)`
+- ✅ Priorité 1 (`quotesMap[symbol]`) et 2 (`memCache`) préservées
+- ✅ Cas partial/unavailable préservés
+- ✅ Formule score legacy intacte
+- ✅ Aucune dépendance dans `calcDetailScore`, `buildWorkerPlan`, `strategicAnalysis`
+- ✅ Aucun nouvel appel direct provider hors `resolveLiveQuote` / `validateSymbolOnProviders`
+
+### Impact attendu runtime
+
+Pour les 17 actifs divergents observés sur le test précédent :
+- AVANT : liste `snapshot/eod` vs fiche `eodhd/delayed_15m` → deux prix différents
+- APRÈS : liste `eodhd/delayed_15m` (via `resolveLiveQuote`) vs fiche `eodhd/delayed_15m` → prix identique
+
+### Limites restantes
+
+- Si EODHD différé EU est lui-même KO (rare), le code tombe sur `getStoredDailyQuoteFallback` (filet ultime) — cohérent avec la fiche qui aurait le même comportement
+- Le snapshot EOD reste utile en filet (jour de cron raté, weekend, jour férié sans data live)
+- Pas de nouvelle dépendance externe, pas de nouveau cache
+
+---
+
 ## Session 2026-05-15 (fin) — Vague B.7 : resolveLiveQuote + cache KV partagé
 
 PR architecturale qui résout le bug runtime observé sur BMW.DE (76,38 € sur opp vs 74,58 € sur fiche).
