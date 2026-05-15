@@ -2727,13 +2727,19 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
   const strategicLowParticipation = strategicParticipation < 52;
   const strategicEntryTooLate = timing < 42;
 
+  const strategicMacroFragile = strategicContext < 45;
+
   const strategicHardFlags = [];
   if (strategicRiskTooHigh) strategicHardFlags.push("risk_too_high");
   if (strategicEntryTooLate || extensionTooHigh) strategicHardFlags.push("entry_too_late");
   if (strategicTrendConflict) strategicHardFlags.push("trend_conflict");
   if (strategicLowParticipation) strategicHardFlags.push("low_participation");
-  if (macroFragile) strategicHardFlags.push("macro_fragile");
+  if (strategicMacroFragile) strategicHardFlags.push("macro_fragile");
   const strategicHardPassed = !["risk_too_high","entry_too_late","trend_conflict"].some(f => strategicHardFlags.includes(f));
+
+  // setupType doit etre declare AVANT strategicAnalysis (qui le reference).
+  // Anciennement declare plus bas en let, deplace ici en const (la valeur ne change pas).
+  const setupType = detectedConfig.config !== "AUCUNE" ? String(detectedConfig.config).toLowerCase() : "aucun";
 
   let strategicRaw = 0.24 * structure + 0.20 * strategicMomentum + 0.20 * timing + 0.18 * strategicRisk + 0.10 * strategicContext + 0.08 * strategicDataQuality;
   if (strategicDirection === "long" && structure >= 60 && strategicMomentum >= 60) strategicRaw += 4;
@@ -2794,7 +2800,7 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
   if (detectedConfig.config === "BREAKOUT" || detectedConfig.config === "BREAKDOWN") configBonus = 8;
   if (detectedConfig.config === "CONTINUATION" || detectedConfig.config === "CONTINUATION_SHORT") configBonus = 3;
 
-  let setupType = detectedConfig.config !== "AUCUNE" ? detectedConfig.config.toLowerCase() : "aucun";
+  // setupType est desormais declare plus haut (avant strategicAnalysis) pour eviter une TDZ.
 
   let analysisLabel = "No clear direction";
   if (direction === "long") {

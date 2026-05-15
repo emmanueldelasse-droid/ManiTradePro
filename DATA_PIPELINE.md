@@ -157,7 +157,7 @@ Depuis la vague A.1, `calcDetailScore` retourne **deux objets supplémentaires**
 }
 ```
 
-`strategicAnalysis.score` ne change qu'à clôture de bougie. `liveContext` est l'unique source de vérité pour les valeurs volatiles.
+`strategicAnalysis.score` est **conçu pour être stable** entre deux clôtures de bougies sur les entrées live directes (prix, volume, freshness). Ce n'est pas une garantie absolue : il peut bouger si le régime macro est rafraîchi (cache KV 1 h, modifie `regimeMalus`), si un nouveau trade clos publie ses stats (modifie `learningMalus`), ou si la dernière bougie daily est encore ouverte côté provider. `snapshotId` (vague B.4) sera nécessaire pour figer ces dépendances. `liveContext` est la source de vérité unique pour les valeurs volatiles directes.
 
 Plumberie :
 - `buildStablePayload` (`cloudflare-worker/worker.js`) propage `strategicAnalysis` et `liveContext` du `scored` au payload de fiche.

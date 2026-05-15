@@ -91,7 +91,7 @@ Le chantier le plus sensible de la refonte : isoler le **score stratégique stab
 
 `calcDetailScore` (`cloudflare-worker/worker.js`) retourne désormais **deux nouveaux objets** à côté du payload composite legacy :
 
-- **`strategicAnalysis`** = score recalculé sans `change24hPct`, sans `volume24h`, sans `regimeBonus`, sans `newsBonus`, avec `dataQuality` neutralisé à 80. Applique uniquement `regimeMalus` (stable par batch) et `learningMalus` (bucket histoire). Garanti stable entre deux clôtures de bougies.
+- **`strategicAnalysis`** = score recalculé sans `change24hPct`, sans `volume24h`, sans `regimeBonus`, sans `newsBonus`, avec `dataQuality` neutralisé à 80. Applique uniquement `regimeMalus` (stable par batch) et `learningMalus` (bucket histoire). **Conçu pour être stable** entre deux clôtures de bougies sur les entrées live directes — pas une garantie absolue tant que `regimeMalus`, `learningMalus`, le cache régime KV (1 h) ou la dernière bougie daily peuvent évoluer indépendamment. `snapshotId` (vague B.4) sera nécessaire pour fermer ces angles.
 - **`liveContext`** = container pour `change24hPct`, `volume24h`, `freshness`, `quotedAt`, `price`, `regimeBonus`, `newsBonus` + un `scoreImpact: { strategicScore, compositeScore, delta }` pour mesurer l'écart.
 
 Plomberie additive (zéro champ supprimé/renommé) :

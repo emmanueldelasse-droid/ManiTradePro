@@ -26,7 +26,7 @@ Le `score` calculé par `calcDetailScore` mélangeait composantes stables (bougi
 
 **Solution livrée (vague A.1)**
 `calcDetailScore` retourne maintenant DEUX nouveaux objets en plus du payload existant :
-- `strategicAnalysis` — score recalculé en retirant `change24hPct` (momentum/risk/participation) et `volume24h` (risk/context/participation), avec `dataQuality` neutralisé à 80 et SANS `regimeBonus` ni `newsBonus`. Applique uniquement `regimeMalus` (validité config vs régime, stable par batch) et `learningMalus` (bucket histoire, stable). **Garanti stable entre deux clôtures de bougies.**
+- `strategicAnalysis` — score recalculé en retirant `change24hPct` (momentum/risk/participation) et `volume24h` (risk/context/participation), avec `dataQuality` neutralisé à 80 et SANS `regimeBonus` ni `newsBonus`. Applique uniquement `regimeMalus` (validité config vs régime, stable par batch) et `learningMalus` (bucket histoire, stable). **Conçu pour être stable entre deux clôtures de bougies sur les entrées live directes** — mais pas une garantie absolue tant que : (a) `regimeMalus` peut bouger si le régime macro est rafraîchi côté KV (cache 1 h), (b) `learningMalus` peut bouger si un nouveau trade clos publie ses stats, (c) la dernière bougie daily peut être encore ouverte selon le provider et le fuseau, (d) `snapshotId` n'est pas encore propagé (vague B.4).
 - `liveContext` — container des inputs volatils (`change24hPct`, `volume24h`, `freshness`, `regimeBonus`, `newsBonus`) + `scoreImpact: { strategicScore, compositeScore, delta }` pour diagnostiquer l'écart.
 
 Les champs legacy (`score`, `breakdown`, `plan`, `plan.safetyScore`, etc.) sont **inchangés** pour préserver `buildWorkerPlan` et le paper trading. Le front peut basculer son affichage sur `strategicAnalysis.score` quand il veut une valeur stable.
@@ -215,7 +215,7 @@ Suite à la refonte horaires de bourse, la fonction `pad(n)` définie localement
 | Bot ouvre des positions un jour férié | Calendrier `MARKET_HOLIDAYS` + filtre dans `isTrainingCandidateAllowed` | Tables 2026-2027 USD/EUR/CHF/GBP |
 | Horaires NYSE en heure NY au lieu de Paris | `localHourToParis` via Intl | DST géré auto |
 | Carte "Paramètres du bot" dupliquée | Retrait de la version Trades | Carte uniquement dans Réglages |
-| Score volatile entre deux refresh (#1) | Vague A.1 : `strategicAnalysis` + `liveContext` séparés dans `calcDetailScore` | `strategicAnalysis.score` stable, `liveContext` isole les inputs volatils |
+| Score volatile entre deux refresh (#1) | Vague A.1 : `strategicAnalysis` + `liveContext` séparés dans `calcDetailScore` | `strategicAnalysis.score` stable par conception sur les entrées live directes ; stabilité absolue conditionnée à la vague B.4 (`snapshotId`) |
 
 ---
 
