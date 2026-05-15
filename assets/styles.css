@@ -270,7 +270,11 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);cursor:poi
    un halo derrière le ring pour attirer l'œil sur ce qui est
    actionnable, sans bruit visuel sur les scores neutres. */
 .score-ring--hot::before{content:"";position:absolute;inset:-4px;border-radius:50%;background:radial-gradient(circle,var(--ring-color,var(--accent)) 0%,transparent 65%);opacity:.22;filter:blur(6px);pointer-events:none;z-index:0}
-.score-ring--hot svg,.score-ring--hot .score-ring-text{position:relative;z-index:1}
+/* On force le z-index sans écraser le `position:absolute` du texte
+   (qui est centré via inset:0). L'écraser en `position:relative`
+   faisait tomber le chiffre sous le SVG. */
+.score-ring--hot svg{position:relative;z-index:1}
+.score-ring--hot .score-ring-text{z-index:1}
 .score-meta{display:flex;flex-direction:column;gap:5px}
 .price-col{text-align:right}
 .price{font-family:var(--font-mono);font-weight:700;font-variant-numeric:var(--num-features);letter-spacing:-0.005em}
