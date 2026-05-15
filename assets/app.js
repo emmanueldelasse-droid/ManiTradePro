@@ -4310,7 +4310,7 @@ function detailTileValue(kind, plan, detail) {
             </div>
           <div class="detail-layout">
             <div>
-              <div class="card" style="margin-bottom:18px">
+              <div class="card" style="margin-bottom:18px" data-symbol="${safeText(d.symbol || "")}">
                 <div class="detail-head">
                   <div class="detail-title-wrap">
                     <div class="detail-icon">${safeText((d.symbol || "").slice(0, 4))}</div>
