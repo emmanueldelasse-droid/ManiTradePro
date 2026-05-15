@@ -139,6 +139,7 @@ Pour les 17 actifs divergents observés sur le test précédent :
 
 ---
 
+
 ## Session 2026-05-15 (fin) — Vague B.7 : resolveLiveQuote + cache KV partagé
 
 PR architecturale qui résout le bug runtime observé sur BMW.DE (76,38 € sur opp vs 74,58 € sur fiche).

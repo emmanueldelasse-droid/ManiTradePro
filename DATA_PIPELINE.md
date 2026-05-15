@@ -46,6 +46,7 @@ Quand `resolveLiveQuote` échoue (tous providers KO, KV indispo, etc.), `handleO
 
 Avant B.7.1, l'étape 4 venait avant l'étape 3 → la liste opportunités pouvait servir un prix EOD périmé tandis que la fiche actif (qui appelait `resolveLiveQuote` directement) servait un prix `delayed_15m` plus frais. Bug résolu en inversant l'ordre.
 
+
 **Écriture** :
 - Mémoire locale (via `resolveUnifiedMarketQuote`)
 - KV (best-effort, ne bloque pas si KV indispo)
