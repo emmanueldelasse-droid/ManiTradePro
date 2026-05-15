@@ -295,6 +295,7 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);cursor:poi
 .skeleton-line.huge{height:2.2rem;width:55%}
 .skeleton-card{padding:18px;background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--card-radius)}
 .app-shell.theme-light .skeleton{background:linear-gradient(90deg,#eef0f5 0%,#f7f8fa 50%,#eef0f5 100%);background-size:200% 100%}
+.app-shell.theme-light .skeleton-card{background:#fff;border-color:#e2e6ef}
 .detail-layout{display:grid;grid-template-columns:1.25fr .9fr;gap:18px}
 .detail-head{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
 .detail-title-wrap{display:flex;gap:14px;align-items:center}
