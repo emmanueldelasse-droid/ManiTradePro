@@ -19,25 +19,19 @@ Ce fichier liste **ce qui ne va pas dans le projet** : bugs identifiés, incohé
 
 ## Issues actuelles (mai 2026)
 
-### #1 🟠 Score volatile (composante live dans `calcDetailScore`)
+### #1 ✅ Score volatile — résolu en vague A.1 (mai 2026)
 
-**Description**
-Le `score` actuel calculé par `calcDetailScore` (dans `cloudflare-worker/worker.js`) mélange composantes stables (bougies clôturées) et composantes live (`quote.change24hPct` dans momentum/risk). Résultat : le score affiché peut osciller entre 87 et 89 entre deux refresh sans qu'aucune bougie n'ait clôturé.
+**Description initiale**
+Le `score` calculé par `calcDetailScore` mélangeait composantes stables (bougies clôturées) et composantes live (`quote.change24hPct` dans momentum/risk). Le score pouvait osciller entre 87 et 89 entre deux refresh sans qu'aucune bougie n'ait clôturé.
 
-**Impact réel**
-- Décision auto-cycle volatile : un même setup peut passer "Trade propose → A surveiller → Trade propose" sur 90 s
-- Apprentissage faussé : le `score_at_open` enregistré sur un trade ouvert à 17:30 ≠ score que le bot voyait 30 s plus tard
-- En passage broker réel : ordre passé sur un signal qui n'existe déjà plus à l'instant du fill
+**Solution livrée (vague A.1)**
+`calcDetailScore` retourne maintenant DEUX nouveaux objets en plus du payload existant :
+- `strategicAnalysis` — score recalculé en retirant `change24hPct` (momentum/risk/participation) et `volume24h` (risk/context/participation), avec `dataQuality` neutralisé à 80 et SANS `regimeBonus` ni `newsBonus`. Applique uniquement `regimeMalus` (validité config vs régime, stable par batch) et `learningMalus` (bucket histoire, stable). **Garanti stable entre deux clôtures de bougies.**
+- `liveContext` — container des inputs volatils (`change24hPct`, `volume24h`, `freshness`, `regimeBonus`, `newsBonus`) + `scoreImpact: { strategicScore, compositeScore, delta }` pour diagnostiquer l'écart.
 
-**Cause**
-- Pondération du score inclut `0.20 × momentum` qui intègre `quote.change24hPct × 9`
-- Pondération `0.18 × risk` qui inclut aussi `change24hPct`
-- Représente ~42 pts sur 100 de volatilité potentielle
+Les champs legacy (`score`, `breakdown`, `plan`, `plan.safetyScore`, etc.) sont **inchangés** pour préserver `buildWorkerPlan` et le paper trading. Le front peut basculer son affichage sur `strategicAnalysis.score` quand il veut une valeur stable.
 
-**Solution prévue**
-Vague A.1 : calcul parallèle `strategicScore` basé uniquement sur bougies clôturées + modulateurs stables. `liveContext` exposé séparément.
-
-**État** : non commencé.
+**État** : ✅ résolu côté Worker. Adaptation front (afficher strategicAnalysis.score) à faire dans une PR séparée si désiré.
 
 ---
 
@@ -221,6 +215,7 @@ Suite à la refonte horaires de bourse, la fonction `pad(n)` définie localement
 | Bot ouvre des positions un jour férié | Calendrier `MARKET_HOLIDAYS` + filtre dans `isTrainingCandidateAllowed` | Tables 2026-2027 USD/EUR/CHF/GBP |
 | Horaires NYSE en heure NY au lieu de Paris | `localHourToParis` via Intl | DST géré auto |
 | Carte "Paramètres du bot" dupliquée | Retrait de la version Trades | Carte uniquement dans Réglages |
+| Score volatile entre deux refresh (#1) | Vague A.1 : `strategicAnalysis` + `liveContext` séparés dans `calcDetailScore` | `strategicAnalysis.score` stable, `liveContext` isole les inputs volatils |
 
 ---
 

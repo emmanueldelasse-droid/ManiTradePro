@@ -2506,6 +2506,17 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
       breakdown: null, hardFilters: { passed: false, flags: ["data_quality_low"] },
       setupType: "aucun", avgRange: null,
       configuration: { config: "AUCUNE", reason: "données insuffisantes", levels: {} },
+      strategicAnalysis: null,
+      liveContext: {
+        change24hPct: typeof quote?.change24hPct === "number" ? quote.change24hPct : null,
+        volume24h: quote?.volume24h ?? null,
+        freshness: quote?.freshness ?? null,
+        quotedAt: quote?.quotedAt || null,
+        price: quote?.price ?? null,
+        regimeBonus: 0, regimeBonusReason: null,
+        newsBonus: 0, newsBonusReason: null,
+        scoreImpact: null
+      },
       plan: null
     };
   }
@@ -2672,6 +2683,111 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
 
   const score = clamp(Math.round(raw) - regimeMalus + regimeBonus + newsBonus - learningMalus, 0, 100);
 
+  // ============================================================
+  // STRATEGIC ANALYSIS / LIVE CONTEXT — Vague A.1
+  //
+  // strategicAnalysis = score recalculé sans aucune donnée live :
+  //   - retire la contribution de quote.change24hPct (momentum, risk, participation)
+  //   - retire la contribution de quote.volume24h (risk, context, participation)
+  //   - neutralise dataQuality (live/recent/stale → constante 80)
+  //   - n'applique PAS regimeBonus (F&G/VIX recalculés en live)
+  //   - n'applique PAS newsBonus (news cache 3-6h, mais traité comme live)
+  //   - applique regimeMalus (validité config vs régime — stable par batch)
+  //   - applique learningMalus (bucket histoire — stable)
+  //
+  // Conséquence : strategicAnalysis.score ne change qu'à clôture de bougie.
+  //
+  // liveContext = container des inputs volatils + bonus live + impact estimé.
+  // Le score legacy `score` reste composite (strategic + live) pour back-compat
+  // avec buildWorkerPlan / plan.safetyScore. Côté front, l'UI peut afficher
+  // strategicAnalysis.score pour la stabilité, ou `score` pour la vue composite.
+  // ============================================================
+  const liveMomentumDelta = (typeof quote.change24hPct === "number")
+    ? clamp(quote.change24hPct * 9, -22, 24) : 0;
+  const liveRiskChangeDelta = (typeof quote.change24hPct === "number")
+    ? clamp(Math.abs(quote.change24hPct) * 1.1, 0, 10) : 0;
+  const liveRiskVolumeDelta = (quote.volume24h != null) ? 4 : 0;
+  const liveContextVolumeDelta = (quote.volume24h != null) ? 4 : 0;
+  const liveParticipationChangeDelta = (typeof quote.change24hPct === "number" && Math.abs(quote.change24hPct) > 1.5) ? 5 : 0;
+  const liveParticipationBaselineDelta = (quote.volume24h != null) ? (70 - 52) : 0;
+
+  const strategicMomentum = clamp(momentum - liveMomentumDelta, 0, 100);
+  const strategicRisk = clamp(risk + liveRiskChangeDelta - liveRiskVolumeDelta, 0, 100);
+  const strategicContext = clamp(context - liveContextVolumeDelta, 0, 100);
+  const strategicParticipation = clamp(participation - liveParticipationChangeDelta - liveParticipationBaselineDelta, 0, 100);
+  const strategicDataQuality = 80;
+
+  let strategicDirection = "neutral";
+  if (structure >= 56 && strategicMomentum >= 54) strategicDirection = "long";
+  else if (structure <= 44 && strategicMomentum <= 46) strategicDirection = "short";
+
+  const strategicTrendConflict = (strategicDirection === "long" && chg5 != null && chg20 != null && chg5 < 0 && chg20 > 0) ||
+    (strategicDirection === "short" && chg5 != null && chg20 != null && chg5 > 0 && chg20 < 0);
+  const strategicRiskTooHigh = strategicRisk < 42;
+  const strategicLowParticipation = strategicParticipation < 52;
+  const strategicEntryTooLate = timing < 42;
+
+  const strategicHardFlags = [];
+  if (strategicRiskTooHigh) strategicHardFlags.push("risk_too_high");
+  if (strategicEntryTooLate || extensionTooHigh) strategicHardFlags.push("entry_too_late");
+  if (strategicTrendConflict) strategicHardFlags.push("trend_conflict");
+  if (strategicLowParticipation) strategicHardFlags.push("low_participation");
+  if (macroFragile) strategicHardFlags.push("macro_fragile");
+  const strategicHardPassed = !["risk_too_high","entry_too_late","trend_conflict"].some(f => strategicHardFlags.includes(f));
+
+  let strategicRaw = 0.24 * structure + 0.20 * strategicMomentum + 0.20 * timing + 0.18 * strategicRisk + 0.10 * strategicContext + 0.08 * strategicDataQuality;
+  if (strategicDirection === "long" && structure >= 60 && strategicMomentum >= 60) strategicRaw += 4;
+  if (strategicDirection === "short" && structure <= 40 && strategicMomentum <= 40) strategicRaw += 4;
+  if (strategicTrendConflict) strategicRaw -= 6;
+  if (extensionTooHigh) strategicRaw -= 8;
+  if (strategicRiskTooHigh) strategicRaw -= 6;
+  if (strategicLowParticipation) strategicRaw -= 4;
+
+  const strategicScoreValue = clamp(Math.round(strategicRaw) - regimeMalus - learningMalus, 0, 100);
+
+  let strategicConfidence = "medium";
+  if ((strategicScoreValue >= 78 || strategicScoreValue <= 28) && Math.abs(strategicMomentum - 50) >= 12 && strategicHardPassed) strategicConfidence = "high";
+  if (strategicScoreValue >= 48 && strategicScoreValue <= 56) strategicConfidence = "low";
+  if (!strategicHardPassed) strategicConfidence = "low";
+
+  const strategicAnalysis = {
+    score: strategicScoreValue,
+    direction: strategicDirection,
+    confidence: strategicConfidence,
+    setupType,
+    configuration: detectedConfig,
+    hardFilters: { passed: strategicHardPassed, flags: strategicHardFlags },
+    breakdown: {
+      trend: structure,
+      momentum: strategicMomentum,
+      timing,
+      risk: strategicRisk,
+      context: strategicContext,
+      participation: strategicParticipation,
+      dataQuality: strategicDataQuality
+    },
+    regimeMalus,
+    learningMalus,
+    learningReason
+  };
+
+  const liveContext = {
+    change24hPct: typeof quote.change24hPct === "number" ? quote.change24hPct : null,
+    volume24h: quote.volume24h ?? null,
+    freshness: quote.freshness ?? null,
+    quotedAt: quote.quotedAt || null,
+    price: quote.price ?? null,
+    regimeBonus,
+    regimeBonusReason,
+    newsBonus,
+    newsBonusReason,
+    scoreImpact: {
+      strategicScore: strategicScoreValue,
+      compositeScore: score,
+      delta: score - strategicScoreValue
+    }
+  };
+
   // Bonus de configuration détectée (long + miroirs short)
   let configBonus = 0;
   if (detectedConfig.config === "PULLBACK" || detectedConfig.config === "PULLBACK_SHORT") configBonus = 6;
@@ -2723,7 +2839,9 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
     breakdown: {
       regime: context, trend: structure, momentum,
       entryQuality: timing, risk, participation, context, dataQuality
-    }
+    },
+    strategicAnalysis,
+    liveContext
   };
 }
 
@@ -3068,7 +3186,18 @@ function buildPartialAnalysisPayload(symbol, quote, message = "Analyse technique
     officialDecision: plan.decision,
     officialTrendLabel: trendLabel,
     officialWaitFor: plan.waitFor,
-    plan
+    plan,
+    strategicAnalysis: null,
+    liveContext: {
+      change24hPct: quote?.change24hPct == null ? null : finiteOrNull(quote?.change24hPct),
+      volume24h: quote?.volume24h ?? null,
+      freshness: quote?.freshness || "unknown",
+      quotedAt: quote?.quotedAt || null,
+      price: quote?.price == null ? null : finiteOrNull(quote?.price),
+      regimeBonus: 0, regimeBonusReason: null,
+      newsBonus: 0, newsBonusReason: null,
+      scoreImpact: null
+    }
   };
 }
 
@@ -3121,7 +3250,9 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
     newsBonus: scored?.newsBonus ?? 0,
     newsBonusReason: scored?.newsBonusReason || null,
     regimeBonus: scored?.regimeBonus ?? 0,
-    regimeBonusReason: scored?.regimeBonusReason || null
+    regimeBonusReason: scored?.regimeBonusReason || null,
+    strategicAnalysis: scored?.strategicAnalysis ?? null,
+    liveContext: scored?.liveContext ?? null
   };
 
   if (base.score == null) {
@@ -3225,6 +3356,8 @@ function toOpportunityRow(payload) {
     aiContextStatus: payload.aiContextStatus || null,
     plan: payload.plan,
     candles: [],
+    strategicAnalysis: payload.strategicAnalysis ?? null,
+    liveContext: payload.liveContext ?? null,
     error: payload.status === "unavailable" ? payload.reasonShort : null
   };
 }
