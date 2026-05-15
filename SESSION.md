@@ -83,6 +83,65 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-15 (suite) — Vague B.4 livrée : snapshotId + timestamps analytiques
+
+Infrastructure logique pour la cohérence analytique. Permet de comparer deux payloads et détecter si l'analyse stratégique vient du même snapshot ou si elle a été recalculée.
+
+### Apport
+
+`calcDetailScore` retourne désormais 5 nouveaux champs analytiques en plus du payload existant :
+- **`snapshotId`** — hash FNV-1a 8 chars hex déterministe sur `symbol | timeframe | analysisType | candlesAt | regimeAt | learningAt`. Strictement analytique : aucun input live n'entre dans le hash.
+- **`strategicCalculatedAt`** — ISO du moment où `calcDetailScore` s'est exécuté
+- **`candlesUpdatedAt`** — timestamp de la dernière bougie utilisée
+- **`regimeUpdatedAt`** — `regime.updatedAt` (déjà rempli par `detectMarketRegime`)
+- **`learningSnapshotAt`** — nouveau champ `computedAt` ajouté à `loadLearningContextForScan`
+
+Tous exposés à la racine du payload **ET** dans `strategicAnalysis` pour traçabilité complète.
+
+### Plomberie additive
+
+- `fnv1a32(str)` + `buildSnapshotId({...})` — helpers synchrones (Math.imul, 32-bit, déterministe, sans dépendance crypto async)
+- `loadLearningContextForScan` retourne maintenant `{ enabled, statsByBucket, computedAt }` (additif)
+- `calcDetailScore` calcule les 4 timestamps et le `snapshotId` au début de la fonction, expose dans `strategicAnalysis` et dans le return final + early-return
+- `buildStablePayload` propage les 5 champs
+- `toOpportunityRow` propage les 5 champs
+- `buildPartialAnalysisPayload` calcule un `snapshotId` minimal (sur `symbol + regimeUpdatedAt`) et expose `strategicCalculatedAt: nowIso()`
+- 2 call sites de `calcDetailScore` injectent `quote.symbol = clean/symbol` si absent — fiabilise le hash (certains providers omettent ce champ)
+
+### Garanties par construction
+
+- TEST 1 ✅ — mêmes candles + même régime + même learning ⇒ même `snapshotId`
+- TEST 2 ✅ — prix live différent uniquement ⇒ `snapshotId` identique (le hash n'intègre AUCUNE source live)
+- TEST 3 ✅ — nouvelle bougie daily ⇒ `snapshotId` différent
+- TEST 4 ✅ — changement learning snapshot ⇒ `snapshotId` différent
+- TEST 5 ✅ — changement régime ⇒ `snapshotId` différent
+- TEST 6 ✅ — aucun champ legacy supprimé/renommé
+- TEST 7 ✅ — paper trading inchangé (`buildWorkerPlan`, `computeTradeSafetyScore`, `plan.safetyScore`)
+- TEST 8 ✅ — zéro modification front (`assets/`, `index.html`, `sw.js`)
+- TEST 9 ✅ — `handleOpportunities` et `handleOpportunityDetail` signatures inchangées
+- TEST 10 ✅ — `buildSnapshotId` ne fuit aucun token live (`change24hPct`, `quote.price`, `quotedAt`, `volume24h`, `freshness`, `spread`)
+
+### Validation statique
+
+`/tmp/check_b4.js` — **72/72 checks PASS** (présence, propagation, simulation runtime du hash sur les 5 cas + bonus symboles différents).
+
+### Limites restantes
+
+- `analysis_snapshot` (Supabase JSON) recevra automatiquement le `snapshotId` quand de nouveaux trades seront ouverts, mais les trades historiques restent sans cette donnée.
+- Le `snapshotId` ne capture PAS encore : `planGeneratedAt`, `newsUpdatedAt`, `regimeIndicators` (F&G/VIX). Ces sources contextuelles évoluent indépendamment. À traiter en vague B.5 si besoin.
+- Aucune logique côté front ne consomme encore le `snapshotId` — c'est volontaire (cette PR est backend uniquement). Badge "recalcul détecté", refresh intelligent, blocage auto-cycle incohérent sont des PRs séparées.
+
+### Futurs chantiers débloqués
+
+- Badge UI "recalcul détecté" si `card.snapshotId !== detail.snapshotId`
+- Badge "analyse de X minutes" basé sur `strategicCalculatedAt`
+- Refresh intelligent côté front (ne pas re-render si même `snapshotId`)
+- Blocage auto-cycle sur incohérence analytique
+- Audit learning (corréler chaque trade ouvert à son `snapshotId` d'analyse)
+- Validation broker réel (preuve que le signal n'a pas dérivé entre analyse et exécution)
+
+---
+
 ## Session 2026-05-15 — Vague A.1 livrée : séparation strategicAnalysis / liveContext
 
 Le chantier le plus sensible de la refonte : isoler le **score stratégique stable** (basé uniquement sur bougies clôturées + modulateurs stables) du **contexte live volatile** (prix, volume, freshness, F&G/VIX, news).

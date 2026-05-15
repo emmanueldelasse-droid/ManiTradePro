@@ -157,12 +157,48 @@ Depuis la vague A.1, `calcDetailScore` retourne **deux objets supplémentaires**
 }
 ```
 
-`strategicAnalysis.score` est **conçu pour être stable** entre deux clôtures de bougies sur les entrées live directes (prix, volume, freshness). Ce n'est pas une garantie absolue : il peut bouger si le régime macro est rafraîchi (cache KV 1 h, modifie `regimeMalus`), si un nouveau trade clos publie ses stats (modifie `learningMalus`), ou si la dernière bougie daily est encore ouverte côté provider. `snapshotId` (vague B.4) sera nécessaire pour figer ces dépendances. `liveContext` est la source de vérité unique pour les valeurs volatiles directes.
+`strategicAnalysis.score` est **conçu pour être stable** entre deux clôtures de bougies sur les entrées live directes (prix, volume, freshness). Avec la vague B.4 (`snapshotId`), on peut maintenant **détecter** les recalculs (changement de candles, de régime ou de learning) en comparant deux `snapshotId`. La stabilité absolue reste conditionnée au fait que le provider n'ait pas inclus une bougie daily encore ouverte. `liveContext` est la source de vérité unique pour les valeurs volatiles directes.
 
 Plumberie :
-- `buildStablePayload` (`cloudflare-worker/worker.js`) propage `strategicAnalysis` et `liveContext` du `scored` au payload de fiche.
-- `toOpportunityRow` (`cloudflare-worker/worker.js`) propage les deux objets dans chaque row de `/api/opportunities`.
-- `buildPartialAnalysisPayload` (cas données insuffisantes) renvoie `strategicAnalysis: null` + un `liveContext` minimal (sans `scoreImpact`).
+- `buildStablePayload` (`cloudflare-worker/worker.js`) propage `strategicAnalysis`, `liveContext`, `snapshotId` et les 4 timestamps analytiques du `scored` au payload de fiche.
+- `toOpportunityRow` (`cloudflare-worker/worker.js`) propage tous ces objets/champs dans chaque row de `/api/opportunities`.
+- `buildPartialAnalysisPayload` (cas données insuffisantes) renvoie `strategicAnalysis: null`, un `liveContext` minimal (sans `scoreImpact`), un `snapshotId` calculé sur les sources disponibles (typiquement `symbol + regimeUpdatedAt`), et `strategicCalculatedAt = nowIso()`.
+
+### Cohérence analytique via snapshotId (vague B.4, mai 2026)
+
+Chaque payload retourné par `/api/opportunities` et `/api/opportunity-detail/:symbol` porte maintenant un **`snapshotId`** déterministe.
+
+**Définition** : hash FNV-1a 8 chars hex calculé par `buildSnapshotId({ symbol, timeframe, analysisType, candlesAt, regimeAt, learningAt })`. Inputs analytiques uniquement, **aucun input live**.
+
+**Garanties** :
+- Deux analyses avec mêmes candles + même régime + même learning ⇒ même `snapshotId`
+- Le prix live qui change ne modifie PAS le `snapshotId`
+- Une nouvelle bougie daily ⇒ `snapshotId` différent
+- Un nouveau régime macro ⇒ `snapshotId` différent
+- Un nouveau learning snapshot ⇒ `snapshotId` différent
+
+**Ce qu'il N'EST PAS** : ce n'est pas un timestamp live, ni une cache key, ni un tradeId, ni un userId. C'est un identifiant de cohérence analytique.
+
+**Usages préparés (PRs futures)** :
+- Badge UI "recalcul détecté" si `card.snapshotId !== detail.snapshotId`
+- Badge "stale" si `strategicCalculatedAt` trop ancien
+- Refresh intelligent côté front (ne pas re-fetcher si le snapshot n'a pas bougé)
+- Blocage auto-cycle sur incohérence analytique
+- Audit learning (corréler les trades ouverts au snapshot d'analyse utilisé)
+- Validation broker réel (preuve que le signal n'a pas dérivé entre l'analyse et l'exécution)
+
+### Timestamps analytiques (vague B.4)
+
+À côté du `snapshotId`, 4 timestamps analytiques sont exposés à la racine du payload **et** dans `strategicAnalysis` :
+
+| Champ | Source | Signification |
+|---|---|---|
+| `strategicCalculatedAt` | `nowIso()` à l'exécution de `calcDetailScore` | Quand l'analyse a tourné |
+| `candlesUpdatedAt` | `candles[length-1].time` | Timestamp de la dernière bougie utilisée |
+| `regimeUpdatedAt` | `regime.updatedAt` (rempli par `detectMarketRegime`) | Quand le régime macro a été calculé |
+| `learningSnapshotAt` | `learningContext.computedAt` (rempli par `loadLearningContextForScan`) | Quand le `learningContext` a été pré-fetché |
+
+Ces timestamps sont strictement analytiques. **Aucun timestamp live** (`quotedAt`, `freshness`) n'est intégré dans ce groupe — le côté live continue d'être exposé séparément dans `liveContext`.
 
 ### Stockage
 

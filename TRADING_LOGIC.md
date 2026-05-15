@@ -98,6 +98,34 @@ Container exposé à côté de `strategicAnalysis`. Contient `change24hPct`, `vo
 
 **Rôle** : isole tout ce qui change avec le prix live, pour l'affichage temps réel, la validation d'entrée, le calcul TP/SL, le PnL paper et l'exécution réelle future.
 
+### `snapshotId` (8 chars hex, **analytique pur**) — vague B.4
+
+Identifiant de cohérence analytique exposé à la racine du payload et dans `strategicAnalysis`. Hash FNV-1a déterministe sur `symbol | timeframe | analysisType | candlesAt | regimeAt | learningAt`.
+
+**Garanties** :
+- Deux analyses avec mêmes inputs analytiques → même `snapshotId`
+- Prix live qui change → `snapshotId` inchangé
+- Nouvelle bougie / nouveau régime / nouveau learning → `snapshotId` change
+
+**Non-garanties** :
+- Ce n'est PAS un timestamp live, PAS une cache key, PAS un tradeId, PAS un userId
+- N'inclut PAS `quotedAt`, `change24hPct`, `volume24h`, `freshness`, `spread`
+
+**Rôle** : permet de comparer carte d'opportunité vs fiche détail (`card.snapshotId === detail.snapshotId` ⇒ même état analytique), de détecter les recalculs, et de préparer l'audit learning + la validation broker réel.
+
+### Timestamps analytiques — vague B.4
+
+Quatre timestamps exposés à la racine du payload **et** dans `strategicAnalysis`, strictement analytiques (zéro source live) :
+
+| Champ | Signification |
+|---|---|
+| `strategicCalculatedAt` | Quand `calcDetailScore` a tourné (ISO) |
+| `candlesUpdatedAt` | Timestamp de la dernière bougie utilisée |
+| `regimeUpdatedAt` | Quand le régime macro a été calculé |
+| `learningSnapshotAt` | Quand le `learningContext` a été pré-fetché |
+
+**Note** : `liveContext.quotedAt` reste exposé séparément pour le côté live. Les timestamps analytiques et le timestamp live sont volontairement séparés pour ne jamais mélanger les deux notions de fraîcheur.
+
 ### `exploitabilityScore` (0–100)
 
 Score d'**actionnabilité** : valide que le setup est tradable maintenant (RR, distance entrée, horaires).
