@@ -83,7 +83,9 @@ Demander une validation explicite si :
 - [ ] La PR **supprime un endpoint authentifié** ou **affaiblit l'auth admin** (PIN, HMAC).
 - [ ] La PR **change la matrice `validateConfiguration`** du moteur de scoring.
 - [ ] La PR **change le contrat du payload `/api/opportunities` ou `/api/opportunity-detail`** d'une manière qui peut casser un cache front existant.
-- [ ] La PR **modifie `calcDetailScore`, `buildWorkerPlan` ou `computeTradeSafetyScore`** d'une manière qui change la valeur du score sur des inputs identiques (toute modif de pondération, seuil ou formule). Les ajouts strictement additifs de champs au payload (cf. vague A.1 `strategicAnalysis` / `liveContext`) sont autorisés sans escalade s'ils ne touchent pas aux champs legacy.
+- [ ] La PR **modifie `calcDetailScore`, `buildWorkerPlan` ou `computeTradeSafetyScore`** d'une manière qui change la valeur du score sur des inputs identiques (toute modif de pondération, seuil ou formule). Les ajouts strictement additifs de champs au payload (cf. vague A.1 `strategicAnalysis` / `liveContext`, vague B.4 `snapshotId` et timestamps analytiques) sont autorisés sans escalade s'ils ne touchent pas aux champs legacy.
+- [ ] La PR **modifie `buildSnapshotId` ou ses inputs** (ajout/retrait d'une source analytique, changement de hash). Toute modif change tous les `snapshotId` historiques et casse la comparaison carte ↔ fiche. Escalade obligatoire.
+- [ ] La PR **introduit une dépendance live dans `buildSnapshotId`** (price, change24h, volume24h, freshness, quotedAt, spread). C'est interdit par construction — vérification obligatoire.
 
 ---
 

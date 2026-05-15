@@ -155,10 +155,11 @@ Les "modules cibles" décrits dans le brief de refonte (`/market/`, `/trading/`,
 
 ### Cluster « Scoring + Plan »
 
-- `calcDetailScore` — composite score 0-100 + retourne aussi `strategicAnalysis` (stable, sans live) et `liveContext` (volatil) depuis vague A.1
+- `calcDetailScore` — composite score 0-100 + retourne aussi `strategicAnalysis` (stable, sans live) et `liveContext` (volatil) depuis vague A.1, + `snapshotId` et 4 timestamps analytiques depuis vague B.4
+- `fnv1a32`, `buildSnapshotId` — helpers vague B.4 pour l'identifiant de cohérence analytique
 - `safetyScoreFrom`, `actionabilityScoreFrom`, `dossierScoreFrom`, `decisionScoreFrom`
 - `buildWorkerPlan` — construit `plan.entry/stop/takeProfit/rr/setupType/etc.` (consomme le composite, inchangé)
-- `buildStablePayload`, `buildPartialAnalysisPayload`, `toOpportunityRow` — assembly du payload, propagent `strategicAnalysis` + `liveContext`
+- `buildStablePayload`, `buildPartialAnalysisPayload`, `toOpportunityRow` — assembly du payload, propagent `strategicAnalysis`, `liveContext`, `snapshotId` et les 4 timestamps analytiques
 
 ### Cluster « Training / paper trading »
 
@@ -314,8 +315,8 @@ Snapshot quotidien lisible par Claude — stats globales pour aider à l'analyse
 ## Non encore fait
 
 - ~~**Séparation `strategicScore` (stable) vs `liveContext` (volatile)** : le score actuel mélange les deux dans `calcDetailScore`. Prévu en vague A.1 de la refonte.~~ ✅ **Livré vague A.1 (mai 2026)** : `strategicAnalysis` et `liveContext` exposés en plus du composite legacy. Adaptation front à venir dans une PR séparée.
-- **`snapshotId` propagé** : aucune cohérence garantie entre la carte opp et la fiche détail si le cron tourne entre deux affichages. Prévu en vague B.4.
-- **Timestamps complets** : seul `quotedAt` est porté. `scoreCalculatedAt`, `candlesUpdatedAt`, `planGeneratedAt`, `newsUpdatedAt` manquants. Prévu en vague B.5.
+- ~~**`snapshotId` propagé** : aucune cohérence garantie entre la carte opp et la fiche détail si le cron tourne entre deux affichages. Prévu en vague B.4.~~ ✅ **Livré vague B.4 (mai 2026)** : `snapshotId` (hash FNV-1a déterministe sur sources analytiques) propagé dans tous les payloads + 4 timestamps analytiques. Adaptation front (badge "recalcul détecté") à venir dans une PR séparée.
+- ~~**Timestamps complets** : seul `quotedAt` est porté. `scoreCalculatedAt`, `candlesUpdatedAt`, `planGeneratedAt`, `newsUpdatedAt` manquants. Prévu en vague B.5.~~ ✅ **Partiellement livré vague B.4** : `strategicCalculatedAt`, `candlesUpdatedAt`, `regimeUpdatedAt`, `learningSnapshotAt` ajoutés. Reste à ajouter : `planGeneratedAt`, `newsUpdatedAt` (vague B.5).
 - **`quoteQualityEngine`** : pas d'engine systématique de validation d'âge / écart / devise. Prévu en vague B.6.
 - **`fxEngine` unifié** : pas d'helper `convert(amount, from, to, asOf)`. Conversions dispersées. Prévu en vague C.7.
 - **Multi-devises strict** : `capital_base` reste stocké en USD ; `originalCurrency` / `convertedCurrency` non systématiques. Prévu en vague C.8-9.

@@ -90,31 +90,28 @@ La carte opportunité et la fiche détail font deux appels API séparés (`/api/
 - PR récente a aligné le score affiché sur la valeur brute `safetyScore`
 - Caches mémoire 2 min sur les quotes individuelles limitent la dérive
 
-**Solution prévue**
-Vague B.4 : `snapshotId` propagé dans tous les payloads. La fiche détail saurait si elle affiche un snapshot ou un recalcul.
+**Solution livrée (vague B.4, mai 2026)**
+`snapshotId` propagé dans tous les payloads. Hash déterministe FNV-1a 8 chars hex basé sur `symbol | timeframe | analysisType | candlesAt | regimeAt | learningAt`. Deux analyses avec les mêmes inputs analytiques produisent exactement le même snapshotId, indépendamment du prix live. Permet de comparer la carte d'opportunité et la fiche détail : `card.snapshotId === detail.snapshotId` ⇒ même état analytique. Le badge UI "recalcul détecté" reste à brancher côté front dans une PR séparée.
 
-**État** : non commencé.
+**État** : ✅ backend livré (PR à venir). Badge UI à brancher dans une PR front.
 
 ---
 
-### #5 🟡 Timestamps manquants sur certains payloads
+### #5 ✅ Timestamps analytiques — résolu en vague B.4 (mai 2026)
 
-**Description**
-Le payload `/api/opportunities` ne porte pas systématiquement :
-- `scoreCalculatedAt`
-- `candlesUpdatedAt`
-- `planGeneratedAt`
+**Description initiale**
+Le payload `/api/opportunities` ne portait pas systématiquement les timestamps de calcul (`scoreCalculatedAt`, `candlesUpdatedAt`, `planGeneratedAt`). Seul `quotedAt` (live) était présent. Impossible de distinguer une analyse de 10 s d'une analyse de 4 h.
 
-Seul `quotedAt` est présent. L'utilisateur ne peut pas distinguer une analyse de 10 s d'une analyse de 4 h.
+**Solution livrée (vague B.4)**
+4 timestamps analytiques exposés dans le payload + dans `strategicAnalysis` :
+- `strategicCalculatedAt` — ISO du moment où `calcDetailScore` s'est exécuté
+- `candlesUpdatedAt` — ISO de la dernière bougie utilisée
+- `regimeUpdatedAt` — ISO de quand le régime macro a été calculé
+- `learningSnapshotAt` — ISO de quand le `learningContext` a été pré-fetché
 
-**Impact réel**
-- Décision opaque : "ce score date de quand ?"
-- Si un cycle cron a planté, la fiche peut afficher des données stale sans alerte
+Ces timestamps sont strictement analytiques, **ne contiennent aucun input live** (pas de `quotedAt`, pas de `freshness`).
 
-**Solution prévue**
-Vague B.5 : timestamps complets sur toutes les sorties API + badges UI.
-
-**État** : non commencé.
+**État** : ✅ backend livré (PR à venir). Affichage front à brancher dans une PR séparée.
 
 ---
 
@@ -216,6 +213,8 @@ Suite à la refonte horaires de bourse, la fonction `pad(n)` définie localement
 | Horaires NYSE en heure NY au lieu de Paris | `localHourToParis` via Intl | DST géré auto |
 | Carte "Paramètres du bot" dupliquée | Retrait de la version Trades | Carte uniquement dans Réglages |
 | Score volatile entre deux refresh (#1) | Vague A.1 : `strategicAnalysis` + `liveContext` séparés dans `calcDetailScore` | `strategicAnalysis.score` stable par conception sur les entrées live directes ; stabilité absolue conditionnée à la vague B.4 (`snapshotId`) |
+| Cohérence opp ↔ fiche détail (#4) | Vague B.4 : `snapshotId` propagé partout | Hash FNV-1a déterministe basé sur sources analytiques (candles + régime + learning). Indépendant du live. |
+| Timestamps analytiques manquants (#5) | Vague B.4 : `strategicCalculatedAt`, `candlesUpdatedAt`, `regimeUpdatedAt`, `learningSnapshotAt` | Exposés dans `strategicAnalysis` et à la racine du payload |
 
 ---
 

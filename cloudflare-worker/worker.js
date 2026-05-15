@@ -2483,21 +2483,89 @@ async function loadLearningContextForScan(env) {
     const settings = await getTrainingSettings(env).catch(() => null);
     const enabled = !!(settings?.learning_enabled);
     if (!enabled || !supabaseConfigured(env)) {
-      return { enabled: false, statsByBucket: new Map() };
+      return { enabled: false, statsByBucket: new Map(), computedAt: nowIso() };
     }
     const stats = await computeLearningStats(env, { mode: "all", limit: 5000 }).catch(() => null);
     const map = new Map();
     for (const b of stats?.buckets || []) {
       if (b?.bucketKey) map.set(b.bucketKey, b);
     }
-    return { enabled: true, statsByBucket: map };
+    return { enabled: true, statsByBucket: map, computedAt: nowIso() };
   } catch {
-    return { enabled: false, statsByBucket: new Map() };
+    return { enabled: false, statsByBucket: new Map(), computedAt: nowIso() };
   }
+}
+
+// ============================================================
+// SNAPSHOT ID — Vague B.4
+//
+// Identifiant de coherence analytique. Permet de comparer deux payloads
+// et detecter si l'analyse strategique a ete recalculee sur un nouveau
+// jeu de candles / regime / learning, ou si elle vient du meme snapshot.
+//
+// REGLE ABSOLUE : le snapshotId est PUREMENT ANALYTIQUE et INDEPENDANT
+// DU LIVE. Il ne change pas quand le prix bouge, le spread change, le
+// volume live change, le freshness change, ou le liveContext change.
+//
+// snapshotId =
+//   PAS un timestamp live
+//   PAS une cache key
+//   PAS un tradeId
+//   PAS un userId
+//
+// C'est un identifiant de coherence analytique base sur :
+//   symbol | timeframe | analysisType | candlesAt | regimeAt | learningAt
+//
+// Deux analyses avec les memes inputs analytiques produisent exactement
+// le meme snapshotId, peu importe le prix live, le batch timestamp ou
+// le moment de l'execution.
+// ============================================================
+function fnv1a32(str) {
+  let h = 0x811c9dc5;
+  const s = String(str || "");
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+
+function buildSnapshotId({ symbol, timeframe = "1d", analysisType = "strategic", candlesAt = null, regimeAt = null, learningAt = null } = {}) {
+  const parts = [
+    String(symbol || ""),
+    String(timeframe || ""),
+    String(analysisType || ""),
+    String(candlesAt || ""),
+    String(regimeAt || ""),
+    String(learningAt || "")
+  ];
+  return fnv1a32(parts.join("|"));
 }
 
 function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8, learningContext = null) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
+
+  // Timestamps analytiques (vague B.4). Sont exposes meme en early-return
+  // pour permettre la tracabilite et la comparaison de snapshots.
+  const strategicCalculatedAt = nowIso();
+  const candlesUpdatedAt = (() => {
+    const lastCandle = Array.isArray(candles) && candles.length > 0 ? candles[candles.length - 1] : null;
+    const t = lastCandle?.time ?? null;
+    if (!t) return null;
+    if (typeof t === "string") return t;
+    if (typeof t === "number") return new Date(t > 1e12 ? t : t * 1000).toISOString();
+    return null;
+  })();
+  const regimeUpdatedAt = regime?.updatedAt ?? null;
+  const learningSnapshotAt = learningContext?.computedAt ?? null;
+  const snapshotId = buildSnapshotId({
+    symbol: quote?.symbol ?? null,
+    timeframe: "1d",
+    analysisType: "strategic",
+    candlesAt: candlesUpdatedAt,
+    regimeAt: regimeUpdatedAt,
+    learningAt: learningSnapshotAt
+  });
 
   if (closes.length < 30 || quote.price == null) {
     return {
@@ -2517,6 +2585,11 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
         newsBonus: 0, newsBonusReason: null,
         scoreImpact: null
       },
+      snapshotId,
+      strategicCalculatedAt,
+      candlesUpdatedAt,
+      regimeUpdatedAt,
+      learningSnapshotAt,
       plan: null
     };
   }
@@ -2774,7 +2847,12 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
     },
     regimeMalus,
     learningMalus,
-    learningReason
+    learningReason,
+    snapshotId,
+    strategicCalculatedAt,
+    candlesUpdatedAt,
+    regimeUpdatedAt,
+    learningSnapshotAt
   };
 
   const liveContext = {
@@ -2847,7 +2925,12 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
       entryQuality: timing, risk, participation, context, dataQuality
     },
     strategicAnalysis,
-    liveContext
+    liveContext,
+    snapshotId,
+    strategicCalculatedAt,
+    candlesUpdatedAt,
+    regimeUpdatedAt,
+    learningSnapshotAt
   };
 }
 
@@ -3203,7 +3286,12 @@ function buildPartialAnalysisPayload(symbol, quote, message = "Analyse technique
       regimeBonus: 0, regimeBonusReason: null,
       newsBonus: 0, newsBonusReason: null,
       scoreImpact: null
-    }
+    },
+    snapshotId: buildSnapshotId({ symbol, timeframe: "1d", analysisType: "strategic", candlesAt: null, regimeAt: regime?.updatedAt ?? null, learningAt: null }),
+    strategicCalculatedAt: nowIso(),
+    candlesUpdatedAt: null,
+    regimeUpdatedAt: regime?.updatedAt ?? null,
+    learningSnapshotAt: null
   };
 }
 
@@ -3258,7 +3346,12 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
     regimeBonus: scored?.regimeBonus ?? 0,
     regimeBonusReason: scored?.regimeBonusReason || null,
     strategicAnalysis: scored?.strategicAnalysis ?? null,
-    liveContext: scored?.liveContext ?? null
+    liveContext: scored?.liveContext ?? null,
+    snapshotId: scored?.snapshotId ?? null,
+    strategicCalculatedAt: scored?.strategicCalculatedAt ?? null,
+    candlesUpdatedAt: scored?.candlesUpdatedAt ?? null,
+    regimeUpdatedAt: scored?.regimeUpdatedAt ?? null,
+    learningSnapshotAt: scored?.learningSnapshotAt ?? null
   };
 
   if (base.score == null) {
@@ -3304,6 +3397,7 @@ async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true,
     // par le caller (batch scan / cron), on le réutilise pour éviter de
     // refaire le calcul. Sinon on le pré-charge ici (cas d'un appel unitaire).
     const learningContext = options?.learningContext || await loadLearningContextForScan(env);
+    if (quote && !quote.symbol) quote.symbol = clean; // B.4 : fiabilise snapshotId
     const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight, learningContext);
     return buildStablePayload(clean, quote, candles || [], scored, regime);
   } catch (e) {
@@ -3364,6 +3458,11 @@ function toOpportunityRow(payload) {
     candles: [],
     strategicAnalysis: payload.strategicAnalysis ?? null,
     liveContext: payload.liveContext ?? null,
+    snapshotId: payload.snapshotId ?? null,
+    strategicCalculatedAt: payload.strategicCalculatedAt ?? null,
+    candlesUpdatedAt: payload.candlesUpdatedAt ?? null,
+    regimeUpdatedAt: payload.regimeUpdatedAt ?? null,
+    learningSnapshotAt: payload.learningSnapshotAt ?? null,
     error: payload.status === "unavailable" ? payload.reasonShort : null
   };
 }
@@ -3635,6 +3734,7 @@ async function handleOpportunities(_url, env) {
       // PR #7 Phase 2 — news context (cache 3h crypto / 6h stocks, coût quota sous contrôle)
       let newsContext = await resolveSymbolNewsContext(env, symbol, quote?.assetClass).catch(() => null);
       if (newsContext) newsContext = await enrichNewsContextWithClaude(env, newsContext).catch(() => newsContext);
+      if (quote && !quote.symbol) quote.symbol = symbol; // B.4 : fiabilise snapshotId
       const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight, learningContext);
       const payload = buildStablePayload(symbol, quote, candles || [], scored, regime);
       rows.push(toOpportunityRow(payload));

@@ -7,6 +7,7 @@
 
 À chaque session, **lire AVANT toute modif** :
 - `BOT_OBJECTIVE.md` — **constitution officielle du projet** : objectif réel, règles absolues, ce que le bot est et n'est pas. À lire en premier.
+- `PROJECT_RULES.md` — règles techniques structurelles (séparation analytique/live, snapshotId, additivité du payload)
 - `SESSION.md` — état du projet
 - `ARCHITECTURE.md` — structure code après merge
 - `DATA_PIPELINE.md` — flux de données par écran
