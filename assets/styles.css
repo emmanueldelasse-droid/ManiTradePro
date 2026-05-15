@@ -355,11 +355,16 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);cursor:poi
 .muted{color:var(--text-secondary);overflow-wrap:break-word;word-break:break-word}
 .bottom-nav{display:none;position:fixed;left:0;right:0;bottom:0;height:calc(var(--bottomnav-height) + var(--safe-bottom));padding-bottom:var(--safe-bottom);padding-left:var(--safe-left);padding-right:var(--safe-right);background:var(--bg-secondary);border-top:1px solid var(--border-subtle);z-index:10;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .bottom-wrap{display:flex;height:var(--bottomnav-height)}
-.bnav-item{flex:1;border:none;background:none;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:var(--bottomnav-height);font-size:.6rem;letter-spacing:.04em;padding:0 4px}
+.bnav-item{flex:1;border:none;background:none;color:var(--text-muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-height:var(--bottomnav-height);font-size:.6rem;letter-spacing:.04em;padding:0 4px;position:relative;transition:color .18s ease}
 .bnav-item span:first-child{width:22px;height:22px;display:flex;align-items:center;justify-content:center}
-.bnav-item span:first-child svg{width:22px;height:22px;display:block}
+.bnav-item span:first-child svg{width:22px;height:22px;display:block;transition:transform .18s ease}
 .bnav-item span:last-child{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Indicateur actif iOS-style : barre fine 3px en haut de l'item +
+   léger fond teinté + icône légèrement plus grande. Lisible immédiatement
+   d'un coup d'œil, contrairement à un simple changement de couleur. */
 .bnav-item.active{color:var(--accent)}
+.bnav-item.active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);width:38px;height:3px;border-radius:0 0 4px 4px;background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+.bnav-item.active span:first-child svg{transform:scale(1.08)}
 .more-menu-backdrop{position:fixed;inset:0;background:transparent;z-index:10}
 .more-menu-sheet{position:absolute;bottom:calc(var(--bottomnav-height) + var(--safe-bottom) + 8px);right:8px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:14px;padding:6px;display:flex;flex-direction:column;gap:2px;min-width:200px;box-shadow:0 -6px 24px rgba(0,0,0,.22);z-index:11;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px)}
 .more-menu-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:none;border:none;color:var(--text-primary);border-radius:10px;min-height:44px;cursor:pointer;font-size:.92rem;text-align:left;font-family:inherit}
@@ -1022,8 +1027,33 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);cursor:poi
   border-right:1px solid var(--border-subtle);
 }
 .app-shell.theme-light .logo-mark{
-  color:#ffffff;
+  /* Texte sombre sur fond accent vert clair (#00a36c) en light theme.
+     Le blanc précédent donnait un contraste WCAG < 3:1. */
+  color:#0a0e1a;
 }
+
+/* =====================================================
+   Overrides thème clair (audit bug-hunter UI #5).
+   Tous les éléments avec ombres ou couleurs sombres
+   hardcodées qui n'étaient pas scopés et fuyaient en
+   thème clair, rendant des zones critiques illisibles.
+   ===================================================== */
+/* Modal overlay : fond très sombre rgba(3,8,20,.78) rendait
+   les modals PIN/alerte/trade-confirm impossibles à lire en light. */
+.app-shell.theme-light .modal-overlay{background:rgba(15,23,42,.45)}
+
+/* Alert toast : ombre 0 4px 24px rgba(0,0,0,.5) noyait le toast
+   sur fond clair → l'utilisateur ne voyait pas les notifications. */
+.app-shell.theme-light .alert-toast{
+  background:#ffffff;
+  border-color:rgba(0,163,108,.32);
+  box-shadow:0 4px 24px rgba(15,23,42,.12);
+}
+.app-shell.theme-light .alert-toast-body{color:#475569}
+
+/* Chart timeframe buttons actifs : color:#fff sur accent vert clair
+   #00a36c = contraste insuffisant. Texte sombre plus lisible. */
+.app-shell.theme-light .chart-tf-btn.active{color:#0a0e1a}
 .app-shell.theme-light .nav-item{
   color:var(--text-secondary);
 }
