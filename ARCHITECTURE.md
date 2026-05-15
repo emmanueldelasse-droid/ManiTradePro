@@ -83,6 +83,12 @@ Tout dans une **seule IIFE**. Pas de modules. State global `state = { ... }`. Re
 - `priceDisplay(value, currency)` (dans `assets/app.js`) : affiche EUR primaire + USD en parenthèses (mode `EUR_PLUS_USD`)
 - `currencyForSymbol(symbol)` miroir du worker pour les positions sans devise stockée
 - Helper `quoteSourceLine(item)` : affiche "Données Yahoo (temps réel) · mis à jour il y a 30 s"
+- Helpers vague B.8 (lecture seule de `liveContext.quoteQuality` produit par le worker) :
+  - `quoteQualityFor(item)` → renvoie `item.liveContext.quoteQuality` ou null
+  - `quoteQualityState(item)` → `{label, tone}` pour le badge compact ("Live fiable", "Différé · fiable", "Marché fermé", "Dernier prix dispo", "Prix périmé", "Prix non fiable", "Devise incohérente")
+  - `quoteQualitySummaryLine(item)` → ligne courte sous le prix ("EODHD · différé 15 min · fiable", "Snapshot EOD · dernier prix disponible")
+  - `quoteSourceShortLabel(src)`, `freshnessChipLabel(f)`, `formatQuotedAtFr(iso)`, `validationStatusLabel`, `reasonLabel` → traductions FR
+  - `renderQuoteQualityCard(d)` → bloc « Qualité du prix » sur la fiche actif (Source / Fraîcheur / Heure quote / Qualité / Utilisable / Statut + chips reasons + footnote)
 
 ---
 
