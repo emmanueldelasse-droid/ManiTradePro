@@ -1041,16 +1041,13 @@
   }
 
   // Convertit une heure locale d'une bourse (ex. 09:30 NY) en heure Paris
-  // formatée "HH:MM". Géré via Intl pour les DST (NYSE en été = -6h
-  // Paris, en hiver = -6h aussi en pratique car les DST sont alignés).
+  // formatée "HH:MM". Géré via Intl pour les DST.
   function localHourToParis(srcTz, localH, localM) {
     const now = new Date();
     const dateFmt = new Intl.DateTimeFormat("en-CA", {
       timeZone: srcTz, year: "numeric", month: "2-digit", day: "2-digit"
     });
     const [y, m, d] = dateFmt.format(now).split("-").map(Number);
-    // On part d'une date UTC à l'heure locale demandée puis on ajuste
-    // l'offset pour que, lue dans srcTz, elle affiche bien localH:localM.
     const guess = new Date(Date.UTC(y, m - 1, d, localH, localM));
     const checkFmt = new Intl.DateTimeFormat("en-GB", {
       timeZone: srcTz, hour: "2-digit", minute: "2-digit", hour12: false
