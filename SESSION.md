@@ -27,7 +27,7 @@ Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-15 (vague B.8 — affichage diagnostic prix live) |
+| **Dernière mise à jour** | 2026-05-15 (vague B.9 — safety gate execution) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
 | **Branche active** | `claude/display-price-diagnostics-Udvpb` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -80,6 +80,111 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-15 — Vague B.9 : safety gate execution
+
+Empêche toute action automatique de l'auto-cycle si la quote live n'est pas réputée fiable (`liveContext.quoteQuality.executionSafe === false` ou diagnostic absent).
+
+### Règle absolue (cf. PROJECT_RULES R5)
+
+Aucune action automatique ne doit s'exécuter sur une quote unsafe :
+- ouverture de position auto
+- validation d'entrée
+- déclench TP/SL automatique
+- préparation d'exécution broker future
+
+Le scoring stratégique reste inchangé. L'opportunité peut toujours être "Trade propose" côté utilisateur — seul l'auto-cycle est bloqué. Le mode manuel (UI) n'est pas affecté (aucun handler manuel dans le worker actuellement).
+
+### Apport
+
+Nouveau helper `evaluateExecutionSafety(payload)` (`worker.js:2867-2924`) — synchrone, sans I/O, sans side effect :
+- Lit `payload.liveContext.quoteQuality` produit par `quoteQualityEngine` (B.6).
+- Renvoie `{safe, code, human, missing}` :
+  - `safe: true` ssi `quoteQuality.executionSafe === true`
+  - `code` machine-readable : `ok` / `currency_mismatch` / `stale` / `abnormal_spread` / `provider_unsafe` / `no_price` / `quote_unsafe` / `quote_quality_missing`
+  - `human` message FR pour journal / payload
+  - `missing` true si quoteQuality absent → blocage par prudence
+- Priorité des codes : currency_mismatch > stale > abnormal_spread > provider_unsafe > no_price > quote_unsafe (suit `quoteQualityEngine.validationStatus`).
+
+Gate appliquée à 2 points dans `handleTrainingAutoCycle` :
+
+**Phase ouverture** (`worker.js:4779-4796`)
+Après `isTrainingCandidateAllowed`, juste avant `openTrainingPositionFromRow` :
+- Si `!safety.safe` → push `log.skipped` avec `reason: "quote_unsafe: ${code}"` + `human`
+- Log structuré `mtp_training_events.event_type = "auto_open_blocked_unsafe"` avec symbol, code, source_used, freshness, quoted_at
+- `continue` (skip le candidat, le cycle continue)
+
+**Phase fermeture** (`worker.js:4683-4698`)
+Avant `trainingCloseTrigger` (et donc avant tout déclench stop/TP automatique) :
+- Si `!closeSafety.safe` → log `auto_close_blocked_unsafe` avec symbol, position_id, code, effective_price, price_source
+- `return` (skip cette position pour ce cycle, le tracker MAE/MFE intra-trade continue d'être mis à jour au-dessus si la devise matche)
+- Au cycle suivant, dès que la quote redevient fiable, la vérif stop/TP rejoue normalement. Si le stop était touché en intraday, `position.live.lowSinceOpen` aura gardé la trace et le close se déclenchera.
+
+### Périmètre strict respecté
+
+- Aucune modif de : `calcDetailScore`, `quoteQualityEngine`, `resolveLiveQuote`, `chooseTrainingExecution`, `trainingCloseTrigger`, `openTrainingPositionFromRow`, `closeTrainingPosition`, providers, RR, strategicAnalysis, scoring, learning.
+- Aucun nouveau score calculé.
+- Aucune décision stratégique modifiée.
+- Zéro modification front (`assets/app.js`, `assets/styles.css`, `index.html`, `sw.js` intacts).
+- Aucune migration SQL.
+- Aucun nouvel appel API.
+- Aucune nouvelle dépendance.
+
+### Tests (13/13 unit + 18/19 statique PASS — 1 FAIL faux positif regex)
+
+Unit (`/tmp/test_b9.mjs`) :
+- ✅ `executionSafe=true` → safe
+- ✅ `stale=true` → bloqué code=stale
+- ✅ `currencyMismatch=true` → bloqué code=currency_mismatch
+- ✅ `abnormalSpread=true` → bloqué code=abnormal_spread
+- ✅ `providerConfidence="unsafe"` → bloqué code=provider_unsafe
+- ✅ `quoteQuality` absent → bloqué code=quote_quality_missing (`missing=true`)
+- ✅ `liveContext` absent → bloqué (missing)
+- ✅ `payload` null → bloqué (missing)
+- ✅ `quoteQuality` non-objet → bloqué (missing)
+- ✅ BMW.DE `delayed+marketClosed` mais `executionSafe=true` → autorisé (delayed et marketClosed ne sont PAS des bloquants)
+- ✅ `reasons.includes("no_price")` → bloqué code=no_price
+- ✅ Fallback générique `executionSafe=false` sans drapeau → code=quote_unsafe
+- ✅ Priorité : `currencyMismatch ET stale` → code=currency_mismatch
+
+Statique (`/tmp/check_b9_integration.mjs`) :
+- ✅ helper défini, placé après `quoteQualityEngine` et avant `calcDetailScore`
+- ✅ gate open : `evaluateExecutionSafety(row)` AVANT `openTrainingPositionFromRow`, log `auto_open_blocked_unsafe`, skipped avec reason
+- ✅ gate close : `evaluateExecutionSafety(detailPayload)` AVANT `trainingCloseTrigger`, log `auto_close_blocked_unsafe`
+- ✅ signatures de `calcDetailScore`, `quoteQualityEngine`, `resolveLiveQuote`, `trainingCloseTrigger`, `chooseTrainingExecution`, `openTrainingPositionFromRow` intactes
+- ✅ Aucun score recalculé via la gate
+
+Build : `node --check cloudflare-worker/worker.js` PASS.
+
+### Comportement runtime attendu
+
+| Situation quote | Action auto |
+|---|---|
+| `executionSafe=true` (live OK ou delayed+OK) | inchangé (open/close normaux) |
+| `executionSafe=false, stale=true` | auto-open + auto-close bloqués |
+| `executionSafe=false, currencyMismatch=true` | bloqués (déjà bloqué dans `trainingCloseTrigger`, redondance volontaire) |
+| `executionSafe=false, abnormalSpread=true` | bloqués |
+| `executionSafe=false, providerConfidence=unsafe` | bloqués |
+| `quoteQuality` absent (payload legacy) | bloqués par prudence |
+| `delayed=true, marketClosed=true, executionSafe=true` (BMW.DE EU hors heures) | inchangé — delayed/marketClosed ne bloquent PAS l'exécution par eux-mêmes (cf. règle B.6) |
+
+Les opportunités unsafe restent visibles dans la liste (badge B.8 "Prix périmé" / "Devise incohérente" / etc.) — c'est l'utilisateur qui voit, le bot qui s'abstient.
+
+### Observabilité
+
+Nouveaux event_types dans `mtp_training_events` :
+- `auto_open_blocked_unsafe` : { symbol, code, human, missing_quote_quality, source_used, freshness, quoted_at }
+- `auto_close_blocked_unsafe` : { symbol, position_id, code, human, missing_quote_quality, effective_price, price_source }
+
+Visibles dans le journal training (route `/api/training/events`) côté admin.
+
+### Limites restantes
+
+- Le mode manuel n'a pas de garde-fou explicite (l'utilisateur peut toujours ouvrir manuellement depuis la fiche, c'est volontaire). Le badge B.8 sur la fiche actif lui montre déjà l'état unsafe.
+- La gate close se base sur `detailPayload.liveContext.quoteQuality`. Si `buildStableMarketPayload` échoue (detailPayload null), la gate considère `quoteQuality` absent → blocage par prudence → le close attend le cycle suivant. Conséquence : sur un provider en panne prolongée, les stop loss peuvent rester non déclenchés. Mitigation : `position.live.highSinceOpen` / `lowSinceOpen` continuent d'être mis à jour, donc le close rattrape dès la fiabilisation. Risque acceptable côté paper trading.
+- Pas encore propagé au futur broker réel (à brancher quand l'intégration broker arrive). La gate est conçue pour s'insérer à tout point de décision exécutive : si le broker réel passe par `chooseTrainingExecution`, il héritera de la gate.
 
 ---
 

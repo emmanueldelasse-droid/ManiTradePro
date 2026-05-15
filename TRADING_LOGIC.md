@@ -219,6 +219,24 @@ Le bot applique `require_structural_setup` : si `true` (par défaut), aucune pos
 | 14 | `post_stop_cooldown_hours` | Stoppé récemment, attendre N h |
 | 15 | Adjustments actifs (raise_min_score, disable_bucket) | Bucket désactivé par règles 1-6 |
 | 16 | Horaires de marché ouverts | Hors séance |
+| **17** | **`evaluateExecutionSafety(row).safe === true`** (vague B.9) | **Quote unsafe — bloqué quote_unsafe** |
+
+### Filtre 17 — Safety gate execution (vague B.9, mai 2026)
+
+Après tous les filtres précédents et juste avant `openTrainingPositionFromRow`, l'auto-cycle vérifie `evaluateExecutionSafety(row)`. Si `safe === false`, la position n'est PAS ouverte. Le candidat reste visible côté UI (badge B.8 "Prix périmé" / "Devise incohérente" / etc.), mais le bot s'abstient.
+
+Causes possibles de blocage (champ `code`) :
+- `currency_mismatch` — devise quote ≠ devise attendue
+- `stale` — quote périmée (cf. seuils B.6.1)
+- `abnormal_spread` — écart > 3 ATR (5 pour crypto)
+- `provider_unsafe` — fournisseur ne donne pas confiance
+- `no_price` — `price` absent ou non fini
+- `quote_unsafe` — fallback générique
+- `quote_quality_missing` — diagnostic absent, blocage par prudence
+
+**Important** : `delayed` et `marketClosed` ne sont PAS des bloquants par eux-mêmes (BMW.DE différé hors heures EU reste exécutable côté bot tant que `executionSafe=true`).
+
+Chaque blocage écrit un événement `auto_open_blocked_unsafe` dans `mtp_training_events` avec `{symbol, code, human, source_used, freshness, quoted_at}` pour observabilité.
 
 ### Si tous les filtres passent
 
@@ -242,6 +260,16 @@ Le bot applique `require_structural_setup` : si `true` (par défaut), aucune pos
 ## Règles de fermeture (`trainingCloseTrigger`)
 
 Vérifié à chaque cycle cron sur chaque position ouverte. Retourne `{ type, exitPrice, intradayDetected, intradaySource, executionAssumption }` ou `null`.
+
+### Filtre 0 — Safety gate execution (vague B.9, mai 2026)
+
+**AVANT** d'appeler `trainingCloseTrigger`, le cycle vérifie `evaluateExecutionSafety(detailPayload)`. Si la quote sur laquelle on baserait la décision n'est pas fiable (`executionSafe=false` ou diagnostic absent), le close est **différé d'un cycle** :
+- pas de stop/TP déclenché ce tour
+- log `auto_close_blocked_unsafe` dans `mtp_training_events`
+- `position.live.highSinceOpen` / `lowSinceOpen` continuent d'être mis à jour (avec check `currencyMatches`), donc si le stop a été touché en intraday, l'info est conservée
+- au cycle suivant, dès que la quote redevient fiable (`executionSafe=true`), `trainingCloseTrigger` rejoue normalement et le close se déclenche si les niveaux ont été franchis
+
+**Conséquence** : sur un provider en panne prolongée, les stops peuvent rester non exécutés tant que la quote reste unsafe. Acceptable côté paper trading. À surveiller pour le futur broker réel — la gate sera réactivable / configurable séparément à ce moment-là.
 
 ### Ordre de priorité
 
