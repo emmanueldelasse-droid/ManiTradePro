@@ -2886,10 +2886,16 @@ function priorityClass(priority) {
 
 
 function safetyScoreFrom(source) {
+    // Priorité : safetyScore brut (= "Score de sûreté" affiché sur la
+    // fiche détail) AVANT officialScore (composite avec bonus régime/news).
+    // Avant cette inversion, la carte opportunité montrait 69 (composite)
+    // alors que la fiche montrait 55 (sûreté) pour le même actif → user
+    // perdu. Maintenant les deux affichent le même chiffre brut. Les
+    // bonus restent visibles via les chips séparés sur la carte.
     const raw = Number(
-      source?.officialScore ??
       source?.plan?.safetyScore ??
       source?.safetyScore ??
+      source?.officialScore ??
       NaN
     );
     return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
