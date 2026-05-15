@@ -115,26 +115,32 @@ Ces timestamps sont strictement analytiques, **ne contiennent aucun input live**
 
 ---
 
-### #6 🟡 `quoteQualityEngine` absent
+### #6 ✅ `quoteQualityEngine` — livré vague B.6 (mai 2026)
 
-**Description**
-Aucune validation systématique :
-- Âge de la quote (peut être > 2 min sans alerte)
-- Écart entre providers (Yahoo dit 152, Twelve dit 145 → pas de signal)
-- Quote sans `currency` explicite acceptée
+**Description initiale**
+Aucune validation systématique de l'âge des quotes, écart inter-providers, ou devise explicite.
 
-**Impact réel**
-- Faux stop possible si quote vieille de plusieurs heures
-- Pas de détection de provider qui dérive
+**Solution livrée (vague B.6)**
+Nouveau moteur `quoteQualityEngine(quote, candles, options)` synchrone qui produit un objet `quoteQuality` dans `liveContext` :
+- `trustScore` 0-100 — agrégat indicatif
+- `stale` — quote trop vieille en heures de marché (crypto > 120 s, autre > 600 s)
+- `delayed` — provider légalement différé (EODHD EU, Alpha Vantage)
+- `marketClosed` — marché fermé (week-end, hors fenêtre par devise, jour férié)
+- `abnormalSpread` — `|livePrice - lastClose| / ATR > 3` (5 pour crypto)
+- `currencyMismatch` — quote.currency ≠ `getCurrencyForSymbol(symbol)`
+- `providerConfidence` — high / medium / low / unsafe selon `sourceUsed`
+- `executionSafe` — `true` si aucune anomalie disqualifiante
+- `validationStatus` — 1ère raison disqualifiante par ordre de gravité
+- `reasons[]` — liste explicite des flags actifs
 
-**Mitigation partielle**
-- `tradeValidationEngine` détecte `stale_quote` à la fermeture (filet d'audit)
-- Le check devise empêche le mismatch EUR/USD
+**Périmètre strict** : agit uniquement sur la validation live. **N'altère PAS** `strategicAnalysis`, le score, le plan, le paper trading, le learning, ni les RR.
 
-**Solution prévue**
-Vague B.6 : `quoteQualityEngine` qui vérifie âge, écart, devise AVANT toute décision.
+**État** : ✅ backend livré. Branchement broker réel + UI badges à venir dans des PRs séparées.
 
-**État** : non commencé.
+**Limites résiduelles** :
+- Comparaison inter-providers non encore implémentée (un seul provider par quote)
+- Heures de marché synchrones approximatives (USD 13:00-21:30 UTC, EUR/CHF/GBP 07:00-16:30 UTC) — large pour tolérer DST, peut donner un faux positif `marketClosed` à la marge
+- `executionSafe` ne consulte pas encore `getMarketStatus` complet (front uniquement)
 
 ---
 
@@ -215,6 +221,7 @@ Suite à la refonte horaires de bourse, la fonction `pad(n)` définie localement
 | Score volatile entre deux refresh (#1) | Vague A.1 : `strategicAnalysis` + `liveContext` séparés dans `calcDetailScore` | `strategicAnalysis.score` stable par conception sur les entrées live directes ; stabilité absolue conditionnée à la vague B.4 (`snapshotId`) |
 | Cohérence opp ↔ fiche détail (#4) | Vague B.4 : `snapshotId` propagé partout | Hash FNV-1a déterministe basé sur sources analytiques (candles + régime + learning). Indépendant du live. |
 | Timestamps analytiques manquants (#5) | Vague B.4 : `strategicCalculatedAt`, `candlesUpdatedAt`, `regimeUpdatedAt`, `learningSnapshotAt` | Exposés dans `strategicAnalysis` et à la racine du payload |
+| `quoteQualityEngine` absent (#6) | Vague B.6 : moteur synchrone produisant `quoteQuality` dans `liveContext` | 6 détections + trustScore + validationStatus + reasons[]. Périmètre strict : aucune modif scoring/plan/learning |
 
 ---
 
