@@ -4050,6 +4050,27 @@ async function handleOpportunities(_url, env) {
   for (const symbol of allSymbols) {
     let quote = quotesMap[symbol] || getMemoryCache(`market:snapshot:${symbol}`);
     try {
+      // B.7.1 : ordre fallback corrige.
+      // Avant B.7.1, getStoredDailyQuoteFallback (snapshot EOD de la veille)
+      // etait appele AVANT resolveLiveQuote. Resultat : sur les actions
+      // EU/UK/CH ou Yahoo batch echouait, la liste opp servait un prix
+      // EOD perime tandis que la fiche actif via resolveLiveQuote tombait
+      // sur EODHD differe 15 min => deux prix differents (cf. bug BMW.DE).
+      //
+      // Nouvel ordre :
+      //   1. quotesMap[symbol] (Phase 1 batch)
+      //   2. cache memoire `market:snapshot:${symbol}` (intra-worker)
+      //   3. resolveLiveQuote (cascade memoire / KV partage / providers live)
+      //   4. getStoredDailyQuoteFallback (filet ultime, snapshot EOD veille)
+      //   5. partial/unavailable
+      if (!quote) {
+        try {
+          quote = await resolveLiveQuote(symbol, env, ctx, { allowAlphaFallback: false });
+        } catch {
+          // resolveLiveQuote a echoue (tous providers KO ou KV indispo).
+          // On tente le filet EOD juste apres.
+        }
+      }
       if (!isCrypto(symbol) && !quote) {
         quote = await getStoredDailyQuoteFallback(symbol, env);
         if (!quote) {
@@ -4062,9 +4083,6 @@ async function handleOpportunities(_url, env) {
           continue;
         }
       }
-      // Quote depuis cache (pré-rempli en phase 1)
-      // B.7 : passe par resolveLiveQuote (cache KV cross-worker)
-      quote = quote || await resolveLiveQuote(symbol, env, ctx, { allowAlphaFallback: false });
       // Bougies depuis KV si disponibles
       const candles = await getCandlesBySymbol(symbol, "1d", 90, env, ctx);
       // PR #7 Phase 2 — news context (cache 3h crypto / 6h stocks, coût quota sous contrôle)

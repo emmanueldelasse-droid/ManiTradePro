@@ -33,6 +33,19 @@ Toute résolution de prix live destinée à l'affichage ou aux décisions tradin
 2. **Cache KV partagé** `kv:livequote:${symbol}` (TTL effectif 30 s, KV ttl 60 s imposé par Cloudflare) — **cross-worker** ← résout le bug "deux prix différents entre opp et fiche"
 3. **Cascade providers** via `resolveUnifiedMarketQuote` (Yahoo, EODHD, Twelve, etc.)
 
+**Filet ultime — snapshot EOD (`getStoredDailyQuoteFallback`)** :
+
+Quand `resolveLiveQuote` échoue (tous providers KO, KV indispo, etc.), `handleOpportunities` Phase 2 tente un dernier filet : `getStoredDailyQuoteFallback(symbol, env)` qui retourne la dernière bougie quotidienne stockée en KV avec `sourceUsed: "snapshot"` et `freshness: "eod"`. Utile en cas de weekend / jour férié / panne provider prolongée.
+
+**Important (vague B.7.1, mai 2026)** : `getStoredDailyQuoteFallback` est strictement un **filet ultime, jamais une source prioritaire**. L'ordre des fallbacks dans Phase 2 est :
+1. `quotesMap[symbol]` (Phase 1 batch)
+2. cache mémoire `market:snapshot:${symbol}`
+3. `resolveLiveQuote` (cascade mémoire / KV / providers live)
+4. `getStoredDailyQuoteFallback` (snapshot EOD veille — uniquement si tout le live a échoué)
+5. partial/unavailable
+
+Avant B.7.1, l'étape 4 venait avant l'étape 3 → la liste opportunités pouvait servir un prix EOD périmé tandis que la fiche actif (qui appelait `resolveLiveQuote` directement) servait un prix `delayed_15m` plus frais. Bug résolu en inversant l'ordre.
+
 **Écriture** :
 - Mémoire locale (via `resolveUnifiedMarketQuote`)
 - KV (best-effort, ne bloque pas si KV indispo)
