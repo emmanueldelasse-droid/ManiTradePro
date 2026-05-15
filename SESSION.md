@@ -83,6 +83,63 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-15 (fin) — Vague B.6.1 : correctif stale ≠ delayed
+
+Mini-PR corrective pour résoudre un faux positif identifié en runtime sur les quotes EODHD `delayed_15m`. Le brief B.6 disait : *"Le système doit distinguer stale ET delayed. Ce n'est PAS la même chose."* — mais l'implémentation initiale appliquait le même seuil `600 s` aux deux cas, marquant systématiquement les quotes delayed comme `stale: true`.
+
+### Cause observée
+
+Test runtime sur NESN.SW / ASML.AS / AAPL :
+- `freshness: "delayed_15m"`, `quotedAt` ~21 min, `ageSec: 1255`
+- Code initial : `if (ageSec > 600) stale = true` → marquait stale alors que c'est normal pour une quote différée de 15 min
+
+### Fix livré (5 lignes)
+
+Dans `quoteQualityEngine` (`cloudflare-worker/worker.js`) :
+1. **Ordre inversé** : `delayed` calculé AVANT `stale` (au lieu d'après)
+2. **Seuil `maxAge` adapté** :
+   - crypto : `120 s` (inchangé)
+   - **delayed : `1800 s`** (30 min — tolère 15 min légal + 15 min de marge)
+   - live : `600 s` (inchangé)
+
+```js
+const maxAge = cls === "crypto" ? 120 : delayed ? 1800 : 600;
+```
+
+### Tests (72/72 PASS)
+
+- ✅ TEST B.6.1 — quote `delayed_15m` à 21 min : `stale=false` (était `true` avant fix)
+- ✅ TEST B.6.1 — `delayed=true` maintenu
+- ✅ TEST B.6.1 — `validationStatus="delayed"` (pas `"stale"`)
+- ✅ TEST B.6.1 sanity — quote `delayed` à 40 min : `stale=true` (seuil 1800 dépassé)
+- ✅ Tous les 12 tests obligatoires B.6 toujours PASS
+- ✅ TEST 1 (quote fraîche live) toujours `executionSafe=true`
+- ✅ TEST 2 (quote live à 20 min) toujours `stale=true` (seuil 600 inchangé pour live)
+
+### Périmètre strict respecté
+
+- Aucune autre logique modifiée (autres flags, autres seuils, autres champs)
+- Aucun champ legacy supprimé/renommé
+- Aucun impact `strategicAnalysis`, `score`, `plan`, paper trading, learning, RR, providers
+- Zéro modification front
+- Aucune migration SQL
+
+### Impact attendu en runtime
+
+Les 3 quotes testées (NESN.SW, ASML.AS, AAPL via Alpha delayed) passeront de :
+- AVANT : `stale=true`, `executionSafe=false`, `validationStatus="stale"`, `trustScore=25`
+- APRÈS : `stale=false`, `executionSafe=true`, `validationStatus="delayed"`, `trustScore ≈ 60`
+
+Cela ouvre les quotes delayed comme exploitables pour validation entrée — exactement le comportement spécifié dans le brief B.6.
+
+### Limites restantes
+
+- Les heures de marché synchrones approximatives (cf. limite B.6 inchangée)
+- La comparaison inter-providers reste à implémenter
+- Pas encore branché à l'auto-cycle ni au broker réel (volontaire)
+
+---
+
 ## Session 2026-05-15 (suite) — Vague B.6 livrée : quoteQualityEngine
 
 Validation live structurée des quotes pour préparer le branchement broker réel et les futurs blocages auto-trade. Périmètre STRICT : aucun changement de scoring, paper trading, learning, RR ou seuils.
