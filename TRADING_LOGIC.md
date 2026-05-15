@@ -126,6 +126,27 @@ Quatre timestamps exposés à la racine du payload **et** dans `strategicAnalysi
 
 **Note** : `liveContext.quotedAt` reste exposé séparément pour le côté live. Les timestamps analytiques et le timestamp live sont volontairement séparés pour ne jamais mélanger les deux notions de fraîcheur.
 
+### `quoteQuality` (objet, **validation live**) — vague B.6
+
+Exposé dans `liveContext.quoteQuality`. Diagnostic structuré de la qualité de la quote live, produit par `quoteQualityEngine(quote, candles, options)`.
+
+**Champs principaux** : `trustScore` (0-100), `executionSafe` (bool), `validationStatus` (string), `reasons` (string[]), 6 flags booléens (`stale`, `delayed`, `marketClosed`, `abnormalSpread`, `currencyMismatch`, `providerConfidence`).
+
+**Rôle** : préparer la validation d'entrée, le suivi TP/SL live et la future validation broker réel. Permet de bloquer une exécution sur une quote douteuse SANS toucher au scoring stratégique.
+
+**Ce que `quoteQuality` N'EST PAS** :
+- Ne remplace PAS le `strategicAnalysis`
+- Ne remplace PAS le moteur trading
+- Ne décide PAS des setups ni des scores
+- Ne pilote PAS encore le paper trading (à brancher dans une PR future)
+
+**Ce que `quoteQuality` valide** :
+- Qualité live (âge, freshness)
+- Sécurité quote (cohérence devise, écart vs candles)
+- Cohérence exécution (provider confidence, market hours)
+
+Cf. `DATA_PIPELINE.md` pour la structure complète et les règles de détection.
+
 ### `exploitabilityScore` (0–100)
 
 Score d'**actionnabilité** : valide que le setup est tradable maintenant (RR, distance entrée, horaires).

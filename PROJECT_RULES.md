@@ -38,6 +38,14 @@ Ce fichier-ci porte les règles **techniques structurelles** qui ne rentrent dan
 - Le timestamp live (`liveContext.quotedAt`) reste exposé séparément.
 - **Interdit de mélanger les deux notions de fraîcheur**. Un timestamp analytique ne doit jamais référencer une source live, et vice-versa.
 
+### R3-bis. `quoteQualityEngine` — validation live, jamais analytique
+
+- `quoteQualityEngine` produit un objet `quoteQuality` qui rejoint **uniquement** `liveContext.quoteQuality`.
+- **Interdit** d'injecter `quoteQuality` dans `strategicAnalysis` ou dans `plan.safetyScore` / `plan.decisionScore` / etc.
+- **Interdit** de modifier le score stratégique ou le composite à partir de `quoteQuality`.
+- `quoteQualityEngine` est synchrone (cohérent avec `calcDetailScore`). Pas d'I/O, pas d'`await` dedans.
+- Si une nouvelle source de validation live est ajoutée, elle doit être un champ supplémentaire du `quoteQuality`, pas une modif du moteur de score.
+
 ### R4. Champs legacy préservés (additif uniquement)
 
 - Toute évolution du payload `/api/opportunities` ou `/api/opportunity-detail/:symbol` doit être **additive**.

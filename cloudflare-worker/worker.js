@@ -2542,6 +2542,207 @@ function buildSnapshotId({ symbol, timeframe = "1d", analysisType = "strategic",
   return fnv1a32(parts.join("|"));
 }
 
+// ============================================================
+// QUOTE QUALITY ENGINE — Vague B.6
+//
+// Analyse la qualite des quotes live et produit un diagnostic structure
+// utilisable pour la validation d'entree, le TP/SL live, le futur broker
+// reel et l'audit learning.
+//
+// REGLES ABSOLUES (cf. PROJECT_RULES.md) :
+// - N'altere PAS strategicAnalysis ni le strategic score
+// - N'altere PAS buildWorkerPlan ni computeTradeSafetyScore
+// - N'altere PAS le paper trading, le learning, les RR ni les setups
+// - Agit uniquement sur la validation live et la securite execution
+// - Produit un objet quoteQuality qui rejoint liveContext (jamais
+//   strategicAnalysis)
+// - Synchrone (comme calcDetailScore et buildSnapshotId)
+// ============================================================
+
+// Heuristique synchrone : marche ouvert ou non, base sur asset class +
+// devise + jour ferie. Volontairement plus simple que getMarketStatus
+// front (qui gere les fuseaux precis via Intl) — pour B.6 le but n'est
+// pas l'exactitude minute par minute mais de desamorcer les faux positifs
+// "stale" quand le marche est ferme.
+function isMarketLikelyClosed(symbol, assetClass, currency, nowDate = new Date()) {
+  const cls = (assetClass || "").toLowerCase();
+  if (cls === "crypto") return false; // 24/7
+  const day = nowDate.getUTCDay();
+  const mins = nowDate.getUTCHours() * 60 + nowDate.getUTCMinutes();
+  if (cls === "forex") {
+    // Ferme samedi entier, dimanche avant 22h UTC, vendredi apres 22h UTC.
+    if (day === 6) return true;
+    if (day === 0 && mins < 22 * 60) return true;
+    if (day === 5 && mins >= 22 * 60) return true;
+    return false;
+  }
+  // Stocks / ETF : ferme week-end + jours feries + hors fenetre de seance
+  // approximative en UTC par devise. Les fenetres sont volontairement
+  // larges pour tolerer DST (USD : 13:00-21:30, EUR/CHF/GBP : 07:00-16:30).
+  if (day === 0 || day === 6) return true;
+  if (symbol && isMarketHoliday(symbol, nowDate.toISOString())) return true;
+  const cur = (currency || "").toUpperCase();
+  const windows = {
+    USD: [13 * 60, 21 * 60 + 30],
+    EUR: [7 * 60, 16 * 60 + 30],
+    CHF: [7 * 60, 16 * 60 + 30],
+    GBP: [7 * 60, 16 * 60 + 30],
+    SEK: [7 * 60, 16 * 60 + 30],
+    NOK: [7 * 60, 16 * 60 + 30],
+    DKK: [7 * 60, 16 * 60 + 30]
+  };
+  const win = windows[cur];
+  if (!win) return false; // devise inconnue → on ne marque pas fermé (prudence)
+  return mins < win[0] || mins >= win[1];
+}
+
+// Calcule l'age d'une quote (en secondes) a partir de quotedAt ISO. Retourne
+// null si quotedAt absent ou invalide. Toujours synchrone.
+function quoteAgeSeconds(quotedAtIso, nowDate = new Date()) {
+  if (!quotedAtIso) return null;
+  const t = Date.parse(quotedAtIso);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.round((nowDate.getTime() - t) / 1000));
+}
+
+// Confiance provider — table statique fondee sur l'observation du projet
+// (cf. PROVIDERS_MATRIX.md). High = real-time fiable, medium = delayed ou
+// rate-limited, low = source de filet, unsafe = inconnu.
+function providerConfidenceForSource(sourceUsed, freshness) {
+  const src = String(sourceUsed || "").toLowerCase();
+  const fresh = String(freshness || "").toLowerCase();
+  if (src === "binance") return "high";
+  if (src === "eodhd") return fresh.includes("delayed") ? "medium" : "high";
+  if (src === "yahoo" || src === "yahoo_chart") return fresh === "live" ? "high" : "medium";
+  if (src === "twelve" || src === "twelvedata") return "medium";
+  if (src === "alphavantage" || src === "alpha") return "medium";
+  if (!src) return "unsafe";
+  return "low";
+}
+
+// Moteur central. Synchrone, deterministe, sans I/O.
+//
+// Entrees :
+//   quote   : {symbol, price, currency, freshness, quotedAt, sourceUsed, assetClass, change24hPct, volume24h}
+//   candles : tableau de bougies daily (utilise pour ATR et derniere close)
+//   options : { now: Date, expectedCurrency: string|null }
+//
+// Sortie : objet quoteQuality decrit dans PROJECT_RULES.md / DATA_PIPELINE.md.
+function quoteQualityEngine(quote, candles = [], options = {}) {
+  const now = options?.now instanceof Date ? options.now : new Date();
+  const expectedCurrency = options?.expectedCurrency
+    ? String(options.expectedCurrency).toUpperCase()
+    : (quote?.symbol ? String(getCurrencyForSymbol(quote.symbol) || "").toUpperCase() : null);
+
+  const sym = quote?.symbol ?? null;
+  const cls = (quote?.assetClass || "").toLowerCase();
+  const freshness = String(quote?.freshness || "").toLowerCase();
+  const sourceUsed = String(quote?.sourceUsed || "").toLowerCase();
+  const livePrice = Number(quote?.price);
+  const quoteCurrency = quote?.currency ? String(quote.currency).toUpperCase() : null;
+
+  const marketClosed = isMarketLikelyClosed(sym, cls, expectedCurrency || quoteCurrency, now);
+  const ageSec = quoteAgeSeconds(quote?.quotedAt, now);
+
+  // STALE — quote trop vieille en heures de marche.
+  // - crypto : > 120 s
+  // - autre : > 600 s (10 min) si marche ouvert. Hors marche, marketClosed
+  //   gere ; on ne marque PAS stale par defaut.
+  // - freshness === "stale" => stale direct (provider l'a signale).
+  let stale = false;
+  const staleReasons = [];
+  if (freshness === "stale") { stale = true; staleReasons.push("freshness=stale"); }
+  if (!marketClosed && Number.isFinite(ageSec)) {
+    const maxAge = cls === "crypto" ? 120 : 600;
+    if (ageSec > maxAge) { stale = true; staleReasons.push(`age=${ageSec}s > ${maxAge}s`); }
+  }
+
+  // DELAYED — distinct de stale. Provider legalement differe (ex. EODHD EU).
+  let delayed = false;
+  if (freshness.includes("delayed") || freshness === "recent") delayed = true;
+  if (sourceUsed === "alphavantage" || sourceUsed === "alpha") delayed = true;
+
+  // CURRENCY MISMATCH — devise quote != devise attendue (ou absente).
+  let currencyMismatch = false;
+  if (expectedCurrency) {
+    if (!quoteCurrency) currencyMismatch = true;
+    else if (quoteCurrency !== expectedCurrency) currencyMismatch = true;
+  }
+
+  // ABNORMAL SPREAD — ecart livePrice vs derniere close en multiples d'ATR.
+  // Detecte quote aberrante / split non applique / mauvais symbole resolu.
+  let abnormalSpread = false;
+  let spreadDeltaAtr = null;
+  if (Number.isFinite(livePrice) && Array.isArray(candles) && candles.length >= 14) {
+    const lastClose = Number(candles[candles.length - 1]?.close);
+    const atr = averageRange(candles, 14);
+    if (Number.isFinite(lastClose) && Number.isFinite(atr) && atr > 0) {
+      const delta = Math.abs(livePrice - lastClose);
+      spreadDeltaAtr = +(delta / atr).toFixed(2);
+      // Seuil : >3*ATR. Crypto peut bouger plus fort, on tolere 5*ATR.
+      const threshold = cls === "crypto" ? 5 : 3;
+      if (spreadDeltaAtr > threshold) abnormalSpread = true;
+    }
+  }
+
+  const providerConfidence = providerConfidenceForSource(sourceUsed, freshness);
+
+  // EXECUTION SAFE — peut-on tabler dessus pour valider une entree ou
+  // gerer un TP/SL live ?
+  // false si : stale, currencyMismatch, abnormalSpread, provider unsafe,
+  //            price absent ou non fini.
+  // marketClosed et delayed n'empechent pas la securite par eux-memes —
+  // ils contraignent juste l'usage (pas d'execution si marche ferme).
+  let executionSafe = true;
+  const reasons = [];
+  if (!Number.isFinite(livePrice) || livePrice <= 0) { executionSafe = false; reasons.push("no_price"); }
+  if (stale) { executionSafe = false; reasons.push("stale"); for (const r of staleReasons) reasons.push("stale:" + r); }
+  if (currencyMismatch) { executionSafe = false; reasons.push("currency_mismatch"); }
+  if (abnormalSpread) { executionSafe = false; reasons.push(`abnormal_spread:${spreadDeltaAtr}atr`); }
+  if (providerConfidence === "unsafe") { executionSafe = false; reasons.push("provider_unsafe"); }
+  if (delayed) reasons.push("delayed");
+  if (marketClosed) reasons.push("market_closed");
+
+  // VALIDATION STATUS — 1ere raison disqualifiante par ordre de gravite.
+  let validationStatus = "valid";
+  if (currencyMismatch) validationStatus = "currency_mismatch";
+  else if (stale) validationStatus = "stale";
+  else if (abnormalSpread) validationStatus = "abnormal_spread";
+  else if (providerConfidence === "unsafe") validationStatus = "unsafe";
+  else if (marketClosed) validationStatus = "market_closed";
+  else if (delayed) validationStatus = "delayed";
+
+  // TRUST SCORE 0-100 — agregat indicatif (provider 40 + freshness 30 +
+  // pas d'anomalies 30, avec penalites).
+  let trustScore = 0;
+  trustScore += providerConfidence === "high" ? 40 : providerConfidence === "medium" ? 25 : providerConfidence === "low" ? 10 : 0;
+  trustScore += freshness === "live" ? 30 : freshness === "recent" ? 20 : freshness.includes("delayed") ? 15 : 0;
+  trustScore += 30;
+  if (stale) trustScore -= 35;
+  if (delayed) trustScore -= 10;
+  if (currencyMismatch) trustScore -= 70;
+  if (abnormalSpread) trustScore -= 40;
+  trustScore = Math.max(0, Math.min(100, trustScore));
+
+  return {
+    trustScore,
+    stale,
+    delayed,
+    marketClosed,
+    abnormalSpread,
+    currencyMismatch,
+    providerConfidence,
+    executionSafe,
+    validationStatus,
+    reasons,
+    // metadata utile pour debug / audit
+    ageSec,
+    spreadDeltaAtr,
+    expectedCurrency,
+    quoteCurrency
+  };
+}
+
 function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8, learningContext = null) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
 
@@ -2583,7 +2784,8 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
         price: quote?.price ?? null,
         regimeBonus: 0, regimeBonusReason: null,
         newsBonus: 0, newsBonusReason: null,
-        scoreImpact: null
+        scoreImpact: null,
+        quoteQuality: quoteQualityEngine(quote, candles)
       },
       snapshotId,
       strategicCalculatedAt,
@@ -2869,7 +3071,8 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
       strategicScore: strategicScoreValue,
       compositeScore: score,
       delta: score - strategicScoreValue
-    }
+    },
+    quoteQuality: quoteQualityEngine(quote, candles)
   };
 
   // Bonus de configuration détectée (long + miroirs short)
@@ -3285,7 +3488,8 @@ function buildPartialAnalysisPayload(symbol, quote, message = "Analyse technique
       price: quote?.price == null ? null : finiteOrNull(quote?.price),
       regimeBonus: 0, regimeBonusReason: null,
       newsBonus: 0, newsBonusReason: null,
-      scoreImpact: null
+      scoreImpact: null,
+      quoteQuality: quoteQualityEngine({ symbol, ...(quote || {}) }, [], { expectedCurrency: getCurrencyForSymbol(symbol) })
     },
     snapshotId: buildSnapshotId({ symbol, timeframe: "1d", analysisType: "strategic", candlesAt: null, regimeAt: regime?.updatedAt ?? null, learningAt: null }),
     strategicCalculatedAt: nowIso(),

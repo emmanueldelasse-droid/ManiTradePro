@@ -83,6 +83,76 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-15 (suite) — Vague B.6 livrée : quoteQualityEngine
+
+Validation live structurée des quotes pour préparer le branchement broker réel et les futurs blocages auto-trade. Périmètre STRICT : aucun changement de scoring, paper trading, learning, RR ou seuils.
+
+### Apport
+
+Nouveau moteur synchrone `quoteQualityEngine(quote, candles, options)` qui produit un objet `quoteQuality` injecté dans `liveContext` (jamais dans `strategicAnalysis`).
+
+`quoteQuality` contient :
+- `trustScore` (0-100) — agrégat indicatif
+- 6 flags booléens : `stale`, `delayed`, `marketClosed`, `abnormalSpread`, `currencyMismatch`
+- `providerConfidence` : `"high" | "medium" | "low" | "unsafe"`
+- `executionSafe` (bool) — peut servir à valider entrée / TP/SL
+- `validationStatus` : 1ère raison disqualifiante par ordre de gravité
+- `reasons[]` : liste explicite des flags actifs
+- metadata debug : `ageSec`, `spreadDeltaAtr`, `expectedCurrency`, `quoteCurrency`
+
+### Règles de détection
+
+| Flag | Règle |
+|---|---|
+| `stale` | crypto > 120 s, autre marché ouvert > 600 s, OU `freshness === "stale"` |
+| `delayed` | `freshness` contient "delayed"/"recent", OU `sourceUsed` = alphavantage |
+| `marketClosed` | crypto jamais ; forex week-end UTC ; stock/etf week-end OU jour férié OU hors fenêtre UTC par devise |
+| `abnormalSpread` | `|livePrice - lastClose| / ATR > 3` (5 pour crypto), sur 14 bougies |
+| `currencyMismatch` | quote.currency absent OU ≠ `getCurrencyForSymbol(symbol)` |
+| `providerConfidence` | table par `sourceUsed` (binance/eodhd-rt/yahoo-live → high) |
+| `executionSafe` | false si no_price, stale, currencyMismatch, abnormalSpread, ou provider unsafe |
+
+`marketClosed` et `delayed` n'invalident PAS `executionSafe` par eux-mêmes — volontaire.
+
+### Plomberie additive
+
+- `quoteQualityEngine` + 3 helpers (`isMarketLikelyClosed`, `quoteAgeSeconds`, `providerConfidenceForSource`)
+- `liveContext.quoteQuality` injecté à 3 endroits : `calcDetailScore` success path, early-return, `buildPartialAnalysisPayload`
+- Aucun champ legacy touché
+
+### Tests obligatoires (12/12 PASS)
+
+- ✅ TEST 1 : quote fraîche marché ouvert → executionSafe=true
+- ✅ TEST 2 : quote stale → stale=true, executionSafe=false, validationStatus=stale
+- ✅ TEST 3 : samedi → marketClosed=true, stale=false (marché fermé ≠ stale)
+- ✅ TEST 4 : delayed_15m → delayed=true
+- ✅ TEST 5 : spread 25 ATR → abnormalSpread=true, executionSafe=false
+- ✅ TEST 6 : NESN.SW résolu en USD → currencyMismatch=true, validationStatus=currency_mismatch
+- ✅ TEST 7 : zéro impact strategic score (vérifié statiquement)
+- ✅ TEST 8 : zéro régression paper trading (`buildWorkerPlan` continue de lire `base?.score`, `computeTradeSafetyScore` intact)
+- ✅ TEST 9 : 21 champs legacy + B.4 préservés dans le return de `calcDetailScore`
+- ✅ TEST 10 : front intact (aucun fichier `assets/`, `index.html`, `sw.js` modifié)
+- ✅ TEST 11 : `quoteQualityEngine` ne dépend pas de `snapshotId` ni de `strategicScoreValue`
+- ✅ TEST 12 : `handleOpportunities` et `handleOpportunityDetail` signatures inchangées
+
+**Validation statique** : `/tmp/check_b6.js` — **68/68 checks PASS** (présence, propagation, simulation runtime du moteur sur les 6 cas + bonus trustScore).
+
+### Limites restantes
+
+- Heures de marché synchrones approximatives (fenêtres UTC larges pour tolérer DST). Peut donner un faux positif `marketClosed` à la marge — documenté dans `KNOWN_ISSUES.md` #6.
+- Pas de comparaison inter-providers (un seul provider par quote). À ajouter si on déclenche un faux signal.
+- `executionSafe` n'est pas encore branché à l'auto-cycle ni au futur broker réel — c'est volontaire, à brancher dans des PRs séparées.
+
+### Futurs chantiers débloqués
+
+- Badge UI "quote stale" / "marché fermé" / "spread anormal" basé sur `validationStatus` (PR front séparée)
+- Blocage auto-cycle si `executionSafe === false` (PR métier séparée)
+- Validation broker réel via `quoteQuality.executionSafe` à l'ordre
+- Audit learning : corréler chaque trade ouvert à son `quoteQuality` au moment de l'ouverture
+- Détection de provider qui dérive (en comparant `quoteQuality` entre providers concurrents)
+
+---
+
 ## Session 2026-05-15 (suite) — Vague B.4 livrée : snapshotId + timestamps analytiques
 
 Infrastructure logique pour la cohérence analytique. Permet de comparer deux payloads et détecter si l'analyse stratégique vient du même snapshot ou si elle a été recalculée.

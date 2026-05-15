@@ -200,6 +200,57 @@ Chaque payload retourné par `/api/opportunities` et `/api/opportunity-detail/:s
 
 Ces timestamps sont strictement analytiques. **Aucun timestamp live** (`quotedAt`, `freshness`) n'est intégré dans ce groupe — le côté live continue d'être exposé séparément dans `liveContext`.
 
+### Quality engine de la quote live (vague B.6, mai 2026)
+
+`liveContext.quoteQuality` — objet produit par `quoteQualityEngine(quote, candles, options)` (synchrone, sans I/O). Diagnostic structuré de la qualité de la quote utilisée pour l'affichage live et les futurs branchements broker réel.
+
+**Structure** :
+```
+liveContext.quoteQuality = {
+  trustScore,            // 0-100, agrégat indicatif
+  stale,                 // bool — quote trop vieille en heures de marché
+  delayed,               // bool — provider légalement différé
+  marketClosed,          // bool — week-end / hors fenêtre / jour férié
+  abnormalSpread,        // bool — livePrice trop éloigné de lastClose (en ATR)
+  currencyMismatch,      // bool — quote.currency ≠ devise attendue
+  providerConfidence,    // "high" | "medium" | "low" | "unsafe"
+  executionSafe,         // bool — peut servir à valider entrée / TP/SL
+  validationStatus,      // "valid" | "stale" | "delayed" | "market_closed" |
+                         //   "unsafe" | "currency_mismatch" | "abnormal_spread"
+  reasons,               // string[] — liste explicite des flags actifs
+  // metadata debug/audit
+  ageSec,                // age en secondes (ou null)
+  spreadDeltaAtr,        // écart en multiples d'ATR (ou null)
+  expectedCurrency,      // devise attendue (résolue depuis le symbole)
+  quoteCurrency          // devise déclarée par la quote
+}
+```
+
+**Règles de détection** :
+
+| Flag | Règle |
+|---|---|
+| `stale` | crypto : âge > 120 s ; autre marché ouvert : âge > 600 s ; OU `freshness === "stale"` |
+| `delayed` | `freshness` contient "delayed" ou "recent" ; OU `sourceUsed` ∈ {alphavantage} |
+| `marketClosed` | crypto → jamais ; forex → fermé week-end UTC ; stock/etf → week-end OU jour férié OU hors fenêtre UTC par devise (USD 13:00-21:30, EUR/CHF/GBP 07:00-16:30) |
+| `abnormalSpread` | `|livePrice - lastClose| / ATR > 3` (5 pour crypto) sur 14 bougies |
+| `currencyMismatch` | `quote.currency` absent OU ≠ `getCurrencyForSymbol(symbol)` |
+| `providerConfidence` | binance / eodhd real-time / yahoo live → high ; eodhd delayed / yahoo non-live / twelve / alpha → medium ; sourceUsed vide → unsafe |
+| `executionSafe` | `false` si `no_price` OU `stale` OU `currencyMismatch` OU `abnormalSpread` OU `providerConfidence === "unsafe"` |
+
+**`marketClosed` ET `delayed` n'empêchent PAS `executionSafe`** par eux-mêmes — c'est volontaire : ils contraignent l'usage (pas d'exécution si marché fermé), mais n'invalident pas la quote en tant que telle.
+
+**Ce que `quoteQualityEngine` N'EST PAS** :
+- Ne décide pas du scoring stratégique (séparé)
+- Ne pilote pas encore le paper trading
+- Ne bloque pas encore l'auto-cycle (à brancher dans une PR future)
+- N'est pas une logique de comparaison inter-providers (un seul provider par quote)
+
+**Périmètre** : injecté dans `liveContext.quoteQuality` à 3 endroits :
+1. `calcDetailScore` success path
+2. `calcDetailScore` early-return (données insuffisantes)
+3. `buildPartialAnalysisPayload` (cas quote disponible mais analyse partielle)
+
 ### Stockage
 
 - Position ouverte : `mtp_positions.score` + `mtp_positions.analysis_snapshot` (JSON complet)
