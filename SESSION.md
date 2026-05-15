@@ -83,6 +83,87 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-15 (fin) — Vague B.7 : resolveLiveQuote + cache KV partagé
+
+PR architecturale qui résout le bug runtime observé sur BMW.DE (76,38 € sur opp vs 74,58 € sur fiche).
+
+### Cause du bug
+
+Le cache mémoire `market:snapshot:${symbol}` est **isolé par instance Worker Cloudflare**. Une requête `/api/opportunities` qui tape worker A et `/api/opportunity-detail/BMW.DE` qui tape worker B se résolvent indépendamment via la cascade providers, et peuvent retomber sur des sources différentes (Yahoo vs EODHD différé) → deux prix.
+
+### Apport
+
+Nouveau point d'entrée unique `resolveLiveQuote(symbol, env, ctx, options)` qui implémente une **cascade à 3 niveaux** :
+
+1. **Cache mémoire local** `market:snapshot:${symbol}` (TTL 2 min non-crypto / 30 s crypto) — intra-worker
+2. **Cache KV partagé** `kv:livequote:${symbol}` (TTL effectif 30 s, KV ttl 60 s) — **cross-worker** ← résout le bug
+3. **Cascade providers** via `resolveUnifiedMarketQuote` (Yahoo, EODHD, Twelve, etc.)
+
+Tous les endpoints d'affichage prix passent maintenant par `resolveLiveQuote` (5 call sites migrés) :
+- `/api/opportunity-detail/:symbol` (via `buildStableMarketPayload`)
+- `/api/opportunities` Phase 2 fallback unitaire
+- `/api/market-snapshot/:symbol`
+- `/api/quotes/:symbol` (unitaire)
+- `/api/quotes?symbols=...` (batch)
+
+La Phase 1 batch de `handleOpportunities` écrit aussi en KV après chaque résolution pour que la fiche actif sur un autre worker retrouve le même prix.
+
+### Format normalisé garanti
+
+`resolveLiveQuote` retourne toujours une quote avec : `symbol`, `assetClass`, `currency`, `sourceUsed`, `freshness`, `quotedAt` présents (defaults explicites si le provider les omet). Fiabilise `snapshotId` (B.4) et `quoteQualityEngine` (B.6).
+
+### Limites techniques
+
+- **Cloudflare KV impose `ttl >= 60 s`**. On stocke un `cachedAt` dans la valeur et on invalide côté lecture si `Date.now() - cachedAt > 30000` ms. TTL effectif respecté.
+- **Fallback KV indispo** : `kvGet`/`kvSet` retournent silencieusement `null`/`false` si `env.MTP_CACHE` manquant. La cascade providers prend le relais sans erreur.
+- **Latence KV** : ~10-50 ms par read+write. Acceptable car le cache mémoire intra-worker court-circuite la plupart des requêtes.
+- **Coût KV** : ~7 200 writes/jour estimés pour les scans opp toutes les 10 min × ~50 actifs. Plan paid 1M writes/mois : marge confortable.
+
+### Périmètre strict respecté
+
+- Aucune modification de `calcDetailScore`, `buildWorkerPlan`, `computeTradeSafetyScore`
+- Aucune modification de `strategicAnalysis`, scoring, RR, learning, paper trading, setups
+- Aucune modification des providers (juste un cache au-dessus)
+- Zéro modification front (`assets/app.js`, `index.html`, `sw.js` intacts)
+- Aucune migration SQL
+- Champs legacy intacts
+
+### Validation statique (46/46 PASS)
+
+`/tmp/check_b7.js` vérifie :
+- Présence de `resolveLiveQuote`, `normalizeLiveQuote`, `readLiveQuoteFromKv`, `writeLiveQuoteToKv`
+- Cascade mémoire → KV → providers respectée
+- Format normalisé garanti
+- 5 call sites publics migrés
+- Phase 1 batch écrit en KV
+- Aucune dépendance dans `calcDetailScore` / `buildWorkerPlan` / `strategicAnalysis`
+- Quote-quality (B.6) et snapshotId (B.4) intacts
+- Tests runtime : normalisation, TTL effectif 30 s validé (entry 25 s OK, entry 35 s invalidée)
+
+### Doc mise à jour
+
+- `KNOWN_ISSUES.md` : ajouté ligne au tableau "Issues résolues récemment" (bug BMW.DE 76,38 € vs 74,58 €)
+- `DATA_PIPELINE.md` : nouvelle section "Point d'entrée unique — `resolveLiveQuote` (vague B.7)" avec cascade, coût KV, exceptions
+- `ARCHITECTURE.md` : cluster Market data mis à jour avec `resolveLiveQuote` et helpers
+- `PROJECT_RULES.md` : nouvelle règle R4 "Prix live unique — `resolveLiveQuote`"
+- `CHECKLIST_MERGE.md` : 2 règles ajoutées (escalade si nouvel appel direct provider, escalade si modif `resolveLiveQuote`)
+
+### Tests runtime attendus après merge
+
+Sur BMW.DE :
+- Liste opportunités → fiche actif → comparer `liveContext.price`, `liveContext.sourceUsed`, `liveContext.quoteQuality`
+- Attendu : valeurs identiques (cache KV partagé entre workers)
+- Avant : 76,38 € vs 74,58 € (deux providers, deux workers)
+
+### Futurs chantiers débloqués
+
+- Branchement trades ouverts P&L live sur `resolveLiveQuote`
+- Alertes prix
+- TP/SL live cohérent
+- Futur broker réel : `resolveLiveQuote` reste le point d'entrée unique
+
+---
+
 ## Session 2026-05-15 (fin) — Vague B.6.1 : correctif stale ≠ delayed
 
 Mini-PR corrective pour résoudre un faux positif identifié en runtime sur les quotes EODHD `delayed_15m`. Le brief B.6 disait : *"Le système doit distinguer stale ET delayed. Ce n'est PAS la même chose."* — mais l'implémentation initiale appliquait le même seuil `600 s` aux deux cas, marquant systématiquement les quotes delayed comme `stale: true`.

@@ -148,7 +148,9 @@ Les "modules cibles" décrits dans le brief de refonte (`/market/`, `/trading/`,
 - `getYahooBatchQuotes`, `getYahooQuote`, `getYahooQuoteFromChart`, `getYahooCandles` — Yahoo
 - `getAlphaQuote` — Alpha Vantage
 - `getEodhdRealTimeBatchQuotes`, `getEodhdCandles`, `getEodhdCandlesWithKV` — EODHD
-- `resolveUnifiedMarketQuote` — dispatcher quote
+- `resolveLiveQuote` — **point d'entrée officiel unique** pour toute résolution de prix live (vague B.7). Cascade : cache mémoire → cache KV partagé (`kv:livequote:${symbol}`, TTL effectif 30 s) → providers. Garantit cohérence cross-worker.
+- `resolveUnifiedMarketQuote` — dispatcher provider (appelé en interne par `resolveLiveQuote`)
+- `normalizeLiveQuote`, `readLiveQuoteFromKv`, `writeLiveQuoteToKv` — helpers B.7
 - `getCandlesBySymbol` — dispatcher candles
 - `getStoredDailyQuoteFallback` — snapshot fallback
 - `getCurrencyForSymbol` + `MARKET_HOLIDAYS` + `isMarketHoliday`

@@ -1721,6 +1721,123 @@ async function resolveUnifiedMarketQuote(symbol, env, ctx = null, options = {}) 
 }
 
 // ============================================================
+// RESOLVE LIVE QUOTE — Vague B.7 (cache KV partage cross-worker)
+//
+// Point d'entree officiel unique pour TOUTE resolution de prix live
+// destinee a l'affichage ou aux decisions trading. Tous les ecrans qui
+// montrent un prix DOIVENT passer par cette fonction :
+//   - /api/opportunities (Phase 1 batch et Phase 2 fallback unitaire)
+//   - /api/opportunity-detail/:symbol (via buildStableMarketPayload)
+//   - trades ouverts (P&L live, futur)
+//   - alertes prix (futur)
+//   - TP/SL live (futur)
+//   - broker reel (futur)
+//
+// REGLE ABSOLUE (cf. PROJECT_RULES.md) :
+// Un meme actif ne doit jamais afficher deux prix differents entre la
+// liste opportunites et la fiche actif. Avant B.7 ce bug existait :
+// le cache memoire `market:snapshot:${symbol}` n'est PAS partage entre
+// instances Worker Cloudflare. Si /api/opportunities tape worker A et
+// /api/opportunity-detail tape worker B, les deux peuvent re-resoudre
+// independamment via des providers differents -> deux prix.
+//
+// Solution : cache KV `kv:livequote:${symbol}` partage cross-worker.
+//
+// Cascade de lecture :
+//   1. cache memoire local (TTL 2 min non-crypto, 30s crypto) — rapide
+//   2. cache KV partage (TTL effectif 30 s, KV ttl 60 s) — cross-worker
+//   3. cascade providers via resolveUnifiedMarketQuote — fresh fetch
+//
+// Ecriture :
+//   - cache memoire local (via resolveUnifiedMarketQuote, deja en place)
+//   - cache KV partage (best-effort, ne bloque pas si KV indispo)
+//
+// Fallback KV indisponible :
+//   - kvGet/kvSet retournent silencieusement null/false si env.MTP_CACHE
+//     manquant. On continue avec providers normalement.
+//
+// Format quote NORMALISE garanti : symbol, assetClass, currency,
+// sourceUsed, freshness, quotedAt sont toujours presents (defaults
+// explicites si le provider les omet). Fiabilise snapshotId (B.4) et
+// quoteQualityEngine (B.6).
+//
+// Cout KV : 1 read par appel + 1 write si miss. Cloudflare KV gratuit
+// jusqu'a 100k reads + 1k writes / jour. Phase 1 batch d'un scan opp
+// (~50 actifs) = ~50 writes par scan, cron toutes les 10 min = ~7200
+// writes / jour. Marge OK sur le plan paid (1M reads / 1M writes / mois).
+//
+// Limite TTL : Cloudflare KV impose ttl >= 60s. On stocke un cachedAt
+// dans la valeur et invalide cote lecture si > 30s effectif.
+//
+// Exceptions (chemins paralleles volontaires) :
+// - validateSymbolOnProviders : validation a l'ajout d'un actif (POST
+//   /api/user-assets), pas d'affichage. Court-circuite pour tester
+//   chaque provider individuellement. Documente dans KNOWN_ISSUES.
+// ============================================================
+const LIVE_QUOTE_KV_TTL_SEC = 60;     // KV minimum impose par CF
+const LIVE_QUOTE_FRESH_MS   = 30000;  // TTL effectif cote lecture
+
+function normalizeLiveQuote(quote, symbol) {
+  if (!quote || typeof quote !== "object") return quote;
+  if (!quote.symbol) quote.symbol = symbol;
+  if (!quote.assetClass) quote.assetClass = getAssetClass(symbol);
+  if (!quote.currency) quote.currency = getCurrencyForSymbol(symbol);
+  if (!quote.sourceUsed) quote.sourceUsed = "unknown";
+  if (!quote.freshness) quote.freshness = "unknown";
+  if (quote.quotedAt === undefined) quote.quotedAt = null;
+  return quote;
+}
+
+async function readLiveQuoteFromKv(symbol, env) {
+  if (!env?.MTP_CACHE) return null;
+  try {
+    const entry = await kvGet(`kv:livequote:${symbol}`, env);
+    if (!entry || typeof entry !== "object") return null;
+    const age = Date.now() - Number(entry.cachedAt || 0);
+    if (!Number.isFinite(age) || age < 0 || age > LIVE_QUOTE_FRESH_MS) return null;
+    if (!entry.quote || !Number.isFinite(Number(entry.quote.price))) return null;
+    return entry.quote;
+  } catch { return null; }
+}
+
+async function writeLiveQuoteToKv(symbol, quote, env) {
+  if (!env?.MTP_CACHE) return false;
+  if (!quote || !Number.isFinite(Number(quote.price))) return false;
+  try {
+    return await kvSet(`kv:livequote:${symbol}`, { quote, cachedAt: Date.now() }, LIVE_QUOTE_KV_TTL_SEC, env);
+  } catch { return false; }
+}
+
+async function resolveLiveQuote(symbol, env, ctx = null, options = {}) {
+  const clean = parseSymbol(symbol);
+
+  // 1. Cache memoire local (intra-worker)
+  const memCached = getMemoryCache(`market:snapshot:${clean}`);
+  if (memCached && Number.isFinite(Number(memCached.price))) {
+    return normalizeLiveQuote(memCached, clean);
+  }
+
+  // 2. Cache KV partage (cross-worker, TTL effectif 30s)
+  const kvCached = await readLiveQuoteFromKv(clean, env);
+  if (kvCached) {
+    const normalized = normalizeLiveQuote(kvCached, clean);
+    // Hydrater le cache memoire pour les prochaines requetes intra-worker
+    const ttl = isCrypto(clean) ? TTL.quoteCrypto : TTL.quoteNonCrypto;
+    setMemoryCache(`market:snapshot:${clean}`, ttl, normalized);
+    return normalized;
+  }
+
+  // 3. Cascade providers via resolveUnifiedMarketQuote (qui re-set mem cache)
+  const quote = await resolveUnifiedMarketQuote(clean, env, ctx, options);
+  const normalized = normalizeLiveQuote(quote, clean);
+
+  // 4. Ecrire en KV pour les autres workers (best-effort)
+  await writeLiveQuoteToKv(clean, normalized, env);
+
+  return normalized;
+}
+
+// ============================================================
 // BOUGIES — KV pour non-crypto, Binance pour crypto
 // ============================================================
 async function getCryptoCandles(symbol, limit = 90) {
@@ -3594,7 +3711,8 @@ async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true,
   let quote = null;
   try {
     // SEQUENTIEL — evite de depasser la limite 50 subrequetes Cloudflare
-    quote = await resolveUnifiedMarketQuote(clean, env, ctx, options);
+    // B.7 : passe par resolveLiveQuote pour cache KV cross-worker
+    quote = await resolveLiveQuote(clean, env, ctx, options);
     const candles = includeCandles ? await getCandlesBySymbol(clean, "1d", 90, env, ctx) : [];
     const regimeIndicators = await fetchRegimeIndicators(env);
     // PR #7 Phase 2 — news context best-effort (null si source indispo)
@@ -3883,10 +4001,19 @@ async function handleOpportunities(_url, env) {
 
   // Pré-remplir le cache memoire avec les quotes obtenues. Plus de
   // dédicace au cache `quote:twelve:` parce qu'on ne tape plus Twelve.
+  // B.7 : ecrire AUSSI en KV `kv:livequote:${symbol}` (TTL 60s, effectif
+  // 30s cote lecture) pour que la fiche actif sur un autre worker
+  // retrouve le meme prix que la liste opportunites. Best-effort : si KV
+  // indispo, on continue sans bloquer le scan.
+  const kvWrites = [];
   for (const [symbol, quote] of Object.entries(quotesMap)) {
     if (!quote) continue;
-    setMemoryCache(`market:snapshot:${symbol}`, TTL.quoteNonCrypto, quote);
+    const normalized = normalizeLiveQuote(quote, symbol);
+    setMemoryCache(`market:snapshot:${symbol}`, TTL.quoteNonCrypto, normalized);
+    kvWrites.push(writeLiveQuoteToKv(symbol, normalized, env).catch(() => false));
   }
+  // Attente KV writes en parallele, ne plante pas si echec
+  if (kvWrites.length) await Promise.allSettled(kvWrites);
 
   // ============================================================
   // PHASE 2 — Régime global depuis KV ou calcul
@@ -3936,7 +4063,8 @@ async function handleOpportunities(_url, env) {
         }
       }
       // Quote depuis cache (pré-rempli en phase 1)
-      quote = quote || await resolveUnifiedMarketQuote(symbol, env, ctx, { allowAlphaFallback: false });
+      // B.7 : passe par resolveLiveQuote (cache KV cross-worker)
+      quote = quote || await resolveLiveQuote(symbol, env, ctx, { allowAlphaFallback: false });
       // Bougies depuis KV si disponibles
       const candles = await getCandlesBySymbol(symbol, "1d", 90, env, ctx);
       // PR #7 Phase 2 — news context (cache 3h crypto / 6h stocks, coût quota sous contrôle)
@@ -8662,7 +8790,8 @@ async function handleMarketSnapshot(symbol, env) {
   if (!clean) return fail("Invalid symbol", "error", 400);
   const ctx = createBudgetContext("quote");
   try {
-    const quote = await resolveUnifiedMarketQuote(clean, env, ctx);
+    // B.7 : passe par resolveLiveQuote (cache KV cross-worker)
+    const quote = await resolveLiveQuote(clean, env, ctx);
     return attachBudgetHeaders(ok(quote, quote.sourceUsed, nowIso(), quote.freshness, null), ctx);
   } catch (error) {
     return attachBudgetHeaders(fail(compactProviderError(error instanceof Error ? error.message : "unavailable"), "unavailable", 503), ctx);
@@ -8674,7 +8803,8 @@ async function handleQuotes(url, env) {
   if (singleSymbol && url.pathname !== "/api/quotes") {
     try {
       const ctx = createBudgetContext("quotes");
-      const item = await resolveUnifiedMarketQuote(singleSymbol, env, ctx);
+      // B.7 : passe par resolveLiveQuote (cache KV cross-worker)
+      const item = await resolveLiveQuote(singleSymbol, env, ctx);
       return attachBudgetHeaders(ok(item, item.sourceUsed, nowIso(), item.freshness, null), ctx);
     } catch (error) { return fail(compactProviderError(error instanceof Error ? error.message : "unavailable"), "unavailable", 503); }
   }
@@ -8683,7 +8813,8 @@ async function handleQuotes(url, env) {
   const symbols = symbolsParam.split(",").map(parseSymbol).filter(Boolean);
   if (!symbols.length) return fail("No valid symbols", "error", 400);
   const ctx = createBudgetContext("quotes_batch");
-  const items = await Promise.all(symbols.map(async symbol => { try { return await resolveUnifiedMarketQuote(symbol, env, ctx); } catch { return null; } }));
+  // B.7 : passe par resolveLiveQuote (cache KV cross-worker)
+  const items = await Promise.all(symbols.map(async symbol => { try { return await resolveLiveQuote(symbol, env, ctx); } catch { return null; } }));
   const valid = items.filter(Boolean);
   if (!valid.length) return fail("No real prices available", "unavailable", 503);
   return attachBudgetHeaders(ok(valid, "unified", nowIso(), "recent", null), ctx);

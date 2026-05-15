@@ -19,12 +19,46 @@ Aujourd'hui (mai 2026), cette séparation **n'est pas encore stricte côté work
 
 ## Prix live d'une action ou crypto
 
-### Flux
+### Point d'entrée unique — `resolveLiveQuote` (vague B.7, mai 2026)
+
+Toute résolution de prix live destinée à l'affichage ou aux décisions trading passe par **une seule fonction** : `resolveLiveQuote(symbol, env, ctx, options)` dans `cloudflare-worker/worker.js`. Tous les endpoints concernés :
+- `/api/opportunities` (Phase 1 batch + Phase 2 fallback unitaire)
+- `/api/opportunity-detail/:symbol` (via `buildStableMarketPayload`)
+- `/api/market-snapshot/:symbol`
+- `/api/quotes/:symbol` et `/api/quotes?symbols=`
+- futur : trades ouverts, alertes prix, TP/SL live, broker réel
+
+**Cascade de lecture** (dans `resolveLiveQuote`) :
+1. **Cache mémoire local** `market:snapshot:${symbol}` (TTL 2 min non-crypto, 30 s crypto) — intra-worker
+2. **Cache KV partagé** `kv:livequote:${symbol}` (TTL effectif 30 s, KV ttl 60 s imposé par Cloudflare) — **cross-worker** ← résout le bug "deux prix différents entre opp et fiche"
+3. **Cascade providers** via `resolveUnifiedMarketQuote` (Yahoo, EODHD, Twelve, etc.)
+
+**Écriture** :
+- Mémoire locale (via `resolveUnifiedMarketQuote`)
+- KV (best-effort, ne bloque pas si KV indispo)
+- Phase 1 batch de `/api/opportunities` écrit aussi en KV après chaque résolution pour que la fiche actif sur un autre worker retrouve le même prix
+
+**Format normalisé garanti** : `symbol`, `assetClass`, `currency`, `sourceUsed`, `freshness`, `quotedAt` toujours présents (defaults explicites si le provider les omet).
+
+**Fallback KV indisponible** : `kvGet`/`kvSet` retournent silencieusement `null`/`false` si `env.MTP_CACHE` manquant. La cascade providers prend le relais sans erreur.
+
+**Limite TTL** : Cloudflare KV impose `ttl >= 60 s`. On stocke un `cachedAt` dans la valeur et on invalide côté lecture si `Date.now() - cachedAt > 30 000` ms.
+
+**Coût KV** :
+- ~1 read par requête utilisateur (cache mémoire en miss)
+- ~1 write par résolution provider (cache KV en miss)
+- Phase 1 batch d'un scan opp (~50 actifs) = ~50 writes par scan, cron toutes les 10 min ≈ ~7 200 writes/jour
+- Plan paid Cloudflare KV : 1M reads + 1M writes/mois → marge confortable
+
+**Exception (chemin parallèle volontaire)** : `validateSymbolOnProviders` (validation à l'ajout d'un actif via POST `/api/user-assets`) court-circuite `resolveLiveQuote` pour tester chaque provider individuellement. Pas d'affichage, donc pas de problème de cohérence.
+
+### Flux (héritage)
 
 1. Le worker reçoit `GET /api/opportunities` ou `GET /api/opportunity-detail/:symbol`
-2. La fonction `resolveUnifiedMarketQuote` ou la Phase 1 batch dispatch route par devise (cf. `PROVIDERS_MATRIX.md`)
+2. `resolveLiveQuote(symbol, env, ctx)` → cascade mémoire / KV / providers
 3. La quote retournée porte : `price, currency, sourceUsed, freshness, quotedAt`
-4. Stockée en cache mémoire `market:snapshot:${symbol}` pour 2 min
+4. Stockée en cache mémoire `market:snapshot:${symbol}` pour 2 min (intra-worker)
+5. Stockée en cache KV `kv:livequote:${symbol}` pour 30 s effectif (cross-worker)
 5. Renvoyée au front via le payload
 
 ### Cas par type d'actif
