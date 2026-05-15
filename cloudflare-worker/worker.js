@@ -4838,6 +4838,91 @@ function buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailP
   };
 }
 
+// ============================================================
+// TRADE VALIDATION ENGINE (PR refonte vague A.2)
+// ============================================================
+// Évalue la qualité d'un trade clos pour décider s'il alimente
+// l'apprentissage du bot. Sans ce garde-fou, un faux stop (cas réel
+// ASML : devise mélangée → stop déclenché à tort à -36 €) polluait
+// les buckets et faisait apprendre au bot des règles fausses.
+//
+// Trois niveaux de qualité :
+//   - 'ok'      : trade fiable, alimente normalement les buckets
+//   - 'suspect' : doute, exclu par prudence
+//   - 'invalid' : preuve d'incident (prix négatif, mouvement de 50 %
+//                 en quelques minutes), donnée non exploitable
+//
+// `quality_flags` : codes machine-readable pour le debug post-mortem.
+// Pas utilisé par le moteur de décision, juste pour la traçabilité.
+function tradeValidationEngine(closedRow, position, closeType, triggerMeta) {
+  const flagsBySeverity = { invalid: [], suspect: [] };
+
+  const entry = Number(closedRow?.entry_price);
+  const exit  = Number(closedRow?.exit_price);
+
+  // INVALID : prix non finis, négatifs ou nuls. Aucune analyse ne peut
+  // se baser sur ces chiffres.
+  if (!Number.isFinite(entry) || entry <= 0 || !Number.isFinite(exit) || exit <= 0) {
+    flagsBySeverity.invalid.push("invalid_price");
+  }
+
+  // INVALID : mouvement extrême sur une action / ETF (> 50 % en un trade).
+  // Pour une action, 50 % en quelques heures = bug de data ou ticker
+  // halted. Crypto exclu (mouvements 50 % possibles sur les altcoins).
+  if (Number.isFinite(entry) && Number.isFinite(exit) && entry > 0) {
+    const move = Math.abs(exit / entry - 1);
+    const cls = closedRow?.asset_class;
+    if (move > 0.5 && (cls === "stock" || cls === "etf")) {
+      flagsBySeverity.invalid.push("extreme_move");
+    }
+  }
+
+  // SUSPECT : live.updatedAt trop ancien au moment du stop / TP.
+  // Si la quote n'a pas été rafraîchie depuis > 1 h, le déclencheur est
+  // basé sur un snapshot périmé, pas sur du temps réel → apprentissage
+  // peu fiable. Pour engine_invalidation et time_exit, pas grave (la
+  // décision ne dépend pas du dernier tick).
+  const closedAtMs = Date.parse(closedRow?.closed_at || nowIso());
+  const liveUpdatedAtMs = Date.parse(position?.live?.updatedAt || "");
+  if (Number.isFinite(liveUpdatedAtMs) && liveUpdatedAtMs > 0 && Number.isFinite(closedAtMs)) {
+    const staleMs = closedAtMs - liveUpdatedAtMs;
+    const isTriggerBased = (closeType === "stop_loss" || closeType === "take_profit");
+    if (staleMs > 60 * 60 * 1000 && isTriggerBased) {
+      flagsBySeverity.suspect.push("stale_quote");
+    }
+  }
+
+  // SUSPECT : stop déclenché alors qu'on n'avait pas de tracker
+  // intraday (intradaySource = "snapshot_unavailable"). Le stop est
+  // basé sur la close daily, pas sur les vraies bornes intraday → en
+  // réel, le stop aurait pu être touché et déclenché à un autre prix.
+  if (closeType === "stop_loss" && triggerMeta?.intradaySource === "snapshot_unavailable") {
+    flagsBySeverity.suspect.push("partial_data");
+  }
+
+  // SUSPECT : durée de détention quasi nulle (< 1 min) sauf si l'opération
+  // est explicitement manuelle. Sur du paper trading auto, ça veut dire
+  // que la position a été ouverte et fermée dans le même cycle → bug
+  // probable (devise, ticker mal mappé, etc.).
+  const openedAtMs = Date.parse(closedRow?.opened_at || "");
+  if (Number.isFinite(openedAtMs) && openedAtMs > 0 && Number.isFinite(closedAtMs)) {
+    const holdingMs = closedAtMs - openedAtMs;
+    const isAuto = (closeType !== "manual" && closeType !== "manual_close");
+    if (holdingMs < 60 * 1000 && isAuto) {
+      flagsBySeverity.suspect.push("instant_close");
+    }
+  }
+
+  let quality = "ok";
+  if (flagsBySeverity.invalid.length > 0) quality = "invalid";
+  else if (flagsBySeverity.suspect.length > 0) quality = "suspect";
+
+  return {
+    quality,
+    flags: [...flagsBySeverity.invalid, ...flagsBySeverity.suspect]
+  };
+}
+
 async function closeTrainingPosition(env, position, exitPrice, closeType, detailPayload, triggerMeta = null) {
   const closedRow = buildClosedTradeRowFromPosition(position, exitPrice, closeType, detailPayload);
   // Propager intra-high/low au trade clos (utilisé par captureTradeFeedback)
@@ -4867,6 +4952,14 @@ async function closeTrainingPosition(env, position, exitPrice, closeType, detail
       }
     };
   }
+
+  // Validation qualité du trade clos — décide s'il alimentera ou non
+  // les buckets d'apprentissage. Tag quality + flags inscrits sur la
+  // ligne mtp_trades ET propagés à mtp_trade_feedback plus bas.
+  const validation = tradeValidationEngine(closedRow, position, closeType, triggerMeta);
+  closedRow.quality = validation.quality;
+  closedRow.quality_flags = validation.flags.length ? validation.flags : null;
+
   await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
@@ -5077,7 +5170,12 @@ async function captureTradeFeedback(env, closedRow, position, closeType, trigger
       articleCount: newsContextClose.articleCount,
       topHeadline: newsContextClose.topHeadline
     } : null,
-    notes: null
+    notes: null,
+    // Propagation depuis closedRow (déjà calculée par tradeValidationEngine
+    // dans closeTrainingPosition). Permet aux requêtes d'apprentissage de
+    // filtrer directement sur mtp_trade_feedback sans JOIN avec mtp_trades.
+    quality: closedRow?.quality || null,
+    quality_flags: Array.isArray(closedRow?.quality_flags) ? closedRow.quality_flags : null
   };
 
   try {
@@ -5138,9 +5236,14 @@ async function computeLearningStats(env, { mode = "all", limit = 1000 } = {}) {
   const cached = getMemoryCache(cacheKey);
   if (cached) return cached;
 
-  // 1. Lire les feedback rows (riches : pnl_pct, MAE/MFE, holding…)
+  // 1. Lire les feedback rows (riches : pnl_pct, MAE/MFE, holding…).
+  //    Filtre qualité : on exclut quality=suspect et quality=invalid. Les
+  //    trades historiques (quality=NULL avant migration 016) sont traités
+  //    comme "ok" via `or=(quality.eq.ok,quality.is.null)` — sans ça, on
+  //    perdrait tout l'historique des trades clos avant l'introduction du
+  //    tradeValidationEngine.
   const feedbackRows = await supabaseFetch(env,
-    `${TRADE_FEEDBACK_TABLE}?select=trade_id,bucket_key,setup_type,direction,regime_at_open,asset_class,pnl_pct,holding_minutes,mae_pct,mfe_pct&order=closed_at.desc&limit=${clampInt(limit, 1, 5000, 1000)}`
+    `${TRADE_FEEDBACK_TABLE}?select=trade_id,bucket_key,setup_type,direction,regime_at_open,asset_class,pnl_pct,holding_minutes,mae_pct,mfe_pct,quality&or=(quality.eq.ok,quality.is.null)&order=closed_at.desc&limit=${clampInt(limit, 1, 5000, 1000)}`
   ).catch(() => []);
   const rows = Array.isArray(feedbackRows) ? feedbackRows : [];
 
