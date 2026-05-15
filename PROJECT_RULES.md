@@ -46,6 +46,18 @@ Ce fichier-ci porte les règles **techniques structurelles** qui ne rentrent dan
 - `quoteQualityEngine` est synchrone (cohérent avec `calcDetailScore`). Pas d'I/O, pas d'`await` dedans.
 - Si une nouvelle source de validation live est ajoutée, elle doit être un champ supplémentaire du `quoteQuality`, pas une modif du moteur de score.
 
+### R4. Prix live unique — `resolveLiveQuote` (vague B.7)
+
+- **Un même actif ne doit jamais afficher deux prix différents entre la liste opportunités et la fiche actif.**
+- Tout code qui doit obtenir un prix live destiné à l'affichage ou à une décision trading **DOIT** passer par `resolveLiveQuote(symbol, env, ctx, options)`.
+- **Interdit** d'appeler `getYahooQuote`, `getEodhdRealTimeBatchQuotes`, `getTwelveQuote`, `getCryptoQuote`, `resolveUnifiedMarketQuote` directement dans un nouveau handler d'affichage. Réservé au mécanisme interne de `resolveLiveQuote`.
+- **Interdit** de stocker un prix live ailleurs que dans :
+  - le cache mémoire `market:snapshot:${symbol}` (TTL 2 min)
+  - le cache KV `kv:livequote:${symbol}` (TTL effectif 30 s, écriture via `writeLiveQuoteToKv`)
+- Le front **NE DOIT PAS** inventer ni recalculer un prix. Il lit le payload, point.
+- **Aucun prix périmé ne doit être affiché comme actuel**. Si `quoteQuality.executionSafe === false` (`stale`, `currency_mismatch`, etc.), le payload signale le problème via `validationStatus` et `reasons[]`. Le consommateur a la responsabilité de respecter ce signal.
+- Exception **volontaire** : `validateSymbolOnProviders` (validation à l'ajout d'un actif) court-circuite `resolveLiveQuote` pour tester chaque provider individuellement. Pas d'affichage. Documenté dans `KNOWN_ISSUES.md`.
+
 ### R4. Champs legacy préservés (additif uniquement)
 
 - Toute évolution du payload `/api/opportunities` ou `/api/opportunity-detail/:symbol` doit être **additive**.

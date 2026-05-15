@@ -232,6 +232,8 @@ Suite à la refonte horaires de bourse, la fonction `pad(n)` définie localement
 | Cohérence opp ↔ fiche détail (#4) | Vague B.4 : `snapshotId` propagé partout | Hash FNV-1a déterministe basé sur sources analytiques (candles + régime + learning). Indépendant du live. |
 | Timestamps analytiques manquants (#5) | Vague B.4 : `strategicCalculatedAt`, `candlesUpdatedAt`, `regimeUpdatedAt`, `learningSnapshotAt` | Exposés dans `strategicAnalysis` et à la racine du payload |
 | `quoteQualityEngine` absent (#6) | Vague B.6 : moteur synchrone produisant `quoteQuality` dans `liveContext` | 6 détections + trustScore + validationStatus + reasons[]. Périmètre strict : aucune modif scoring/plan/learning |
+| Faux positif `stale` sur quotes `delayed` | Vague B.6.1 : seuil `maxAge` adapté (delayed → 1800 s) + ordre `delayed` calculé avant `stale` | Distinction stricte stale ≠ delayed comme spécifié dans le brief B.6 |
+| Prix BMW.DE incohérent opp vs fiche (76,38 € vs 74,58 €) | Vague B.7 : `resolveLiveQuote` + cache KV `kv:livequote:${symbol}` partagé cross-worker (TTL effectif 30 s) | Tous les endpoints d'affichage prix passent par la même fonction. Phase 1 batch écrit en KV pour que la fiche actif sur un autre worker retrouve le même prix. |
 
 ---
 

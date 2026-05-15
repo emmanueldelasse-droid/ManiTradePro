@@ -88,6 +88,8 @@ Demander une validation explicite si :
 - [ ] La PR **introduit une dépendance live dans `buildSnapshotId`** (price, change24h, volume24h, freshness, quotedAt, spread). C'est interdit par construction — vérification obligatoire.
 - [ ] La PR **modifie `quoteQualityEngine`** (ajout/retrait de flag, changement de seuil, changement de logique `executionSafe`). Toute modif change la décision de validation live et potentiellement les futurs blocages broker — escalade obligatoire si on touche aux seuils.
 - [ ] La PR **fait dépendre `strategicAnalysis` de `quoteQuality`** (interdit par construction — `quoteQuality` est purement live, `strategicAnalysis` purement analytique).
+- [ ] La PR **introduit un nouvel appel direct à un provider de quote** (`getYahooQuote`, `getEodhdRealTimeBatchQuotes`, `getTwelveQuote`, `getCryptoQuote`, `resolveUnifiedMarketQuote`) dans un handler d'affichage. Tout affichage prix doit passer par `resolveLiveQuote` (cf. PROJECT_RULES.md R4).
+- [ ] La PR **modifie `resolveLiveQuote`** (cascade, TTL, écriture KV). Escalade obligatoire — c'est le point d'entrée unique pour tous les écrans de prix.
 
 ---
 
