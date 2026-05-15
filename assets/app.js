@@ -882,6 +882,46 @@
     return "USD";
   }
 
+  // Calendrier des jours fériés par devise. Miroir EXACT du même tableau
+  // côté worker (worker.js MARKET_HOLIDAYS). Si tu modifies ici, modifie
+  // l'autre — sinon le front affichera "fermé" pendant que le worker
+  // tente d'ouvrir un trade (ou l'inverse).
+  const MARKET_HOLIDAYS = {
+    USD: [
+      "2026-01-01","2026-01-19","2026-02-16","2026-04-03","2026-05-25",
+      "2026-06-19","2026-07-03","2026-09-07","2026-11-26","2026-12-25",
+      "2027-01-01","2027-01-18","2027-02-15","2027-03-26","2027-05-31",
+      "2027-06-18","2027-07-05","2027-09-06","2027-11-25","2027-12-24"
+    ],
+    EUR: [
+      "2026-01-01","2026-04-03","2026-04-06","2026-05-01","2026-12-25","2026-12-28",
+      "2027-01-01","2027-03-26","2027-03-29","2027-12-27","2027-12-28"
+    ],
+    CHF: [
+      "2026-01-01","2026-01-02","2026-04-03","2026-04-06","2026-05-01",
+      "2026-05-14","2026-05-25","2026-08-03","2026-12-24","2026-12-25",
+      "2026-12-31",
+      "2027-01-01","2027-03-26","2027-03-29","2027-05-06","2027-05-17",
+      "2027-08-02","2027-12-24","2027-12-27","2027-12-31"
+    ],
+    GBP: [
+      "2026-01-01","2026-04-03","2026-04-06","2026-05-04","2026-05-25",
+      "2026-08-31","2026-12-25","2026-12-28",
+      "2027-01-01","2027-03-26","2027-03-29","2027-05-03","2027-05-31",
+      "2027-08-30","2027-12-27","2027-12-28"
+    ]
+  };
+
+  function isMarketHoliday(symbol, dateIso = null) {
+    const cls = inferAssetClass(symbol);
+    if (cls === "crypto" || cls === "forex" || cls === "commodity") return false;
+    const ccy = (typeof currencyForSymbol === "function") ? currencyForSymbol(symbol) : "USD";
+    const list = MARKET_HOLIDAYS[ccy];
+    if (!Array.isArray(list)) return false;
+    const day = dateIso || new Date().toISOString().slice(0, 10);
+    return list.includes(day);
+  }
+
   // Taux de conversion approximatifs vers l'euro pour les devises secondaires
   // (CHF Nestlé, GBP actions UK, scandinaves). Valeurs proches du marché
   // long terme — la conversion sert uniquement à présenter un ordre de
@@ -1094,6 +1134,16 @@
       if (weClosed) return { open: false, status: "closed", label: "Ferme", detail: `Ouvre dim. ${fmtH(23)} · Lun–Ven 23h–22h (CME)` };
       if (brk) return { open: false, status: "break", label: "Pause", detail: `Ouvre a ${fmtH(23)} · pause 22h–23h (CME)` };
       return { open: true, status: "open", label: "Ouvert", detail: `${fmtH(23)}–${fmtH(22)} · Lun–Ven (CME)` };
+    }
+
+    // Jour férié : on court-circuite le calcul d'horaires et on signale
+    // explicitement à l'utilisateur que la bourse est fermée pour cause
+    // de fête. Le worker applique le même garde-fou pour ne pas tenter
+    // d'ouvrir un trade ce jour-là (cf. isTrainingCandidateAllowed).
+    if (isMarketHoliday(symbol)) {
+      const ex = getExchangeInfo(symbol);
+      const hoursLabel = `${localHourToParis(ex.tz, ex.openH, ex.openM)}–${localHourToParis(ex.tz, ex.closeH, ex.closeM)}`;
+      return { open: false, status: "holiday", label: "Ferie", detail: `Bourse fermée aujourd'hui · ${hoursLabel} (${ex.label})` };
     }
 
     // stock / etf — horaires routés par bourse via la devise du symbole.

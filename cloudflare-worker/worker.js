@@ -1098,6 +1098,62 @@ function getCurrencyForSymbol(symbol) {
   return "USD";
 }
 
+// ============================================================
+// CALENDRIER DES JOURS FÉRIÉS PAR DEVISE / GROUPE D'EXCHANGE
+// ============================================================
+// Couvre 2026 et les principales dates 2027 connues. Source : sites
+// officiels NYSE / Euronext / SIX / LSE consultés mai 2026.
+//
+// Indexé par DEVISE plutôt que par exchange exact pour matcher la même
+// logique que `getCurrencyForSymbol` (un seul mapping = moins de risque
+// d'incohérence). USD = NYSE+Nasdaq, EUR = Euronext+Xetra, CHF = SIX,
+// GBP = LSE.
+//
+// Format : YYYY-MM-DD. Demi-séances et early-closes pas couverts à ce
+// stade (le bot ne tente pas d'ouvrir si l'heure tombe hors plage de
+// `getMarketStatus`, donc une demi-séance reste inoffensive).
+//
+// IMPORTANT : ne jamais ajouter une date sans l'avoir vérifiée sur la
+// source officielle. Mieux vaut une lacune (le bot croit la bourse
+// ouverte un jour férié → l'ordre rejeté en réel) qu'une fausse date
+// férié (le bot rate une vraie séance).
+const MARKET_HOLIDAYS = {
+  USD: [
+    "2026-01-01","2026-01-19","2026-02-16","2026-04-03","2026-05-25",
+    "2026-06-19","2026-07-03","2026-09-07","2026-11-26","2026-12-25",
+    "2027-01-01","2027-01-18","2027-02-15","2027-03-26","2027-05-31",
+    "2027-06-18","2027-07-05","2027-09-06","2027-11-25","2027-12-24"
+  ],
+  EUR: [
+    "2026-01-01","2026-04-03","2026-04-06","2026-05-01","2026-12-25","2026-12-28",
+    "2027-01-01","2027-03-26","2027-03-29","2027-12-27","2027-12-28"
+  ],
+  CHF: [
+    "2026-01-01","2026-01-02","2026-04-03","2026-04-06","2026-05-01",
+    "2026-05-14","2026-05-25","2026-08-03","2026-12-24","2026-12-25",
+    "2026-12-31",
+    "2027-01-01","2027-03-26","2027-03-29","2027-05-06","2027-05-17",
+    "2027-08-02","2027-12-24","2027-12-27","2027-12-31"
+  ],
+  GBP: [
+    "2026-01-01","2026-04-03","2026-04-06","2026-05-04","2026-05-25",
+    "2026-08-31","2026-12-25","2026-12-28",
+    "2027-01-01","2027-03-26","2027-03-29","2027-05-03","2027-05-31",
+    "2027-08-30","2027-12-27","2027-12-28"
+  ]
+};
+
+function isMarketHoliday(symbol, dateIso = null) {
+  // Crypto / forex : pas de jours fériés (24/7 et 24/5 globalement).
+  if (isCrypto(symbol) || isForex(symbol) || isCommodity(symbol)) return false;
+  const ccy = getCurrencyForSymbol(symbol);
+  const list = MARKET_HOLIDAYS[ccy];
+  if (!Array.isArray(list)) return false;
+  // dateIso optionnel = "YYYY-MM-DD". Par défaut : aujourd'hui en UTC.
+  const day = dateIso || new Date().toISOString().slice(0, 10);
+  return list.includes(day);
+}
+
 // Bougies daily EODHD. Format de sortie aligné sur Twelve/Yahoo pour rester
 // drop-in dans getCandlesBySymbol. La métadonnée `source: "eodhd"` est portée
 // par le caller via le champ `sourceUsed` du payload, pas dans la bougie
@@ -3709,6 +3765,12 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
   if (row.decision !== "Trade propose") return false;
   if (!row.plan?.tradeNow) return false;
   if (riskState && riskState.tradingEnabled === false) return false;
+
+  // Garde-fou jour férié : on n'ouvre pas une nouvelle position si la
+  // bourse de cotation du symbole est officiellement fermée. Crypto et
+  // forex ignorés (24/7 ou 24/5). Les fermetures de positions existantes
+  // restent autorisées (gérées en amont, pas dans cette fonction).
+  if (isMarketHoliday(row.symbol)) return false;
 
   // News garde-fou (PR #3 Phase 1) : blocage dans la fenêtre ±30 min d'un event high-impact.
   // Le newsWindow est pré-fetché en amont du cycle training pour éviter un appel par candidat.
