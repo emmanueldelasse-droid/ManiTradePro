@@ -315,6 +315,20 @@ executionSafe===false (fallback)  → safe=false, code="quote_unsafe"
 2. **Phase fermeture** (avant `trainingCloseTrigger`) : si `!safe` → skip position pour ce cycle, log `auto_close_blocked_unsafe`. Le tracker MAE/MFE (`position.live.highSinceOpen/lowSinceOpen`) continue d'être mis à jour, donc l'info de breach intraday n'est pas perdue ; le close se rejoue au cycle suivant dès que la quote redevient fiable.
 
 **Périmètre** : aucune autre modif (scoring, RR, providers, learning, strategicAnalysis intacts). Aucun front modifié. Le mode manuel UI (futur ou existant) n'est PAS gated par défaut — l'utilisateur reste souverain.
+
+### Observabilité — route admin `safety-stats` (vague B.9.1, mai 2026)
+
+`GET /api/training/safety-stats` (admin) — agrégateur lecture seule des événements `auto_open_blocked_unsafe` + `auto_close_blocked_unsafe` dans `mtp_training_events`. Pas de nouvelle table, pas de cache complexe, pas de cron supplémentaire.
+
+Query params :
+- `windowHours` (défaut 24, max 720) — fenêtre d'agrégation
+- `limit` (défaut 20, max 100) — taille de `recentEvents`
+
+Réponse : `{ generatedAt, windowHours, cutoffAt, totals:{openBlocked, closeBlocked}, byCode, topSymbols, recentEvents, truncated }`.
+
+`byCode` pré-rempli à 0 pour les 7 codes connus (`stale`, `currency_mismatch`, `abnormal_spread`, `provider_unsafe`, `no_price`, `quote_unsafe`, `quote_quality_missing`) → réponse déterministe même fenêtre vide. Codes inattendus exposés tels quels (forward-compat).
+
+`truncated: true` si on a atteint le hard cap 2000 rows Supabase → réduire `windowHours` ou paginer côté admin.
 - N'est pas une logique de comparaison inter-providers (un seul provider par quote)
 
 **Périmètre** : injecté dans `liveContext.quoteQuality` à 3 endroits :

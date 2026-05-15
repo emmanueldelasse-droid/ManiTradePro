@@ -6185,6 +6185,118 @@ async function handleTrainingEvents(url, env) {
   }
 }
 
+// ============================================================
+// SAFETY STATS — vague B.9.1 (lecture seule, mtp_training_events)
+// ============================================================
+// Agrege les evenements de blocage `auto_open_blocked_unsafe` et
+// `auto_close_blocked_unsafe` produits par le safety gate B.9 pour faciliter
+// l'observation du runtime (combien de blocages, par quel code, sur quels
+// actifs). Strictement additif : ne calcule rien de nouveau, n'ecrit nulle
+// part, ne touche pas l'auto-cycle / quoteQualityEngine / resolveLiveQuote.
+//
+// Query params :
+//   - windowHours (defaut 24, max 720 = 30 jours)
+//   - limit       (defaut 20, max 100) — taille de recentEvents
+async function handleTrainingSafetyStats(url, env) {
+  const generatedAt = nowIso();
+  if (!supabaseConfigured(env)) {
+    return ok(
+      { configured: false, generatedAt, windowHours: 0, totals: { openBlocked: 0, closeBlocked: 0 }, byCode: {}, topSymbols: [], recentEvents: [] },
+      "worker_training", generatedAt, "recent", "Supabase non configure"
+    );
+  }
+  const windowHoursRaw = Number(url?.searchParams?.get("windowHours"));
+  const windowHours = Number.isFinite(windowHoursRaw) && windowHoursRaw > 0
+    ? Math.min(windowHoursRaw, 720)
+    : 24;
+  const limitRaw = Number(url?.searchParams?.get("limit"));
+  const recentLimit = Number.isFinite(limitRaw) && limitRaw > 0
+    ? Math.min(limitRaw, 100)
+    : 20;
+  const cutoffIso = new Date(Date.now() - windowHours * 3600 * 1000).toISOString();
+
+  // Codes connus produits par evaluateExecutionSafety (cf. worker.js B.9).
+  // On les pre-declare a zero pour que la reponse soit deterministe meme
+  // si la fenetre n'a vu aucun blocage.
+  const knownCodes = [
+    "stale", "currency_mismatch", "abnormal_spread", "provider_unsafe",
+    "no_price", "quote_unsafe", "quote_quality_missing"
+  ];
+  const byCode = Object.fromEntries(knownCodes.map(k => [k, 0]));
+
+  try {
+    // On limite a 2000 rows pour eviter de saturer la memoire du worker
+    // sur de tres longues fenetres ; le order desc garantit qu'on a au
+    // moins les plus recents pour `recentEvents`.
+    const eventTypeIn = "(auto_open_blocked_unsafe,auto_close_blocked_unsafe)";
+    const rows = await supabaseFetch(
+      env,
+      `${TRAINING_EVENTS_TABLE}?select=id,created_at,event_type,symbol,payload`
+      + `&event_type=in.${eventTypeIn}`
+      + `&created_at=gte.${encodeURIComponent(cutoffIso)}`
+      + `&order=created_at.desc&limit=2000`
+    );
+
+    let openBlocked = 0;
+    let closeBlocked = 0;
+    const symbolCounter = new Map();
+
+    if (Array.isArray(rows)) {
+      for (const r of rows) {
+        if (r?.event_type === "auto_open_blocked_unsafe") openBlocked += 1;
+        else if (r?.event_type === "auto_close_blocked_unsafe") closeBlocked += 1;
+        const code = String(r?.payload?.code || "").toLowerCase();
+        if (code && Object.prototype.hasOwnProperty.call(byCode, code)) {
+          byCode[code] += 1;
+        } else if (code) {
+          // Code inattendu : on le remonte quand meme pour visibilite
+          byCode[code] = (byCode[code] || 0) + 1;
+        }
+        const sym = String(r?.symbol || "").toUpperCase();
+        if (sym) symbolCounter.set(sym, (symbolCounter.get(sym) || 0) + 1);
+      }
+    }
+
+    const topSymbols = Array.from(symbolCounter.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([symbol, count]) => ({ symbol, count }));
+
+    const recentEvents = (Array.isArray(rows) ? rows.slice(0, recentLimit) : []).map(r => ({
+      id: r?.id,
+      at: r?.created_at,
+      type: r?.event_type,
+      symbol: r?.symbol || null,
+      code: String(r?.payload?.code || "") || null,
+      human: r?.payload?.human || null,
+      missingQuoteQuality: r?.payload?.missing_quote_quality === true,
+      sourceUsed: r?.payload?.source_used || null,
+      freshness: r?.payload?.freshness || null,
+      quotedAt: r?.payload?.quoted_at || null,
+      positionId: r?.payload?.position_id || null
+    }));
+
+    return ok(
+      {
+        configured: true,
+        generatedAt,
+        windowHours,
+        cutoffAt: cutoffIso,
+        totals: { openBlocked, closeBlocked },
+        byCode,
+        topSymbols,
+        recentEvents,
+        truncated: Array.isArray(rows) && rows.length === 2000
+      },
+      "supabase",
+      generatedAt,
+      "recent"
+    );
+  } catch (e) {
+    return fail(`Erreur safety-stats : ${e.message || "supabase"}`, "error", 500);
+  }
+}
+
 async function handleTrainingStats(env) {
   if (!supabaseConfigured(env)) return ok({ configured: false, stats: null }, "worker_training", nowIso(), "recent", "Supabase non configure");
   try {
@@ -10249,6 +10361,15 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingStats(env));
+    }
+    if (url.pathname === "/api/training/safety-stats") {
+      // Vague B.9.1 — agregateur lecture seule des blocages safety gate
+      // (mtp_training_events.event_type IN auto_open_blocked_unsafe,
+      // auto_close_blocked_unsafe). Meme protection admin que les autres
+      // routes training/admin.
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingSafetyStats(url, env));
     }
     if (url.pathname === "/api/admin/backtest-runs") {
       const denied = await requireAdminAccess(request, env);
