@@ -7080,10 +7080,11 @@ async function getClaudeNewsKillSwitchWeight(env) {
   if (!supabaseConfigured(env)) return 8; // défaut sans data
 
   try {
-    // Récupère les 100 derniers feedback ; on filtre sur Claude signal high
-    // confidence et on garde les 30 les plus récents.
+    // Récupère les 200 derniers feedback ; on filtre sur Claude signal high
+    // confidence et on garde les 30 les plus récents. Exclut les trades
+    // suspect/invalid (cf. tradeValidationEngine, PR refonte #2).
     const rows = await supabaseFetch(env,
-      `${TRADE_FEEDBACK_TABLE}?select=pnl,news_context_open,closed_at&order=closed_at.desc&limit=200`
+      `${TRADE_FEEDBACK_TABLE}?select=pnl,news_context_open,closed_at,quality&or=(quality.eq.ok,quality.is.null)&order=closed_at.desc&limit=200`
     );
     if (!Array.isArray(rows)) { setMemoryCache(cacheKey, 3600, 8); return 8; }
 
@@ -7156,8 +7157,12 @@ function computeTemporalWeight(closedAtIso) {
 async function aggregateFeedbackBuckets(env, { limit = 1000 } = {}) {
   if (!supabaseConfigured(env)) return {};
   try {
+    // Filtre qualité : exclut suspect/invalid pour ne pas contaminer les
+    // règles correctives 1-6 (raise_min_score, disable_bucket, etc.).
+    // Sans ce filtre, un faux stop (cas ASML) pouvait faire disable
+    // automatiquement un bucket à tort.
     const rows = await supabaseFetch(env,
-      `${TRADE_FEEDBACK_TABLE}?order=closed_at.desc&limit=${clampInt(limit, 1, 2000, 1000)}`
+      `${TRADE_FEEDBACK_TABLE}?or=(quality.eq.ok,quality.is.null)&order=closed_at.desc&limit=${clampInt(limit, 1, 2000, 1000)}`
     );
     if (!Array.isArray(rows) || rows.length === 0) return {};
 
@@ -7404,8 +7409,11 @@ async function observeShadowAdjustments(env) {
   // Pré-fetch les feedback rows récents pour éviter une requête par ajustement.
   let feedback = [];
   try {
+    // Filtre qualité : les shadow rules opèrent sur l'historique
+    // d'apprentissage propre. Exclure suspect/invalid évite qu'un faux
+    // signal déclenche `reduce_size` ou `aggressive` à tort.
     feedback = await supabaseFetch(env,
-      `${TRADE_FEEDBACK_TABLE}?order=closed_at.desc&limit=500`
+      `${TRADE_FEEDBACK_TABLE}?or=(quality.eq.ok,quality.is.null)&order=closed_at.desc&limit=500`
     );
   } catch (e) {
     console.error("observeShadowAdjustments feedback fetch failed:", e.message);
@@ -7589,9 +7597,10 @@ async function collectWeeklyReportStats(env, weekStart, weekEnd) {
   const startIso = new Date(weekStart + "T00:00:00.000Z").toISOString();
   const endIso = new Date(weekEnd + "T23:59:59.999Z").toISOString();
 
-  // Feedback de la semaine
+  // Feedback de la semaine. Filtre qualité : on exclut suspect/invalid
+  // pour que les stats de régime hebdo restent fiables.
   const feedback = await supabaseFetch(env,
-    `${TRADE_FEEDBACK_TABLE}?closed_at=gte.${startIso}&closed_at=lte.${endIso}&order=closed_at.desc&limit=500`
+    `${TRADE_FEEDBACK_TABLE}?closed_at=gte.${startIso}&closed_at=lte.${endIso}&or=(quality.eq.ok,quality.is.null)&order=closed_at.desc&limit=500`
   ).catch(() => []);
 
   // Ajustements activés / rollback dans la semaine
