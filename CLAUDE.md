@@ -12,8 +12,9 @@
 - `TRADING_LOGIC.md` — logique du moteur
 - `PROVIDERS_MATRIX.md` — routage providers
 - `KNOWN_ISSUES.md` — bugs et dette
+- `CHECKLIST_MERGE.md` — checklist obligatoire avant tout merge
 
-À chaque merge, **mettre à jour** les fichiers concernés AVANT le merge :
+À chaque merge, **parcourir `CHECKLIST_MERGE.md`** et mettre à jour les fichiers concernés AVANT le merge :
 - Modif architecture → `ARCHITECTURE.md`
 - Modif flux donnée → `DATA_PIPELINE.md`
 - Modif logique trading → `TRADING_LOGIC.md`

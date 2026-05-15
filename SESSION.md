@@ -1,6 +1,12 @@
 # SESSION – ManiTradePro
 > **Fichier de continuité de session — à lire en PREMIER à chaque nouvelle session IA.**
 
+## Explication simple
+
+Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce qui vient d'être fait, ce qui est en cours, et ce qu'il faut faire ensuite. À lire avant toute modification pour ne pas casser un travail existant ou redécouvrir un problème déjà connu.
+
+---
+
 > ⚠️ **RÈGLE IMPÉRATIVE — DOCUMENTATION PERMANENTE (mai 2026)**
 >
 > À CHAQUE merge, mettre à jour AVANT le merge :
@@ -10,6 +16,7 @@
 > - `TRADING_LOGIC.md` — logique de décision
 > - `PROVIDERS_MATRIX.md` — routage providers
 > - `KNOWN_ISSUES.md` — bugs et dette
+> - `CHECKLIST_MERGE.md` — checklist obligatoire à valider avant chaque merge
 >
 > Un merge n'est PAS considéré terminé tant que ces fichiers ne sont pas à jour.
 > Cf. directive utilisateur du 15/05 — la documentation est désormais une partie critique du projet.
@@ -19,7 +26,7 @@
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-15 (PR #158 — filtres learning) |
+| **Dernière mise à jour** | 2026-05-15 (passe de fiabilisation documentaire) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
 | **Branche active** | `claude/resume-manitradepro-MeZLc` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -30,12 +37,12 @@
 
 ## Stack technique
 - **Type** : PWA — iPhone + web, vanilla JS, zéro dépendances
-- **Frontend** : `assets/app.js` (~5700 lignes) + `assets/styles.css`
-- **Backend** : `cloudflare-worker/worker.js` — déployé via `wrangler deploy` dans `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker`
-- **APIs marché** : Binance, Twelve Data (4 clés en rotation), Yahoo Finance, CoinGecko, Alpha Vantage, Finnhub, Claude AI
-- **Sync cross-device** : Supabase — tables `mtp_positions` + `mtp_trades`
+- **Frontend** : `assets/app.js` (~8 200 lignes) + `assets/styles.css` (~1 830 lignes) + `index.html` + `sw.js`
+- **Backend** : `cloudflare-worker/worker.js` (~9 800 lignes) — déploiement auto via GitHub Action `deploy-worker.yml` (fallback `wrangler deploy` manuel possible)
+- **APIs marché** : Binance, EODHD, Twelve Data (4 clés en rotation), Yahoo Finance, CoinGecko, Alpha Vantage, Finnhub, Claude AI
+- **Sync cross-device** : Supabase — tables `mtp_positions`, `mtp_trades`, `mtp_trade_feedback`, etc.
 - **Proxy CORS** : Cloudflare Worker (pour Binance iOS Safari)
-- **EUR/USD** : Sourcé depuis Yahoo Finance `EURUSD=X`
+- **EUR/USD** : Sourcé depuis Yahoo Finance `EURUSD=X` (fallback hardcodé `0.92` à supprimer, cf. `KNOWN_ISSUES.md` #2)
 - **Auth admin** : PIN → session token HMAC-SHA256 24h
 - **Graphiques** : Lightweight Charts v4.2 (TradingView, CDN unpkg dans `index.html`)
 - **Skill UI/UX** : `.claude/skills/ui-ux-pro-max/` — 67 styles, 96 palettes, 57 font pairings
@@ -324,8 +331,8 @@ toucher au passage en réel.
 - Event `cooldown_active` loggué dans `mtp_training_events` pour traçabilité.
 
 ### Nettoyage de routine
-- Doublon `getYahooCandles` supprimé (l'ancienne ligne ~1015 écrasait la
-  définition L962 — code mort).
+- Doublon `getYahooCandles` supprimé dans `cloudflare-worker/worker.js`
+  (deux définitions se chevauchaient — code mort retiré).
 
 ### Migration SQL requise (avant `wrangler deploy`)
 `cloudflare-worker/migrations/013_setup_required_and_cooldown.sql` :
