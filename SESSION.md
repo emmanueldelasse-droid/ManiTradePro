@@ -27,7 +27,7 @@ Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-15 (vague B.9 — safety gate execution) |
+| **Dernière mise à jour** | 2026-05-15 (vague B.9.1 — safety stats admin) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
 | **Branche active** | `claude/display-price-diagnostics-Udvpb` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -80,6 +80,107 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-15 — Vague B.9.1 : safety stats admin (lecture seule)
+
+Mini-PR additive post-B.9. Ajoute une route admin lecture seule qui agrège les événements `auto_open_blocked_unsafe` et `auto_close_blocked_unsafe` déjà émis par le safety gate B.9 dans `mtp_training_events`. Objectif : observer en un appel combien de blocages, par quel code, sur quels actifs.
+
+### Apport
+
+Nouveau handler `handleTrainingSafetyStats(url, env)` (~110 lignes, lecture seule). Route `GET /api/training/safety-stats` protégée par `requireAdminAccess` (même protection que `/api/training/events` et `/api/training/stats`).
+
+Query params optionnels :
+- `windowHours` : fenêtre d'agrégation, défaut 24 h, clamp max 720 h (30 jours)
+- `limit` : taille de `recentEvents`, défaut 20, clamp max 100
+
+Réponse :
+```json
+{
+  "configured": true,
+  "generatedAt": "2026-05-15T20:00:00.000Z",
+  "windowHours": 24,
+  "cutoffAt": "2026-05-14T20:00:00.000Z",
+  "totals": { "openBlocked": 12, "closeBlocked": 3 },
+  "byCode": {
+    "stale": 5,
+    "currency_mismatch": 0,
+    "abnormal_spread": 2,
+    "provider_unsafe": 1,
+    "no_price": 0,
+    "quote_unsafe": 4,
+    "quote_quality_missing": 3
+  },
+  "topSymbols": [
+    { "symbol": "BMW.DE", "count": 4 },
+    { "symbol": "AAPL", "count": 2 }
+  ],
+  "recentEvents": [
+    {
+      "id": "...", "at": "...", "type": "auto_open_blocked_unsafe",
+      "symbol": "BMW.DE", "code": "stale", "human": "...",
+      "missingQuoteQuality": false,
+      "sourceUsed": "eodhd", "freshness": "delayed_15m", "quotedAt": "..."
+    }
+  ],
+  "truncated": false
+}
+```
+
+`byCode` pré-rempli à 0 pour les 7 codes B.9 connus → réponse déterministe même si la fenêtre est vide. Les codes inattendus (futures évolutions de `evaluateExecutionSafety`) sont remontés tels quels en plus.
+
+### Périmètre strict respecté
+
+- ✅ Lecture seule. Aucun `POST/PUT/PATCH/DELETE`. Aucun `logTrainingEvent`. Aucun `setMemoryCache`.
+- ✅ Aucune nouvelle table. Aucune migration SQL.
+- ✅ Aucun cron supplémentaire.
+- ✅ Aucun cache complexe (l'agrégation se fait à la volée à chaque appel).
+- ✅ Aucune modification de : `evaluateExecutionSafety`, `handleTrainingAutoCycle`, `quoteQualityEngine`, `resolveLiveQuote`, `calcDetailScore`, scoring, RR, providers, learning, paper trading.
+- ✅ Zéro modification front (`assets/app.js`, `assets/styles.css`, `index.html`, `sw.js` intacts).
+- ✅ Aucune nouvelle dépendance, aucun nouvel appel API externe.
+
+### Tests
+
+Unit (`/tmp/test_b91.mjs`, 21/21 PASS) :
+- ✅ aucun event → openBlocked=0, closeBlocked=0, byCode tout à 0 (7 keys), topSymbols vide, recentEvents vide
+- ✅ mix open/close avec codes connus → compteurs corrects, topSymbols trié par count desc
+- ✅ code inattendu → exposé quand même (forward-compat)
+- ✅ symbol null/vide → pas inclus dans topSymbols, mais totals comptent quand même
+- ✅ limit recentEvents respectée (20 par défaut, 100 max)
+- ✅ totals reflète tous les rows même si recentEvents tronqué
+- ✅ windowHours clamp 720 max, défaut 24 si ≤ 0 ou non-fini
+- ✅ limit clamp 100 max
+
+Statique (`/tmp/check_b91.mjs`, 17/18 PASS, 1 faux positif regex string-template) :
+- ✅ handler défini, route enregistrée, protégée par `requireAdminAccess`
+- ✅ early return si `!supabaseConfigured(env)`
+- ✅ filtre Supabase `event_type=in.(...)` (vérifié à l'œil ligne 6231-6235)
+- ✅ `TRAINING_EVENTS_TABLE` réutilisée (pas de nouvelle table)
+- ✅ clamps windowHours/limit/hard-cap 2000 rows
+- ✅ 7 codes B.9 pré-déclarés
+- ✅ signatures de toutes les fonctions sensibles intactes
+- ✅ aucune écriture / pas de side-effect dans la fonction
+
+Build : `node --check cloudflare-worker/worker.js` PASS.
+
+### Usage
+
+```bash
+# Fenêtre 24h par défaut, 20 events récents
+curl -H "X-Admin-Token: <session>" \
+  https://manitradepro.emmanueldelasse.workers.dev/api/training/safety-stats
+
+# Fenêtre 7 jours, 50 events
+curl -H "X-Admin-Token: <session>" \
+  "https://manitradepro.emmanueldelasse.workers.dev/api/training/safety-stats?windowHours=168&limit=50"
+```
+
+### Limites restantes
+
+- Le `limit=2000` sur la requête Supabase est un hard cap pour éviter de saturer la mémoire du worker. `truncated: true` indique au consommateur qu'il manque des rows si on a touché ce plafond — à ce moment-là, réduire `windowHours` ou paginer côté admin.
+- Pas de pagination native — pas besoin pour du suivi opérationnel sur 24h.
+- Pas branché au front pour l'instant. Visible uniquement via curl/Postman/script admin. Le front pourra consommer cette route dans une future vague si tu veux un onglet "Santé du bot".
 
 ---
 

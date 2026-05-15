@@ -124,6 +124,7 @@ Monolithique, un seul `fetch(request, env)` exporté. Toutes les routes sont des
 | `/api/training/auto-cycle` | Trigger cron manuel |
 | `/api/training/settings` | POST mise à jour des paramètres bot |
 | `/api/training/feedback` | Liste feedback (lecture) |
+| `/api/training/safety-stats` | (B.9.1) Agrégation lecture seule des blocages safety gate (params : `windowHours`, `limit`) |
 | `/api/trades/wipe` | Effacement total (positions, trades, feedback, events) |
 
 ### Routes admin
