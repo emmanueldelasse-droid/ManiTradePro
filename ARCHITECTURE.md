@@ -1,18 +1,19 @@
 # ARCHITECTURE — État réel du projet
 
-> **Représente le code APRÈS MERGE.** Mise à jour obligatoire à chaque PR architecture.
-> Dernière vérification : 2026-05-15, après PR #158.
+## Explication simple
+
+Ce fichier décrit **comment l'application est organisée** : front, worker, base de données, caches, déploiement. C'est la carte du projet pour comprendre où le code vit et comment les pièces s'emboîtent.
 
 ---
 
 ## Vue d'ensemble
 
-ManiTradePro est une PWA vanilla JS (front) + Cloudflare Worker (back) + Supabase (DB). Pas de framework, pas de bundler. Tout est servi en clair depuis GitHub Pages.
+ManiTradePro est une PWA vanilla JS (front) + Cloudflare Worker (back) + Supabase (base Postgres). Pas de framework, pas de bundler. Tout est servi en clair depuis GitHub Pages.
 
 ```
 ┌────────────┐    HTTPS     ┌──────────────────────┐    PostgREST    ┌────────────┐
 │ iPhone /   │─────────────►│ Cloudflare Worker    │────────────────►│ Supabase   │
-│ Mac PWA    │   /api/*     │ ~9000 lignes JS      │                 │ Postgres   │
+│ Mac PWA    │   /api/*     │ ~9800 lignes JS      │                 │ Postgres   │
 │ (GH Pages) │              │ + KV namespace       │                 │            │
 └────────────┘              └──────────────────────┘                 └────────────┘
                                        │
@@ -33,43 +34,64 @@ ManiTradePro est une PWA vanilla JS (front) + Cloudflare Worker (back) + Supabas
 
 ---
 
-## Frontend — `assets/app.js` (~8000 lignes)
+## Tailles de fichiers actuelles
 
-Tout dans une **seule IIFE**. Pas de modules. State global `state = { ... }`. Render unique `render()` qui rewrite `app.innerHTML` à chaque fois (préservation du scroll via PR #141).
+Mesurées le 2026-05-15 après PR #159 (`wc -l` sur la branche `claude/resume-manitradepro-MeZLc`) :
 
-### Routes principales (state.route)
-| Route | Vue | Description |
-|---|---|---|
-| `dashboard` | Accueil | Synthèse jour : régime macro, top opps, alertes news |
-| `opportunities` | Opportunités | Scan des 35+ actifs avec score + plan de trade |
-| `asset-detail` | Fiche actif | Bougies + analyse + plan + IA + news |
-| `portfolio` | Trades | Positions ouvertes + historique + bot paramètres |
-| `settings` | Réglages | Compte, alertes, paramètres bot (déplacé ici depuis Trades en PR #143), actifs personnalisés, à propos |
+| Fichier | Lignes |
+|---|---|
+| `assets/app.js` | ~8 200 |
+| `assets/styles.css` | ~1 830 |
+| `cloudflare-worker/worker.js` | ~9 800 |
+| `index.html` | 25 |
+| `sw.js` | ~145 |
 
-### Logique paper trading
-- `state.trades.positions` (en mémoire) ← lu depuis `/api/trades/state`
-- `state.trades.history` ← idem
-- Ouverture manuelle : modal "Confirmer le trade" → POST `/api/trades/open` (entry/stop/TP saisis ou calculés)
-- Auto-ouverture : déléguée au cron worker `handleTrainingAutoCycle`
-
-### Logique synchronisation
-- Polling 30 s sur dashboard / opp / detail / settings / portfolio
-- Re-fetch immédiat sur `visibilitychange` quand l'onglet revient au premier plan (PR #135)
-- localStorage : persistance offline (`mtp_trades_positions`, `mtp_trades_history`, `mtp_opportunities_snapshot_v1`)
-- Service Worker `sw.js` : network-first pour `/api/*`, cache-first pour assets (cache version bumped à chaque release UI)
-
-### Affichage prix
-- `priceDisplay(value, currency)` (app.js L908) : affiche EUR primaire + USD en parenthèses (mode `EUR_PLUS_USD`)
-- `currencyForSymbol(symbol)` miroir du worker pour les positions sans devise stockée
-- Helper `quoteSourceLine(item)` (app.js L965) : affiche "Données Yahoo (temps réel) · mis à jour il y a 30 s"
+> Ces chiffres bougent à chaque PR. À recroiser avec `wc -l` si doute.
 
 ---
 
-## Backend — `cloudflare-worker/worker.js` (~9000 lignes)
+## Frontend — `assets/app.js`
+
+Tout dans une **seule IIFE**. Pas de modules. State global `state = { ... }`. Render unique `render()` qui réécrit `app.innerHTML` à chaque fois (préservation du scroll côté `.main-content`).
+
+### Routes principales (`state.route`)
+
+| Route | Vue | Description |
+|---|---|---|
+| `dashboard` | Accueil | Synthèse jour : régime macro, top opps, alertes news |
+| `opportunities` | Opportunités | Scan des actifs avec score + plan de trade |
+| `asset-detail` | Fiche actif | Bougies + analyse + plan + IA + news |
+| `portfolio` | Trades | Positions ouvertes + historique |
+| `settings` | Réglages | Compte, alertes, paramètres bot, actifs personnalisés, à propos |
+
+### Logique paper trading
+
+- `state.trades.positions` (en mémoire) ← lu depuis `/api/trades/state`
+- `state.trades.history` ← idem
+- Ouverture manuelle : modal "Confirmer le trade" → POST `/api/trades/open`
+- Auto-ouverture : déléguée au cron worker `handleTrainingAutoCycle`
+
+### Logique synchronisation
+
+- Polling 30 s sur dashboard / opp / detail / settings / portfolio
+- Re-fetch immédiat sur `visibilitychange` quand l'onglet revient au premier plan
+- localStorage : persistance offline (`mtp_trades_positions`, `mtp_trades_history`, `mtp_opportunities_snapshot_v1`)
+- Service Worker `sw.js` : network-first pour `/api/*`, cache-first pour assets (cache version bumpée à chaque release UI)
+
+### Affichage prix
+
+- `priceDisplay(value, currency)` (dans `assets/app.js`) : affiche EUR primaire + USD en parenthèses (mode `EUR_PLUS_USD`)
+- `currencyForSymbol(symbol)` miroir du worker pour les positions sans devise stockée
+- Helper `quoteSourceLine(item)` : affiche "Données Yahoo (temps réel) · mis à jour il y a 30 s"
+
+---
+
+## Backend — `cloudflare-worker/worker.js`
 
 Monolithique, un seul `fetch(request, env)` exporté. Toutes les routes sont des `if (url.pathname === "/api/...")` dans le handler.
 
 ### Routes API publiques (GET)
+
 | Route | Handler | Description |
 |---|---|---|
 | `/api/opportunities` | `handleOpportunities` | Scan complet du panel |
@@ -88,6 +110,7 @@ Monolithique, un seul `fetch(request, env)` exporté. Toutes les routes sont des
 | `/api/engine/observe-shadows` | `handleObserveShadows` | Shadow rules en cours |
 
 ### Routes training (admin)
+
 | Route | Handler |
 |---|---|
 | `/api/training/account` | Capital, settings, équité |
@@ -95,9 +118,10 @@ Monolithique, un seul `fetch(request, env)` exporté. Toutes les routes sont des
 | `/api/training/auto-cycle` | Trigger cron manuel |
 | `/api/training/settings` | POST mise à jour des paramètres bot |
 | `/api/training/feedback` | Liste feedback (lecture) |
-| `/api/training/wipe` (redirigé vers `/api/trades/wipe`) | Effacement total |
+| `/api/trades/wipe` | Effacement total (positions, trades, feedback, events) |
 
 ### Routes admin
+
 | Route | Handler |
 |---|---|
 | `/api/admin/eodhd-probe/:symbol` | Diagnostic EODHD |
@@ -105,51 +129,56 @@ Monolithique, un seul `fetch(request, env)` exporté. Toutes les routes sont des
 | `/api/admin/backtest-*` | Backtest sur historique EODHD |
 
 ### Cron (scheduled)
+
 `handleTrainingAutoCycle(env)` lancé toutes les ~10 min :
 1. Lecture `mtp_training_settings`
-2. Phase fermeture : pour chaque position ouverte, fetch quote, `trainingCloseTrigger` → close si stop/TP/invalidation/time_exit
-3. Phase ouverture : si `auto_open_enabled`, lecture du dernier scan opp via `buildOpportunityRowsForTraining`, filtre via `isTrainingCandidateAllowed` (inclut maintenant le check jours fériés, PR #156), ouvre via `openTrainingPositionFromRow`
+2. **Phase fermeture** : pour chaque position ouverte, fetch quote, `trainingCloseTrigger` → close si stop/TP/invalidation/time_exit
+3. **Phase ouverture** : si `auto_open_enabled`, lecture du dernier scan opp via `buildOpportunityRowsForTraining`, filtre via `isTrainingCandidateAllowed` (inclut le check jours fériés), ouvre via `openTrainingPositionFromRow`
 
 ---
 
 ## Modules logiques actuels (dans le monolithe)
 
-Les "modules cibles" décrits dans le brief de refonte ne sont pas encore extraits. Voici la cartographie réelle.
+Les "modules cibles" décrits dans le brief de refonte (`/market/`, `/trading/`, `/learning/`, `/shared/`) **ne sont pas encore extraits**. Voici la cartographie réelle des clusters logiques au sein de `cloudflare-worker/worker.js`.
 
 ### Cluster « Market data »
-- `getCryptoQuote`, `getCryptoCandles`, `getCryptoCandlesTf` (~L1200) — Binance
-- `getTwelveQuote`, `getTwelveBatchQuotes`, `getTwelveCandlesWithKV` (~L1250-1500) — Twelve
-- `getYahooBatchQuotes`, `getYahooQuote`, `getYahooQuoteFromChart`, `getYahooCandles` (~L850-1000) — Yahoo
-- `getAlphaQuote` (~L1490) — Alpha Vantage
-- `getEodhdRealTimeBatchQuotes`, `getEodhdCandles`, `getEodhdCandlesWithKV` (~L1100-1200) — EODHD
-- `resolveUnifiedMarketQuote` (~L1603) — dispatcher quote
-- `getCandlesBySymbol` (~L1812) — dispatcher candles
-- `getStoredDailyQuoteFallback` (~L1730) — snapshot fallback
-- `getCurrencyForSymbol` (~L1078) + `MARKET_HOLIDAYS` + `isMarketHoliday` (~L1100-1163)
+
+- `getCryptoQuote`, `getCryptoCandles`, `getCryptoCandlesTf` — Binance
+- `getTwelveQuote`, `getTwelveBatchQuotes`, `getTwelveCandlesWithKV` — Twelve
+- `getYahooBatchQuotes`, `getYahooQuote`, `getYahooQuoteFromChart`, `getYahooCandles` — Yahoo
+- `getAlphaQuote` — Alpha Vantage
+- `getEodhdRealTimeBatchQuotes`, `getEodhdCandles`, `getEodhdCandlesWithKV` — EODHD
+- `resolveUnifiedMarketQuote` — dispatcher quote
+- `getCandlesBySymbol` — dispatcher candles
+- `getStoredDailyQuoteFallback` — snapshot fallback
+- `getCurrencyForSymbol` + `MARKET_HOLIDAYS` + `isMarketHoliday`
 
 ### Cluster « Scoring + Plan »
-- `calcDetailScore` (~L2499) — composite score 0-100
-- `safetyScoreFrom`, `actionabilityScoreFrom`, `dossierScoreFrom`, `decisionScoreFrom` (~L2790-2900)
-- `buildWorkerPlan` (~L2200) — construit `plan.entry/stop/takeProfit/rr/setupType/etc.`
-- `buildStablePayload`, `buildPartialAnalysisPayload`, `toOpportunityRow` (~L2947-3110) — assembly du payload
+
+- `calcDetailScore` — composite score 0-100
+- `safetyScoreFrom`, `actionabilityScoreFrom`, `dossierScoreFrom`, `decisionScoreFrom`
+- `buildWorkerPlan` — construit `plan.entry/stop/takeProfit/rr/setupType/etc.`
+- `buildStablePayload`, `buildPartialAnalysisPayload`, `toOpportunityRow` — assembly du payload
 
 ### Cluster « Training / paper trading »
-- `getTrainingSettings`, `getTrainingDefaults`, `normalizeTrainingSettingsRow` (~L3550-3700)
-- `isTrainingCandidateAllowed` (~L3707) — filtre d'ouverture (statut, news, setup, cooldown, jours fériés)
-- `handleTrainingAutoCycle` (~L3851) — cron orchestrateur
-- `trainingCloseTrigger` (~L4615) — détection stop/TP/invalidation/time_exit avec intra-bornes
-- `updatePositionIntraExcursion`, `persistPositionIntraExcursion` (~L4685)
-- `openTrainingPositionFromRow`, `buildTrainingPositionRowFromSignal` (~L4654-5060)
-- `closeTrainingPosition`, `buildClosedTradeRowFromPosition` (~L4789-4892)
-- `tradeValidationEngine` (~L4843) — qualité du trade clos (PR #157)
+
+- `getTrainingSettings`, `getTrainingDefaults`, `normalizeTrainingSettingsRow`
+- `isTrainingCandidateAllowed` — filtre d'ouverture
+- `handleTrainingAutoCycle` — cron orchestrateur
+- `trainingCloseTrigger` — détection stop/TP/invalidation/time_exit avec intra-bornes
+- `updatePositionIntraExcursion`, `persistPositionIntraExcursion`
+- `openTrainingPositionFromRow`, `buildTrainingPositionRowFromSignal`
+- `closeTrainingPosition`, `buildClosedTradeRowFromPosition`
+- `tradeValidationEngine` — qualité du trade clos
 
 ### Cluster « Learning + correction »
-- `captureTradeFeedback` (~L4997) — écrit `mtp_trade_feedback`
-- `computeLearningStats`, `loadLearningContextForScan` (~L5232) — stats par bucket
-- `aggregateFeedbackBuckets` (~L7157) — règles 1-6 correctives
-- `observeShadowAdjustments` (~L7405) — shadow rules
-- `getClaudeNewsKillSwitchWeight` (~L7080) — pondère Claude
-- `computeMarketRegimeStats` (~L7590) — stats régime hebdo
+
+- `captureTradeFeedback` — écrit `mtp_trade_feedback`
+- `computeLearningStats`, `loadLearningContextForScan` — stats par bucket
+- `aggregateFeedbackBuckets` — règles 1-6 correctives
+- `observeShadowAdjustments` — shadow rules
+- `getClaudeNewsKillSwitchWeight` — pondère Claude
+- `computeMarketRegimeStats` — stats régime hebdo
 
 ---
 
@@ -161,8 +190,8 @@ Positions ouvertes en paper trading.
 | Colonne | Type | Note |
 |---|---|---|
 | `id` | text (PK) | `${symbol}:${botMode}:${timestamp}` |
-| `symbol`, `name`, `mode`, `status`, `side` | text | mode = training/exploration/core |
-| `asset_class`, `currency` | text | currency ajouté en migration 015 |
+| `symbol`, `name`, `mode`, `status`, `side` | text | mode = training / exploration / core |
+| `asset_class`, `currency` | text | `currency` ajouté en migration 015 |
 | `entry_price`, `stop_loss`, `take_profit`, `invested`, `quantity` | numeric | |
 | `score`, `trend_label`, `trade_decision`, `trade_reason` | mixed | snapshot du moment d'ouverture |
 | `horizon`, `source_used` | text | |
@@ -175,19 +204,20 @@ Positions ouvertes en paper trading.
 Trades clos (historique).
 
 Mêmes colonnes que `mtp_positions` + :
-| Colonne | Type | Note |
+
+| Colonne | Type | Migration |
 |---|---|---|
-| `exit_price`, `pnl`, `pnl_pct`, `closed_at`, `duration_days` | mixed | |
-| `closed_execution` | jsonb | exitPrice, closedAt, closeType |
-| `intraday_detected`, `intraday_source`, `intraday_high`, `intraday_low`, `execution_assumption` | mixed | migration 014 |
-| `quality`, `quality_flags` | text + text[] | migration 016, PR #157 |
+| `exit_price`, `pnl`, `pnl_pct`, `closed_at`, `duration_days` | mixed | base |
+| `closed_execution` | jsonb | base |
+| `intraday_detected`, `intraday_source`, `intraday_high`, `intraday_low`, `execution_assumption` | mixed | 014 |
+| `quality`, `quality_flags` | text + text[] | 016 |
 
 ### `mtp_trade_feedback`
 Ligne par trade clos avec données d'apprentissage.
 
 | Colonne | Type | Note |
 |---|---|---|
-| `trade_id` (PK) | text | FK logique vers mtp_trades.id |
+| `trade_id` (PK) | text | FK logique vers `mtp_trades.id` |
 | `symbol`, `asset_class`, `setup_type`, `direction` | text | |
 | `regime_at_open`, `regime_at_close` | text | |
 | `exit_reason`, `intraday_detected`, `intraday_source`, `intraday_high`, `intraday_low`, `execution_assumption` | mixed | |
@@ -196,10 +226,11 @@ Ligne par trade clos avec données d'apprentissage.
 | `mae_pct`, `mfe_pct`, `stop_distance_pct`, `tp_distance_pct`, `mae_vs_stop_ratio`, `mfe_vs_tp_ratio` | numeric | excursion intra-trade |
 | `bucket_key` | text | `${setup}|${direction}|${regime}|${asset_class}` |
 | `news_context_open`, `news_context_close` | jsonb | sentiment + Claude signal |
-| `quality`, `quality_flags` | text + text[] | migration 016, PR #157 |
+| `quality`, `quality_flags` | text + text[] | migration 016 |
 
 ### `mtp_training_settings`
 Singleton (1 row) avec tous les paramètres du bot.
+
 - `auto_open_enabled`, `auto_close_enabled`, `is_enabled`
 - `capital_base`, `risk_per_trade_pct`, `allocation_per_trade_pct`
 - `max_open_positions`, `max_positions_per_symbol`, `max_holding_hours`
@@ -207,7 +238,7 @@ Singleton (1 row) avec tous les paramètres du bot.
 - `max_daily_loss_pct`, `max_weekly_loss_pct`, `max_consecutive_losses`
 - `allow_long`, `allow_short`, `mean_reversion_enabled`
 - `allowed_setups` (array)
-- `require_structural_setup` (PR #10), `post_stop_cooldown_hours` (PR #10)
+- `require_structural_setup`, `post_stop_cooldown_hours`
 - `learning_enabled`, `bot_mode`, `mode`
 
 ### `mtp_training_events`
@@ -223,13 +254,13 @@ Règles correctives 1-6 actives (raise_min_score, disable_bucket, reduce_size, e
 Rapports hebdo Claude (lundi 8h CEST).
 
 ### `mtp_bot_stats_snapshot`
-Snapshot quotidien lisible par Claude (PR #105) — stats globales pour aider à l'analyse.
+Snapshot quotidien lisible par Claude — stats globales pour aider à l'analyse. *(Déclaré dans SESSION.md d'origine, à vérifier dans le code si besoin de confirmer le contenu exact.)*
 
 ---
 
 ## Caches actifs
 
-### Cache mémoire worker (volatile, par isolate)
+### Cache mémoire worker (volatile, par isolate Cloudflare)
 
 | Clé | TTL | Stocke |
 |---|---|---|
@@ -255,18 +286,19 @@ Snapshot quotidien lisible par Claude (PR #105) — stats globales pour aider à
 | `news:${kind}:${symbol}` | 30 min | News raw |
 
 ### Cache front (localStorage + state mémoire)
+
 - `STORAGE_KEYS.opportunitiesSnapshot` : dernier scan offline-safe
 - `TRADE_STORAGE.positions / .history` : positions + historique persistés
 - `state.opportunities`, `state.detail`, `state.trades` : mémoire RAM rechargée depuis localStorage au boot
-- Service Worker cache : version `manitradepro-v8.0` (PR #137-#142)
+- Service Worker cache : version `manitradepro-v8.0` au moment de la dernière release UI
 
 ---
 
 ## Sécurité et auth
 
-- PIN admin → HMAC SHA-256 → token session 24h
+- PIN admin → HMAC SHA-256 → token session 24 h
 - Token stocké en localStorage `mtp_session_v1`
-- Vérification côté worker via `requireAdminAccess` (cookies signés HMAC)
+- Vérification côté worker via `requireAdminAccess`
 - Secrets Cloudflare : `ADMIN_API_TOKEN`, `ADMIN_PIN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `EODHD_API_KEY`, `TWELVE_API_KEYS`, `ALPHAVANTAGE_API_KEY`, `FINNHUB_API_KEY`, `CRYPTOPANIC_API_KEY`, `CLAUDE_API_KEY`
 
 ---
@@ -275,18 +307,27 @@ Snapshot quotidien lisible par Claude (PR #105) — stats globales pour aider à
 
 - Push sur `main` → GitHub Pages déploie le front en 2-5 min
 - Push sur `main` touchant `cloudflare-worker/**` → GitHub Action `deploy-worker.yml` lance `wrangler deploy` en 30-60 s
-- Pas de manuel `wrangler` requis en routine (fallback documenté dans CLAUDE.md)
+- Pas de `wrangler` manuel requis en routine (fallback documenté dans `CLAUDE.md`)
 
 ---
 
-## Refonte en cours (vague A — fondations)
+## Non encore fait
 
-Cf. SESSION.md pour l'état actuel des PRs. La vague A est en cours, vague B-D non commencées :
+- **Séparation `strategicScore` (stable) vs `liveContext` (volatile)** : le score actuel mélange les deux dans `calcDetailScore`. Prévu en vague A.1 de la refonte.
+- **`snapshotId` propagé** : aucune cohérence garantie entre la carte opp et la fiche détail si le cron tourne entre deux affichages. Prévu en vague B.4.
+- **Timestamps complets** : seul `quotedAt` est porté. `scoreCalculatedAt`, `candlesUpdatedAt`, `planGeneratedAt`, `newsUpdatedAt` manquants. Prévu en vague B.5.
+- **`quoteQualityEngine`** : pas d'engine systématique de validation d'âge / écart / devise. Prévu en vague B.6.
+- **`fxEngine` unifié** : pas d'helper `convert(amount, from, to, asOf)`. Conversions dispersées. Prévu en vague C.7.
+- **Multi-devises strict** : `capital_base` reste stocké en USD ; `originalCurrency` / `convertedCurrency` non systématiques. Prévu en vague C.8-9.
+- **Modularisation worker** : `/market/`, `/trading/`, `/learning/`, `/shared/` non extraits du monolithe `cloudflare-worker/worker.js`. Prévu en vague D.10.
+- **Modularisation front** : pas de couche `/services/`. Helpers et views mélangés dans l'IIFE de `assets/app.js`. Prévu en vague D.11.
+- **Préparation broker réel** : aucun `slippage-engine`, aucun adapter broker. Hors périmètre actuel.
+- **Tests automatiques** : aucune CI ne valide worker ou front. On compte sur l'agent bug-hunter + tests manuels utilisateur.
 
-- ✅ A.3 Jours fériés (PR #156)
-- ✅ A.2 tradeValidationEngine (PR #157)
-- ✅ A.2 bis 4 filtres learning (PR #158)
-- 🔲 A.1 Séparation `strategicScore` vs `liveContext` (à venir)
-- 🔲 B Cohérence (snapshotId, timestamps, quoteQualityEngine)
-- 🔲 C Multi-devises rigoureux (fxEngine unifié)
-- 🔲 D Modularisation worker + front
+---
+
+## Limites de fiabilité
+
+- Les chiffres de lignes ci-dessus sont la mesure du jour. À recroiser avec `wc -l` à chaque session importante.
+- La liste des routes API est tirée du code actuel mais peut être incomplète si des routes admin ont été ajoutées sans documentation. À grepper `url.pathname ===` ou `url.pathname.startsWith` dans `cloudflare-worker/worker.js` pour confirmation exhaustive.
+- Les schemas Supabase listés sont les colonnes connues via les migrations 001-016. Toute colonne ajoutée hors migration documentée n'est pas dans ce fichier.
