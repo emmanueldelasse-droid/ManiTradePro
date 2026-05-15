@@ -1,15 +1,25 @@
 # SESSION – ManiTradePro
-> **Fichier de continuité de session — à lire en PREMIER à chaque nouvelle session IA**
+> **Fichier de continuité de session — à lire en PREMIER à chaque nouvelle session IA.**
 
-> ⚠️ **RÈGLE IMPÉRATIVE** : Mettre à jour ce fichier **après chaque évolution**, pas en fin de session.
-> Chaque commit = une mise à jour SESSION.md. Ne pas attendre la "fin" pour documenter.
+> ⚠️ **RÈGLE IMPÉRATIVE — DOCUMENTATION PERMANENTE (mai 2026)**
+>
+> À CHAQUE merge, mettre à jour AVANT le merge :
+> - `SESSION.md` (ce fichier) — état du projet
+> - `ARCHITECTURE.md` — code après merge
+> - `DATA_PIPELINE.md` — flux de données
+> - `TRADING_LOGIC.md` — logique de décision
+> - `PROVIDERS_MATRIX.md` — routage providers
+> - `KNOWN_ISSUES.md` — bugs et dette
+>
+> Un merge n'est PAS considéré terminé tant que ces fichiers ne sont pas à jour.
+> Cf. directive utilisateur du 15/05 — la documentation est désormais une partie critique du projet.
 
 ---
 
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-14 (PR #147 — dedup Paramètres du bot) |
+| **Dernière mise à jour** | 2026-05-15 (PR #158 — filtres learning) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
 | **Branche active** | `claude/resume-manitradepro-MeZLc` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
@@ -62,6 +72,65 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-15 — Refonte vague A (PRs #156 → #158) + Documentation permanente
+
+Suite de la session du 14/05. L'utilisateur a demandé une refonte architecture
+rigoureuse en plusieurs vagues (A fondations, B cohérence, C multi-devises,
+D modularisation) puis a établi en cours de session le principe de
+**documentation permanente** : 5 fichiers de référence à maintenir à chaque merge.
+
+### Refonte livrée — Vague A
+
+| PR | Vague | Apport |
+|---|---|---|
+| #156 | A.3 | Calendrier jours fériés par devise (USD, EUR, CHF, GBP) pour 2026-2027. Worker bloque l'ouverture auto sur jour férié. Front affiche "Ferie · Bourse fermée aujourd'hui". |
+| #157 | A.2 | `tradeValidationEngine` qui tag chaque trade clos `quality: ok / suspect / invalid` selon 5 règles (invalid_price, extreme_move, stale_quote, partial_data, instant_close). Migration SQL 016 : colonnes `quality` + `quality_flags` sur `mtp_trades` ET `mtp_trade_feedback`. `computeLearningStats` filtre maintenant `or=(quality.eq.ok,quality.is.null)`. |
+| #158 | A.2 bis | 4 filtres learning restants : `aggregateFeedbackBuckets`, `observeShadowAdjustments`, `getClaudeNewsKillSwitchWeight`, `computeMarketRegimeStats`. Toute la chaîne d'apprentissage est maintenant strictement filtrée par qualité. |
+
+### Documentation permanente créée
+
+5 nouveaux fichiers à la racine (sans extension de chemin = à côté de SESSION.md) :
+
+| Fichier | Rôle |
+|---|---|
+| **ARCHITECTURE.md** | État réel du code après merge : structure front, worker, Supabase, caches |
+| **DATA_PIPELINE.md** | Flux de données par écran : où ça vient, cache, TTL, devise, usages |
+| **TRADING_LOGIC.md** | Scoring, setups, règles d'ouverture/fermeture, apprentissage |
+| **PROVIDERS_MATRIX.md** | Matrice de routage des fournisseurs (crypto, US, EU, UK, CH, forex, commodity) |
+| **KNOWN_ISSUES.md** | Bugs, incohérences, dette technique, risques |
+
+À chaque merge, mise à jour obligatoire des fichiers concernés.
+
+### Reste de la refonte (planifié, non commencé)
+
+| Vague | PR | Contenu | Risque |
+|---|---|---|---|
+| A.1 | À venir | Séparation `strategicScore` (stable, bougies clôturées) vs `liveContext` (volatile) | **ÉLEVÉ** — touche le moteur de scoring |
+| B.4 | À venir | `snapshotId` propagé partout (cohérence opp/fiche) | Faible (additif) |
+| B.5 | À venir | Timestamps complets (`scoreCalculatedAt`, `candlesUpdatedAt`, `planGeneratedAt`) | Faible |
+| B.6 | À venir | `quoteQualityEngine` (âge max 120s, écart inter-providers, devise explicite) | Moyen |
+| C.7-9 | À venir | `fxEngine` unifié, `originalCurrency` / `convertedCurrency` partout | Élevé (touche P&L) |
+| D.10-11 | À venir | Modularisation worker (`/market/`, `/trading/`, `/learning/`, `/shared/`) + front (`/services/`) | Très élevé |
+
+### Décisions importantes prises pendant la session
+
+1. **Capital base** reste USD pour l'instant — bascule EUR repoussée à vague C
+2. **Score stratégique fixe** : confirmé que le score affiché à l'ouverture doit être stable
+3. **Trades historiques** : `quality=NULL` traités comme `ok` → pas de backfill rétroactif (préserve l'historique)
+4. **Branche** : tout sur `claude/resume-manitradepro-MeZLc`
+5. **Auto-merge** : maintenu pour les PRs additives validées par bug-hunter (cf. CLAUDE.md). Mais demande explicite de l'utilisateur pour les changements architecturaux (vague A.1 et au-delà)
+
+### Risques actifs (extrait — cf. KNOWN_ISSUES.md pour la liste complète)
+
+- 🟠 #1 Score volatile (`calcDetailScore` mélange live + bougies) → vague A.1
+- 🟠 #2 `fxRateUsdToEur` fallback hardcodé 0.92 → vague C
+- 🟠 #3 `capital_base` USD vs affichage EUR → vague C
+- 🟡 #4 Pas de `snapshotId` (carte vs fiche) → vague B.4
+- 🟡 #5 Timestamps incomplets → vague B.5
+- 🟡 #6 `quoteQualityEngine` absent → vague B.6
 
 ---
 
