@@ -3,6 +3,26 @@
 > Règles permanentes pour toute session Claude Code sur ce repo.
 > **Lire aussi `SESSION.md`** en premier — c'est le fichier de continuité vivant.
 
+## Documentation permanente (IMPÉRATIVE — mai 2026)
+
+À chaque session, **lire AVANT toute modif** :
+- `SESSION.md` — état du projet
+- `ARCHITECTURE.md` — structure code après merge
+- `DATA_PIPELINE.md` — flux de données par écran
+- `TRADING_LOGIC.md` — logique du moteur
+- `PROVIDERS_MATRIX.md` — routage providers
+- `KNOWN_ISSUES.md` — bugs et dette
+
+À chaque merge, **mettre à jour** les fichiers concernés AVANT le merge :
+- Modif architecture → `ARCHITECTURE.md`
+- Modif flux donnée → `DATA_PIPELINE.md`
+- Modif logique trading → `TRADING_LOGIC.md`
+- Modif provider → `PROVIDERS_MATRIX.md`
+- Découverte bug → `KNOWN_ISSUES.md`
+- Toute évolution → `SESSION.md`
+
+Un merge n'est PAS considéré comme terminé tant que la doc n'est pas à jour. La doc doit représenter l'ÉTAT RÉEL APRÈS MERGE, jamais une intention ou un futur.
+
 ## Règle workflow Git (IMPÉRATIVE)
 
 **Après toute livraison fonctionnelle significative, créer une PR vers `main` et la signaler explicitement à l'utilisateur.**
