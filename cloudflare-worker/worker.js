@@ -161,6 +161,10 @@ async function getDynamicNameMap(env) {
 const circuitBreakers = {
   twelvedata: { failures: 0, openUntil: 0, threshold: 3, cooldowns: [30000, 60000, 120000, 300000] },
   yahoo:      { failures: 0, openUntil: 0, threshold: 2, cooldowns: [15000, 30000, 60000] },
+  // Vague B.10 P1.2 — circuit dédié EODHD. Aligné sur Yahoo (threshold 2,
+  // cooldowns 15/30/60 s). Permet le court-circuit direct vers le filet EOD
+  // dans handleOpportunities Phase 2 quand Yahoo + EODHD sont KO simultanés.
+  eodhd:      { failures: 0, openUntil: 0, threshold: 2, cooldowns: [15000, 30000, 60000] },
   supabase:   { failures: 0, openUntil: 0, threshold: 3, cooldowns: [15000, 30000, 60000] },
   binance:    { failures: 0, openUntil: 0, threshold: 5, cooldowns: [10000, 15000, 30000] }
 };
@@ -1190,6 +1194,7 @@ function isMarketHoliday(symbol, dateIso = null) {
 // elle-même (cohérent avec Twelve qui ne tague pas non plus chaque bougie).
 async function getEodhdCandles(symbol, timeframe, limit, env, ctx = null) {
   if (!eodhdConfigured(env)) throw new Error("eodhd_disabled");
+  if (circuitIsOpen("eodhd")) throw new Error("eodhd_circuit_open");
   if (timeframe !== "1d" && timeframe !== "1w") {
     // EODHD intraday existe mais facturé séparément — non couvert tier actuel.
     throw new Error(`eodhd_unsupported_timeframe:${timeframe}`);
@@ -1207,10 +1212,18 @@ async function getEodhdCandles(symbol, timeframe, limit, env, ctx = null) {
       url,
       { headers: { Accept: "application/json" } },
       { timeoutMs: 9000, maxRetries: 2, backoffMs: 600 }
-    ).catch((e) => { throw new Error(`eodhd_network:${e.message || e}`); });
+    ).catch((e) => {
+      // Vague B.10 P1.2 — réseau KO → comptabilise dans le circuit breaker
+      recordFailure("eodhd");
+      throw new Error(`eodhd_network:${e.message || e}`);
+    });
     if (!res.ok) {
-      // 401/403/429 EODHD — on laisse remonter sans recordFailure (pas de
-      // circuit breaker dédié, le caller fait fallback Twelve immédiat).
+      // 401/403/429 EODHD — comptabilise dans le circuit breaker (vague B.10
+      // P1.2). Le caller (resolveUnifiedMarketQuote / getCandlesBySymbol)
+      // fait fallback Twelve/Yahoo immédiat ; mais après N échecs consécutifs
+      // on évite désormais de gratter EODHD pour rien et on court-circuite
+      // direct vers le filet EOD dans handleOpportunities Phase 2.
+      recordFailure("eodhd");
       throw new Error(`eodhd_http_${res.status}`);
     }
     const payload = await res.json();
@@ -1230,6 +1243,8 @@ async function getEodhdCandles(symbol, timeframe, limit, env, ctx = null) {
       });
     }
     if (!rows.length) throw new Error("eodhd_no_candles");
+    // Vague B.10 P1.2 — succès → reset le circuit breaker eodhd
+    recordSuccess("eodhd");
     return rows.length > max ? rows.slice(-max) : rows;
   });
 }
@@ -1241,6 +1256,7 @@ async function getEodhdCandles(symbol, timeframe, limit, env, ctx = null) {
 // symbole pour avoir le vrai temps réel partout.
 async function getEodhdRealTimeBatchQuotes(symbols, env) {
   if (!eodhdConfigured(env)) throw new Error("eodhd_disabled");
+  if (circuitIsOpen("eodhd")) throw new Error("eodhd_circuit_open");
   if (!Array.isArray(symbols) || !symbols.length) return {};
   const mapped = symbols
     .map((s) => ({ orig: s, td: normalizeEodhdSymbol(s) }))
@@ -1255,10 +1271,19 @@ async function getEodhdRealTimeBatchQuotes(symbols, env) {
     url,
     { headers: { Accept: "application/json" } },
     { timeoutMs: 9000, maxRetries: 1, backoffMs: 600 }
-  ).catch((e) => { throw new Error(`eodhd_rt_batch_network:${e.message || e}`); });
-  if (!res.ok) throw new Error(`eodhd_rt_batch_http_${res.status}`);
+  ).catch((e) => {
+    // Vague B.10 P1.2 — réseau KO → comptabilise dans le circuit breaker
+    recordFailure("eodhd");
+    throw new Error(`eodhd_rt_batch_network:${e.message || e}`);
+  });
+  if (!res.ok) {
+    recordFailure("eodhd");
+    throw new Error(`eodhd_rt_batch_http_${res.status}`);
+  }
   const payload = await res.json();
   const rows = Array.isArray(payload) ? payload : (payload && typeof payload === "object" ? [payload] : []);
+  // Vague B.10 P1.2 — réponse OK → reset le circuit breaker eodhd
+  recordSuccess("eodhd");
   const nowSec = Math.floor(Date.now() / 1000);
   const out = {};
   for (const row of rows) {

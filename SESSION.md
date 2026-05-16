@@ -83,6 +83,39 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ---
 
+## Session 2026-05-16 — Vague B.10.1 : circuit breaker EODHD manquant (fix bloquant PR #172)
+
+Audit utilisateur sur la PR #172 (B.10) : le patch P1.2 utilisait `circuitIsOpen("eodhd")` pour court-circuiter directement vers le filet EOD quand Yahoo + EODHD sont KO simultanés. Mais `"eodhd"` **n'existait pas** dans `circuitBreakers` (qui n'avait que `twelvedata`, `yahoo`, `supabase`, `binance`). Le `if` était donc silencieusement faux ; le court-circuit ne se déclenchait jamais et le risque de timeout cron persistait.
+
+### Patchs
+
+1. `circuitBreakers` (~l. 161-168) : ajout `eodhd: { failures: 0, openUntil: 0, threshold: 2, cooldowns: [15000, 30000, 60000] }` (aligné sur Yahoo).
+2. `getEodhdRealTimeBatchQuotes` : `circuitIsOpen("eodhd")` au début, `recordFailure("eodhd")` dans le catch network ET sur `!res.ok`, `recordSuccess("eodhd")` après parsing OK.
+3. `getEodhdCandles` : même traitement. Le commentaire historique "pas de circuit breaker dédié, le caller fait fallback Twelve immédiat" est obsolète et a été remplacé.
+
+### Test statique
+
+Script vérifiant que tous les `circuitIsOpen("xxx")` / `recordFailure("xxx")` / `recordSuccess("xxx")` correspondent à une clé déclarée dans `circuitBreakers` :
+```
+Keys in circuitBreakers: binance, eodhd, supabase, twelvedata, yahoo
+Providers referenced:    binance, eodhd, supabase, twelvedata, yahoo
+PASS — all referenced providers are declared in circuitBreakers
+```
+
+`node --check cloudflare-worker/worker.js` PASS. `node --check assets/app.js` PASS.
+
+### Effet runtime
+
+- Après 2 échecs consécutifs EODHD (réseau / HTTP non-OK), le circuit s'ouvre pour 15-60 s (escalade).
+- Le `circuitIsOpen("eodhd") && circuitIsOpen("yahoo")` dans `handleOpportunities` Phase 2 devient fonctionnel : court-circuit direct vers `getStoredDailyQuoteFallback` (filet EOD) au lieu de gratter EODHD/Yahoo encore une fois par symbole.
+- Gain estimé : 17 EU stocks × ~2.5 s timeout = 42 s économisés sur le budget cron 25 s par cycle de panne avérée.
+
+### Périmètre strict respecté
+
+Aucune modif scoring / RR / learning / providers crypto / format API public. Compat B.9.1 safety-stats préservée.
+
+---
+
 ## Session 2026-05-16 — Vague B.10 : correctifs critiques post-audit safety gate
 
 Suite à double audit senior indépendant sur les vagues B.4 → B.9.1, série de 15 patchs ciblés sur `cloudflare-worker/worker.js` + `assets/app.js`. Aucun refactor architectural. Verdict avant : **SAFE MAIS FRAGILE / NO GO argent réel**. Verdict après : voir bas de section.
