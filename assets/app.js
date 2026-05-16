@@ -1066,12 +1066,18 @@
     if (qq) {
       if (qq.currencyMismatch) return { label: "Devise incohérente", tone: "negative" };
       if (qq.stale) return { label: "Prix périmé", tone: "negative" };
+      if (qq.abnormalSpread) return { label: "Écart anormal", tone: "negative" };
+      if (!Number.isFinite(Number(item?.price))) return { label: "Prix indisponible", tone: "negative" };
+      // P0.1 — snapshot/EOD reste informatif côté UI (warn, pas negative)
+      // même si le backend l'a maintenant marqué providerConfidence="unsafe"
+      // et validationStatus="eod_snapshot" pour bloquer l'exécution. C'est
+      // une donnée affichable (dernier prix dispo), pas une erreur.
+      if (src === "snapshot" || fresh === "eod" || qq.isSnapshot === true || qq.validationStatus === "eod_snapshot") {
+        return { label: "Dernier prix dispo", tone: "warn" };
+      }
       if (qq.providerConfidence === "unsafe" || qq.validationStatus === "unsafe") {
         return { label: "Prix non fiable", tone: "negative" };
       }
-      if (qq.abnormalSpread) return { label: "Écart anormal", tone: "negative" };
-      if (!Number.isFinite(Number(item?.price))) return { label: "Prix indisponible", tone: "negative" };
-      if (src === "snapshot" || fresh === "eod") return { label: "Dernier prix dispo", tone: "warn" };
       if (qq.marketClosed) return { label: "Marché fermé", tone: "neutral" };
       if (qq.delayed) return { label: "Différé · fiable", tone: "neutral" };
       if (qq.executionSafe) return { label: "Live fiable", tone: "positive" };
@@ -1130,6 +1136,8 @@
     if (v === "unsafe") return "non fiable";
     if (v === "currency_mismatch") return "devise incohérente";
     if (v === "abnormal_spread") return "écart anormal";
+    // P0.1 — nouveau status : snapshot EOD = filet ultime, non exécutable
+    if (v === "eod_snapshot") return "snapshot EOD";
     return value || "—";
   }
 
@@ -1141,6 +1149,11 @@
     if (v === "no_price") return "prix absent";
     if (v === "currency_mismatch") return "devise incohérente";
     if (v === "provider_unsafe") return "fournisseur non fiable";
+    // P0.1 — drapeau snapshot EOD remonte aussi dans reasons[]
+    if (v === "eod_snapshot") return "prix de clôture veille";
+    // P2.3 — fallback générique et diagnostic absent (B.9 / B.10)
+    if (v === "quote_unsafe") return "prix non fiable";
+    if (v === "quote_quality_missing") return "diagnostic absent";
     if (v.startsWith("abnormal_spread")) return v.replace("abnormal_spread:", "écart ");
     if (v.startsWith("stale:")) return v.replace("stale:", "périmé · ");
     return v;

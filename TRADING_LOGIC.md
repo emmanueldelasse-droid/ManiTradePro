@@ -434,3 +434,45 @@ Trades `suspect` / `invalid` sont **exclus**. Trades historiques `quality = NULL
 - Les pondérations exactes (0.34, 0.24, etc.) sont prises du code au moment de la documentation. À recroiser avec `computeTradeSafetyScore` et `calcDetailScore` si ces nombres changent.
 - La règle prudente "stop d'abord en cas d'ambiguïté intra" est une **décision de design** documentée ici. Toute modification doit passer par une PR explicite avec mise à jour de ce fichier.
 - Les seuils des règles 1-6 (WR < 30 %, sample_size >= 20) sont prises de `aggregateFeedbackBuckets`. À revérifier si ajustement.
+
+---
+
+## Vague B.10 — durcissement safety gate (mai 2026)
+
+Trois ajustements critiques de la chaîne de décision exécutive du paper trading auto-cycle.
+
+### Filtre 17 (open) et filtre 0 (close) — snapshot/EOD non exécutable
+
+Le brief B.6 stipulait que `quoteQualityEngine` produirait `executionSafe=true` pour toute quote non aberrante. L'audit a montré qu'une quote `sourceUsed:"snapshot"` (filet ultime EOD veille) passait ce filtre. **Conséquence avant B.10** : pendant une panne Yahoo + EODHD simultanée, le bot ouvrait des positions au prix de clôture de la veille, immédiatement stop-loss au cycle suivant.
+
+**Règle B.10 (vérifiée par `quoteQualityEngine`)** :
+> Une quote dont `sourceUsed === "snapshot"` ou `freshness === "eod"` est marquée `isSnapshot=true`, `executionSafe=false`, `validationStatus="eod_snapshot"`. Le drapeau `"eod_snapshot"` est poussé dans `reasons[]` pour audit. `providerConfidenceForSource("snapshot")` retourne `"unsafe"` en complément.
+
+Côté UI : la quote reste affichable (tone `warn`, libellé "Dernier prix dispo"). Côté exécution : `evaluateExecutionSafety` bloque.
+
+### Ordre d'évaluation au close — gate AVANT le tracker MAE/MFE
+
+Le tracker intra-trade (`updatePositionIntraExcursion` → persistence en BDD `position.live.highSinceOpen` / `lowSinceOpen`) était mis à jour AVANT la safety gate. Une quote `abnormalSpread` polluait l'intra-trade et provoquait un faux close intraday au cycle suivant (gate passe, trigger lit l'intra pollué, déclare `intraday_low_breach`).
+
+**Règle B.10 (vérifiée par `handleTrainingAutoCycle` phase fermeture)** :
+> `evaluateExecutionSafety(detailPayload)` est exécutée AVANT `updatePositionIntraExcursion`. Si `!safe`, log + return. Le tracker n'est jamais alimenté avec une quote unsafe.
+
+### Alignement quote validée ↔ quote exécutée (close)
+
+Avant B.10, la phase close appelait `resolveUnifiedMarketQuote` (bypass KV) pour `liveQuote.price`, et `buildStableMarketPayload` (via `resolveLiveQuote`, KV) pour `detailPayload.liveContext.quoteQuality`. La gate validait la deuxième, le trigger utilisait la première.
+
+**Règle B.10** :
+> Le close repose sur UNE seule quote. `liveQuote = resolveLiveQuote(...)`. `effectivePrice = detailPayload.price ?? liveQuote.price ?? stalePrice`. La quote validée est la quote utilisée.
+
+### Fraîcheur réelle Yahoo
+
+`getYahooBatchQuotes` et `getYahooQuoteFromChart` posaient `freshness:"live"` + `quotedAt:nowIso()` quel que soit l'âge réel du payload. Détection `stale` impossible sur Yahoo.
+
+**Règle B.10** :
+> `quotedAt` est dérivé de `regularMarketTime` (epoch s). `freshness` est dérivé de `exchangeDataDelayedBy` (minutes) — ≥ 15 min → `"delayed_15m"`, > 0 → `"delayed"`, sinon `"live"`.
+
+### Fallback abnormalSpread si ATR absent
+
+Le check `abnormalSpread` (écart livePrice vs lastClose en multiples d'ATR) nécessitait ≥ 14 bougies ET `atr > 0`. Quote aberrante avec moins de bougies passait silencieusement.
+
+**Règle B.10** : si ATR indispo, bascule sur seuil en pourcentage brut — 15 % non-crypto, 30 % crypto. Champ `spreadPct` exposé dans `quoteQuality`.

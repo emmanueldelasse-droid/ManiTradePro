@@ -27,9 +27,9 @@ Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-15 (vague B.9.1 — safety stats admin) |
+| **Dernière mise à jour** | 2026-05-16 (vague B.10 — correctifs critiques post-audit safety gate) |
 | **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/display-price-diagnostics-Udvpb` |
+| **Branche active** | `claude/audit-manitradepro-prs-eydXl` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker (auto-deploy GitHub Actions) |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -80,6 +80,84 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-16 — Vague B.10 : correctifs critiques post-audit safety gate
+
+Suite à double audit senior indépendant sur les vagues B.4 → B.9.1, série de 15 patchs ciblés sur `cloudflare-worker/worker.js` + `assets/app.js`. Aucun refactor architectural. Verdict avant : **SAFE MAIS FRAGILE / NO GO argent réel**. Verdict après : voir bas de section.
+
+### Problèmes corrigés
+
+**P0 — bloquants pour argent réel**
+
+1. **Gate B.9 laissait passer snapshot/EOD comme exécutable.**
+   `providerConfidenceForSource("snapshot", ...)` retournait `"low"` (pas `"unsafe"`). Avec `quotedAt = nowIso()` à la création du filet EOD, `stale=false`, `abnormalSpread=0`, `executionSafe=true`. Le bot pouvait ouvrir une position au prix de clôture de la veille pendant que Yahoo + EODHD étaient KO simultanément.
+   **Fix** : (a) `providerConfidenceForSource` retourne `"unsafe"` pour `src === "snapshot"`. (b) `quoteQualityEngine` calcule un drapeau `isSnapshot = freshness === "eod" || sourceUsed === "snapshot"` qui force `executionSafe=false`, pousse `"eod_snapshot"` dans `reasons[]` et `validationStatus="eod_snapshot"`. (c) `handleTrainingSafetyStats` reconnaît le nouveau code.
+
+2. **Tracker MAE/MFE pollué AVANT la safety gate au close.**
+   `updatePositionIntraExcursion(position, effectivePrice)` puis `persistPositionIntraExcursion` étaient appelés ligne 4653 — donc une quote `abnormalSpread` / `stale` poussait `highSinceOpen` / `lowSinceOpen` en BDD. Au cycle suivant, gate passe (quote propre) mais le trigger lit l'intra pollué → faux close intraday avec `executionAssumption:"intraday_low_breach"`.
+   **Fix** : `evaluateExecutionSafety(detailPayload)` exécutée AVANT `updatePositionIntraExcursion`. Si `!safe`, log + return AVANT toute écriture dans le tracker.
+
+3. **Gate validait une quote, trigger exécutait sur une autre (cycle close).**
+   Ligne 4610 : `liveQuote = resolveUnifiedMarketQuote(...)` (bypass KV). Ligne 4612 : `detailPayload = buildStableMarketPayload(...)` (via `resolveLiveQuote` / KV). Gate validait `detailPayload.liveContext.quoteQuality`, trigger utilisait `liveQuote.price`. En pratique aligné par l'ordre d'appel mais aucun contrat formel.
+   **Fix** : `liveQuote = resolveLiveQuote(...)` et `effectivePrice = detailPayload.price ?? liveQuote.price ?? stalePrice`. Une seule quote pour toute la chaîne close.
+
+**P1 — sérieux non bloquants**
+
+4. **Détection `stale` aveugle sur Yahoo.**
+   Yahoo posait `freshness:"live"` + `quotedAt: nowIso()` quel que soit l'âge réel. `quoteAgeSeconds` retournait 0 — impossible de flagger une donnée 15+ min vieille servie par Yahoo cache upstream (cas observé sur ASML.AS, MC.PA).
+   **Fix** : nouveaux helpers `detectYahooFreshness(payload)` (lit `exchangeDataDelayedBy` en minutes → renvoie `"delayed_15m"` / `"delayed"` / `"live"`) et `yahooQuotedAt(payload)` (lit `regularMarketTime` epoch seconds). Appliqués dans `getYahooBatchQuotes` et `getYahooQuoteFromChart`.
+
+5. **Latence cron Phase 2 fragile après B.7.1.**
+   `for (const symbol of allSymbols)` séquentiel avec `resolveLiveQuote` sans timeout — pour 17 EU stocks tous en fallback avec providers lents → potentiel dépassement du budget 25 s.
+   **Fix** : `withTimeout(resolveLiveQuote(...), 2500, ...)` + court-circuit direct EOD si `circuitIsOpen("yahoo") && circuitIsOpen("eodhd")` (hors crypto).
+
+6. **abnormalSpread silencieux si ATR absent.**
+   Une quote aberrante (split non appliqué, mauvais ticker résolu) avec moins de 14 bougies ou `atr === 0` voyait `abnormalSpread=false` automatique.
+   **Fix** : fallback en pourcentage brut (15 % non-crypto / 30 % crypto) sur `lastClose` quand ATR indispo. Champ `spreadPct` exposé dans le retour.
+
+**P2 — hygiène**
+
+7. **Race KV cross-worker pouvait downgrade une quote plus fraîche.**
+   **Fix** : `writeLiveQuoteToKv` compare le `quotedAt` existant (s'il est encore frais) au nouveau ; refuse l'écrasement si l'existant est plus récent.
+
+8. **snapshotId déterministe pour différentes représentations temporelles.**
+   `buildSnapshotId` faisait `String(candlesAt || "")` — un même candle passé en epoch sec, epoch ms et ISO produisait 3 hash différents.
+   **Fix** : nouveau helper `normalizeSnapshotTime(v)` qui canonicalise tout en ISO. Appliqué aux 3 champs temporels avant le hash.
+
+9. **evaluateExecutionSafety perdait les causes secondaires.**
+   `currencyMismatch + stale` ne remontaient que `currency_mismatch` ; safety-stats ne voyait pas la cause #2.
+   **Fix** : retour augmenté `{ safe, code, reasons[], human, missing }`. `code` reste le premier élément de `reasons[]` pour compatibilité B.9.1. Log `auto_close_blocked_unsafe` enrichi avec `reasons:[...]`.
+
+### Front (`assets/app.js`)
+
+10. `validationStatusLabel` et `reasonLabel` reconnaissent `"eod_snapshot"` → "snapshot EOD" / "prix de clôture veille".
+11. `quoteQualityState` traite `src === "snapshot" || qq.validationStatus === "eod_snapshot"` AVANT le check `providerConfidence === "unsafe"` pour préserver l'UX d'origine (tone `warn` "Dernier prix dispo", pas `negative` "Prix non fiable").
+
+### Tests effectués
+
+- `node --check cloudflare-worker/worker.js` PASS
+- `node --check assets/app.js` PASS
+- 2 passes bug-hunter (mi-session et fin) — aucune des 6 classes de bugs UI introduite, cohérence cross-modules vérifiée.
+- Aucune modification : schema Supabase, format API public, dépendances, comportement delayed/marketClosed, scoring stratégique, RR, learning, providers crypto.
+
+### Risques résiduels après patch
+
+- **Race KV résiduelle** sur cold-start simultané : deux workers initialement vides peuvent encore servir deux prix différents pendant la fenêtre 30 s. Anti-downgrade limite mais n'élimine pas. Documenté.
+- **`quoteAgeSeconds` null si provider omet `quotedAt`** : `normalizeLiveQuote` force `null` si absent → stale ne fire pas sur ageSec. Couvert pour Yahoo après P1.1, mais latent pour tout futur provider non instrumenté.
+- **Cache `opportunities:snapshot` KV TTL 300 s** : le gate auto-open lit `liveContext.quoteQuality` figé à T-5min. Si la quote s'est dégradée entre temps, la gate reste sur ancien diagnostic. Acceptable en paper.
+- **Mode manuel UI non gated** : par design (utilisateur souverain). À surveiller si on ajoute un broker réel.
+
+### Verdict après B.10
+
+**SAFE pour paper trading.** Le bot ne peut plus :
+- ouvrir une position sur un snapshot EOD,
+- exécuter un close sur une quote unsafe (gate avant tracker),
+- traiter Yahoo comme universellement live (vraie fraîcheur lue depuis le payload),
+- diverger entre quote validée et quote utilisée au close.
+
+**Argent réel** : encore NO GO tant que (a) la race KV cold-start n'est pas verrouillée, (b) le mode manuel UI n'a pas son propre gate de confirmation, (c) les risques résiduels ci-dessus ne sont pas adressés. Mais la fondation est désormais propre.
 
 ---
 

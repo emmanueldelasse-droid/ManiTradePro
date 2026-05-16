@@ -856,6 +856,34 @@ async function callTwelveJson(path, env, seed = "", ctx = null) {
 // ============================================================
 // YAHOO BATCH — source principale pour les quotes non-crypto
 // ============================================================
+// P1.1 — Yahoo signe le retard de la quote via `exchangeDataDelayedBy`
+// (en MINUTES, payload v8 chart) ou `exchangeDelay` (rare). Sans ça,
+// quoteQualityEngine voyait quotedAt=nowIso() + freshness="live" sur
+// tous les EU stocks et ne pouvait jamais flagger une donnée 15+ min
+// vieille servie par Yahoo. Retourne "delayed_15m" / "delayed" / "live".
+function detectYahooFreshness(payload) {
+  // `exchangeDataDelayedBy` est en minutes (Yahoo v7 et v8). On accepte
+  // aussi `exchangeDelay` (secondes) au cas où Yahoo renomme le champ.
+  const delayMinRaw = Number(payload?.exchangeDataDelayedBy);
+  const delaySecRaw = Number(payload?.exchangeDelay);
+  const delaySec = Number.isFinite(delayMinRaw) && delayMinRaw > 0
+    ? delayMinRaw * 60
+    : (Number.isFinite(delaySecRaw) && delaySecRaw > 0 ? delaySecRaw : 0);
+  if (delaySec >= 15 * 60) return "delayed_15m";
+  if (delaySec > 0) return "delayed";
+  return "live";
+}
+
+// Convertit `regularMarketTime` Yahoo (epoch seconds) en ISO 8601. Renvoie
+// nowIso() en dernier recours pour ne pas casser le format quote.
+function yahooQuotedAt(payload, nowFallback) {
+  const t = Number(payload?.regularMarketTime);
+  if (Number.isFinite(t) && t > 0) {
+    return new Date(t * 1000).toISOString();
+  }
+  return nowFallback || nowIso();
+}
+
 async function getYahooBatchQuotes(symbols) {
   if (!symbols.length) return {};
 
@@ -890,8 +918,9 @@ async function getYahooBatchQuotes(symbols) {
           currency: row.currency || "USD",
           eurusdRate: null, // sera rempli si disponible
           sourceUsed: "yahoo",
-          freshness: "live",
-          quotedAt: nowIso()
+          // P1.1 — fraîcheur réelle issue du payload Yahoo, pas figée "live".
+          freshness: detectYahooFreshness(row),
+          quotedAt: yahooQuotedAt(row)
         };
       }
       // On ne reset le compteur d'echecs que si Yahoo a renvoyé au moins
@@ -951,8 +980,9 @@ async function getYahooQuoteFromChart(symbol) {
       volume24h: Number.isFinite(Number(meta?.regularMarketVolume)) ? Number(meta?.regularMarketVolume) : null,
       currency: meta.currency || (isForex(symbol) ? symbol.slice(3, 6) : "USD"),
       sourceUsed: "yahoo",
-      freshness: "live",
-      quotedAt: nowIso()
+      // P1.1 — fraîcheur réelle issue du payload Yahoo, pas figée "live".
+      freshness: detectYahooFreshness(meta),
+      quotedAt: yahooQuotedAt(meta)
     };
   } catch (e) {
     recordFailure("yahoo");
@@ -1804,6 +1834,20 @@ async function writeLiveQuoteToKv(symbol, quote, env) {
   if (!env?.MTP_CACHE) return false;
   if (!quote || !Number.isFinite(Number(quote.price))) return false;
   try {
+    // P2.1 — anti-downgrade. Une race cross-worker peut amener un worker
+    // lent à écraser le KV avec une quote plus ancienne que celle déjà
+    // présente. Si l'existant a un quotedAt strictement plus récent ET un
+    // cachedAt encore frais (< LIVE_QUOTE_FRESH_MS), on garde l'existant.
+    const existing = await kvGet(`kv:livequote:${symbol}`, env);
+    if (existing && typeof existing === "object" && existing.quote) {
+      const existingAge = Date.now() - Number(existing.cachedAt || 0);
+      const existingFresh = Number.isFinite(existingAge) && existingAge >= 0 && existingAge <= LIVE_QUOTE_FRESH_MS;
+      const existingTs = Date.parse(existing.quote?.quotedAt || "");
+      const newTs = Date.parse(quote?.quotedAt || "");
+      if (existingFresh && Number.isFinite(existingTs) && Number.isFinite(newTs) && existingTs > newTs) {
+        return false;
+      }
+    }
     return await kvSet(`kv:livequote:${symbol}`, { quote, cachedAt: Date.now() }, LIVE_QUOTE_KV_TTL_SEC, env);
   } catch { return false; }
 }
@@ -2647,14 +2691,33 @@ function fnv1a32(str) {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
+// P2.2 — Normalise n'importe quelle représentation temporelle en chaîne ISO
+// canonique avant de la mixer dans le snapshotId. Sans ça, un même candle
+// passé une fois en epoch seconds, une autre en epoch ms, une troisième en
+// ISO produisait trois snapshotId différents pour la même analyse.
+// Renvoie "" si la valeur est nulle / non parsable (déterministe).
+function normalizeSnapshotTime(v) {
+  if (v == null || v === "") return "";
+  if (typeof v === "number") {
+    if (!Number.isFinite(v) || v <= 0) return "";
+    return new Date(v > 1e12 ? v : v * 1000).toISOString();
+  }
+  if (typeof v === "string") {
+    const t = Date.parse(v);
+    if (Number.isFinite(t)) return new Date(t).toISOString();
+    return v; // chaîne déjà déterministe non parsable — on la garde brute
+  }
+  return "";
+}
+
 function buildSnapshotId({ symbol, timeframe = "1d", analysisType = "strategic", candlesAt = null, regimeAt = null, learningAt = null } = {}) {
   const parts = [
     String(symbol || ""),
     String(timeframe || ""),
     String(analysisType || ""),
-    String(candlesAt || ""),
-    String(regimeAt || ""),
-    String(learningAt || "")
+    normalizeSnapshotTime(candlesAt),
+    normalizeSnapshotTime(regimeAt),
+    normalizeSnapshotTime(learningAt)
   ];
   return fnv1a32(parts.join("|"));
 }
@@ -2733,6 +2796,9 @@ function providerConfidenceForSource(sourceUsed, freshness) {
   if (src === "yahoo" || src === "yahoo_chart") return fresh === "live" ? "high" : "medium";
   if (src === "twelve" || src === "twelvedata") return "medium";
   if (src === "alphavantage" || src === "alpha") return "medium";
+  // P0.1 — snapshot/EOD = filet ultime de bougie close, JAMAIS exécutable.
+  // Côté UI reste affichable ("Dernier prix dispo"), côté safety gate non.
+  if (src === "snapshot") return "unsafe";
   if (!src) return "unsafe";
   return "low";
 }
@@ -2760,6 +2826,13 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
 
   const marketClosed = isMarketLikelyClosed(sym, cls, expectedCurrency || quoteCurrency, now);
   const ageSec = quoteAgeSeconds(quote?.quotedAt, now);
+
+  // SNAPSHOT EOD — vague P0.1. Une quote issue du filet ultime (sourceUsed
+  // "snapshot" ou freshness "eod") est le close de la veille servi quand
+  // tous les providers live ont échoué. Affichable côté UI ("Dernier prix
+  // dispo"), MAIS jamais exécutable côté safety gate. Le drapeau remonte
+  // dans reasons[] et bloque executionSafe.
+  const isSnapshot = freshness === "eod" || sourceUsed === "snapshot";
 
   // DELAYED — distinct de stale. Provider legalement differe (ex. EODHD EU).
   // Calcule AVANT stale (vague B.6.1) pour permettre au seuil stale de
@@ -2792,17 +2865,27 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
 
   // ABNORMAL SPREAD — ecart livePrice vs derniere close en multiples d'ATR.
   // Detecte quote aberrante / split non applique / mauvais symbole resolu.
+  // P1.3 — si ATR indisponible (moins de 14 bougies ou atr <= 0) on bascule
+  // sur un seuil en pourcentage brut (15% non-crypto, 30% crypto). Avant ce
+  // fallback, l'absence d'ATR rendait silencieusement executionSafe pour des
+  // splits non appliqués ou des symboles mal résolus.
   let abnormalSpread = false;
   let spreadDeltaAtr = null;
-  if (Number.isFinite(livePrice) && Array.isArray(candles) && candles.length >= 14) {
+  let spreadPct = null;
+  if (Number.isFinite(livePrice) && Array.isArray(candles) && candles.length >= 1) {
     const lastClose = Number(candles[candles.length - 1]?.close);
-    const atr = averageRange(candles, 14);
-    if (Number.isFinite(lastClose) && Number.isFinite(atr) && atr > 0) {
+    const atr = candles.length >= 14 ? averageRange(candles, 14) : NaN;
+    if (Number.isFinite(lastClose) && lastClose > 0) {
       const delta = Math.abs(livePrice - lastClose);
-      spreadDeltaAtr = +(delta / atr).toFixed(2);
-      // Seuil : >3*ATR. Crypto peut bouger plus fort, on tolere 5*ATR.
-      const threshold = cls === "crypto" ? 5 : 3;
-      if (spreadDeltaAtr > threshold) abnormalSpread = true;
+      if (Number.isFinite(atr) && atr > 0) {
+        spreadDeltaAtr = +(delta / atr).toFixed(2);
+        const threshold = cls === "crypto" ? 5 : 3;
+        if (spreadDeltaAtr > threshold) abnormalSpread = true;
+      } else {
+        spreadPct = +(delta / lastClose).toFixed(4);
+        const pctThreshold = cls === "crypto" ? 0.30 : 0.15;
+        if (spreadPct > pctThreshold) abnormalSpread = true;
+      }
     }
   }
 
@@ -2819,14 +2902,25 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   if (!Number.isFinite(livePrice) || livePrice <= 0) { executionSafe = false; reasons.push("no_price"); }
   if (stale) { executionSafe = false; reasons.push("stale"); for (const r of staleReasons) reasons.push("stale:" + r); }
   if (currencyMismatch) { executionSafe = false; reasons.push("currency_mismatch"); }
-  if (abnormalSpread) { executionSafe = false; reasons.push(`abnormal_spread:${spreadDeltaAtr}atr`); }
+  if (abnormalSpread) {
+    executionSafe = false;
+    if (spreadDeltaAtr != null) reasons.push(`abnormal_spread:${spreadDeltaAtr}atr`);
+    else if (spreadPct != null) reasons.push(`abnormal_spread:${(spreadPct * 100).toFixed(1)}pct`);
+    else reasons.push("abnormal_spread");
+  }
   if (providerConfidence === "unsafe") { executionSafe = false; reasons.push("provider_unsafe"); }
+  // P0.1 — snapshot/EOD pas exécutable. Drapeau distinct dans reasons[] pour
+  // que safety-stats (B.9.1) puisse compter les blocages dus au filet EOD.
+  if (isSnapshot) { executionSafe = false; reasons.push("eod_snapshot"); }
   if (delayed) reasons.push("delayed");
   if (marketClosed) reasons.push("market_closed");
 
   // VALIDATION STATUS — 1ere raison disqualifiante par ordre de gravite.
+  // eod_snapshot remonte tout en haut : si c'est juste un snapshot sans autre
+  // anomalie, c'est l'info la plus utile pour l'UI et le journal.
   let validationStatus = "valid";
-  if (currencyMismatch) validationStatus = "currency_mismatch";
+  if (isSnapshot) validationStatus = "eod_snapshot";
+  else if (currencyMismatch) validationStatus = "currency_mismatch";
   else if (stale) validationStatus = "stale";
   else if (abnormalSpread) validationStatus = "abnormal_spread";
   else if (providerConfidence === "unsafe") validationStatus = "unsafe";
@@ -2843,6 +2937,7 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   if (delayed) trustScore -= 10;
   if (currencyMismatch) trustScore -= 70;
   if (abnormalSpread) trustScore -= 40;
+  if (isSnapshot) trustScore -= 50;
   trustScore = Math.max(0, Math.min(100, trustScore));
 
   return {
@@ -2856,9 +2951,11 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
     executionSafe,
     validationStatus,
     reasons,
+    isSnapshot,
     // metadata utile pour debug / audit
     ageSec,
     spreadDeltaAtr,
+    spreadPct,
     expectedCurrency,
     quoteCurrency
   };
@@ -2894,33 +2991,47 @@ function evaluateExecutionSafety(payload) {
     return {
       safe: false,
       code: "quote_quality_missing",
+      reasons: ["quote_quality_missing"],
       human: "Diagnostic quote indisponible — blocage par prudence",
       missing: true
     };
   }
   if (qq.executionSafe === true) {
-    return { safe: true, code: "ok", human: null, missing: false };
+    return { safe: true, code: "ok", reasons: [], human: null, missing: false };
   }
-  // executionSafe === false : on remonte la cause la plus grave en premier
-  // pour que le journal soit lisible. L'ordre suit validationStatus de
-  // quoteQualityEngine (cf. worker.js:2827-2834).
-  if (qq.currencyMismatch === true) {
-    return { safe: false, code: "currency_mismatch", human: "Devise incohérente — blocage exécution", missing: false };
-  }
-  if (qq.stale === true) {
-    return { safe: false, code: "stale", human: "Prix live périmé — blocage exécution", missing: false };
-  }
-  if (qq.abnormalSpread === true) {
-    return { safe: false, code: "abnormal_spread", human: "Écart anormal vs dernière clôture — blocage exécution", missing: false };
-  }
-  if (qq.providerConfidence === "unsafe") {
-    return { safe: false, code: "provider_unsafe", human: "Fournisseur de prix non fiable — blocage exécution", missing: false };
-  }
-  if (Array.isArray(qq.reasons) && qq.reasons.includes("no_price")) {
-    return { safe: false, code: "no_price", human: "Prix absent — blocage exécution", missing: false };
-  }
-  // Fallback générique : executionSafe=false sans drapeau spécifique connu.
-  return { safe: false, code: "quote_unsafe", human: "Prix live non fiable — blocage exécution", missing: false };
+  // P2.3 — multi-reasons. `code` reste la cause principale (premier élément)
+  // pour ne casser ni les logs `auto_open_blocked_unsafe` /
+  // `auto_close_blocked_unsafe` ni les compteurs safety-stats (B.9.1). Les
+  // raisons secondaires sont préservées pour audit. Ordre = gravité
+  // décroissante. eod_snapshot remonte en tête : si c'est juste le filet
+  // EOD, c'est l'info la plus actionable pour le journal.
+  const qqReasons = Array.isArray(qq.reasons) ? qq.reasons : [];
+  const reasons = [];
+  if (qqReasons.includes("eod_snapshot") || qq.isSnapshot === true) reasons.push("eod_snapshot");
+  if (qq.currencyMismatch === true) reasons.push("currency_mismatch");
+  if (qq.stale === true) reasons.push("stale");
+  if (qq.abnormalSpread === true) reasons.push("abnormal_spread");
+  if (qq.providerConfidence === "unsafe" && !reasons.includes("eod_snapshot")) reasons.push("provider_unsafe");
+  if (qqReasons.includes("no_price")) reasons.push("no_price");
+  if (!reasons.length) reasons.push("quote_unsafe");
+
+  const code = reasons[0];
+  const humanByCode = {
+    eod_snapshot: "Snapshot EOD — pas d'exécution sur prix de clôture",
+    currency_mismatch: "Devise incohérente — blocage exécution",
+    stale: "Prix live périmé — blocage exécution",
+    abnormal_spread: "Écart anormal vs dernière clôture — blocage exécution",
+    provider_unsafe: "Fournisseur de prix non fiable — blocage exécution",
+    no_price: "Prix absent — blocage exécution",
+    quote_unsafe: "Prix live non fiable — blocage exécution"
+  };
+  return {
+    safe: false,
+    code,
+    reasons,
+    human: humanByCode[code] || "Prix live non fiable — blocage exécution",
+    missing: false
+  };
 }
 
 function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8, learningContext = null) {
@@ -4116,18 +4227,34 @@ async function handleOpportunities(_url, env) {
       // EOD perime tandis que la fiche actif via resolveLiveQuote tombait
       // sur EODHD differe 15 min => deux prix differents (cf. bug BMW.DE).
       //
-      // Nouvel ordre :
+      // Ordre :
       //   1. quotesMap[symbol] (Phase 1 batch)
       //   2. cache memoire `market:snapshot:${symbol}` (intra-worker)
       //   3. resolveLiveQuote (cascade memoire / KV partage / providers live)
+      //      — withTimeout 2500 ms (P1.2) pour tenir le budget cron 25 s
       //   4. getStoredDailyQuoteFallback (filet ultime, snapshot EOD veille)
       //   5. partial/unavailable
+      //
+      // P1.2 — court-circuit : si les circuits Yahoo ET EODHD sont déjà
+      // ouverts (panne avérée), on saute resolveLiveQuote pour aller direct
+      // au filet EOD. Évite N appels providers garantis KO qui mangent le
+      // budget. Crypto exclu car Binance est le seul provider et son circuit
+      // est traité séparément.
       if (!quote) {
-        try {
-          quote = await resolveLiveQuote(symbol, env, ctx, { allowAlphaFallback: false });
-        } catch {
-          // resolveLiveQuote a echoue (tous providers KO ou KV indispo).
-          // On tente le filet EOD juste apres.
+        const yahooDown = circuitIsOpen("yahoo");
+        const eodhdDown = circuitIsOpen("eodhd");
+        const allMajorsDown = !isCrypto(symbol) && yahooDown && eodhdDown;
+        if (!allMajorsDown) {
+          try {
+            quote = await withTimeout(
+              resolveLiveQuote(symbol, env, ctx, { allowAlphaFallback: false }),
+              2500,
+              `resolve_quote:${symbol}`
+            );
+          } catch {
+            // resolveLiveQuote a echoue (timeout, providers KO ou KV indispo).
+            // On tente le filet EOD juste apres.
+          }
         }
       }
       if (!isCrypto(symbol) && !quote) {
@@ -4607,55 +4734,39 @@ async function handleTrainingAutoCycle(env) {
           let liveQuote = null;
           let detailPayload = null;
           let quoteError = null;
-          try { liveQuote = await withTimeout(resolveUnifiedMarketQuote(symbol, env, null), 6000, `quote:${symbol}`); }
+          // P0.3 — passe par resolveLiveQuote (cache KV partagé) pour que la
+          // quote validée par la safety gate soit la même que celle utilisée
+          // par buildStableMarketPayload (alignement detailPayload ↔ trigger).
+          try { liveQuote = await withTimeout(resolveLiveQuote(symbol, env, null), 6000, `quote:${symbol}`); }
           catch (e) { quoteError = e?.message || "quote_failed"; }
           try { detailPayload = await withTimeout(buildStableMarketPayload(symbol, env, null, true), 8000, `detail:${symbol}`); } catch {}
 
-          // Prix effectif pour le check stop/TP : chaîne 3 niveaux pour
-          // éviter qu'une indispo de quote provider gèle silencieusement les
-          // fermetures (bug observé : V opened 02/05 stop touché, mais
-          // Twelve+Yahoo+Alpha tous KO sur ce symbole, position bloquée 10+
-          // jours).
-          //
-          // Ordre IMPORTANT : stalePrice (= position.live.lastPrice, dernier
-          // fetch temps réel réussi, vieux de quelques heures au pire) passe
-          // AVANT detailPayload.price (qui fallback sur getStoredDailyQuoteFallback
-          // = bougie daily stockée, potentiellement vieille de plusieurs jours
-          // et donc moins représentative du prix intra-day actuel).
-          //
-          // Cas V : stalePrice=309,94 (hier soir 20:46), detailPayload.price=~328
-          // (close daily du 02/05). 309,94 < stop 311,84 → close. 328 > stop →
-          // pas de close. L'ordre détermine si V se ferme ou pas.
+          // P0.3 — effectivePrice basé sur detailPayload (la même quote dont
+          // le liveContext.quoteQuality vient d'être validé par la gate). Le
+          // fallback liveQuote.price puis stalePrice reste pour les cas où
+          // detailPayload manque ou n'a pas réussi à scorer. Le commentaire
+          // historique « stalePrice avant detailPayload car detailPayload
+          // fallback EOD » est obsolète : buildStableMarketPayload utilise
+          // désormais resolveLiveQuote (B.7) qui ne descend PAS au filet EOD
+          // (filet EOD est branché uniquement dans handleOpportunities Phase 2).
           const stalePrice = finiteOrNull(position?.live?.lastPrice);
-          const effectivePrice = finiteOrNull(liveQuote?.price)
+          const effectivePrice = finiteOrNull(detailPayload?.price)
+            ?? finiteOrNull(liveQuote?.price)
             ?? stalePrice
-            ?? finiteOrNull(detailPayload?.price)
             ?? null;
-          const priceSource = Number.isFinite(liveQuote?.price) ? "live"
+          const priceSource = Number.isFinite(detailPayload?.price) ? "detail"
+            : Number.isFinite(liveQuote?.price) ? "live"
             : Number.isFinite(stalePrice) ? "stale"
-            : Number.isFinite(detailPayload?.price) ? "detail"
             : null;
 
-          // Devise du live : nécessaire pour éviter de mélanger les devises
-          // dans le tracker intra-trade. Le worker peut basculer de provider
-          // (Yahoo USD → Twelve EUR par ex.) entre deux cycles ; sans ce tag
-          // on enregistrerait silencieusement un prix EUR dans une position
-          // ouverte en USD et le stop sauterait à tort.
-          const livePriceCurrency = String(liveQuote?.currency || "").toUpperCase();
+          // Devise pour le check tracker / trigger. detailPayload est la
+          // source canonique ; liveQuote en secours.
+          const livePriceCurrency = String(
+            detailPayload?.currency || liveQuote?.currency || ""
+          ).toUpperCase();
           const positionEntryCurrency = String(position?.currency || "").toUpperCase();
           const currencyMatches = !positionEntryCurrency || !livePriceCurrency
             || positionEntryCurrency === livePriceCurrency;
-
-          // PR #5 Phase 2 — tracker MAE/MFE en continu, même si pas de clôture ce cycle.
-          // On ne met à jour le tracker QUE si la devise correspond — sinon
-          // on injecterait un prix dans une autre devise dans highSinceOpen /
-          // lowSinceOpen, ce qui pollue ensuite le check stop.
-          const excursion = currencyMatches
-            ? updatePositionIntraExcursion(position, effectivePrice)
-            : { changed: false };
-          if (excursion.changed) {
-            await persistPositionIntraExcursion(env, position, excursion);
-          }
 
           if (effectivePrice == null) {
             // Aucune source de prix dispo → on logge pour que ça remonte dans
@@ -4669,22 +4780,18 @@ async function handleTrainingAutoCycle(env) {
             return;
           }
 
-          // Vague B.9 — safety gate execution (cote fermeture). Bloque
-          // l'auto-close si la quote sur laquelle on baserait la decision
-          // n'est pas fiable. Mieux vaut differer le declench TP/SL d'un
-          // cycle que d'executer sur une quote periemee / currency mismatch /
-          // ecart anormal. La position reste OPEN, le tracker MAE/MFE continue
-          // d'etre mis a jour au-dessus (avec le check currencyMatches), et le
-          // prochain cycle reverifiera. Aucune perte de signal : si le stop
-          // etait deja touche en intraday, position.live.lowSinceOpen aura
-          // garde la trace et le close se declenchera au cycle suivant des
-          // que la quote redevient fiable.
+          // P0.2 — safety gate AVANT le tracker MAE/MFE. Une quote unsafe
+          // (abnormal_spread, stale, eod_snapshot, currency_mismatch) ne doit
+          // PAS polluer highSinceOpen / lowSinceOpen, qui sont persistés en
+          // BDD et peuvent provoquer un faux close intraday au cycle suivant.
+          // delayed et marketClosed ne bloquent pas (cf. règles B.6).
           const closeSafety = evaluateExecutionSafety(detailPayload);
           if (!closeSafety.safe) {
             await logTrainingEvent(env, "auto_close_blocked_unsafe", {
               symbol,
               position_id: position?.id || null,
               code: closeSafety.code,
+              reasons: closeSafety.reasons || [closeSafety.code],
               human: closeSafety.human,
               missing_quote_quality: closeSafety.missing === true,
               effective_price: effectivePrice,
@@ -4693,13 +4800,23 @@ async function handleTrainingAutoCycle(env) {
             return;
           }
 
+          // PR #5 Phase 2 — tracker MAE/MFE en continu (gate passée).
+          // Conditionné à currencyMatches pour ne jamais injecter un prix
+          // d'une autre devise dans highSinceOpen / lowSinceOpen.
+          const excursion = currencyMatches
+            ? updatePositionIntraExcursion(position, effectivePrice)
+            : { changed: false };
+          if (excursion.changed) {
+            await persistPositionIntraExcursion(env, position, excursion);
+          }
+
           const trigger = trainingCloseTrigger(
             position,
             effectivePrice,
             detailPayload,
             settings,
             {
-              source: isCrypto(symbol) ? "binance" : (liveQuote?.sourceUsed || "twelve"),
+              source: isCrypto(symbol) ? "binance" : (detailPayload?.sourceUsed || liveQuote?.sourceUsed || "twelve"),
               currency: livePriceCurrency || null
             }
           );
@@ -6215,12 +6332,12 @@ async function handleTrainingSafetyStats(url, env) {
     : 20;
   const cutoffIso = new Date(Date.now() - windowHours * 3600 * 1000).toISOString();
 
-  // Codes connus produits par evaluateExecutionSafety (cf. worker.js B.9).
-  // On les pre-declare a zero pour que la reponse soit deterministe meme
-  // si la fenetre n'a vu aucun blocage.
+  // Codes connus produits par evaluateExecutionSafety (cf. worker.js B.9
+  // + P0.1 eod_snapshot). On les pre-declare a zero pour que la reponse
+  // soit deterministe meme si la fenetre n'a vu aucun blocage.
   const knownCodes = [
     "stale", "currency_mismatch", "abnormal_spread", "provider_unsafe",
-    "no_price", "quote_unsafe", "quote_quality_missing"
+    "no_price", "quote_unsafe", "quote_quality_missing", "eod_snapshot"
   ];
   const byCode = Object.fromEntries(knownCodes.map(k => [k, 0]));
 
