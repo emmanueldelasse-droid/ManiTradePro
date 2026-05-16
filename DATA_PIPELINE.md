@@ -489,3 +489,70 @@ Garde-fou anti-mismatch : si la devise d'un live quote ≠ devise de l'entry d'u
 
 - Les durées de cache citées sont prises du code actuel mais peuvent être ajustées par un commit non documenté ici. À recroiser avec `cloudflare-worker/worker.js` si doute.
 - Les écrans front décrits sont les routes actuelles documentées dans `assets/app.js`. Toute nouvelle route doit être ajoutée à `ARCHITECTURE.md` et à ce fichier.
+
+---
+
+## Vague B.10 — flux post-durcissement (mai 2026)
+
+### Yahoo : fraîcheur lue depuis le payload
+
+Pour toute requête Yahoo (v7 batch ou v8 chart) :
+
+```
+quotedAt  = new Date(payload.regularMarketTime * 1000).toISOString()   (fallback nowIso si absent)
+freshness = exchangeDataDelayedBy >= 15 min ? "delayed_15m"
+          : exchangeDataDelayedBy > 0       ? "delayed"
+          :                                   "live"
+```
+
+Conséquence : `quoteQualityEngine` peut désormais flagger `stale` sur Yahoo (impossible avant B.10).
+
+### Cycle close — ordre canonique
+
+```
+resolveLiveQuote(symbol)            ──► liveQuote
+buildStableMarketPayload(symbol)    ──► detailPayload (utilise resolveLiveQuote en interne, même quote)
+effectivePrice = detailPayload.price ?? liveQuote.price ?? position.live.lastPrice
+
+evaluateExecutionSafety(detailPayload)   ◄── GATE ICI
+    └── safe=false → log auto_close_blocked_unsafe + return
+    └── safe=true → continue
+
+updatePositionIntraExcursion(position, effectivePrice)   ◄── tracker APRES gate
+persistPositionIntraExcursion(...)
+trainingCloseTrigger(...)
+```
+
+Le tracker MAE/MFE n'est jamais alimenté avec une quote `executionSafe=false`. Pas de pollution `highSinceOpen` / `lowSinceOpen` qui causait des faux close intraday avant B.10.
+
+### handleOpportunities Phase 2 — court-circuit EOD
+
+```
+quote = quotesMap[symbol] || memCache market:snapshot:${symbol}
+if (!quote) {
+  if (yahoo_circuit_open AND eodhd_circuit_open AND !crypto) {
+    quote = getStoredDailyQuoteFallback(symbol, env)   ◄── direct, pas de provider tenté
+  } else {
+    quote = withTimeout(resolveLiveQuote(symbol), 2500ms)
+  }
+}
+if (!quote) quote = getStoredDailyQuoteFallback(symbol, env)
+```
+
+Évite N appels providers garantis KO qui mangeaient le budget cron 25 s.
+
+### KV `kv:livequote:${symbol}` — anti-downgrade
+
+`writeLiveQuoteToKv` lit l'entrée existante avant d'écrire. Si l'existant est encore frais (< 30 s) ET son `quotedAt` est strictement plus récent que la nouvelle quote, l'écriture est refusée. Protège des races cross-worker où un worker lent finit après un worker rapide avec des données plus anciennes.
+
+### `quoteQuality` augmenté (sortie de `quoteQualityEngine`)
+
+Nouveaux champs exposés dans `liveContext.quoteQuality` :
+- `isSnapshot: boolean` — `true` si `sourceUsed === "snapshot"` ou `freshness === "eod"`. Force `executionSafe=false`.
+- `spreadPct: number|null` — pourcentage brut |livePrice - lastClose| / lastClose, utilisé en fallback si ATR indispo.
+
+Le format `reasons[]` peut désormais contenir `"eod_snapshot"` en plus des 7 codes B.9 existants. `validationStatus` peut valoir `"eod_snapshot"`.
+
+### `evaluateExecutionSafety` augmenté
+
+Retour augmenté `{ safe, code, reasons[], human, missing }`. `code` reste le premier élément de `reasons[]` pour préserver le format des événements `auto_open_blocked_unsafe` / `auto_close_blocked_unsafe` (B.9) et les compteurs `byCode` de safety-stats (B.9.1). Les raisons secondaires sont préservées dans `reasons[]` et loggées dans les events.

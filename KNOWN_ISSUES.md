@@ -217,6 +217,30 @@ Suite à la refonte horaires de bourse, la fonction `pad(n)` définie localement
 
 ---
 
+### #12 🟡 Race KV cross-worker au cold-start (résiduelle)
+
+**Description**
+Le cache `kv:livequote:${symbol}` partagé (vague B.7) élimine le bug originel BMW.DE pour la majorité des requêtes, mais un cold-start simultané de deux workers vides peut encore produire deux fetches providers en parallèle et écrire deux quotes différentes dans la fenêtre 30 s. L'anti-downgrade ajouté en B.10 (P2.1) ne refuse que les écritures explicitement plus anciennes — il ne sérialise pas les écritures concurrentes.
+
+**Impact réel** : faible. Le pattern observé (BMW.DE 76,38 vs 74,58) ne peut survenir que si deux requêtes arrivent à 0 ms d'écart sur deux workers cold. En pratique, le mem cache + l'anti-downgrade limitent fortement la fenêtre.
+
+**Solution propre** : lock distribué KV (write-if-not-exists) ou single-flight pattern. Non trivial sur l'API Cloudflare KV actuelle. Pas planifié à court terme.
+
+---
+
+### #13 🟡 `quoteAgeSeconds` retourne null si `quotedAt` absent
+
+**Description**
+`normalizeLiveQuote` force `quote.quotedAt = null` si le provider ne le pose pas. `quoteAgeSeconds(null)` retourne `null`, et `quoteQualityEngine` n'a alors aucun moyen de calculer un âge → `stale` ne peut pas être déclenché par âge.
+
+Avant B.10, ce trou existait pour Yahoo (le provider posait `quotedAt = nowIso()`). B.10 P1.1 a corrigé pour Yahoo via `regularMarketTime`. Le risque reste latent pour tout futur provider mal instrumenté.
+
+**Impact réel** : moyen latent. Les 5 providers actuels (Binance, EODHD, Yahoo, Twelve, AlphaVantage) sont OK. Mais un nouveau provider intégré sans `quotedAt` rouvrirait silencieusement le trou.
+
+**Solution future** : forcer `quotedAt` non-null à l'entrée de `quoteQualityEngine` (ou marquer la quote `executionSafe=false` si `quotedAt` manque). À considérer si on intègre un nouveau provider.
+
+---
+
 ## Issues résolues récemment
 
 | Description | Résolu par | Note |
