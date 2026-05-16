@@ -10584,10 +10584,19 @@ async function validateSymbolOnProviders(symbol, assetClass, env, ctx) {
       // bien dispo. On accepte le symbole si on a au moins une bougie
       // daily — la fiche pourra calculer son analyse à partir des
       // bougies KV et utiliser Yahoo ou snapshot pour le prix live.
-      try {
-        const candles = await getEodhdCandles(s, "1d", 5, env, ctx).catch(() => null);
-        if (Array.isArray(candles) && candles.length > 0) return { provider: "eodhd" };
-      } catch {}
+      //
+      // Vague B.10.1 — garde explicite `circuitIsOpen("eodhd")`. Le 1er appel
+      // ci-dessus (getEodhdRealTimeBatchQuotes) a déjà pu déclencher 1
+      // recordFailure si EODHD est KO. Sans cette garde, le 2e appel
+      // (getEodhdCandles) déclenche un 2e recordFailure pour la même panne →
+      // le circuit s'ouvre sur une seule validation admin au lieu de deux.
+      // On respecte le seuil threshold:2 en évitant la double comptabilisation.
+      if (!circuitIsOpen("eodhd")) {
+        try {
+          const candles = await getEodhdCandles(s, "1d", 5, env, ctx).catch(() => null);
+          if (Array.isArray(candles) && candles.length > 0) return { provider: "eodhd" };
+        } catch {}
+      }
     }
     try {
       const qy = await getYahooQuote(s).catch(() => null);
