@@ -611,3 +611,109 @@ Rôle des nouveaux fichiers :
 
 Décision importante :
 `ASSET_REGISTRY.md` est provisoire. La vérité définitive devra venir du futur moteur `asset-quality-engine-v1.mjs`.
+
+---
+
+# TODO quant prioritaire
+
+## Priorité 1 — asset-quality-engine-v1
+
+Créer :
+
+`tools/backtests/asset-quality-engine-v1.mjs`
+
+Objectif :
+- lire les résultats JSON,
+- scorer les actifs,
+- produire :
+  - ELITE
+  - CORE
+  - TACTICAL
+  - BLACKLIST
+
+---
+
+## Priorité 2 — Walk-forward réel
+
+Mettre en place :
+- séparation train/test stricte,
+- validation séquentielle,
+- anti-overfit,
+- robustesse temporelle.
+
+---
+
+## Priorité 3 — Frictions réelles
+
+Ajouter :
+- slippage,
+- spread,
+- gaps,
+- frais,
+- liquidité.
+
+---
+
+## Priorité 4 — Allocation dynamique
+
+Construire le moteur d'allocation :
+- ELITE = allocation forte,
+- CORE = allocation normale,
+- TACTICAL = allocation réduite,
+- RISK_OFF = réduction exposition.
+
+---
+
+## Priorité 5 — Paper trading live automatique
+
+Valider :
+- stabilité live,
+- fréquence réelle,
+- drawdown réel,
+- comportement réel des setups.
+
+---
+
+## Priorité 6 — Universe maintenance
+
+Définir :
+- quand promouvoir un actif,
+- quand blacklist,
+- quand retirer un actif,
+- fréquence refresh universe.
+
+---
+
+## Priorité 7 — Regime Engine V2
+
+Étudier :
+- VIX fiable,
+- breadth,
+- volatility regime,
+- correlations,
+- macro risk.
+
+---
+
+## Priorité 8 — Risk Engine réel
+
+Ajouter :
+- max perte/jour,
+- max drawdown,
+- max exposition secteur,
+- max exposition crypto,
+- kill switch,
+- cooldown après pertes.
+
+---
+
+## Priorité 9 — Validation multi-univers
+
+Tester :
+- défensif,
+- value,
+- Europe,
+- commodities,
+- bonds.
+
+Objectif : déterminer si le moteur est universel ou spécialisé.
