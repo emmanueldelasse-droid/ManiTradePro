@@ -107,6 +107,24 @@ Si la PR est :
 
 ...alors l'auto-merge est OK (squash, titre `<scope>: <résumé> (#<num>)`). Sinon, demander l'OK utilisateur avant `merge_pull_request`.
 
+**Important** : l'auto-merge ci-dessus reste subordonné à la **gouvernance IA** (cf. section suivante). Pour toute PR non triviale, le `GO MERGE` explicite de ChatGPT est requis, quel que soit le statut "additif".
+
+---
+
+## Gouvernance IA — validation ChatGPT obligatoire
+
+Pour toute PR importante (touchant le moteur, les setups, la classification d'actifs, l'architecture, la quant, l'exécution), avant `merge_pull_request` :
+
+- [ ] Tous les fichiers `.md` impactés ont été mis à jour.
+- [ ] Les impacts quantitatifs ont été documentés.
+- [ ] Les impacts architecture ont été documentés.
+- [ ] Les risques potentiels ont été documentés.
+- [ ] Les diffs ont été fournis.
+- [ ] Validation ChatGPT obtenue.
+- [ ] `GO MERGE` explicite reçu.
+
+Cf. `GPT_ROLE.md` pour le rôle de chaque IA et le workflow complet.
+
 ---
 
 ## Mémo de fin

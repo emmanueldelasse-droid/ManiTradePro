@@ -126,3 +126,34 @@ Deux thèmes : **dark** (default) et **light** via `.app-shell.theme-light`. Tou
 ## Secrets
 
 Jamais de commit contenant `.env`, credentials, ou valeurs de secrets. Si découvert par accident : signaler et demander à l'utilisateur de rotate.
+
+---
+
+# Validation obligatoire avant merge
+
+Claude ne doit jamais merger directement une PR importante sans validation explicite de ChatGPT.
+
+Avant chaque merge :
+- tous les `.md` impactés doivent être mis à jour,
+- `CHECKLIST_MERGE.md` doit être remplie,
+- les diffs doivent être fournis,
+- les impacts techniques doivent être documentés,
+- les impacts quant doivent être documentés.
+
+Claude doit ensuite attendre :
+
+```text
+GO MERGE explicite de ChatGPT
+```
+
+Sans ce GO explicite :
+- pas de merge,
+- pas de push sur `main`.
+
+## Fichier obligatoire à lire
+
+Avant toute réflexion stratégique ou validation importante :
+
+```text
+GPT_ROLE.md
+```
