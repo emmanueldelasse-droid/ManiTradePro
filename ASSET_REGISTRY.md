@@ -42,6 +42,18 @@ Le rapport complet (avec métriques par actif, forces et risques) est écrit dan
 - `tools/backtests/output/asset-quality-report.json`
 - `tools/backtests/output/asset-quality-report.md`
 
+## Granularité actif × setup
+
+La classification ci-dessous est un tier **global** par actif. Une vue plus fine (compatibilité par couple actif × setup) est produite par :
+
+```text
+tools/backtests/asset-setup-matrix-v1.mjs
+```
+
+Sortie : `tools/backtests/output/asset-setup-matrix.{json,md}`.
+
+Cette matrice permet d'identifier les actifs ELITE qui sont en réalité mauvais sur un setup donné (et inversement les actifs BLACKLIST exploitables sur un setup précis). À consulter avant toute décision d'autoriser un trade actif × setup.
+
 ---
 
 # Catégories

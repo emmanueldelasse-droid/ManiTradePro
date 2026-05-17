@@ -12,9 +12,18 @@
 //
 // Usage : node tools/backtests/asset-quality-engine-v1.mjs
 
-import { readFile, readdir, writeFile, mkdir, stat } from "node:fs/promises";
+import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, basename, relative, resolve } from "node:path";
+
+import {
+  extractRecords,
+  listJsonFiles,
+  emptyBucket,
+  pushToBucket,
+  summarizeBucket,
+  pickCanonicalRecords,
+} from "./lib/backtest-records.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -24,7 +33,7 @@ const OUTPUT_JSON = join(OUTPUT_DIR, "asset-quality-report.json");
 const OUTPUT_MD = join(OUTPUT_DIR, "asset-quality-report.md");
 
 // Fichiers à ignorer côté input (sorties du moteur lui-même, données brutes)
-const SKIP_FILENAMES = new Set(["asset-quality-report.json"]);
+const SKIP_FILENAMES = new Set(["asset-quality-report.json", "asset-setup-matrix.json"]);
 
 // Seuils de score (cf. CLAUDE.md + spec asset-quality)
 const TIER_THRESHOLDS = {
@@ -32,289 +41,6 @@ const TIER_THRESHOLDS = {
   CORE: 65,
   TACTICAL: 50,
 };
-
-// Famille de setup déduite du nom de variant, setupId, ou nom de source en fallback
-function inferSetupFamily(record) {
-  const setupId = (record.setupId || "").toString().toUpperCase();
-  if (setupId) return setupId;
-  const variant = (record.variant || "").toString().toLowerCase();
-  if (variant.startsWith("rs_")) return "RELATIVE_STRENGTH_ROTATION";
-  if (variant.includes("breakout")) return "BREAKOUT_EXPANSION";
-  if (variant.includes("rsi") || variant.includes("pullback")) return "PULLBACK_MOMENTUM";
-  if (variant.includes("meanrev")) return "MEAN_REVERSION";
-  if (variant.includes("volcomp") || variant.includes("vol_comp")) return "VOLATILITY_COMPRESSION";
-  const source = (record.source || "").toString().toLowerCase();
-  if (source.includes("relative-strength") || source.includes("rotation")) return "RELATIVE_STRENGTH_ROTATION";
-  if (source.includes("breakout")) return "BREAKOUT_EXPANSION";
-  if (source.includes("pullback")) return "PULLBACK_MOMENTUM";
-  if (source.includes("meanrev")) return "MEAN_REVERSION";
-  return "UNKNOWN";
-}
-
-function toNumberOrNull(v) {
-  if (v === null || v === undefined || v === "") return null;
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-// Normalise un enregistrement brut (symbol + métriques) vers le format interne.
-// Retourne null si pas d'enregistrement exploitable.
-function normalizeRecord(raw, context) {
-  const symbol = (raw.symbol || "").toString().trim().toUpperCase();
-  if (!symbol) return null;
-  const trades = toNumberOrNull(raw.trades);
-  if (trades === null || trades <= 0) return null;
-  // winrate peut être en % (0-100) ou en ratio (0-1). On normalise en % (0-100).
-  let winrate = toNumberOrNull(raw.winrate);
-  if (winrate !== null && winrate > 0 && winrate <= 1) winrate = winrate * 100;
-  const record = {
-    symbol,
-    source: context.source,
-    setupFamily: inferSetupFamily({
-      setupId: raw.setupId || context.setupId,
-      variant: raw.variant || context.variant,
-      source: context.source,
-    }),
-    variant: raw.variant || context.variant || null,
-    regimeMode: raw.regimeMode || context.regimeMode || null,
-    year: raw.year || context.year || null,
-    trades,
-    wins: toNumberOrNull(raw.wins),
-    losses: toNumberOrNull(raw.losses),
-    winrate,
-    expectancy: toNumberOrNull(raw.expectancy),
-    profitFactor: toNumberOrNull(raw.profitFactor),
-    totalR: toNumberOrNull(raw.totalR),
-    totalPnl: toNumberOrNull(raw.totalPnl),
-    maxDrawdown: toNumberOrNull(raw.maxDrawdown),
-    longestLossStreak: toNumberOrNull(raw.longestLossStreak),
-  };
-  return record;
-}
-
-// Adaptateurs par shape : chacun retourne un tableau d'enregistrements normalisés.
-// Tous reçoivent (data, sourceLabel).
-
-function adaptShapeFlatArray(data, source) {
-  if (!Array.isArray(data)) return null;
-  if (!data.length) return [];
-  const first = data[0];
-  if (!first || typeof first !== "object") return null;
-  // Tableau plat de records par symbole — premier elt a "symbol" et pas "bySymbol"
-  if (first.symbol && !first.bySymbol) {
-    const out = [];
-    for (const raw of data) {
-      const rec = normalizeRecord(raw, { source });
-      if (rec) out.push(rec);
-    }
-    return out;
-  }
-  return null;
-}
-
-function adaptShapeVariantArrayWithBySymbol(data, source) {
-  // Tableau de variantes, chacune avec bySymbol[] (results-pullback-grid-2025)
-  if (!Array.isArray(data)) return null;
-  if (!data.length) return [];
-  const first = data[0];
-  if (!first || typeof first !== "object") return null;
-  if (!first.variant || !Array.isArray(first.bySymbol)) return null;
-  const out = [];
-  for (const variantBlock of data) {
-    for (const raw of variantBlock.bySymbol || []) {
-      const rec = normalizeRecord(raw, { source, variant: variantBlock.variant });
-      if (rec) out.push(rec);
-    }
-  }
-  return out;
-}
-
-function adaptShapeRsRotation(data, source) {
-  // { overall: { bySymbol: [{symbol, variant, ...}] }, yearly: { "2024": { bySymbol: [...] } } }
-  // Quand yearly existe, on n'émet QUE les records yearly (qui somment à overall).
-  // Pour les sources avec champ regimeMode, on tag chaque record mais on ne le
-  // déduplique pas ici — le dédoublonnage par mode régime se fait à l'agrégation.
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  if (!data.overall || typeof data.overall !== "object") return null;
-  const hasYearly = data.yearly && typeof data.yearly === "object" && Object.keys(data.yearly).length > 0;
-  const out = [];
-  const pushBySymbolArray = (arr, year) => {
-    if (!Array.isArray(arr)) return;
-    for (const raw of arr) {
-      const rec = normalizeRecord(raw, { source, year });
-      if (rec) out.push(rec);
-    }
-  };
-  if (hasYearly) {
-    for (const [year, block] of Object.entries(data.yearly)) {
-      if (block && Array.isArray(block.bySymbol)) pushBySymbolArray(block.bySymbol, year);
-    }
-  } else if (Array.isArray(data.overall.bySymbol)) {
-    pushBySymbolArray(data.overall.bySymbol, null);
-  }
-  return out.length > 0 ? out : null;
-}
-
-function adaptShapeMultiSetupGrid(data, source) {
-  // { overall: { bySymbolSetup: [{setupId, variant, symbol, ...}] }, yearly: {...} }
-  // Yearly prioritaire si présent (overall = somme des yearly).
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  const hasOverallBSS = data.overall && Array.isArray(data.overall.bySymbolSetup);
-  const hasYearlyBSS = data.yearly && Object.values(data.yearly).some(v => v && Array.isArray(v.bySymbolSetup));
-  if (!hasOverallBSS && !hasYearlyBSS) return null;
-  const out = [];
-  const pushBSS = (arr, year) => {
-    for (const raw of arr || []) {
-      const rec = normalizeRecord(raw, { source, year });
-      if (rec) out.push(rec);
-    }
-  };
-  if (hasYearlyBSS) {
-    for (const [year, block] of Object.entries(data.yearly)) {
-      if (block && Array.isArray(block.bySymbolSetup)) pushBSS(block.bySymbolSetup, year);
-    }
-  } else if (hasOverallBSS) {
-    pushBSS(data.overall.bySymbolSetup, null);
-  }
-  return out.length > 0 ? out : null;
-}
-
-function adaptShapePullbackYearlyWalkforward(data, source) {
-  // { overall: [{variant, bySymbol: [...]}, ...], yearly: { "2024": [{variant, bySymbol}] } }
-  // Yearly prioritaire si présent (overall = somme des yearly).
-  if (!data || typeof data !== "object" || Array.isArray(data)) return null;
-  if (!Array.isArray(data.overall) || !data.overall.length) return null;
-  const first = data.overall[0];
-  if (!first.variant || !Array.isArray(first.bySymbol)) return null;
-  const hasYearly = data.yearly && typeof data.yearly === "object" && Object.keys(data.yearly).length > 0;
-  const out = [];
-  const pushFromVariantArray = (arr, year) => {
-    for (const variantBlock of arr || []) {
-      for (const raw of variantBlock.bySymbol || []) {
-        const rec = normalizeRecord(raw, { source, variant: variantBlock.variant, year });
-        if (rec) out.push(rec);
-      }
-    }
-  };
-  if (hasYearly) {
-    for (const [year, block] of Object.entries(data.yearly)) {
-      if (Array.isArray(block)) pushFromVariantArray(block, year);
-    }
-  } else {
-    pushFromVariantArray(data.overall, null);
-  }
-  return out.length > 0 ? out : null;
-}
-
-const ADAPTERS = [
-  adaptShapeFlatArray,
-  adaptShapeVariantArrayWithBySymbol,
-  adaptShapePullbackYearlyWalkforward,
-  adaptShapeMultiSetupGrid,
-  adaptShapeRsRotation,
-];
-
-function extractRecords(data, source) {
-  for (const adapt of ADAPTERS) {
-    const out = adapt(data, source);
-    if (Array.isArray(out) && out.length > 0) return { records: out, adapter: adapt.name };
-  }
-  return { records: [], adapter: null };
-}
-
-async function listJsonFiles() {
-  const seen = new Set();
-  const files = [];
-  for (const dir of INPUT_DIRS) {
-    let entries;
-    try {
-      entries = await readdir(dir);
-    } catch (_err) {
-      continue;
-    }
-    for (const name of entries) {
-      if (!name.endsWith(".json")) continue;
-      if (SKIP_FILENAMES.has(name)) continue;
-      const full = join(dir, name);
-      if (seen.has(full)) continue;
-      try {
-        const s = await stat(full);
-        if (!s.isFile()) continue;
-      } catch (_e) {
-        continue;
-      }
-      seen.add(full);
-      files.push(full);
-    }
-  }
-  return files.sort();
-}
-
-// Agrégation pondérée (par trades). On accumule sum(metric * trades) et sum(trades),
-// puis on divise. Pour totalR / totalPnl / maxDrawdown : sums et max.
-function emptyBucket() {
-  return {
-    trades: 0,
-    wins: 0,
-    losses: 0,
-    weightedExpectancySum: 0,
-    weightedExpectancyTrades: 0,
-    weightedPfSum: 0,
-    weightedPfTrades: 0,
-    totalR: 0,
-    totalRRecorded: 0,
-    totalPnl: 0,
-    totalPnlRecorded: 0,
-    maxDrawdown: 0,
-    longestLossStreak: 0,
-    recordsCount: 0,
-  };
-}
-
-function pushToBucket(bucket, rec) {
-  bucket.trades += rec.trades;
-  if (rec.wins !== null) bucket.wins += rec.wins;
-  if (rec.losses !== null) bucket.losses += rec.losses;
-  if (rec.expectancy !== null) {
-    bucket.weightedExpectancySum += rec.expectancy * rec.trades;
-    bucket.weightedExpectancyTrades += rec.trades;
-  }
-  if (rec.profitFactor !== null && rec.profitFactor < 999) {
-    // 999 est utilisé comme sentinelle "infini" (zéro perte) — on l'exclut du PF moyen
-    // pour éviter de polluer la moyenne pondérée. La compatibilité est tout de même
-    // captée via l'expectancy positive.
-    bucket.weightedPfSum += rec.profitFactor * rec.trades;
-    bucket.weightedPfTrades += rec.trades;
-  }
-  if (rec.totalR !== null) { bucket.totalR += rec.totalR; bucket.totalRRecorded++; }
-  if (rec.totalPnl !== null) { bucket.totalPnl += rec.totalPnl; bucket.totalPnlRecorded++; }
-  if (rec.maxDrawdown !== null && rec.maxDrawdown > bucket.maxDrawdown) bucket.maxDrawdown = rec.maxDrawdown;
-  if (rec.longestLossStreak !== null && rec.longestLossStreak > bucket.longestLossStreak) bucket.longestLossStreak = rec.longestLossStreak;
-  bucket.recordsCount++;
-}
-
-function summarizeBucket(bucket) {
-  const winrate = bucket.trades > 0 ? (bucket.wins / bucket.trades) * 100 : null;
-  const expectancy = bucket.weightedExpectancyTrades > 0
-    ? bucket.weightedExpectancySum / bucket.weightedExpectancyTrades
-    : null;
-  const profitFactor = bucket.weightedPfTrades > 0
-    ? bucket.weightedPfSum / bucket.weightedPfTrades
-    : null;
-  return {
-    trades: bucket.trades,
-    wins: bucket.wins,
-    losses: bucket.losses,
-    winrate,
-    expectancy,
-    profitFactor,
-    totalR: bucket.totalRRecorded > 0 ? bucket.totalR : null,
-    totalPnl: bucket.totalPnlRecorded > 0 ? bucket.totalPnl : null,
-    maxDrawdown: bucket.maxDrawdown,
-    longestLossStreak: bucket.longestLossStreak,
-    recordsCount: bucket.recordsCount,
-  };
-}
 
 // Score 0-100 + classification + raisons (forces/risques)
 function scoreSymbolAggregate(agg) {
@@ -446,33 +172,6 @@ function scoreSymbolAggregate(agg) {
   const recommendedAllocationProfile = allocByTier[tier];
 
   return { tier, qualityScore: score, confidence, strengths, risks, recommendedAllocationProfile };
-}
-
-// Quand une source emet plusieurs regimeMode pour les mêmes trades sous-jacents
-// (ex. ALL_REGIMES et NO_RISK_OFF sont deux filtres sur les mêmes runs), on ne
-// conserve qu'un seul mode dans l'agrégat principal pour éviter le double-comptage.
-// L'autre mode reste capté dans `byRegimeMode` à des fins de comparaison.
-function pickCanonicalRecords(records) {
-  // Groupe par (symbol, source, setupFamily, variant, year)
-  const groups = new Map();
-  for (const rec of records) {
-    const key = [rec.symbol, rec.source, rec.setupFamily, rec.variant || "", rec.year || ""].join("|");
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(rec);
-  }
-  const canonical = [];
-  for (const group of groups.values()) {
-    if (group.length === 1) { canonical.push(group[0]); continue; }
-    // Plusieurs records pour le même groupe — c'est le cas regimeMode multiple
-    // Préférer NO_RISK_OFF (mode opérationnel cible), sinon ALL_REGIMES,
-    // sinon le premier rencontré.
-    const noRiskOff = group.find(r => r.regimeMode === "NO_RISK_OFF");
-    if (noRiskOff) { canonical.push(noRiskOff); continue; }
-    const allReg = group.find(r => r.regimeMode === "ALL_REGIMES");
-    if (allReg) { canonical.push(allReg); continue; }
-    canonical.push(group[0]);
-  }
-  return canonical;
 }
 
 function aggregateBySymbol(records) {
@@ -733,7 +432,7 @@ function expectedFormatMessage() {
 
 async function main() {
   console.log("[asset-quality-engine] démarrage");
-  const files = await listJsonFiles();
+  const files = await listJsonFiles({ inputDirs: INPUT_DIRS, skipFilenames: SKIP_FILENAMES });
   if (!files.length) {
     console.error("[asset-quality-engine] aucun fichier .json trouvé");
     console.error(expectedFormatMessage());
