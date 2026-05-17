@@ -144,6 +144,26 @@ La cohérence prix cross-worker de R4 **dépend du binding KV `MTP_CACHE`** côt
 
 ---
 
+### Règle quant — validation setup
+
+Un setup n'est considéré comme `VALIDATED` que si :
+- il est testé sur plusieurs années,
+- il passe un filtre de robustesse,
+- son comportement par régime est connu,
+- ses actifs compatibles sont identifiés,
+- ses faiblesses sont documentées,
+- il est documenté dans `SETUPS_REGISTRY.md`.
+
+Un setup non documenté dans `SETUPS_REGISTRY.md` ne doit pas être traité comme une vérité moteur.
+
+### Règle quant — classification actifs
+
+Un actif n'est considéré comme `ELITE`, `CORE`, `TACTICAL` ou `BLACKLIST` que s'il est documenté dans `ASSET_REGISTRY.md`.
+
+Tant que `asset-quality-engine-v1.mjs` n'existe pas, cette classification reste provisoire.
+
+---
+
 ## Non encore fait
 
 - Pas de CI automatisée sur les règles ci-dessus. Repose sur la vigilance manuelle + bug-hunter.

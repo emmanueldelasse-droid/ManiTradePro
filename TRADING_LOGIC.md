@@ -195,6 +195,29 @@ Le bot applique `require_structural_setup` : si `true` (par défaut), aucune pos
 
 ---
 
+## Recherche quantitative externe
+
+Les setups officiellement validés sont désormais centralisés dans :
+
+```text
+SETUPS_REGISTRY.md
+```
+
+Ce fichier devient la source officielle des variantes validées, des métriques de robustesse et des compatibilités régime/actifs.
+
+La classification provisoire des actifs est centralisée dans :
+
+```text
+ASSET_REGISTRY.md
+```
+
+Important :
+- `TRADING_LOGIC.md` explique la logique du moteur.
+- `SETUPS_REGISTRY.md` conserve la mémoire quantitative des setups.
+- `ASSET_REGISTRY.md` conserve la mémoire des actifs compatibles.
+
+---
+
 ## Règles d'ouverture (cron `handleTrainingAutoCycle`)
 
 **Pré-requis** : `auto_open_enabled = true` ET `is_enabled = true` ET `tradingEnabled` (risque pas dépassé).
