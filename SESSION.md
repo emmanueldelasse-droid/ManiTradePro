@@ -590,3 +590,24 @@ Critères :
 ManiTradePro doit devenir :
 
 un moteur de sélection de leaders momentum structurels avec allocation adaptative selon le régime marché.
+
+---
+
+# Documentation quantitative créée
+
+Nouveaux fichiers de référence :
+- `SETUPS_REGISTRY.md`
+- `ASSET_REGISTRY.md`
+
+Le projet dispose maintenant d'une séparation claire entre :
+- mémoire session,
+- logique moteur,
+- recherche quantitative,
+- classification actifs.
+
+Rôle des nouveaux fichiers :
+- `SETUPS_REGISTRY.md` : source officielle des setups validés, variantes robustes, métriques, régimes compatibles.
+- `ASSET_REGISTRY.md` : classification provisoire des actifs compatibles, à automatiser avec `asset-quality-engine-v1.mjs`.
+
+Décision importante :
+`ASSET_REGISTRY.md` est provisoire. La vérité définitive devra venir du futur moteur `asset-quality-engine-v1.mjs`.
