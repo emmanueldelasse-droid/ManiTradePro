@@ -66,6 +66,18 @@ Sortie : `tools/backtests/output/setup-variant-matrix.{json,md}`.
 
 Utile pour repérer les cas où **un setup est moyen globalement mais une variante précise est excellente** (ex. SOXL × RS sort AVOID en agrégé, mais `rs_20d_top5_hold5` ressort STRONG). À consulter avant de figer une combinaison actif × setup × variante.
 
+## Granularité variant × régime (global)
+
+Une matrice supplémentaire compare les variantes selon le régime de marché :
+
+```text
+tools/backtests/variant-regime-matrix-v1.mjs
+```
+
+Sortie : `tools/backtests/output/variant-regime-matrix.{json,md}`.
+
+**Limite à connaître** : la dimension régime n'est exposée que par un seul fichier de backtest (RS rotation regime), et uniquement à un niveau global (pas per-symbol-per-regime individuel). La matrice livre la classification (variant × regime) globale et la comparaison (symbol × variant × ALL_REGIMES vs NO_RISK_OFF) par actif. Pour la décision per-actif-par-régime exacte, un breakdown `bySymbolByRegime` dans les scripts de backtest sera nécessaire.
+
 ---
 
 # Catégories
