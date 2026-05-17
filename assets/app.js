@@ -1111,7 +1111,23 @@
       else if (qq.marketClosed) tail = "marché fermé";
       else if (qq.executionSafe) tail = "fiable";
     }
-    return tail ? `${src} · ${fresh} · ${tail}` : `${src} · ${fresh}`;
+    // B.11.1 P1.2 — âge humain de la quote (>30 sec uniquement, sinon trop bruyant)
+    const age = formatQuoteAgeHuman(qq?.ageSec);
+    const parts = [src, fresh];
+    if (tail) parts.push(tail);
+    if (age) parts.push(age);
+    return parts.join(" · ");
+  }
+
+  // B.11.1 P1.2 — convertit un âge en secondes en libellé compact FR.
+  // Renvoie "" si l'âge n'est pas un nombre fini ou <= 30s (silence).
+  function formatQuoteAgeHuman(ageSec) {
+    const n = Number(ageSec);
+    if (!Number.isFinite(n) || n <= 30) return "";
+    if (n < 60) return `${Math.round(n)} sec`;
+    if (n < 3600) return `${Math.round(n / 60)} min`;
+    if (n < 86400) return `${Math.round(n / 3600)} h`;
+    return `${Math.round(n / 86400)} j`;
   }
 
   // Date FR lisible "15/05/2026 17:42" pour la fiche actif.

@@ -3131,6 +3131,88 @@ function evaluateExecutionSafety(payload) {
   };
 }
 
+// ============================================================
+// UNSAFE RANKING DOWNGRADE — vague B.11.1 P0.1 / P0.2 / P1.1
+// ============================================================
+// Si quoteQuality.executionSafe === false, le payload final ne doit plus
+// remonter comme une "bonne" opportunité dans les tops. On cap les scores
+// affichés (officialScore, safetyScore, dossierScore), on force decision /
+// tradeNow / waitFor à la valeur bloquante, et on substitue reasonShort par
+// une libellé FR cohérent avec la cause runtime. On laisse strictement
+// intact `strategicAnalysis` (scoring brut conservé pour audit/learning) et
+// `plan.decisionScore` (signal moteur préservé). Tout le reste qu'un
+// utilisateur ou un consommateur API peut lire est aligné.
+//
+// Idempotent : si le payload est déjà cohérent (executionSafe=true ou
+// quoteQuality absent), on retourne tel quel.
+function applyUnsafeDowngrade(payload) {
+  const qq = payload?.liveContext?.quoteQuality;
+  if (!qq || qq.executionSafe !== false) return payload;
+
+  const reasons = Array.isArray(qq.reasons) ? qq.reasons : [];
+  const hasReason = (needle) => reasons.some((r) => {
+    const s = String(r || "").toLowerCase();
+    return s === needle || s.startsWith(`${needle}:`);
+  });
+
+  let reasonShort;
+  if (hasReason("stale")) reasonShort = "Données live trop anciennes";
+  else if (hasReason("eod_snapshot") || qq.isSnapshot === true) reasonShort = "Dernier prix disponible non exécutable";
+  else if (hasReason("abnormal_spread")) reasonShort = "Prix live incohérent";
+  else if (hasReason("quote_quality_missing")) reasonShort = "Diagnostic live indisponible";
+  else if (hasReason("currency_mismatch")) reasonShort = "Devise live incohérente";
+  else reasonShort = "Données live non exploitables";
+
+  const evalSafety = evaluateExecutionSafety(payload);
+
+  const capN = (v, max) => {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return v;
+    return Math.min(n, max);
+  };
+
+  const cappedOfficial = capN(payload.officialScore ?? payload?.plan?.safetyScore, 55);
+  const cappedSafety = capN(payload?.plan?.safetyScore, 45);
+  const cappedFinal = capN(payload?.plan?.finalScore ?? payload?.score, 55);
+
+  const baseConfidence = payload.confidence || {};
+  const confLevel = Math.min(Number(baseConfidence.level) || 1, 1);
+
+  return {
+    ...payload,
+    score: cappedFinal,
+    confidence: {
+      level: confLevel,
+      label: baseConfidence.label || "Surveillance",
+      display: baseConfidence.display || "●○○"
+    },
+    confidenceLabel: "faible",
+    reasonShort,
+    decision: "Pas de trade",
+    officialScore: Number.isFinite(Number(cappedOfficial)) ? Number(cappedOfficial) : payload.officialScore,
+    officialDecision: "Pas de trade",
+    officialWaitFor: "prix live fiable",
+    plan: {
+      ...(payload.plan || {}),
+      tradeNow: false,
+      decision: "Pas de trade",
+      setupStatus: "Données live non exploitables",
+      reason: reasonShort,
+      refusalReason: reasonShort,
+      waitFor: "prix live fiable",
+      finalScore: Number.isFinite(Number(cappedFinal)) ? Number(cappedFinal) : payload?.plan?.finalScore,
+      safetyScore: Number.isFinite(Number(cappedSafety)) ? Number(cappedSafety) : payload?.plan?.safetyScore
+    },
+    liveContext: {
+      ...(payload.liveContext || {}),
+      executionBlocked: true,
+      executionBlockedReason: reasons[0] ?? null,
+      executionBlockedHuman: evalSafety?.human ?? null
+    }
+  };
+}
+__name(applyUnsafeDowngrade, "applyUnsafeDowngrade");
+
 function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8, learningContext = null) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
 
@@ -3961,7 +4043,7 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
   const plan = buildWorkerPlan({ ...base, avgRange: scored?.avgRange }, regime);
   const confidence = confidenceLevelFromPlan(plan);
 
-  return {
+  const finalPayload = {
     ...base,
     reasonShort: plan.reason,
     decision: plan.decision,
@@ -3979,6 +4061,8 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
     },
     plan
   };
+  // B.11.1 P0.1/P0.2/P1.1 — downgrade unsafe ranking en sortie.
+  return applyUnsafeDowngrade(finalPayload);
 }
 
 async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true, regime = null, options = {}) {
@@ -4013,7 +4097,13 @@ async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true,
   }
 }
 
-function toOpportunityRow(payload) {
+function toOpportunityRow(payload, options = {}) {
+  // B.11.1 P1.3 — debugCandles=1 expose les 20 dernières bougies du payload
+  // détaillé pour audit. Comportement par défaut inchangé (candles=[]).
+  const includeCandles = options?.debugCandles === true;
+  const slicedCandles = includeCandles && Array.isArray(payload.candles)
+    ? payload.candles.slice(-20)
+    : [];
   return {
     symbol: payload.symbol,
     name: payload.name,
@@ -4056,7 +4146,7 @@ function toOpportunityRow(payload) {
     aiInfluence: payload.aiInfluence || "aucune",
     aiContextStatus: payload.aiContextStatus || null,
     plan: payload.plan,
-    candles: [],
+    candles: slicedCandles,
     strategicAnalysis: payload.strategicAnalysis ?? null,
     liveContext: payload.liveContext ?? null,
     snapshotId: payload.snapshotId ?? null,
@@ -4200,6 +4290,10 @@ async function handleOpportunities(url, env) {
   // B.11 P2 — force=1 bypass le cache memoire ET demande un Cache-Control
   // no-store en sortie pour neutraliser les CDN/navigateurs intermédiaires.
   const forceRefresh = url?.searchParams?.get("force") === "1";
+  // B.11.1 P1.3 — expose les 20 dernières bougies de chaque actif quand
+  // ?debugCandles=1 est présent. Sinon comportement inchangé (candles=[]).
+  const debugCandles = url?.searchParams?.get("debugCandles") === "1";
+  const rowOptions = { debugCandles };
 
   // Cache memoire valide ? Skip si force=1.
   const cachedRows = forceRefresh ? null : getMemoryCache("route:opportunities:data");
@@ -4374,7 +4468,7 @@ async function handleOpportunities(url, env) {
             buildPartialPlaceholderQuote(symbol),
             quoteErrors[symbol] || nonCryptoBatchError,
             regime
-          )));
+          ), rowOptions));
           continue;
         }
       }
@@ -4386,12 +4480,12 @@ async function handleOpportunities(url, env) {
       if (quote && !quote.symbol) quote.symbol = symbol; // B.4 : fiabilise snapshotId
       const scored = calcDetailScore(quote, candles || [], regime, env, regimeIndicators, newsContext, claudeWeight, learningContext);
       const payload = buildStablePayload(symbol, quote, candles || [], scored, regime);
-      rows.push(toOpportunityRow(payload));
+      rows.push(toOpportunityRow(payload, rowOptions));
     } catch (e) {
       if (quote && Number.isFinite(Number(quote.price))) {
-        rows.push(toOpportunityRow(buildPartialAnalysisPayload(symbol, quote, e instanceof Error ? e.message : "Analyse technique partielle", regime)));
+        rows.push(toOpportunityRow(buildPartialAnalysisPayload(symbol, quote, e instanceof Error ? e.message : "Analyse technique partielle", regime), rowOptions));
       } else {
-        rows.push(toOpportunityRow(buildUnavailablePayload(symbol, e instanceof Error ? e.message : "indisponible")));
+        rows.push(toOpportunityRow(buildUnavailablePayload(symbol, e instanceof Error ? e.message : "indisponible"), rowOptions));
       }
     }
   }
@@ -9463,7 +9557,15 @@ async function handleHealth(request, env) {
       status: cronFreshness.status,
       lastCycleMode: cronFreshness.lastCycleMode
     },
-    adminProtectionEnabled: hasConfiguredAdminToken(env)
+    adminProtectionEnabled: hasConfiguredAdminToken(env),
+    // B.11.1 P2 — montre quelles protections runtime sont actives au worker
+    // courant. Tous les flags refletent du code reellement deploye, pas une
+    // intention. A maintenir lors d'ajout/retrait d'une protection majeure.
+    runtimeGuards: {
+      maxStagnantAge: true,
+      candlesTooOld: true,
+      unsafeRankingDowngrade: true
+    }
   };
   if (!adminAccess) return ok(basePayload, "worker-v2", nowIso(), "live", null);
   const pnlIntegrity = await getPnlIntegrity(env);
