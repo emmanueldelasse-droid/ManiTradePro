@@ -336,6 +336,38 @@ Réponse : `{ generatedAt, windowHours, cutoffAt, totals:{openBlocked, closeBloc
 2. `calcDetailScore` early-return (données insuffisantes)
 3. `buildPartialAnalysisPayload` (cas quote disponible mais analyse partielle)
 
+### Unsafe ranking downgrade (vague B.11.1, mai 2026)
+
+`applyUnsafeDowngrade(payload)` — fonction synchrone appelée en **sortie de `buildStablePayload`**. Si `liveContext.quoteQuality.executionSafe === false`, cap les champs affichés pour qu'un actif inexécutable n'apparaisse plus en haut des tops opportunités.
+
+**Caps appliqués** (Math.min, jamais d'augmentation) :
+- `officialScore`, `score`, `plan.finalScore` → max 55
+- `plan.safetyScore` → max 45
+- `plan.tradeNow → false`, `decision → "Pas de trade"`, `waitFor → "prix live fiable"`
+- `confidence.level → min(1, level)`, `confidenceLabel → "faible"`
+- `plan.setupStatus → "Données live non exploitables"`
+- `reasonShort` substitué selon la cause prioritaire dans `reasons[]`
+
+**Strictement inchangés** : `strategicAnalysis.score` (scoring brut/learning), `plan.decisionScore` (signal moteur), `liveContext.quoteQuality` (diagnostic intact, conservé pour audit).
+
+**Idempotent** : si `executionSafe === true` ou `quoteQuality` absent, retourne le payload sans modification.
+
+**Champs `executionBlocked*` ajoutés dans `liveContext`** quand unsafe :
+```json
+{
+  "executionBlocked": true,
+  "executionBlockedReason": "stale",
+  "executionBlockedHuman": "Prix live périmé — blocage exécution"
+}
+```
+
+**`runtimeGuards` dans `/health`** : objet exposant quelles protections runtime sont actives :
+```json
+"runtimeGuards": { "maxStagnantAge": true, "candlesTooOld": true, "unsafeRankingDowngrade": true }
+```
+
+**`?debugCandles=1` sur `/api/opportunities`** : `toOpportunityRow(payload, options)` expose `candles.slice(-20)` si `options.debugCandles === true`. Par défaut `candles=[]` (inchangé). Transparent pour le cron et tous les call-sites existants.
+
 ### Stockage
 
 - Position ouverte : `mtp_positions.score` + `mtp_positions.analysis_snapshot` (JSON complet)
@@ -356,7 +388,7 @@ Réponse : `{ generatedAt, windowHours, cutoffAt, totals:{openBlocked, closeBloc
 Le front lit (sans recalculer) `liveContext.quoteQuality` + `sourceUsed` / `freshness` / `quotedAt` pour rendre visible la qualité de la quote :
 
 **Liste opportunités** :
-- Une ligne courte sous le prix (`quoteQualitySummaryLine(item)`) : `EODHD · différé 15 min · fiable`, `Snapshot EOD · dernier prix disponible`, `Twelve Data · live · périmé · ne pas utiliser`, etc.
+- Une ligne courte sous le prix (`quoteQualitySummaryLine(item)`) : `EODHD · différé 15 min · fiable`, `Snapshot EOD · dernier prix disponible`, `Twelve Data · live · périmé · ne pas utiliser`, etc. Depuis B.11.1, l'âge de la quote (`formatQuoteAgeHuman(ageSec)`) est ajouté silencieusement à la fin de la ligne uniquement si > 30 s (ex. "41 h", "2 j").
 - Un badge dans la zone de tags (`quoteQualityState(item)`) : « Live fiable » / « Différé · fiable » / « Marché fermé » / « Dernier prix dispo » / « Prix périmé » / « Prix non fiable » / « Devise incohérente » / « Écart anormal » / « Prix indisponible ».
 
 **Fiche actif** : carte « Qualité du prix » (`renderQuoteQualityCard`) — Source, Fraîcheur, Heure quote (FR `JJ/MM/AAAA HH:mm`), Qualité (`trustScore`/100), Utilisable (`executionSafe`), Statut (`validationStatus` traduit), chips `reasons[]` si présentes.
@@ -556,3 +588,53 @@ Le format `reasons[]` peut désormais contenir `"eod_snapshot"` en plus des 7 co
 ### `evaluateExecutionSafety` augmenté
 
 Retour augmenté `{ safe, code, reasons[], human, missing }`. `code` reste le premier élément de `reasons[]` pour préserver le format des événements `auto_open_blocked_unsafe` / `auto_close_blocked_unsafe` (B.9) et les compteurs `byCode` de safety-stats (B.9.1). Les raisons secondaires sont préservées dans `reasons[]` et loggées dans les events.
+
+---
+
+## Vague B.11.1 — unsafe ranking downgrade (mai 2026)
+
+### `buildStablePayload` — sortie conditionnelle via `applyUnsafeDowngrade`
+
+Depuis B.11.1, `buildStablePayload` ne retourne plus directement le payload brut : il passe systématiquement par `applyUnsafeDowngrade(finalPayload)` avant de répondre. Si la quote est unsafe (`executionSafe=false`), les champs affichables sont capés pour que l'actif ne monte pas artificiellement dans les tops.
+
+```
+buildStablePayload(symbol, quote, candles, scored, regime)
+  └── buildWorkerPlan(...)          ← score/plan calculé normalement
+  └── confidenceLevelFromPlan(...)
+  └── applyUnsafeDowngrade(payload) ◄── NOUVEAU : cap si executionSafe=false
+       └── executionSafe=true  → pass-through (payload intact)
+       └── executionSafe=false → caps + reasonShort substituté + executionBlocked* ajouté
+```
+
+Ce qui passe TOUJOURS sans modification : `strategicAnalysis.score`, `plan.decisionScore`, `liveContext.quoteQuality`, `snapshotId`, tous les timestamps analytiques.
+
+### Format `liveContext` après B.11.1 (actif unsafe)
+
+```json
+{
+  "liveContext": {
+    "quoteQuality": { "...": "..." },
+    "executionBlocked": true,
+    "executionBlockedReason": "stale",
+    "executionBlockedHuman": "Prix live périmé — blocage exécution"
+  }
+}
+```
+
+Ces 3 champs sont absents (pas `false`) pour les actifs safe.
+
+### `quoteQualitySummaryLine` — âge affiché (front)
+
+`formatQuoteAgeHuman(ageSec)` retourne "" si ≤ 30 s, sinon "N sec" / "N min" / "N h" / "N j". Ajouté en queue de `quoteQualitySummaryLine` pour alerter silencieusement sur les quotes périmées sans modifier le ton ni le badge.
+
+### `/health` — `runtimeGuards`
+
+Objet statique exposant l'état des protections runtime actives dans le worker déployé :
+```json
+{ "maxStagnantAge": true, "candlesTooOld": true, "unsafeRankingDowngrade": true }
+```
+À maintenir manuellement si une protection est ajoutée ou retirée.
+
+### `/api/opportunities?debugCandles=1`
+
+`toOpportunityRow(payload, options={})` : si `options.debugCandles === true`, expose `payload.candles.slice(-20)` au lieu de `[]`. Utile pour auditer les indicateurs techniques (EMA, RSI, ATR) sans déployer un endpoint dédié. Par défaut inchangé.

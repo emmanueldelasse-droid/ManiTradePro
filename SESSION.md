@@ -27,9 +27,9 @@ Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-16 (vague B.10 — correctifs critiques post-audit safety gate) |
-| **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/audit-manitradepro-prs-eydXl` |
+| **Dernière mise à jour** | 2026-05-17 (vague B.11.1 — unsafe ranking downgrade + observabilité) |
+| **IA utilisée** | Claude (claude-sonnet-4-6) |
+| **Branche active** | `claude/confident-pasteur-u5ktT` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker (auto-deploy GitHub Actions) |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -80,6 +80,94 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-17 — Vague B.11.1 : unsafe ranking downgrade + observabilité (PR #174)
+
+Audit runtime B.11 (verdict 🟢 SAFE paper trading) : les tops d'opportunités weekend remontaient MSFT, AAPL, BMW.DE et 25+ autres actifs avec un score officiel 50-68 alors que leur quote était trop vieille (stale > 24 h) et l'exécution automatique était déjà bloquée. L'utilisateur voyait des actifs « attractifs » inexécutables en tête de liste. 6 patchs ciblés, aucun refactor.
+
+### Patchs livrés
+
+**P0.1 — `applyUnsafeDowngrade` câblé dans `buildStablePayload`** (`cloudflare-worker/worker.js`)
+Nouvelle fonction synchrone. Si `liveContext.quoteQuality.executionSafe === false` :
+- `officialScore`, `score` et `plan.finalScore` capés à 55 (Math.min, jamais d'augmentation)
+- `plan.safetyScore` capé à 45
+- `plan.tradeNow → false`, `plan.decision → "Pas de trade"`, `plan.waitFor → "prix live fiable"`
+- `officialDecision → "Pas de trade"`, `officialWaitFor → "prix live fiable"`
+- `confidence.level → min(1, level)`, `confidenceLabel → "faible"`
+- `plan.setupStatus → "Données live non exploitables"`
+
+**Strictement inchangés** : `strategicAnalysis.score` (scoring brut audit/learning), `plan.decisionScore` (signal moteur), `liveContext.quoteQuality` (diagnostic intact).
+
+Idempotent : si le payload est déjà sûr (`executionSafe=true` ou `quoteQuality` absent), passe sans modification.
+
+**P0.2 — `reasonShort` cohérent par cause**
+Substitution prioritaire selon `reasons[]` :
+- `stale` / `stale:*` → "Données live trop anciennes"
+- `eod_snapshot` / `isSnapshot=true` → "Dernier prix disponible non exécutable"
+- `abnormal_spread:*` → "Prix live incohérent"
+- `quote_quality_missing` → "Diagnostic live indisponible"
+- `currency_mismatch` → "Devise live incohérente"
+- fallback → "Données live non exploitables"
+
+Ne touche ni `aiSummary`, ni `strategicAnalysis.reason`.
+
+**P1.1 — Champs `executionBlocked*` dans `liveContext`**
+3 nouveaux champs ajoutés par `applyUnsafeDowngrade` si unsafe :
+```json
+"liveContext": {
+  "executionBlocked": true,
+  "executionBlockedReason": "stale",
+  "executionBlockedHuman": "Prix live périmé — blocage exécution"
+}
+```
+
+**P1.2 — Âge humain de la quote (front, `assets/app.js`)**
+Nouvelle fonction `formatQuoteAgeHuman(ageSec)` : retourne "" si ≤ 30 s ou non-fini, sinon un libellé compact ("3 sec" / "12 min" / "41 h" / "2 j"). Câblée dans `quoteQualitySummaryLine` : l'âge s'affiche silencieusement à droite de la ligne de statut uniquement si > 30 s.
+
+**P1.3 — `?debugCandles=1` sur `/api/opportunities`**
+`toOpportunityRow(payload, options={})` accepte un 2e arg. Si `options.debugCandles === true` → expose `payload.candles.slice(-20)`. Par défaut `candles=[]` (inchangé). Tous les call-sites existants transparents via défaut. Usage : audit et débogage des indicateurs techniques sans modification du comportement normal.
+
+**P2 — `runtimeGuards` dans `/health`**
+```json
+"runtimeGuards": {
+  "maxStagnantAge": true,
+  "candlesTooOld": true,
+  "unsafeRankingDowngrade": true
+}
+```
+
+### Tests effectués
+
+- `node --check cloudflare-worker/worker.js` PASS
+- `node --check assets/app.js` PASS
+- Test statique structurel 11/11 PASS
+- Test fonctionnel runtime simulé `applyUnsafeDowngrade` :
+  - Payload safe (BTC live) → pass through, officialScore 65 préservé ✅
+  - MSFT stale 40 h → tous caps appliqués, `strategicAnalysis.score=73` intact, `decisionScore=76` intact ✅
+  - ROG.SW eod_snapshot → reasonShort "Dernier prix disponible non exécutable" ✅
+  - `quote_quality_missing` → reasonShort "Diagnostic live indisponible" ✅
+
+### Fichiers modifiés
+
+- `cloudflare-worker/worker.js` : +119 lignes / -8 lignes (fonction `applyUnsafeDowngrade`, câblage `buildStablePayload`, `toOpportunityRow options`, `handleOpportunities debugCandles`, `handleHealth runtimeGuards`)
+- `assets/app.js` : +16 lignes / -1 ligne (fonction `formatQuoteAgeHuman`, câblage `quoteQualitySummaryLine`)
+
+### Périmètre strict respecté
+
+- ❌ Aucun changement Supabase / schema
+- ❌ Aucun changement stratégie / broker / scoring
+- ❌ Aucune dépendance ajoutée
+- ✅ `strategicAnalysis.score` et `plan.decisionScore` inchangés
+- ✅ Cron et tous call-sites existants transparents (defaults)
+- ✅ Reste 🟢 SAFE paper trading
+
+### Risques résiduels (inchangés vs B.10)
+
+- #12 race KV cold-start
+- #13 `quoteAgeSeconds` null possible
+- Mode manuel UI non gated
 
 ---
 
