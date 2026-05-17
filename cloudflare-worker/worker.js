@@ -2877,6 +2877,14 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   const marketClosed = isMarketLikelyClosed(sym, cls, expectedCurrency || quoteCurrency, now);
   const ageSec = quoteAgeSeconds(quote?.quotedAt, now);
 
+  // B.13 P0 — quotedAt manquant = impossible de mesurer la fraicheur.
+  // Avant ce patch, une quote sans quotedAt avait ageSec=null, le check
+  // stale ne tirait jamais, et executionSafe pouvait rester true si le
+  // prix etait valide. C'etait un angle mort dangereux pour l'argent reel.
+  // Distinct de `stale` : stale = mesure trop vieille, missingQuotedAt =
+  // mesure impossible. On force executionSafe=false par prudence absolue.
+  const missingQuotedAt = !quote?.quotedAt || ageSec == null;
+
   // SNAPSHOT EOD — vague P0.1. Une quote issue du filet ultime (sourceUsed
   // "snapshot" ou freshness "eod") est le close de la veille servi quand
   // tous les providers live ont échoué. Affichable côté UI ("Dernier prix
@@ -3001,6 +3009,10 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   // B.11 P0.2 — bougies daily periméees bloquent l'execution. Le scoring
   // amont sera basculé en partial cote builder (cf. buildStablePayload).
   if (candlesTooOld) { executionSafe = false; reasons.push("candles_too_old"); }
+  // B.13 P0 — quotedAt absent / illisible : on ne peut pas mesurer la
+  // fraicheur, donc executionSafe=false par prudence. Snapshot EOD reste
+  // prioritaire dans validationStatus (cas freshness="eod" + quotedAt=null).
+  if (missingQuotedAt) { executionSafe = false; reasons.push("missing_quoted_at"); }
   // P0.1 — snapshot/EOD pas exécutable. Drapeau distinct dans reasons[] pour
   // que safety-stats (B.9.1) puisse compter les blocages dus au filet EOD.
   if (isSnapshot) { executionSafe = false; reasons.push("eod_snapshot"); }
@@ -3010,8 +3022,15 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   // VALIDATION STATUS — 1ere raison disqualifiante par ordre de gravite.
   // eod_snapshot remonte tout en haut : si c'est juste un snapshot sans autre
   // anomalie, c'est l'info la plus utile pour l'UI et le journal.
+  // B.13 P0 — priorite validationStatus :
+  //   eod_snapshot > missing_quoted_at > currency_mismatch > stale >
+  //   candles_too_old > abnormal_spread > unsafe > market_closed > delayed.
+  // missing_quoted_at passe AVANT stale car la mesure est impossible
+  // (pas juste "trop vieille"). Mais reste APRES eod_snapshot : un
+  // snapshot reste plus explicite pour l'utilisateur qu'un timestamp absent.
   let validationStatus = "valid";
   if (isSnapshot) validationStatus = "eod_snapshot";
+  else if (missingQuotedAt) validationStatus = "missing_quoted_at";
   else if (currencyMismatch) validationStatus = "currency_mismatch";
   else if (stale) validationStatus = "stale";
   else if (candlesTooOld) validationStatus = "candles_too_old";
@@ -3031,6 +3050,7 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   if (currencyMismatch) trustScore -= 70;
   if (abnormalSpread) trustScore -= 40;
   if (isSnapshot) trustScore -= 50;
+  if (missingQuotedAt) trustScore -= 50; // B.13 P0
   trustScore = Math.max(0, Math.min(100, trustScore));
 
   return {
@@ -3045,6 +3065,7 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
     validationStatus,
     reasons,
     isSnapshot,
+    missingQuotedAt, // B.13 P0
     candlesTooOld, // B.11 P0.2
     // metadata utile pour debug / audit
     ageSec,
@@ -3103,6 +3124,9 @@ function evaluateExecutionSafety(payload) {
   const qqReasons = Array.isArray(qq.reasons) ? qq.reasons : [];
   const reasons = [];
   if (qqReasons.includes("eod_snapshot") || qq.isSnapshot === true) reasons.push("eod_snapshot");
+  // B.13 P0 — missing_quoted_at passe avant currency_mismatch / stale / etc.
+  // car la mesure de fraicheur est impossible. Reste apres eod_snapshot.
+  if (qq.missingQuotedAt === true || qqReasons.includes("missing_quoted_at")) reasons.push("missing_quoted_at");
   if (qq.currencyMismatch === true) reasons.push("currency_mismatch");
   if (qq.stale === true) reasons.push("stale");
   if (qq.candlesTooOld === true) reasons.push("candles_too_old"); // B.11 P0.2
@@ -3114,6 +3138,7 @@ function evaluateExecutionSafety(payload) {
   const code = reasons[0];
   const humanByCode = {
     eod_snapshot: "Snapshot EOD — pas d'exécution sur prix de clôture",
+    missing_quoted_at: "Horodatage prix absent — exécution bloquée", // B.13 P0
     currency_mismatch: "Devise incohérente — blocage exécution",
     stale: "Prix live périmé — blocage exécution",
     candles_too_old: "Bougies daily périmées — analyse non fiable", // B.11 P0.2
@@ -3147,7 +3172,8 @@ function evaluateExecutionSafety(payload) {
 // quoteQuality absent), on retourne tel quel.
 
 // Helper pur — pas de side-effect, pas de dépendance UI.
-// Priorité stricte : stale > eod_snapshot > abnormal_spread > quote_quality_missing > currency_mismatch > fallback.
+// Priorité stricte (B.13 P0) : stale > missing_quoted_at > eod_snapshot >
+// abnormal_spread > quote_quality_missing > currency_mismatch > fallback.
 function buildUnsafeReasonShort(qq) {
   if (!qq || typeof qq !== "object") return "Données live non exploitables";
   const reasons = Array.isArray(qq.reasons) ? qq.reasons : [];
@@ -3156,6 +3182,7 @@ function buildUnsafeReasonShort(qq) {
     return s === needle || s.startsWith(`${needle}:`);
   });
   if (hasReason("stale")) return "Données live trop anciennes";
+  if (hasReason("missing_quoted_at") || qq.missingQuotedAt === true) return "Horodatage prix absent";
   if (hasReason("eod_snapshot") || qq.isSnapshot === true) return "Dernier prix disponible non exécutable";
   if (hasReason("abnormal_spread")) return "Prix live incohérent";
   if (hasReason("quote_quality_missing")) return "Diagnostic live indisponible";
@@ -6567,7 +6594,8 @@ async function handleTrainingSafetyStats(url, env) {
   const knownCodes = [
     "stale", "currency_mismatch", "abnormal_spread", "provider_unsafe",
     "no_price", "quote_unsafe", "quote_quality_missing", "eod_snapshot",
-    "candles_too_old" // B.11 P0.2
+    "candles_too_old", // B.11 P0.2
+    "missing_quoted_at" // B.13 P0
   ];
   const byCode = Object.fromEntries(knownCodes.map(k => [k, 0]));
 
@@ -9583,7 +9611,8 @@ async function handleHealth(request, env) {
     runtimeGuards: {
       maxStagnantAge: true,
       candlesTooOld: true,
-      unsafeRankingDowngrade: true
+      unsafeRankingDowngrade: true,
+      missingQuotedAtGuard: true // B.13 P0
     }
   };
   if (!adminAccess) return ok(basePayload, "worker-v2", nowIso(), "live", null);

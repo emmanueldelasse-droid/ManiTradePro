@@ -1064,6 +1064,9 @@
     const src = String(item?.sourceUsed || "").toLowerCase();
     const fresh = String(item?.freshness || "").toLowerCase();
     if (qq) {
+      // B.13 P0 — missingQuotedAt prioritaire : impossible de mesurer la
+      // fraicheur, donc on signale immédiatement à l'utilisateur.
+      if (qq.missingQuotedAt) return { label: "Prix non daté", tone: "negative" };
       if (qq.currencyMismatch) return { label: "Devise incohérente", tone: "negative" };
       if (qq.stale) return { label: "Prix périmé", tone: "negative" };
       if (qq.abnormalSpread) return { label: "Écart anormal", tone: "negative" };
@@ -1156,6 +1159,8 @@
     if (v === "eod_snapshot") return "snapshot EOD";
     // B.11 P0.2 — bougies daily périmées
     if (v === "candles_too_old") return "bougies périmées";
+    // B.13 P0 — horodatage prix absent
+    if (v === "missing_quoted_at") return "horodatage absent";
     return value || "—";
   }
 
@@ -1171,6 +1176,8 @@
     if (v === "eod_snapshot") return "prix de clôture veille";
     // B.11 P0.2 — drapeau bougies daily périmées
     if (v === "candles_too_old") return "bougies daily périmées";
+    // B.13 P0 — horodatage prix absent
+    if (v === "missing_quoted_at") return "horodatage prix absent";
     // P2.3 — fallback générique et diagnostic absent (B.9 / B.10)
     if (v === "quote_unsafe") return "prix non fiable";
     if (v === "quote_quality_missing") return "diagnostic absent";
