@@ -24,8 +24,21 @@ jobs:
           echo "CLOUDFLARE_API_TOKEN défini : $TOKEN_SET"
           echo "Longueur approximative : $TOKEN_LEN"
 
-      - name: Deploy via Wrangler
+      # B.11.2 — diagnostic auth + droits du token. Le workflow a échoué
+      # silencieusement plusieurs fois sans qu'on sache pourquoi. whoami
+      # affiche l'account et les permissions effectives du token.
+      - name: Wrangler whoami (diagnostic auth)
+        continue-on-error: true
         uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          workingDirectory: cloudflare-worker
+          command: whoami
+
+      - name: Deploy via Wrangler (log debug)
+        uses: cloudflare/wrangler-action@v3
+        env:
+          WRANGLER_LOG: debug
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           workingDirectory: cloudflare-worker
