@@ -3132,7 +3132,7 @@ function evaluateExecutionSafety(payload) {
 }
 
 // ============================================================
-// UNSAFE RANKING DOWNGRADE — vague B.11.1 P0.1 / P0.2 / P1.1
+// UNSAFE RANKING DOWNGRADE — vague B.11.1 / B.11.2
 // ============================================================
 // Si quoteQuality.executionSafe === false, le payload final ne doit plus
 // remonter comme une "bonne" opportunité dans les tops. On cap les scores
@@ -3145,23 +3145,31 @@ function evaluateExecutionSafety(payload) {
 //
 // Idempotent : si le payload est déjà cohérent (executionSafe=true ou
 // quoteQuality absent), on retourne tel quel.
-function applyUnsafeDowngrade(payload) {
-  const qq = payload?.liveContext?.quoteQuality;
-  if (!qq || qq.executionSafe !== false) return payload;
 
+// Helper pur — pas de side-effect, pas de dépendance UI.
+// Priorité stricte : stale > eod_snapshot > abnormal_spread > quote_quality_missing > currency_mismatch > fallback.
+function buildUnsafeReasonShort(qq) {
+  if (!qq || typeof qq !== "object") return "Données live non exploitables";
   const reasons = Array.isArray(qq.reasons) ? qq.reasons : [];
   const hasReason = (needle) => reasons.some((r) => {
     const s = String(r || "").toLowerCase();
     return s === needle || s.startsWith(`${needle}:`);
   });
+  if (hasReason("stale")) return "Données live trop anciennes";
+  if (hasReason("eod_snapshot") || qq.isSnapshot === true) return "Dernier prix disponible non exécutable";
+  if (hasReason("abnormal_spread")) return "Prix live incohérent";
+  if (hasReason("quote_quality_missing")) return "Diagnostic live indisponible";
+  if (hasReason("currency_mismatch")) return "Devise live incohérente";
+  return "Données live non exploitables";
+}
+__name(buildUnsafeReasonShort, "buildUnsafeReasonShort");
 
-  let reasonShort;
-  if (hasReason("stale")) reasonShort = "Données live trop anciennes";
-  else if (hasReason("eod_snapshot") || qq.isSnapshot === true) reasonShort = "Dernier prix disponible non exécutable";
-  else if (hasReason("abnormal_spread")) reasonShort = "Prix live incohérent";
-  else if (hasReason("quote_quality_missing")) reasonShort = "Diagnostic live indisponible";
-  else if (hasReason("currency_mismatch")) reasonShort = "Devise live incohérente";
-  else reasonShort = "Données live non exploitables";
+function applyUnsafeDowngrade(payload) {
+  const qq = payload?.liveContext?.quoteQuality;
+  if (!qq || qq.executionSafe !== false) return payload;
+
+  const reasons = Array.isArray(qq.reasons) ? qq.reasons : [];
+  const reasonShort = buildUnsafeReasonShort(qq);
 
   const evalSafety = evaluateExecutionSafety(payload);
 
@@ -3177,6 +3185,12 @@ function applyUnsafeDowngrade(payload) {
 
   const baseConfidence = payload.confidence || {};
   const confLevel = Math.min(Number(baseConfidence.level) || 1, 1);
+
+  // B.11.2 — témoin runtime : marque que le helper a bien tiré.
+  const prevGuards = Array.isArray(payload?.liveContext?.runtimeGuardsApplied)
+    ? payload.liveContext.runtimeGuardsApplied
+    : [];
+  const guardsApplied = prevGuards.includes("b11.2") ? prevGuards : [...prevGuards, "b11.2"];
 
   return {
     ...payload,
@@ -3207,7 +3221,8 @@ function applyUnsafeDowngrade(payload) {
       ...(payload.liveContext || {}),
       executionBlocked: true,
       executionBlockedReason: reasons[0] ?? null,
-      executionBlockedHuman: evalSafety?.human ?? null
+      executionBlockedHuman: evalSafety?.human ?? null,
+      runtimeGuardsApplied: guardsApplied
     }
   };
 }
@@ -4098,63 +4113,69 @@ async function buildStableMarketPayload(symbol, env, ctx, includeCandles = true,
 }
 
 function toOpportunityRow(payload, options = {}) {
+  // B.11.2 P0/P1 — filet défensif : si payload entrant n'a PAS été passé par
+  // applyUnsafeDowngrade (chemin court-circuité, cache obsolète pre-B.11.1,
+  // serializer custom, etc.), on re-applique le downgrade ici. La fonction
+  // est idempotente : si `liveContext.runtimeGuardsApplied` contient déjà
+  // "b11.2", on retourne tel quel.
+  const safePayload = applyUnsafeDowngrade(payload);
   // B.11.1 P1.3 — debugCandles=1 expose les 20 dernières bougies du payload
   // détaillé pour audit. Comportement par défaut inchangé (candles=[]).
   const includeCandles = options?.debugCandles === true;
-  const slicedCandles = includeCandles && Array.isArray(payload.candles)
-    ? payload.candles.slice(-20)
+  const slicedCandles = includeCandles && Array.isArray(safePayload.candles)
+    ? safePayload.candles.slice(-20)
     : [];
   return {
-    symbol: payload.symbol,
-    name: payload.name,
-    assetClass: payload.assetClass,
-    price: payload.price,
-    change24hPct: payload.change24hPct,
-    currency: payload.currency || getCurrencyForSymbol(payload.symbol),
-    sourceUsed: payload.sourceUsed,
-    quotedAt: payload.quotedAt || null,
-    freshness: payload.freshness,
-    status: payload.status,
-    score: payload.score,
-    scoreStatus: payload.scoreStatus,
-    direction: payload.direction,
-    analysisLabel: payload.analysisLabel,
-    confidence: payload.confidence,
-    confidenceLabel: typeof payload.confidenceLabel === "string" ? payload.confidenceLabel : (payload.confidence?.label || "faible"),
-    breakdown: payload.breakdown,
-    reasonShort: payload.reasonShort,
-    decision: payload.decision,
-    trendLabel: payload.trendLabel,
-    setupType: payload.setupType || payload?.plan?.setupType || "aucun",
-    setupStatus: payload?.plan?.setupStatus || null,
-    tradeNow: !!payload?.plan?.tradeNow,
-    confirmationCount: payload?.plan?.confirmationCount ?? null,
-    blockers: Array.isArray(payload?.plan?.blockers) ? payload.plan.blockers : [],
-    decisionScore: payload?.plan?.decisionScore ?? null,
-    safetyScore: payload?.plan?.safetyScore ?? null,
-    exploitabilityScore: payload?.plan?.exploitabilityScore ?? null,
-    dossierScore: payload?.plan?.finalScore ?? payload?.score ?? null,
-    officialScore: Number.isFinite(Number(payload?.officialScore))
-      ? Number(payload.officialScore)
-      : (payload?.plan?.safetyScore ?? payload?.plan?.exploitabilityScore ?? null),
-    officialDecision: payload?.officialDecision || payload?.plan?.decision || payload?.decision || null,
-    officialTrendLabel: payload?.officialTrendLabel || payload?.plan?.trendLabel || payload?.trendLabel || null,
-    officialWaitFor: payload?.officialWaitFor || payload?.plan?.waitFor || null,
-    regime: payload.regime || null,
-    aiContextReview: payload.aiContextReview || null,
-    aiModifier: payload.aiModifier ?? 0,
-    aiInfluence: payload.aiInfluence || "aucune",
-    aiContextStatus: payload.aiContextStatus || null,
-    plan: payload.plan,
+    symbol: safePayload.symbol,
+    name: safePayload.name,
+    assetClass: safePayload.assetClass,
+    price: safePayload.price,
+    change24hPct: safePayload.change24hPct,
+    currency: safePayload.currency || getCurrencyForSymbol(safePayload.symbol),
+    sourceUsed: safePayload.sourceUsed,
+    quotedAt: safePayload.quotedAt || null,
+    freshness: safePayload.freshness,
+    status: safePayload.status,
+    score: safePayload.score,
+    scoreStatus: safePayload.scoreStatus,
+    direction: safePayload.direction,
+    analysisLabel: safePayload.analysisLabel,
+    confidence: safePayload.confidence,
+    confidenceLabel: typeof safePayload.confidenceLabel === "string" ? safePayload.confidenceLabel : (safePayload.confidence?.label || "faible"),
+    breakdown: safePayload.breakdown,
+    reasonShort: safePayload.reasonShort,
+    decision: safePayload.decision,
+    trendLabel: safePayload.trendLabel,
+    setupType: safePayload.setupType || safePayload?.plan?.setupType || "aucun",
+    setupStatus: safePayload?.plan?.setupStatus || null,
+    tradeNow: !!safePayload?.plan?.tradeNow,
+    confirmationCount: safePayload?.plan?.confirmationCount ?? null,
+    blockers: Array.isArray(safePayload?.plan?.blockers) ? safePayload.plan.blockers : [],
+    decisionScore: safePayload?.plan?.decisionScore ?? null,
+    safetyScore: safePayload?.plan?.safetyScore ?? null,
+    exploitabilityScore: safePayload?.plan?.exploitabilityScore ?? null,
+    dossierScore: safePayload?.plan?.finalScore ?? safePayload?.score ?? null,
+    officialScore: Number.isFinite(Number(safePayload?.officialScore))
+      ? Number(safePayload.officialScore)
+      : (safePayload?.plan?.safetyScore ?? safePayload?.plan?.exploitabilityScore ?? null),
+    officialDecision: safePayload?.officialDecision || safePayload?.plan?.decision || safePayload?.decision || null,
+    officialTrendLabel: safePayload?.officialTrendLabel || safePayload?.plan?.trendLabel || safePayload?.trendLabel || null,
+    officialWaitFor: safePayload?.officialWaitFor || safePayload?.plan?.waitFor || null,
+    regime: safePayload.regime || null,
+    aiContextReview: safePayload.aiContextReview || null,
+    aiModifier: safePayload.aiModifier ?? 0,
+    aiInfluence: safePayload.aiInfluence || "aucune",
+    aiContextStatus: safePayload.aiContextStatus || null,
+    plan: safePayload.plan,
     candles: slicedCandles,
-    strategicAnalysis: payload.strategicAnalysis ?? null,
-    liveContext: payload.liveContext ?? null,
-    snapshotId: payload.snapshotId ?? null,
-    strategicCalculatedAt: payload.strategicCalculatedAt ?? null,
-    candlesUpdatedAt: payload.candlesUpdatedAt ?? null,
-    regimeUpdatedAt: payload.regimeUpdatedAt ?? null,
-    learningSnapshotAt: payload.learningSnapshotAt ?? null,
-    error: payload.status === "unavailable" ? payload.reasonShort : null
+    strategicAnalysis: safePayload.strategicAnalysis ?? null,
+    liveContext: safePayload.liveContext ?? null,
+    snapshotId: safePayload.snapshotId ?? null,
+    strategicCalculatedAt: safePayload.strategicCalculatedAt ?? null,
+    candlesUpdatedAt: safePayload.candlesUpdatedAt ?? null,
+    regimeUpdatedAt: safePayload.regimeUpdatedAt ?? null,
+    learningSnapshotAt: safePayload.learningSnapshotAt ?? null,
+    error: safePayload.status === "unavailable" ? safePayload.reasonShort : null
   };
 }
 
