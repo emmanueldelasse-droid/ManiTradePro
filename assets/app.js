@@ -1138,6 +1138,8 @@
     if (v === "abnormal_spread") return "écart anormal";
     // P0.1 — nouveau status : snapshot EOD = filet ultime, non exécutable
     if (v === "eod_snapshot") return "snapshot EOD";
+    // B.11 P0.2 — bougies daily périmées
+    if (v === "candles_too_old") return "bougies périmées";
     return value || "—";
   }
 
@@ -1151,6 +1153,8 @@
     if (v === "provider_unsafe") return "fournisseur non fiable";
     // P0.1 — drapeau snapshot EOD remonte aussi dans reasons[]
     if (v === "eod_snapshot") return "prix de clôture veille";
+    // B.11 P0.2 — drapeau bougies daily périmées
+    if (v === "candles_too_old") return "bougies daily périmées";
     // P2.3 — fallback générique et diagnostic absent (B.9 / B.10)
     if (v === "quote_unsafe") return "prix non fiable";
     if (v === "quote_quality_missing") return "diagnostic absent";

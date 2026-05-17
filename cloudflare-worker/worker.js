@@ -685,6 +685,31 @@ function normalizeBinanceSymbol(symbol) {
   };
   return map[symbol] || `${symbol}USDT`;
 }
+// B.11 P1.1 — canonicalise un symbole crypto venu de l'extérieur (Binance pair
+// `BTCUSDT`, Yahoo format `BTC-USD`, etc.) vers le ticker court utilisé dans
+// CRYPTO_SYMBOLS et le panel (`BTC`, `ETH`, ...). Sans ce mapping, la route
+// `/api/opportunity-detail/BTCUSDT` retournait partial price:null alors que le
+// scan listait `BTC` live. N'altère JAMAIS un symbole non-crypto (préserve les
+// stocks ASML.AS, BMW.DE et cie).
+function canonicalCryptoSymbol(raw) {
+  const sym = String(raw || "").trim().toUpperCase();
+  if (!sym) return sym;
+  if (isCrypto(sym)) return sym;
+  if (sym.endsWith("USDT") && sym.length > 4) {
+    const stripped = sym.slice(0, -4);
+    if (isCrypto(stripped)) return stripped;
+    if (stripped === "POL" && isCrypto("MATIC")) return "MATIC";
+  }
+  if (sym.endsWith("-USD") && sym.length > 4) {
+    const stripped = sym.slice(0, -4);
+    if (isCrypto(stripped)) return stripped;
+  }
+  if (sym.endsWith("USD") && sym.length > 3 && !sym.endsWith("CHF") && !sym.endsWith("AUD")) {
+    const stripped = sym.slice(0, -3);
+    if (isCrypto(stripped)) return stripped;
+  }
+  return sym;
+}
 function normalizeYahooSymbol(symbol) {
   // Mapping vers les tickers Yahoo (= bourse de cotation). Sans ce mapping,
   // Yahoo cherche "LVMH" comme ticker US et renvoie "no data" → l'action
@@ -2871,14 +2896,27 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   // - crypto : > 120 s
   // - delayed : > 1800 s (30 min, tolere 15 min de retard legal + marge)
   // - live    : > 600 s (10 min)
-  // Hors marche (marketClosed), on ne marque PAS stale par defaut.
+  // Hors marche (marketClosed), borne dure 24h (B.11 P0.1) — avant ce patch
+  // une quote actions de 40-45h restait executionSafe=true sur le WE et
+  // exposait le bot a un gap d'ouverture lundi matin sur prix de vendredi.
+  // delayed seul et marketClosed seul ne bloquent toujours pas (cf. B.10).
   // - freshness === "stale" => stale direct (provider l'a signale).
   let stale = false;
   const staleReasons = [];
   if (freshness === "stale") { stale = true; staleReasons.push("freshness=stale"); }
-  if (!marketClosed && Number.isFinite(ageSec)) {
-    const maxAge = cls === "crypto" ? 120 : delayed ? 1800 : 600;
-    if (ageSec > maxAge) { stale = true; staleReasons.push(`age=${ageSec}s > ${maxAge}s`); }
+  if (Number.isFinite(ageSec)) {
+    let maxAge;
+    if (cls === "crypto") {
+      maxAge = 120;
+    } else if (marketClosed) {
+      maxAge = 86400; // B.11 P0.1 — anti gap WE
+    } else {
+      maxAge = delayed ? 1800 : 600;
+    }
+    if (ageSec > maxAge) {
+      stale = true;
+      staleReasons.push(`max_stagnant_age:age=${ageSec}s>${maxAge}s`);
+    }
   }
 
   // CURRENCY MISMATCH — devise quote != devise attendue (ou absente).
@@ -2886,6 +2924,32 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   if (expectedCurrency) {
     if (!quoteCurrency) currencyMismatch = true;
     else if (quoteCurrency !== expectedCurrency) currencyMismatch = true;
+  }
+
+  // CANDLES TOO OLD — B.11 P0.2. Detecte les bougies daily figees (ex.
+  // ROG.SW non couvert par EODHD depuis 53 jours qui continuait a scorer
+  // sur donnees fossiles). Le scan B.10 produisait un score "ok" malgre
+  // candlesUpdatedAt vieux de plusieurs semaines. On bloque executionSafe
+  // et on flag le payload pour bascule en partial cote builder.
+  // Bornes : non-crypto > 14 jours, crypto > 3 jours. Si candles vide ou
+  // pas de timestamp lisible, on ne flagge pas (pas de faux positif sur
+  // les actifs qui n'ont juste pas assez de bougies).
+  let candlesTooOld = false;
+  let candlesAgeDays = null;
+  if (Array.isArray(candles) && candles.length > 0) {
+    const lastTime = candles[candles.length - 1]?.time;
+    let lastTs = null;
+    if (typeof lastTime === "string") {
+      const parsed = Date.parse(lastTime);
+      if (Number.isFinite(parsed)) lastTs = parsed;
+    } else if (typeof lastTime === "number" && Number.isFinite(lastTime)) {
+      lastTs = lastTime > 1e12 ? lastTime : lastTime * 1000;
+    }
+    if (Number.isFinite(lastTs)) {
+      candlesAgeDays = +((now.getTime() - lastTs) / 86400000).toFixed(1);
+      const maxDays = cls === "crypto" ? 3 : 14;
+      if (candlesAgeDays > maxDays) candlesTooOld = true;
+    }
   }
 
   // ABNORMAL SPREAD — ecart livePrice vs derniere close en multiples d'ATR.
@@ -2934,6 +2998,9 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
     else reasons.push("abnormal_spread");
   }
   if (providerConfidence === "unsafe") { executionSafe = false; reasons.push("provider_unsafe"); }
+  // B.11 P0.2 — bougies daily periméees bloquent l'execution. Le scoring
+  // amont sera basculé en partial cote builder (cf. buildStablePayload).
+  if (candlesTooOld) { executionSafe = false; reasons.push("candles_too_old"); }
   // P0.1 — snapshot/EOD pas exécutable. Drapeau distinct dans reasons[] pour
   // que safety-stats (B.9.1) puisse compter les blocages dus au filet EOD.
   if (isSnapshot) { executionSafe = false; reasons.push("eod_snapshot"); }
@@ -2947,6 +3014,7 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
   if (isSnapshot) validationStatus = "eod_snapshot";
   else if (currencyMismatch) validationStatus = "currency_mismatch";
   else if (stale) validationStatus = "stale";
+  else if (candlesTooOld) validationStatus = "candles_too_old";
   else if (abnormalSpread) validationStatus = "abnormal_spread";
   else if (providerConfidence === "unsafe") validationStatus = "unsafe";
   else if (marketClosed) validationStatus = "market_closed";
@@ -2977,10 +3045,12 @@ function quoteQualityEngine(quote, candles = [], options = {}) {
     validationStatus,
     reasons,
     isSnapshot,
+    candlesTooOld, // B.11 P0.2
     // metadata utile pour debug / audit
     ageSec,
     spreadDeltaAtr,
     spreadPct,
+    candlesAgeDays, // B.11 P0.2
     expectedCurrency,
     quoteCurrency
   };
@@ -3035,6 +3105,7 @@ function evaluateExecutionSafety(payload) {
   if (qqReasons.includes("eod_snapshot") || qq.isSnapshot === true) reasons.push("eod_snapshot");
   if (qq.currencyMismatch === true) reasons.push("currency_mismatch");
   if (qq.stale === true) reasons.push("stale");
+  if (qq.candlesTooOld === true) reasons.push("candles_too_old"); // B.11 P0.2
   if (qq.abnormalSpread === true) reasons.push("abnormal_spread");
   if (qq.providerConfidence === "unsafe" && !reasons.includes("eod_snapshot")) reasons.push("provider_unsafe");
   if (qqReasons.includes("no_price")) reasons.push("no_price");
@@ -3045,6 +3116,7 @@ function evaluateExecutionSafety(payload) {
     eod_snapshot: "Snapshot EOD — pas d'exécution sur prix de clôture",
     currency_mismatch: "Devise incohérente — blocage exécution",
     stale: "Prix live périmé — blocage exécution",
+    candles_too_old: "Bougies daily périmées — analyse non fiable", // B.11 P0.2
     abnormal_spread: "Écart anormal vs dernière clôture — blocage exécution",
     provider_unsafe: "Fournisseur de prix non fiable — blocage exécution",
     no_price: "Prix absent — blocage exécution",
@@ -3877,6 +3949,14 @@ function buildStablePayload(symbol, quote, candles, scored, regime = null) {
   if (base.score == null) {
     return buildPartialAnalysisPayload(symbol, quote, "Analyse technique partielle", regime);
   }
+  // B.11 P0.2 — si les bougies daily sont périmées (> 14j non-crypto, > 3j crypto),
+  // on refuse de produire un score "ok" exploitable malgré la présence du score
+  // calculé en amont. Bascule en partial avec libellé explicite. La gate safety
+  // a déjà mis executionSafe=false, mais sans ce bypass l'UI continuerait à
+  // afficher une décision tradeable basée sur des données fossiles.
+  if (scored?.liveContext?.quoteQuality?.candlesTooOld === true) {
+    return buildPartialAnalysisPayload(symbol, quote, "Données historiques périmées", regime);
+  }
 
   const plan = buildWorkerPlan({ ...base, avgRange: scored?.avgRange }, regime);
   const confidence = confidenceLevelFromPlan(plan);
@@ -4112,13 +4192,17 @@ function riskStateBlockerMessage(flag) {
 // ============================================================
 // HANDLE OPPORTUNITIES — avec régime global
 // ============================================================
-async function handleOpportunities(_url, env) {
+async function handleOpportunities(url, env) {
   // Enrichit les sets (CRYPTO_SYMBOLS, NAME_MAP, etc.) avec les actifs Supabase
   await refreshDynamicAssetSets(env);
   const allSymbols = await getDynamicSymbols(env);
 
-  // Cache memoire valide ?
-  const cachedRows = getMemoryCache("route:opportunities:data");
+  // B.11 P2 — force=1 bypass le cache memoire ET demande un Cache-Control
+  // no-store en sortie pour neutraliser les CDN/navigateurs intermédiaires.
+  const forceRefresh = url?.searchParams?.get("force") === "1";
+
+  // Cache memoire valide ? Skip si force=1.
+  const cachedRows = forceRefresh ? null : getMemoryCache("route:opportunities:data");
   if (cachedRows) {
     const rows = cloneJsonPayload(cachedRows);
     const validCount = rows.filter(x => x.status === "ok").length;
@@ -4355,10 +4439,15 @@ async function handleOpportunities(_url, env) {
     ? `${validCount}/${publicRows.length} actifs analyses - regime ${regime.regime}`
     : message;
 
+  // B.11 P2 — sortie sans Cache-Control public quand force=1 (ok au lieu de
+  // okCached → Cache-Control: no-store pour neutraliser CDN/navigateur).
+  const responseBuilder = forceRefresh
+    ? (validCount < publicRows.length ? partial : ok)
+    : (validCount < publicRows.length ? partial : okCached);
   return attachBudgetHeaders(
-    (validCount < publicRows.length ? partial : okCached)(
-      publicRows, "worker-v2", nowIso(), validCount ? "recent" : "unknown", publicMessage, KV_TTL.opportunities
-    ),
+    forceRefresh
+      ? responseBuilder(publicRows, "worker-v2", nowIso(), validCount ? "recent" : "unknown", publicMessage)
+      : responseBuilder(publicRows, "worker-v2", nowIso(), validCount ? "recent" : "unknown", publicMessage, KV_TTL.opportunities),
     ctx
   );
 }
@@ -4373,7 +4462,9 @@ function getOpportunityRowFromSnapshot(symbol) {
 // HANDLE OPPORTUNITY DETAIL
 // ============================================================
 async function handleOpportunityDetail(symbol, env, url = null) {
-  const clean = parseSymbol(symbol);
+  // B.11 P1.1 — canonicalise les paires crypto (BTCUSDT → BTC) pour aligner
+  // la route fiche avec la route scan qui utilise les tickers courts du panel.
+  const clean = canonicalCryptoSymbol(symbol);
   if (!clean) return fail("Invalid symbol", "error", 400);
 
   const detailTtl = isCrypto(clean) ? TTL.detailCrypto : TTL.detailNonCrypto;
@@ -6362,7 +6453,8 @@ async function handleTrainingSafetyStats(url, env) {
   // soit deterministe meme si la fenetre n'a vu aucun blocage.
   const knownCodes = [
     "stale", "currency_mismatch", "abnormal_spread", "provider_unsafe",
-    "no_price", "quote_unsafe", "quote_quality_missing", "eod_snapshot"
+    "no_price", "quote_unsafe", "quote_quality_missing", "eod_snapshot",
+    "candles_too_old" // B.11 P0.2
   ];
   const byCode = Object.fromEntries(knownCodes.map(k => [k, 0]));
 
@@ -9346,6 +9438,7 @@ async function handleHealth(request, env) {
   const circuits = {
     twelvedata: circuitStatus("twelvedata"),
     yahoo: circuitStatus("yahoo"),
+    eodhd: circuitStatus("eodhd"), // B.11 P1.2 — combler le trou d'observabilité B.10.1
     supabase: circuitStatus("supabase"),
     binance: circuitStatus("binance")
   };
@@ -9357,7 +9450,11 @@ async function handleHealth(request, env) {
     engineRuleset: ENGINE_RULESET,
     liveDataOnly: true,
     panel: { symbols: LIGHT_SYMBOLS.length, proxyRegime: PROXY_REGIME_SYMBOLS },
-    strategies: { enabled: ["pullback","breakout","continuation"], disabled: ["mean_reversion"], shorts: true },
+    // B.11 P1.3 — mean_reversion EST en réalité activée par défaut (cf.
+    // trainingDefaults.mean_reversion_enabled=true et allowed_setups qui inclut
+    // "mean_reversion", l. 4500-4502). L'ancien hardcoded "disabled" trompait
+    // l'observabilité /health. On reflète la vérité runtime.
+    strategies: { enabled: ["pullback","breakout","continuation","mean_reversion"], disabled: [], shorts: true },
     cron: {
       configured: true,
       schedule: "*/30 13-20 utc weekdays + 0 */2 off-hours",
