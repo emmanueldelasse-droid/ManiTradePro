@@ -854,3 +854,97 @@ PAYX, ZEN, ONTO, DUOL, GBPUSD — tous sur PULLBACK ou BREAKOUT en tier OK, jama
 - **BREAKOUT_EXPANSION** sort 0 cellule STRONG — ce setup est plus fragile que PULLBACK et RS dans les backtests actuels. À investiguer : variant `breakout_h20_vol13` vs `breakout_h10_vol12` pour voir si une variante précise est meilleure (non décomposé dans la matrice actuelle, qui agrège toutes les variantes d'un setup).
 - La matrice ne décompose pas par variante (pullback_rsi42_58_chg20_5 vs pullback_rsi42_58_chg20_3). Une v2 future pourrait ajouter ce niveau de granularité.
 - L'effet de levier (SOXL) reste invisible au moteur : SOXL × PULLBACK sort STRONG 100, le risque non-linéaire doit être pris en compte côté allocation.
+
+---
+
+# Setup × Variant Matrix v1 — troisième livraison quant
+
+Fichier créé :
+
+```text
+tools/backtests/setup-variant-matrix-v1.mjs
+```
+
+Le moteur réutilise `tools/backtests/lib/backtest-records.mjs` (aucune duplication).
+
+Sorties écrites :
+
+- `tools/backtests/output/setup-variant-matrix.json`
+- `tools/backtests/output/setup-variant-matrix.md`
+
+Comment le relancer :
+
+```text
+node tools/backtests/setup-variant-matrix-v1.mjs
+```
+
+## Résultat du premier run
+
+- 181 actifs × 30 variantes distinctes = **4 301 cellules**
+- STRONG : **389**
+- OK : **676**
+- WEAK : **667**
+- AVOID : **2 569**
+
+## Découvertes notables grâce à la granularité variante
+
+### Cas SOXL — RS débloqué via une variante précise
+
+La matrice (actif × setup) classait **SOXL × RELATIVE_STRENGTH_ROTATION** en AVOID (45). En décomposant par variante :
+
+| Setup | Variante | Tier | Score | Trades | Exp | PF |
+|---|---|---|---:|---:|---:|---:|
+| RELATIVE_STRENGTH_ROTATION | rs_20d_top5_hold5 | STRONG | 80 | 29 | 0.55 | 2.36 |
+| RELATIVE_STRENGTH_ROTATION | rs_120d_top10_hold20 | (moins bon) | — | — | — | — |
+
+Donc SOXL est compatible avec **une seule variante** de RS (la 20d top5), pas avec les autres. Sans cette granularité, on perdait du signal exploitable.
+
+### Cas NVDA — confirmé robuste sur Pullback, multi-variantes
+
+NVDA a au moins **8 variantes Pullback STRONG ou OK** avec scores 72-80 :
+- `base_rsi42_58_chg20_0_stop0.1` STRONG (80)
+- `rsi42_58_chg20_3_stop0.1` STRONG (80)
+- `rsi42_58_chg20_5_stop0.5` STRONG (78)
+- `rsi42_58_chg20_3_stop0.5` STRONG (75)
+- etc.
+
+C'est cohérent : NVDA × Pullback est un setup solide quelle que soit la variante précise (signe de robustesse, pas d'overfit). À l'inverse, NVDA × RS reste AVOID toutes variantes confondues.
+
+### Cas PLTR — multi-variantes STRONG sur RS ET Pullback
+
+PLTR sort STRONG 100 sur `rs_120d_top10_hold20` ET `rs_90d_top10_hold20`, et STRONG 95 sur plusieurs Pullback. Actif particulièrement versatile.
+
+## Variantes à abandonner (7 identifiées)
+
+Critères : ≥ 10 actifs testés, aucune cellule STRONG, ratio AVOID > 70 %.
+
+| Setup | Variante | AVOID / total |
+|---|---|---:|
+| VOLATILITY_COMPRESSION | compression_40_ratio0.7_break30_stop1.5_rr2.5 | 100 % (69/69) |
+| MEAN_REVERSION | meanrev_rsi30_dist7_stop1.5_rr1.5 | 92 % |
+| MEAN_REVERSION | meanrev_rsi30_dist5_stop1_rr1.2 | 89 % |
+| BREAKOUT_EXPANSION | breakout_h50_vol1.5_stop1.5_rr2.5 | 88 % |
+| VOLATILITY_COMPRESSION | compression_20_ratio0.65_break20_stop1_rr2 | 87 % |
+| VOLATILITY_COMPRESSION | compression_20_ratio0.75_break20_stop1_rr2 | 85 % |
+| BREAKOUT_EXPANSION | breakout_h50_vol1.2_stop1.5_rr2.5 | 85 % |
+
+Lecture : les variantes BREAKOUT longues fenêtres (h50) sont systématiquement perdantes. Les variantes BREAKOUT h20 sont plus prometteuses (quelques cellules OK). Pour MEAN_REVERSION, seule `meanrev_rsi35_dist4_stop1_rr1.2` survit avec 27 cellules OK.
+
+## Inventaire des nommages variantes (limite documentée)
+
+Le même Pullback existe sous plusieurs noms selon la source :
+- `pullback_rsi42_58_chg20_5_stop0.1` (multi-setup-grid)
+- `rsi42_58_chg20_5_stop0.1` (pullback-grid + walk-forward)
+
+Ils sont **traités comme deux variantes distinctes** dans la matrice — aucune fusion automatique pour ne pas inventer une équivalence non vérifiée. Une normalisation explicite des noms est à prévoir dans une future passe (idéalement côté source de backtest, pour ne pas ajouter de couche fragile dans l'agrégateur).
+
+## Non-régression vérifiée
+
+Cette PR ne modifie ni `asset-quality-engine-v1.mjs` ni `asset-setup-matrix-v1.mjs`. Les deux ont tout de même été relancés et leurs JSON outputs comparés byte-par-byte (hors `generatedAt`) avec les versions actuelles : **strictement identiques**.
+
+## Limites restantes
+
+- Pas de walk-forward strict par variante. Une variante peut paraître STRONG sur l'historique tout en surajustant. C'est exactement ce que la priorité #2 du TODO quant adresse (Walk-forward réel).
+- Les variantes UNKNOWN_VARIANT (8 records issus de `results-pullback-2025.json`) sont préservées mais exclues des sections "meilleures variantes" et "à abandonner".
+- Le moteur d'allocation n'est pas encore implémenté — la matrice variante dit quoi trader, pas combien.
+- Pas de gestion explicite des familles de variantes (ex. tous les `rsi42_58_chg20_5_*` partagent un noyau commun mais sont traités indépendamment).
