@@ -1042,3 +1042,79 @@ Aucune. Les deux variantes RS qui fonctionnent en RANGE fonctionnent aussi (au m
 - **Couverture variant** : seules 2 variantes RS ont un breakdown régime. Les autres setups (Pullback, Breakout, MEAN_REVERSION, VOLATILITY_COMPRESSION) ne sont pas couverts.
 - **Walk-forward** : aucune validation walk-forward par régime. Une variante peut sembler robuste sur l'historique tout en surajustant aux conditions passées.
 - **Allocation** : la matrice dit quoi autoriser/interdire selon le régime, pas combien allouer.
+
+---
+
+# bySymbolByRegime + variant-regime-matrix v2 — verrou data levé
+
+## Ce qui a été fait
+
+1. Ajout d'un champ `bySymbolByRegime[]` au script `tools/backtests/backtest-relative-strength-rotation-regime-v1.mjs`. Strictement additif — aucun champ existant modifié, vérifié byte-par-byte (les anciens `rows`, `byRegime`, `bySymbol` sont identiques avant/après).
+2. Mise à jour de `tools/backtests/variant-regime-matrix-v1.mjs` pour consommer `bySymbolByRegime[]` quand disponible. Le moteur retombe proprement en mode legacy (matrice globale seule) si le champ est absent.
+3. Le rapport `variant-regime-matrix.md` expose désormais une **vraie section per-actif** (symbol × variant × regimeMode × regime) avec tier par cellule.
+
+## Résultat
+
+- Avant : 12 cellules globales agrégées (toutes symboles confondus).
+- Après : 12 cellules globales **+ 888 cellules per-(symbol × variant × regimeMode × regime)** sur 108 actifs × 2 variantes RS.
+- Répartition per-symbol : 103 STRONG / 66 OK / 77 WEAK / 642 AVOID.
+
+## Découvertes validées par la nouvelle granularité
+
+### NVDA × RS — interdiction confirmée par 10 cellules sur 10
+
+| Variante | Mode | Régime | Tier | Trades | Exp | PF |
+|---|---|---|---|---:|---:|---:|
+| rs_90d | ALL_REGIMES | RANGE | AVOID (50) | 15 | -0.46 | 6.06 |
+| rs_90d | ALL_REGIMES | RISK_ON | AVOID (17) | 13 | -1.63 | 0.23 |
+| rs_120d | ALL_REGIMES | RANGE | AVOID (50) | 19 | -0.11 | 6.78 |
+| rs_120d | ALL_REGIMES | RISK_ON | AVOID (13) | 7 | -3.89 | 0.23 |
+
+→ **Toutes** les combinaisons NVDA × RS × régime observées sortent AVOID. La conclusion intuitive ("NVDA n'est pas pour RS") est désormais rigoureusement étayée par les chiffres per-cellule, pas seulement par l'agrégé.
+
+### SOL × RS — STRONG dans tous les régimes observés
+
+| Variante | Mode | Régime | Tier | Trades | Exp | PF |
+|---|---|---|---|---:|---:|---:|
+| rs_90d | ALL_REGIMES | RANGE | STRONG (92) | 13 | 5.52 | 4.17 |
+| rs_90d | ALL_REGIMES | RISK_ON | STRONG (90) | 16 | 2.52 | 5.72 |
+| rs_120d | ALL_REGIMES | RANGE | STRONG (92) | 12 | 7.32 | 12.62 |
+| rs_120d | ALL_REGIMES | RISK_ON | STRONG (77) | 16 | 1.67 | 2.08 |
+
+→ SOL est exploitable en RS **quelle que soit la combinaison**. Pas de filtre régime nécessaire pour cet actif.
+
+### PLTR × RS — STRONG dans RISK_ON ET RANGE
+
+| Variante | Mode | Régime | Tier | Trades | Exp |
+|---|---|---|---|---:|---:|
+| rs_90d | ALL_REGIMES | RANGE | STRONG (89) | 13 | 1.32 |
+| rs_90d | ALL_REGIMES | RISK_ON | STRONG (95) | 18 | 3.13 |
+| rs_120d | ALL_REGIMES | RANGE | STRONG (89) | 13 | 1.44 |
+| rs_120d | ALL_REGIMES | RISK_ON | STRONG (95) | 21 | 2.99 |
+
+→ PLTR confirme son rang ELITE : STRONG partout, exp > 1 dans tous les régimes.
+
+## Non-régression confirmée
+
+Les 3 autres moteurs (asset-quality, asset-setup-matrix, setup-variant-matrix) ont été relancés et leurs JSON outputs comparés byte-par-byte (hors `generatedAt`) : **strictement identiques**. Le re-run du backtest source produit aussi des `rows`, `byRegime`, `bySymbol` identiques aux anciens.
+
+## Conséquences pour le moteur opérationnel
+
+Le moteur peut maintenant raisonner en quatre niveaux complémentaires :
+1. **Tier global par actif** (ELITE/CORE/TACTICAL/BLACKLIST) — décide quel univers tradable.
+2. **Tier par (actif × setup)** — décide quel setup utiliser pour chaque actif.
+3. **Tier par (actif × setup × variante)** — décide quelle variante utiliser.
+4. **Tier par (actif × variante × régime)** — décide d'autoriser ou non un trade dans le régime courant.
+
+Exemple complet : "Aujourd'hui, le bot a une opportunité NVDA. Le tier global NVDA est CORE (autorisé). Le tier NVDA × RS rotation est AVOID (interdit). On passe. Si demain l'opportunité est SOL × RS rotation en RANGE → tier STRONG (autorisé)."
+
+## Limites restantes
+
+- **Couverture variant** : `bySymbolByRegime[]` n'existe que pour `rs_90d_top10_hold20` et `rs_120d_top10_hold20`. Les autres variantes RS et tous les autres setups (Pullback, Breakout, MEAN_REVERSION, VOLATILITY_COMPRESSION) restent sans dimension régime per-symbol.
+- **Symboles couverts** : 108 actifs (sur 181 du total). Les actifs jamais sélectionnés par les variantes RS (faute de momentum suffisant sur la période) n'apparaissent pas dans la matrice per-symbol.
+- **Walk-forward** : toujours pas de validation walk-forward par régime. Une cellule STRONG sur l'historique reste susceptible de surajustement.
+- **Allocation** : décide oui/non, pas le sizing.
+
+## Prochaine étape recommandée
+
+Étendre `bySymbolByRegime[]` aux autres scripts de backtest (Pullback, Breakout) — même pattern, déclaration locale + boucle inside-loop dans le script générateur. Une fois fait, la matrice per-actif-par-régime couvrira tous les setups, et la priorité #4 du TODO quant (Allocation dynamique) deviendra accessible avec la vraie granularité.

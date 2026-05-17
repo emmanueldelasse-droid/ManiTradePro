@@ -1,12 +1,12 @@
 # Variant × Regime Matrix — ManiTradePro
 
-> Généré le 2026-05-17T22:40:43.014Z par `tools/backtests/variant-regime-matrix-v1.mjs`.
+> Généré le 2026-05-17T22:51:36.396Z par `tools/backtests/variant-regime-matrix-v1.mjs`.
 
 ## 1. Synthèse globale
 
-**Limite importante** : la dimension régime n'est exposée que par `results-relative-strength-rotation-regime-v1.json`. Seules **2 variantes RS** ont un breakdown régime complet (`rs_90d_top10_hold20`, `rs_120d_top10_hold20`). Les autres setups (Pullback, Breakout, etc.) ne sont **pas couverts** par cette matrice.
+**Limite résiduelle** : la dimension régime n'est exposée que par `results-relative-strength-rotation-regime-v1.json`. Seules **2 variantes RS** ont un breakdown régime complet (`rs_90d_top10_hold20`, `rs_120d_top10_hold20`). Les autres setups (Pullback, Breakout, etc.) ne sont **pas couverts** par cette matrice tant que leurs scripts de backtest n'auront pas été étendus.
 
-**Limite supplémentaire** : il n'existe **aucune donnée per-(symbol × variant × regime individuel)** dans les JSON disponibles. La matrice globale (`byRegime`) est aggregate (tous symboles confondus). Pour les analyses par actif, la matrice expose uniquement la comparaison (symbol × variant × regimeMode = ALL_REGIMES vs NO_RISK_OFF), ce qui mesure la dépendance RISK_OFF d'un actif sans dire ce qu'il fait précisément en RISK_ON / RANGE / RISK_OFF séparément. Cette dimension est marquée comme non disponible dans le rapport.
+**Breakdown per-(symbol × variant × regimeMode × regime) disponible** depuis l'ajout de `bySymbolByRegime[]` à la source RS regime. La matrice per-symbol expose `888` cellules sur `108` actifs × `2` variantes (cf. sections 7 et 7-bis).
 
 - Cellules globales (variant × regimeMode × regime) : **12**
 - Variantes couvertes : rs_120d_top10_hold20, rs_90d_top10_hold20
@@ -72,102 +72,154 @@ _aucune variante à blacklister sur ce critère_
 
 ## 7. Cas détaillés par actif
 
-**Rappel** : la dimension (symbol × variant × regime individuel) n'est pas disponible. Ce qui suit est la comparaison ALL_REGIMES vs NO_RISK_OFF par actif et par variante RS, pour quantifier l'impact RISK_OFF.
+Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × regime). Le tableau ci-dessous montre toutes les cellules disponibles pour chaque actif focus, avec le tier calculé localement par cellule.
 
 ### NVDA
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_90d_top10_hold20 | ALL_REGIMES | 28 | 57.1% | -1.00 | 5.76 | -28.16 | 35.20 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 28 | 57.1% | -1.00 | 5.76 | -28.16 | 35.20 |
-| rs_120d_top10_hold20 | ALL_REGIMES | 26 | 61.5% | -1.13 | 6.34 | -29.35 | 35.20 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 26 | 61.5% | -1.13 | 6.34 | -29.35 | 35.20 |
-> rs_90d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
-> rs_120d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 50 | 19 | 63.2% | -0.11 | 6.78 | -2.08 | 29.98 | exp -0.11 |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 13 | 7 | 57.1% | -3.89 | 0.23 | -27.27 | 35.20 | exp -3.89 ; PF 0.23 < 1 |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 50 | 19 | 63.2% | -0.11 | 6.78 | -2.08 | 29.98 | exp -0.11 |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | AVOID | 13 | 7 | 57.1% | -3.89 | 0.23 | -27.27 | 35.20 | exp -3.89 ; PF 0.23 < 1 |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | AVOID | 13 | 7 | 57.1% | -3.89 | 0.23 | -27.27 | 35.20 | exp -3.89 ; PF 0.23 < 1 |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 50 | 15 | 60.0% | -0.46 | 6.06 | -6.99 | 29.98 | exp -0.46 |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 17 | 13 | 53.8% | -1.63 | 0.23 | -21.17 | 35.20 | exp -1.63 ; PF 0.23 < 1 |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 50 | 15 | 60.0% | -0.46 | 6.06 | -6.99 | 29.98 | exp -0.46 |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | AVOID | 17 | 13 | 53.8% | -1.63 | 0.23 | -21.17 | 35.20 | exp -1.63 ; PF 0.23 < 1 |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | AVOID | 17 | 13 | 53.8% | -1.63 | 0.23 | -21.17 | 35.20 | exp -1.63 ; PF 0.23 < 1 |
 
 ### SOXL
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_90d_top10_hold20 | ALL_REGIMES | 22 | 54.5% | 0.16 | 2.32 | 3.38 | 17.61 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 22 | 54.5% | 0.16 | 2.32 | 3.38 | 17.61 |
-| rs_120d_top10_hold20 | ALL_REGIMES | 20 | 50.0% | -0.11 | 1.61 | -2.23 | 14.69 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 20 | 50.0% | -0.11 | 1.61 | -2.23 | 14.69 |
-> rs_90d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
-> rs_120d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 28 | 1 | 100.0% | 1.58 | n/a | 1.58 | 0.00 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 40 | 19 | 47.4% | -0.20 | 1.64 | -3.81 | 14.69 | exp -0.20 |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 28 | 1 | 100.0% | 1.58 | n/a | 1.58 | 0.00 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | AVOID | 40 | 19 | 47.4% | -0.20 | 1.64 | -3.81 | 14.69 | exp -0.20 |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | AVOID | 40 | 19 | 47.4% | -0.20 | 1.64 | -3.81 | 14.69 | exp -0.20 |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 17 | 3 | 66.7% | 0.44 | 1.34 | 1.32 | 3.83 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | OK | 53 | 19 | 52.6% | 0.11 | 2.51 | 2.06 | 17.61 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 17 | 3 | 66.7% | 0.44 | 1.34 | 1.32 | 3.83 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | OK | 53 | 19 | 52.6% | 0.11 | 2.51 | 2.06 | 17.61 | — |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | OK | 53 | 19 | 52.6% | 0.11 | 2.51 | 2.06 | 17.61 | — |
 
 ### AVGO
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_90d_top10_hold20 | ALL_REGIMES | 2 | 100.0% | 0.51 | n/a | 1.01 | 0.00 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 2 | 100.0% | 0.51 | n/a | 1.01 | 0.00 |
-| rs_120d_top10_hold20 | ALL_REGIMES | 6 | 66.7% | 0.61 | 4.92 | 3.68 | 2.30 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 5 | 60.0% | 0.64 | 5.82 | 3.23 | 2.30 |
-> rs_90d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
-> rs_120d_top10_hold20 : RISK_OFF contribue +0.45 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | AVOID | 13 | 1 | 100.0% | 0.45 | n/a | 0.45 | 0.00 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | OK | 72 | 5 | 60.0% | 0.64 | 5.82 | 3.23 | 2.30 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | OK | 72 | 5 | 60.0% | 0.64 | 5.82 | 3.23 | 2.30 | — |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | OK | 72 | 5 | 60.0% | 0.64 | 5.82 | 3.23 | 2.30 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 23 | 1 | 100.0% | 0.98 | n/a | 0.98 | 0.00 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 6 | 1 | 100.0% | 0.03 | n/a | 0.03 | 0.00 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 23 | 1 | 100.0% | 0.98 | n/a | 0.98 | 0.00 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | AVOID | 6 | 1 | 100.0% | 0.03 | n/a | 0.03 | 0.00 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | AVOID | 6 | 1 | 100.0% | 0.03 | n/a | 0.03 | 0.00 | échantillon < 5 trades |
 
 ### PLTR
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_120d_top10_hold20 | ALL_REGIMES | 37 | 78.4% | 2.53 | 8.13 | 93.89 | 6.62 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 34 | 79.4% | 2.40 | 7.49 | 81.58 | 6.62 |
-| rs_90d_top10_hold20 | ALL_REGIMES | 34 | 76.5% | 2.53 | 7.74 | 85.86 | 6.62 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 31 | 77.4% | 2.37 | 7.30 | 73.55 | 6.62 |
-> rs_120d_top10_hold20 : RISK_OFF contribue +12.31 totalR (filtrer le retire)
-> rs_90d_top10_hold20 : RISK_OFF contribue +12.31 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 89 | 13 | 76.9% | 1.44 | 2.49 | 18.70 | 5.79 | — |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | WEAK | 55 | 3 | 66.7% | 4.10 | 65.79 | 12.31 | 0.19 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 95 | 21 | 81.0% | 2.99 | 9.35 | 62.88 | 6.62 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 89 | 13 | 76.9% | 1.44 | 2.49 | 18.70 | 5.79 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | STRONG | 95 | 21 | 81.0% | 2.99 | 9.35 | 62.88 | 6.62 | — |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | STRONG | 95 | 21 | 81.0% | 2.99 | 9.35 | 62.88 | 6.62 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 89 | 13 | 84.6% | 1.32 | 2.60 | 17.16 | 5.79 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_OFF | WEAK | 55 | 3 | 66.7% | 4.10 | 65.79 | 12.31 | 0.19 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 95 | 18 | 72.2% | 3.13 | 9.79 | 56.39 | 6.62 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 89 | 13 | 84.6% | 1.32 | 2.60 | 17.16 | 5.79 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | STRONG | 95 | 18 | 72.2% | 3.13 | 9.79 | 56.39 | 6.62 | — |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | STRONG | 95 | 18 | 72.2% | 3.13 | 9.79 | 56.39 | 6.62 | — |
 
 ### APP
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_90d_top10_hold20 | ALL_REGIMES | 42 | 61.9% | 2.25 | 5.74 | 94.49 | 9.96 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 41 | 63.4% | 2.35 | 5.89 | 96.23 | 8.22 |
-| rs_120d_top10_hold20 | ALL_REGIMES | 46 | 67.4% | 2.41 | 7.31 | 110.85 | 15.39 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 43 | 67.4% | 2.29 | 7.57 | 98.39 | 13.65 |
-> rs_90d_top10_hold20 : NO_RISK_OFF apporte +1.74 totalR (RISK_OFF dégrade)
-> rs_120d_top10_hold20 : RISK_OFF contribue +12.46 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 90 | 18 | 61.1% | 1.46 | 3.15 | 26.27 | 7.06 | — |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | WEAK | 55 | 3 | 66.7% | 4.15 | 8.16 | 12.46 | 1.74 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 95 | 25 | 72.0% | 2.89 | 9.51 | 72.12 | 6.59 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 90 | 18 | 61.1% | 1.46 | 3.15 | 26.27 | 7.06 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | STRONG | 95 | 25 | 72.0% | 2.89 | 9.51 | 72.12 | 6.59 | — |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | STRONG | 95 | 25 | 72.0% | 2.89 | 9.51 | 72.12 | 6.59 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 87 | 14 | 57.1% | 1.41 | 2.92 | 19.79 | 5.71 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | -1.74 | 0.00 | -1.74 | 1.74 | échantillon < 5 trades ; RISK_OFF destructeur |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 95 | 27 | 66.7% | 2.83 | 6.88 | 76.44 | 6.59 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 87 | 14 | 57.1% | 1.41 | 2.92 | 19.79 | 5.71 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | STRONG | 95 | 27 | 66.7% | 2.83 | 6.88 | 76.44 | 6.59 | — |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | STRONG | 95 | 27 | 66.7% | 2.83 | 6.88 | 76.44 | 6.59 | — |
 
 ### SMCI
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_120d_top10_hold20 | ALL_REGIMES | 47 | 57.4% | 1.15 | 2.27 | 54.24 | 17.91 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 35 | 57.1% | 0.96 | 2.31 | 33.74 | 17.91 |
-| rs_90d_top10_hold20 | ALL_REGIMES | 35 | 60.0% | 1.29 | 2.21 | 45.13 | 10.53 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 26 | 61.5% | 1.44 | 2.50 | 37.58 | 10.53 |
-> rs_120d_top10_hold20 : RISK_OFF contribue +20.50 totalR (filtrer le retire)
-> rs_90d_top10_hold20 : RISK_OFF contribue +7.55 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 90 | 20 | 65.0% | 1.54 | 2.59 | 30.87 | 8.91 | — |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | STRONG | 82 | 12 | 58.3% | 1.71 | 2.71 | 20.50 | 5.09 | — |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 23 | 15 | 46.7% | 0.19 | 0.99 | 2.87 | 17.91 | PF 0.99 < 1 |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 90 | 20 | 65.0% | 1.54 | 2.59 | 30.87 | 8.91 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | AVOID | 23 | 15 | 46.7% | 0.19 | 0.99 | 2.87 | 17.91 | PF 0.99 < 1 |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | AVOID | 23 | 15 | 46.7% | 0.19 | 0.99 | 2.87 | 17.91 | PF 0.99 < 1 |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 71 | 14 | 57.1% | 0.61 | 2.08 | 8.59 | 7.24 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_OFF | OK | 62 | 9 | 55.6% | 0.84 | 1.67 | 7.55 | 5.09 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 89 | 12 | 66.7% | 2.42 | 3.20 | 28.99 | 10.53 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 71 | 14 | 57.1% | 0.61 | 2.08 | 8.59 | 7.24 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | STRONG | 89 | 12 | 66.7% | 2.42 | 3.20 | 28.99 | 10.53 | — |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | STRONG | 89 | 12 | 66.7% | 2.42 | 3.20 | 28.99 | 10.53 | — |
 
 ### BTC
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_90d_top10_hold20 | ALL_REGIMES | 10 | 70.0% | 1.21 | 2.90 | 12.08 | 2.69 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 10 | 70.0% | 1.21 | 2.90 | 12.08 | 2.69 |
-| rs_120d_top10_hold20 | ALL_REGIMES | 7 | 57.1% | 0.74 | 1.82 | 5.20 | 1.63 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 7 | 57.1% | 0.74 | 1.82 | 5.20 | 1.63 |
-> rs_90d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
-> rs_120d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 28 | 3 | 100.0% | 2.29 | n/a | 6.87 | 0.00 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 0 | 4 | 25.0% | -0.42 | 0.00 | -1.67 | 1.63 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 28 | 3 | 100.0% | 2.29 | n/a | 6.87 | 0.00 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | AVOID | 0 | 4 | 25.0% | -0.42 | 0.00 | -1.67 | 1.63 | échantillon < 5 trades |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | AVOID | 0 | 4 | 25.0% | -0.42 | 0.00 | -1.67 | 1.63 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 28 | 4 | 100.0% | 2.66 | n/a | 10.65 | 0.00 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 28 | 6 | 50.0% | 0.24 | 0.00 | 1.43 | 2.69 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 28 | 4 | 100.0% | 2.66 | n/a | 10.65 | 0.00 | échantillon < 5 trades |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | AVOID | 28 | 6 | 50.0% | 0.24 | 0.00 | 1.43 | 2.69 | — |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | AVOID | 28 | 6 | 50.0% | 0.24 | 0.00 | 1.43 | 2.69 | — |
 
 ### SOL
 
-| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |
-|---|---|---:|---:|---:|---:|---:|---:|
-| rs_120d_top10_hold20 | ALL_REGIMES | 28 | 57.1% | 4.09 | 6.95 | 114.67 | 10.17 |
-| rs_120d_top10_hold20 | NO_RISK_OFF | 28 | 57.1% | 4.09 | 6.95 | 114.67 | 10.17 |
-| rs_90d_top10_hold20 | ALL_REGIMES | 29 | 58.6% | 3.87 | 9.31 | 112.04 | 7.02 |
-| rs_90d_top10_hold20 | NO_RISK_OFF | 29 | 58.6% | 3.87 | 9.31 | 112.04 | 7.02 |
-> rs_120d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
-> rs_90d_top10_hold20 : RISK_OFF contribue +0.00 totalR (filtrer le retire)
+| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |
+|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 92 | 12 | 83.3% | 7.32 | 12.62 | 87.89 | 4.21 | — |
+| rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 77 | 16 | 37.5% | 1.67 | 2.08 | 26.78 | 10.17 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 92 | 12 | 83.3% | 7.32 | 12.62 | 87.89 | 4.21 | — |
+| rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | STRONG | 77 | 16 | 37.5% | 1.67 | 2.08 | 26.78 | 10.17 | — |
+| rs_120d_top10_hold20 | RISK_ON_ONLY | RISK_ON | STRONG | 77 | 16 | 37.5% | 1.67 | 2.08 | 26.78 | 10.17 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 92 | 13 | 69.2% | 5.52 | 4.17 | 71.80 | 4.21 | — |
+| rs_90d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 90 | 16 | 50.0% | 2.52 | 5.72 | 40.24 | 7.02 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 92 | 13 | 69.2% | 5.52 | 4.17 | 71.80 | 4.21 | — |
+| rs_90d_top10_hold20 | NO_RISK_OFF | RISK_ON | STRONG | 90 | 16 | 50.0% | 2.52 | 5.72 | 40.24 | 7.02 | — |
+| rs_90d_top10_hold20 | RISK_ON_ONLY | RISK_ON | STRONG | 90 | 16 | 50.0% | 2.52 | 5.72 | 40.24 | 7.02 | — |
+
+## 7-bis. Matrice per-symbol (synthèse globale)
+
+- Cellules per-(symbol × variant × regimeMode × regime) : **888**
+- Actifs couverts : 108
+- Variantes couvertes : 2
+
+Répartition par tier :
+
+| Tier | Nombre |
+|---|---:|
+| STRONG | 103 |
+| OK | 66 |
+| WEAK | 77 |
+| AVOID | 642 |
 
 ## 8. Recommandations moteur
 
-Sur la base de cette matrice (et compte tenu des limites de couverture) :
+Sur la base de cette matrice :
 
 - **Mode opérationnel cible : NO_RISK_OFF**. La cellule (variant, RANGE) est systématiquement plus rentable que la cellule (variant, RISK_ON) pour les deux variantes RS couvertes. RANGE est l'environnement le plus favorable pour la rotation momentum.
-- **Interdire les variantes RS quand le régime macro est RISK_OFF**. Les cellules ALL_REGIMES × RISK_OFF sortent AVOID ou expectancy ≤ 0 pour `rs_90d_top10_hold20` (`rs_120d` est plus résilient mais marginalement).
-- **Allouer plus en RANGE qu'en RISK_ON** pour les variantes STRONG en RANGE — c'est là que l'expectancy est ~2× supérieure.
-- **Ne pas conclure pour les autres setups** (Pullback, Breakout, etc.) tant qu'un breakdown régime n'est pas ajouté à leurs JSON de backtest. La matrice setup-variant et la matrice asset-quality restent les sources de vérité pour eux, sans dimension régime.
-- **Priorité quant à ajouter** : un breakdown `bySymbolByRegime` dans les scripts de backtest. Sans ça, on ne pourra jamais répondre rigoureusement à la question "NVDA × Pullback en RANGE ?".
+- **Interdire les variantes RS quand le régime macro est RISK_OFF**. Les cellules ALL_REGIMES × RISK_OFF sortent AVOID ou expectancy ≤ 0 pour `rs_90d_top10_hold20` (`rs_120d` est plus résilient).
+- **Allouer plus en RANGE qu'en RISK_ON** pour les variantes STRONG en RANGE.
+- **Filtrer par actif × variante × régime** : avec la matrice per-symbol, on peut maintenant interdire un actif sur une combinaison précise (ex. NVDA × rs_90d × RISK_ON sort AVOID per-cell) même si la combinaison globale est OK.
+- **Ne pas conclure pour les autres setups** (Pullback, Breakout, etc.) tant qu'un breakdown régime n'est pas ajouté à leurs JSON de backtest.
