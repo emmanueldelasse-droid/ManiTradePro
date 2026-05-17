@@ -164,6 +164,31 @@ Tant que `asset-quality-engine-v1.mjs` n'existe pas, cette classification reste 
 
 ---
 
+### Règle de gouvernance IA
+
+Le projet utilise une gouvernance IA à double validation :
+
+- Claude = implémentation technique.
+- ChatGPT = validation stratégique et quant.
+
+Aucun merge important ne doit être effectué sans :
+
+```text
+GO MERGE explicite de ChatGPT
+```
+
+Le but de cette gouvernance est :
+- éviter les régressions silencieuses,
+- éviter les incohérences quant,
+- éviter les hacks fragiles,
+- éviter l'overfit,
+- protéger l'architecture long terme,
+- protéger la robustesse du moteur.
+
+Cf. `GPT_ROLE.md` pour le détail du workflow Claude ↔ ChatGPT et les règles anti-hallucination.
+
+---
+
 ## Non encore fait
 
 - Pas de CI automatisée sur les règles ci-dessus. Repose sur la vigilance manuelle + bug-hunter.
