@@ -24,22 +24,28 @@ jobs:
           echo "CLOUDFLARE_API_TOKEN défini : $TOKEN_SET"
           echo "Longueur approximative : $TOKEN_LEN"
 
-      # B.11.2 — diagnostic auth + droits du token. Le workflow a échoué
-      # silencieusement plusieurs fois sans qu'on sache pourquoi. whoami
-      # affiche l'account et les permissions effectives du token.
-      - name: Wrangler whoami (diagnostic auth)
-        continue-on-error: true
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: cloudflare-worker
-          command: whoami
+      # B.11.2 fix — l'action cloudflare/wrangler-action@v3 swallow stdout/
+      # stderr de wrangler, donc on bypass et on lance wrangler directement
+      # via `run:` pour capturer la VRAIE erreur dans le log GitHub Actions.
+      - name: Install wrangler globally
+        run: npm install -g wrangler@^3
 
-      - name: Deploy via Wrangler (log debug)
-        uses: cloudflare/wrangler-action@v3
+      - name: Wrangler whoami (diagnostic auth, never fails the job)
+        continue-on-error: true
         env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          echo "=== Wrangler version ==="
+          wrangler --version
+          echo ""
+          echo "=== whoami ==="
+          wrangler whoami || echo "whoami exit=$?"
+
+      - name: Wrangler deploy (full stdout/stderr)
+        working-directory: cloudflare-worker
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WRANGLER_LOG: debug
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: cloudflare-worker
-          command: deploy
+        run: |
+          echo "=== Deploy attempt with debug logging ==="
+          wrangler deploy 2>&1
