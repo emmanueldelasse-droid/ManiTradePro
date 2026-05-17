@@ -717,3 +717,58 @@ Tester :
 - bonds.
 
 Objectif : déterminer si le moteur est universel ou spécialisé.
+
+---
+
+# Asset Quality Engine v1 — première livraison
+
+Fichier créé :
+
+```text
+tools/backtests/asset-quality-engine-v1.mjs
+```
+
+Sources lues (depuis `tools/backtests/`) :
+
+- `results-multi-setup-grid.json`
+- `results-pullback-2025.json`
+- `results-pullback-grid-2025.json`
+- `results-pullback-yearly-walkforward.json`
+- `results-relative-strength-rotation-regime-v1.json`
+- `results-relative-strength-rotation-v1.json`
+
+Sorties écrites (dans `tools/backtests/output/`) :
+
+- `asset-quality-report.json`
+- `asset-quality-report.md`
+
+Comment le relancer :
+
+```text
+node tools/backtests/asset-quality-engine-v1.mjs
+```
+
+## Résultat du premier run
+
+- Actifs analysés : **181**
+- ELITE : **29**
+- CORE : **60**
+- TACTICAL : **38**
+- BLACKLIST : **54**
+
+## Décisions techniques importantes
+
+- Le moteur déduplique les enregistrements : quand une source expose à la fois un niveau `overall` et un niveau `yearly`, seul le niveau `yearly` est conservé (overall = somme des yearly).
+- Pour les sources avec modes régime (ALL_REGIMES vs NO_RISK_OFF), le mode NO_RISK_OFF est canonique pour l'agrégation principale ; ALL_REGIMES reste capté à part pour la comparaison.
+- Le scoring s'appuie sur le **meilleur setup** de l'actif (argmax expectancy) pour éviter qu'un setup perdant dégrade la note d'un actif globalement rentable.
+- Pénalité forte si la performance dépend de RISK_OFF (totalR ALL_REGIMES nettement inférieur à NO_RISK_OFF).
+
+## Points à surveiller
+
+- **SOXL** sort ELITE (score 100) sur ses chiffres bruts. C'est un ETF à effet de levier 3× — l'allocation doit tenir compte de son risque non-linéaire, le moteur ne le sait pas.
+- **NVDA** sort en CORE (et non ELITE). Son setup PULLBACK est solide (exp 0.73, PF 2.41) mais sa variante Relative Strength Rotation a une expectancy négative (-1.38) qui tire l'agrégat vers le bas. À ré-évaluer si le bot exclut le setup RS pour NVDA.
+- **QQQ** et **AVGO** sortent TACTICAL/CORE plutôt qu'ELITE — leur expectancy globale est plus faible que les vraies stars momentum.
+
+## Lien avec ASSET_REGISTRY.md
+
+`ASSET_REGISTRY.md` est désormais peuplé par les listes générées par ce moteur. Pour rafraîchir la classification après de nouveaux backtests : relancer le moteur puis vérifier le diff sur `ASSET_REGISTRY.md`.

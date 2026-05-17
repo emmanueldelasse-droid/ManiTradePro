@@ -1,4 +1,4 @@
-# ASSET_REGISTRY — Classification provisoire des actifs
+# ASSET_REGISTRY — Classification des actifs
 
 ## Rôle du fichier
 
@@ -16,92 +16,97 @@ trouver les actifs compatibles avec les setups validés.
 
 # Statut du fichier
 
-Cette classification est provisoire.
-
-Elle provient des backtests récents :
-- Pullback Momentum,
-- Breakout Expansion,
-- Relative Strength Rotation,
-- filtre NO_RISK_OFF.
-
-Elle doit être automatisée plus tard par :
+Classification générée automatiquement par :
 
 ```text
 tools/backtests/asset-quality-engine-v1.mjs
 ```
 
+à partir des résultats JSON des backtests présents dans `tools/backtests/` :
+
+- `results-multi-setup-grid.json`
+- `results-pullback-2025.json`
+- `results-pullback-grid-2025.json`
+- `results-pullback-yearly-walkforward.json`
+- `results-relative-strength-rotation-regime-v1.json`
+- `results-relative-strength-rotation-v1.json`
+
+Pour mettre à jour cette classification :
+
+```text
+node tools/backtests/asset-quality-engine-v1.mjs
+```
+
+Le rapport complet (avec métriques par actif, forces et risques) est écrit dans :
+
+- `tools/backtests/output/asset-quality-report.json`
+- `tools/backtests/output/asset-quality-report.md`
+
 ---
 
 # Catégories
 
-| Niveau | Signification |
-|---|---|
-| ELITE | actifs majeurs du moteur |
-| CORE | actifs fiables et réguliers |
-| TACTICAL | actifs opportunistes / plus risqués |
-| WATCHLIST | surveillance |
-| BLACKLIST | actifs incompatibles ou trop destructeurs |
+| Niveau | Signification | Profil d'allocation |
+|---|---|---|
+| ELITE | actifs majeurs du moteur | strong |
+| CORE | actifs fiables et réguliers | normal |
+| TACTICAL | actifs opportunistes / plus risqués | reduced |
+| WATCHLIST | surveillance | — |
+| BLACKLIST | actifs incompatibles ou trop destructeurs | none |
+
+Règles d'affectation (cf. moteur) :
+- **ELITE** : score ≥ 80, profit factor ≥ 1.4, expectancy positive, stabilité multi-années ou multi-setups, drawdown raisonnable.
+- **CORE** : score ≥ 65, profit factor ≥ 1.1, expectancy positive.
+- **TACTICAL** : score ≥ 50, conditions ELITE/CORE non remplies.
+- **BLACKLIST** : score < 50, ou profit factor < 1, ou expectancy ≤ 0 avec ≥ 30 trades.
 
 ---
 
-# ELITE provisoire
+# Synthèse
 
-## Actions
-- NVDA
-- PLTR
-- APP
-- SMCI
-- AVGO
-- MSTR
-- NBIS
-- APLD
-- AEHR
-
-## Crypto
-- BTC
-- SOL
-- AVAX
-
-## ETF
-- SMH
-- SOXX
-- XLK
-- QQQ
+- Actifs analysés : **181**
+- ELITE : **29**
+- CORE : **60**
+- TACTICAL : **38**
+- BLACKLIST : **54**
 
 ---
 
-# CORE provisoire
+# ELITE (29)
 
-- ASML
-- KLAC
-- TSM
-- COIN
-- META
-- AMZN
-- MSFT
+SOXL, APP, VRNS, PLTR, SOXQ, SOXX, CRWD, FTNT, META, PH, PSI, BNB, NBIS, SMCI, SOL, ANET, AVAX, CAMT, XSD, FICO, ACLS, AEHR, UPST, BTC, LRCX, ALGM, NFLX, SMH, GOOGL
+
+Mises en évidence :
+- Crypto majeures : BTC, SOL, AVAX, BNB.
+- Leaders IA / momentum : PLTR, APP, SMCI, NBIS, AEHR.
+- Semiconducteurs / ETF semi : SOXX, SOXQ, SMH, XSD, LRCX, ALGM, ACLS, CAMT, FICO.
+- Cybersécurité / cloud : CRWD, FTNT, VRNS.
+
+Avertissement : **SOXL** est un ETF à effet de levier 3×. Le moteur le classe ELITE sur ses métriques brutes, mais l'allocation réelle doit tenir compte de son profil de risque non-linéaire.
 
 ---
 
-# TACTICAL provisoire
+# CORE (60)
 
-Ces actifs peuvent être intéressants mais doivent garder une allocation plus faible ou être filtrés plus sévèrement.
+ORCL, MCHP, KLAC, ROKU, SPY, STM, TSM, TTWO, WCLD, IYW, APLD, RMBS, AMZN, DELL, MA, SENT, SLAB, TER, GLD, LINK, PANW, IGM, LIN, NVMI, NXPI, SPYG, VUG, MSTR, SIE, AXP, ETN, HACK, IGV, JPM, MU, TENB, AIR, AMAT, CYBR, GTLB, MPWR, NVDA, ROM, TYL, CIBR, PDD, ASML, BKNG, CLOU, EA, ETH, FTEC, MELI, SAP, SHOP, VGT, XLK, MSFT, PATH, USD
 
-- TSLA
-- AMD
-- SOXL
-- JPM
+---
+
+# TACTICAL (38)
+
+COIN, HUBS, ABNB, DDOG, ENTG, PAYC, ADBE, ARM, BBAI, CHKP, COST, DSY, AKAM, CFLT, DT, ON, SNPS, AMKR, TT, AMD, DOCN, QQQ, SWKS, BUG, WM, AVGO, AI, CDNS, VRTX, NOW, GEN, AAPL, ADI, BOTZ, LLY, SYNA, XSW, SPGI
 
 ---
 
 # WATCHLIST
 
-À alimenter après `asset-quality-engine-v1`.
+Catégorie non encore alimentée par le moteur (à ajouter via une heuristique de promotion / rétrogradation lors d'un rerun).
 
 ---
 
-# BLACKLIST
+# BLACKLIST (54)
 
-À alimenter automatiquement après `asset-quality-engine-v1`.
+SKYY, ASX, MSCI, ADSK, ZEN, ESTC, QRVO, RMS, USDJPY, ZS, CRM, V, GBPUSD, IPGP, MDB, NET, PAYX, FORM, IWM, MDY, TSLA, FDN, NESN, TXN, TTD, PD, QCOM, LSCC, ONTO, TEAM, ROP, DUOL, IBIT, S, CRWV, CAP, HUBB, INTU, MRVL, OKTA, SPLK, WDAY, SE, ELV, SOUN, RBRK, HCP, INTC, SNOW, EURUSD, LVMH, TLT, UBER, TTE
 
 Règle : un actif doit être blacklisté s'il :
 - dégrade durablement le profit factor,
@@ -112,20 +117,27 @@ Règle : un actif doit être blacklisté s'il :
 
 ---
 
-# Critères de scoring futurs
+# Critères de scoring (moteur asset-quality-engine-v1)
 
-Chaque actif devra être évalué selon :
-- expectancy,
-- profit factor,
-- winrate,
-- nombre de trades,
-- max drawdown,
-- longest loss streak,
-- stabilité multi-années,
-- compatibilité setup,
-- comportement en RANGE,
-- comportement en RISK_ON,
-- comportement en RISK_OFF.
+Score sur 100, agrégé à partir de :
+- expectancy du meilleur setup (0-25 pts),
+- profit factor du meilleur setup (0-20 pts),
+- winrate (0-15 pts),
+- nombre de trades total (0-10 pts),
+- drawdown vs gain cumulé (0-10 pts),
+- série de pertes la plus longue (0-5 pts),
+- stabilité multi-années (0-10 pts),
+- nombre de familles de setup compatibles (0-5 pts).
+
+Pénalités :
+- échantillon < 15 trades → -15,
+- une seule période observée → -10,
+- performance fortement dégradée en RISK_OFF (totalR ALL_REGIMES nettement inférieur à NO_RISK_OFF) → -10.
+
+Confiance :
+- HIGH : ≥ 100 trades et ≥ 3 années observées.
+- MEDIUM : ≥ 30 trades et ≥ 2 années observées.
+- LOW : sinon.
 
 ---
 
