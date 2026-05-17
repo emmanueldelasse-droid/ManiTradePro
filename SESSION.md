@@ -948,3 +948,97 @@ Cette PR ne modifie ni `asset-quality-engine-v1.mjs` ni `asset-setup-matrix-v1.m
 - Les variantes UNKNOWN_VARIANT (8 records issus de `results-pullback-2025.json`) sont préservées mais exclues des sections "meilleures variantes" et "à abandonner".
 - Le moteur d'allocation n'est pas encore implémenté — la matrice variante dit quoi trader, pas combien.
 - Pas de gestion explicite des familles de variantes (ex. tous les `rsi42_58_chg20_5_*` partagent un noyau commun mais sont traités indépendamment).
+
+---
+
+# Variant × Regime Matrix v1 — quatrième livraison quant
+
+Fichier créé :
+
+```text
+tools/backtests/variant-regime-matrix-v1.mjs
+```
+
+Réutilise `tools/backtests/lib/backtest-records.mjs` (aucune duplication).
+
+Sorties écrites :
+
+- `tools/backtests/output/variant-regime-matrix.json`
+- `tools/backtests/output/variant-regime-matrix.md`
+
+Comment le relancer :
+
+```text
+node tools/backtests/variant-regime-matrix-v1.mjs
+```
+
+## Limite majeure documentée
+
+La dimension régime n'est exposée que par **un seul fichier de backtest** : `results-relative-strength-rotation-regime-v1.json`. Et même dans ce fichier, le breakdown est **global** (variant × regimeMode × regime, agrégé sur tous les symboles). Aucune source ne fournit de breakdown **per-(symbol × variant × regime individuel)**.
+
+Conséquence : on ne peut PAS répondre rigoureusement à "NVDA × Pullback en RANGE ?" ou "PLTR × RS en RISK_OFF ?". Cette matrice livre :
+
+1. **La matrice globale** (variant × regimeMode × regime) sur les 2 variantes RS pour lesquelles le breakdown existe (`rs_90d_top10_hold20`, `rs_120d_top10_hold20`).
+2. **La comparaison per-(symbol × variant × regimeMode)** : on peut comparer ALL_REGIMES vs NO_RISK_OFF pour chaque actif, ce qui mesure indirectement la dépendance RISK_OFF par actif.
+
+**Action recommandée** : ajouter un breakdown `bySymbolByRegime` dans les scripts de backtest (priorité quant à insérer dans le TODO). Sans ça, la décision per-actif-par-régime restera approximative.
+
+## Résultat du premier run
+
+- 12 cellules globales (sur 18 possibles ; 6 sont vides par construction du regimeMode)
+- 8 STRONG / 3 OK / 0 WEAK / 1 AVOID
+
+## Découvertes notables
+
+### rs_90d_top10_hold20
+
+| Régime | Tier | Score | Trades | Exp | PF | TotalR |
+|---|---|---:|---:|---:|---:|---:|
+| RANGE | STRONG | 100 | 400 | 1.21 | 2.54 | 482.62 |
+| RISK_ON | STRONG | 77 | 529 | 0.66 | 1.60 | 348.40 |
+| RISK_OFF | **AVOID** | 7 | 162 | **-0.05** | 0.99 | -8.38 |
+
+→ Variant **robuste multi-régimes** (STRONG en RISK_ON ET RANGE) mais **dangereuse en RISK_OFF**. C'est exactement la situation qui justifie le filtre NO_RISK_OFF.
+
+### rs_120d_top10_hold20
+
+| Régime | Tier | Score | Trades | Exp | PF | TotalR |
+|---|---|---:|---:|---:|---:|---:|
+| RANGE | STRONG | 100 | 367 | 1.34 | 2.77 | 492.27 |
+| RISK_OFF | **STRONG** | 84 | 152 | **1.00** | 2.03 | 151.78 |
+| RISK_ON | OK | 56 | 530 | 0.35 | 1.34 | 183.45 |
+
+→ Variant **bien plus résiliente en RISK_OFF** que `rs_90d` (exp 1.00 vs -0.05). Découverte importante : la fenêtre plus longue (120d vs 90d) absorbe mieux les phases bear. Ça pourrait justifier d'utiliser `rs_120d` quand le régime macro bascule en RISK_OFF, plutôt que de tout couper.
+
+### Cas NVDA (per-symbol)
+
+NVDA × `rs_90d_top10_hold20` et NVDA × `rs_120d_top10_hold20` ont une **expectancy négative** (-1.00 et -1.13) sur 28 et 26 trades respectivement. ALL_REGIMES et NO_RISK_OFF donnent les mêmes chiffres → NVDA n'a probablement pas eu de trade pendant les périodes RISK_OFF (cohérent avec sa nature high-beta : sort du top 10 en bear).
+
+→ Confirme que **NVDA × RS rotation est à éviter** au niveau actif, même si la variante est globalement bonne. Cohérent avec la matrice setup et la matrice variante précédentes.
+
+## Variantes à blacklister
+
+Aucune sur ce critère (AVOID dans tous les régimes ALL_REGIMES).
+
+## Variantes RANGE-only
+
+Aucune. Les deux variantes RS qui fonctionnent en RANGE fonctionnent aussi (au moins en OK) en RISK_ON.
+
+## Variantes dangereuses RISK_OFF
+
+1 détectée : `rs_90d_top10_hold20`. À filtrer obligatoirement quand le régime macro est RISK_OFF.
+
+## Variantes robustes multi-régimes
+
+1 détectée : `rs_90d_top10_hold20` (STRONG en RISK_ON + RANGE). Avec la résilience surprise de `rs_120d` en RISK_OFF, on a en fait deux variantes RS exploitables — chacune avec son régime favori.
+
+## Non-régression vérifiée
+
+`asset-quality-engine-v1.mjs`, `asset-setup-matrix-v1.mjs` et `setup-variant-matrix-v1.mjs` ont été relancés et leurs JSON outputs comparés byte-par-byte (hors `generatedAt`) : **strictement identiques**.
+
+## Limites restantes (à inscrire dans le TODO quant)
+
+- **Manque crucial** : un breakdown `bySymbolByRegime` dans les JSON de backtest. Sans ça, la décision per-actif-par-régime reste basée sur l'agrégat global, pas sur le comportement vrai de l'actif dans le régime.
+- **Couverture variant** : seules 2 variantes RS ont un breakdown régime. Les autres setups (Pullback, Breakout, MEAN_REVERSION, VOLATILITY_COMPRESSION) ne sont pas couverts.
+- **Walk-forward** : aucune validation walk-forward par régime. Une variante peut sembler robuste sur l'historique tout en surajustant aux conditions passées.
+- **Allocation** : la matrice dit quoi autoriser/interdire selon le régime, pas combien allouer.
