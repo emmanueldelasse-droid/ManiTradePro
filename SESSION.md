@@ -772,3 +772,85 @@ node tools/backtests/asset-quality-engine-v1.mjs
 ## Lien avec ASSET_REGISTRY.md
 
 `ASSET_REGISTRY.md` est désormais peuplé par les listes générées par ce moteur. Pour rafraîchir la classification après de nouveaux backtests : relancer le moteur puis vérifier le diff sur `ASSET_REGISTRY.md`.
+
+---
+
+# Asset × Setup Matrix v1 — deuxième livraison quant
+
+Fichier créé :
+
+```text
+tools/backtests/asset-setup-matrix-v1.mjs
+```
+
+Module partagé (extrait à cette occasion pour éviter la duplication) :
+
+```text
+tools/backtests/lib/backtest-records.mjs
+```
+
+`asset-quality-engine-v1.mjs` a été refactoré pour utiliser ce module. Le rapport généré est **strictement identique** au précédent (vérification par diff JSON byte par byte hors `generatedAt`).
+
+Sorties écrites :
+
+- `tools/backtests/output/asset-setup-matrix.json`
+- `tools/backtests/output/asset-setup-matrix.md`
+
+Comment le relancer :
+
+```text
+node tools/backtests/asset-setup-matrix-v1.mjs
+```
+
+## Résultat du premier run
+
+- 181 actifs × 5 setups = **744 cellules**
+- STRONG : **70**
+- OK : **104**
+- WEAK : **109**
+- AVOID : **461**
+
+Par setup :
+
+| Setup | STRONG | OK | WEAK | AVOID |
+|---|---:|---:|---:|---:|
+| PULLBACK_MOMENTUM | 48 | 46 | 26 | 61 |
+| RELATIVE_STRENGTH_ROTATION | 21 | 12 | 15 | 76 |
+| BREAKOUT_EXPANSION | 0 | 14 | 31 | 113 |
+| MEAN_REVERSION (non prioritaire) | 0 | 26 | 26 | 105 |
+| VOLATILITY_COMPRESSION (non prioritaire) | 1 | 6 | 11 | 106 |
+
+## Cross-check avec asset-quality-report.json
+
+- **103 cellules** actifs ELITE/CORE × tier setup WEAK/AVOID : ces couples sont à exclure du moteur même si l'actif est globalement bon.
+- **5 cellules** actifs BLACKLIST × tier setup STRONG/OK : ces couples mériteraient un usage strictement ciblé.
+
+## Cas démonstratif
+
+NVDA — exactement le problème évoqué :
+
+| Setup | Tier | Score | Trades | Expectancy | PF |
+|---|---|---:|---:|---:|---:|
+| PULLBACK_MOMENTUM | STRONG | 78 | 555 | 0.72 | 2.41 |
+| BREAKOUT_EXPANSION | OK | 60 | 74 | 0.53 | 3.78 |
+| RELATIVE_STRENGTH_ROTATION | AVOID | 50 | 133 | -1.38 | 5.47 |
+| MEAN_REVERSION | AVOID | 10 | 57 | -0.08 | 0.80 |
+
+Conclusion concrète pour le moteur : trader NVDA en Pullback uniquement, jamais en Relative Strength Rotation.
+
+## BLACKLIST mais exploitables identifiés (5)
+
+PAYX, ZEN, ONTO, DUOL, GBPUSD — tous sur PULLBACK ou BREAKOUT en tier OK, jamais STRONG. Usage ciblé seulement.
+
+## Décisions techniques importantes
+
+- Module partagé `lib/backtest-records.mjs` : les adaptateurs JSON, la normalisation et le dédoublonnage par mode régime sont désormais centralisés. Les deux moteurs (quality + matrix) consomment la même source.
+- La matrice utilise un scoring par cellule (et non plus par actif) : expectancy 30, PF 25, winrate 15, sample size 15, drawdown 10, stabilité 5, pénalités sur échantillon faible et dépendance RISK_OFF.
+- Pour Relative Strength Rotation, la pénalité RISK_OFF est calculée par cellule (ALL_REGIMES vs NO_RISK_OFF) si les deux modes sont présents.
+
+## Limites restantes
+
+- **MEAN_REVERSION et VOLATILITY_COMPRESSION** sont marqués `nonPriority` dans la matrice (cohérent avec SETUPS_REGISTRY.md). Aucune cellule MEAN_REVERSION ne sort STRONG, ce qui confirme leur statut.
+- **BREAKOUT_EXPANSION** sort 0 cellule STRONG — ce setup est plus fragile que PULLBACK et RS dans les backtests actuels. À investiguer : variant `breakout_h20_vol13` vs `breakout_h10_vol12` pour voir si une variante précise est meilleure (non décomposé dans la matrice actuelle, qui agrège toutes les variantes d'un setup).
+- La matrice ne décompose pas par variante (pullback_rsi42_58_chg20_5 vs pullback_rsi42_58_chg20_3). Une v2 future pourrait ajouter ce niveau de granularité.
+- L'effet de levier (SOXL) reste invisible au moteur : SOXL × PULLBACK sort STRONG 100, le risque non-linéaire doit être pris en compte côté allocation.
