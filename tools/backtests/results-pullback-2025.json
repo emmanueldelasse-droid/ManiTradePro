@@ -1,0 +1,74 @@
+[
+  {
+    "symbol": "SPY",
+    "trades": 14,
+    "wins": 2,
+    "losses": 12,
+    "timeouts": 0,
+    "winrate": "14.29",
+    "expectancy": "-0.22"
+  },
+  {
+    "symbol": "QQQ",
+    "trades": 16,
+    "wins": 7,
+    "losses": 9,
+    "timeouts": 0,
+    "winrate": "43.75",
+    "expectancy": "0.73"
+  },
+  {
+    "symbol": "NVDA",
+    "trades": 3,
+    "wins": 1,
+    "losses": 2,
+    "timeouts": 0,
+    "winrate": "33.33",
+    "expectancy": "0.02"
+  },
+  {
+    "symbol": "AAPL",
+    "trades": 16,
+    "wins": 5,
+    "losses": 11,
+    "timeouts": 0,
+    "winrate": "31.25",
+    "expectancy": "0.26"
+  },
+  {
+    "symbol": "MSFT",
+    "trades": 15,
+    "wins": 3,
+    "losses": 12,
+    "timeouts": 0,
+    "winrate": "20.00",
+    "expectancy": "-0.43"
+  },
+  {
+    "symbol": "META",
+    "trades": 18,
+    "wins": 4,
+    "losses": 14,
+    "timeouts": 0,
+    "winrate": "22.22",
+    "expectancy": "-0.08"
+  },
+  {
+    "symbol": "AMZN",
+    "trades": 29,
+    "wins": 3,
+    "losses": 24,
+    "timeouts": 2,
+    "winrate": "10.34",
+    "expectancy": "-0.00"
+  },
+  {
+    "symbol": "GOOGL",
+    "trades": 9,
+    "wins": 4,
+    "losses": 5,
+    "timeouts": 0,
+    "winrate": "44.44",
+    "expectancy": "0.96"
+  }
+]
