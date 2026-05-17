@@ -618,6 +618,23 @@ function partial(data, source, asOf, freshness, message) {
 function fail(message, status = "error", httpCode = 500) {
   return json({ status, source: null, asOf: null, freshness: "unknown", message, data: null }, httpCode);
 }
+
+// B.14 P1.1 — payload stable de blocage exécution. Utilisé par toutes les
+// routes qui doivent refuser une action utilisateur quand la safety gate
+// dit non. Forme machine-readable + libellé FR pour le front. HTTP 409 =
+// conflict avec l'état du système (la quote ne permet pas l'action).
+function buildExecutionBlockedResponse(safety, extra = {}) {
+  const payload = {
+    ok: false,
+    executionBlocked: true,
+    code: safety?.code || "quote_unsafe",
+    reasons: Array.isArray(safety?.reasons) ? safety.reasons : [],
+    human: safety?.human || "Prix live non fiable — blocage exécution",
+    ...extra
+  };
+  return json(payload, 409);
+}
+
 async function safeRoute(handler) {
   try { return await handler(); }
   catch (error) { return fail(safeErrorMessage(error), "error", 500); }
@@ -6603,7 +6620,8 @@ async function handleTrainingSafetyStats(url, env) {
     // On limite a 2000 rows pour eviter de saturer la memoire du worker
     // sur de tres longues fenetres ; le order desc garantit qu'on a au
     // moins les plus recents pour `recentEvents`.
-    const eventTypeIn = "(auto_open_blocked_unsafe,auto_close_blocked_unsafe)";
+    // B.14 P1.2 — ajout manual_open_blocked_unsafe dans l'aggregation.
+    const eventTypeIn = "(auto_open_blocked_unsafe,auto_close_blocked_unsafe,manual_open_blocked_unsafe)";
     const rows = await supabaseFetch(
       env,
       `${TRAINING_EVENTS_TABLE}?select=id,created_at,event_type,symbol,payload`
@@ -6614,12 +6632,14 @@ async function handleTrainingSafetyStats(url, env) {
 
     let openBlocked = 0;
     let closeBlocked = 0;
+    let manualBlocked = 0; // B.14 P1.2
     const symbolCounter = new Map();
 
     if (Array.isArray(rows)) {
       for (const r of rows) {
         if (r?.event_type === "auto_open_blocked_unsafe") openBlocked += 1;
         else if (r?.event_type === "auto_close_blocked_unsafe") closeBlocked += 1;
+        else if (r?.event_type === "manual_open_blocked_unsafe") manualBlocked += 1; // B.14 P1.2
         const code = String(r?.payload?.code || "").toLowerCase();
         if (code && Object.prototype.hasOwnProperty.call(byCode, code)) {
           byCode[code] += 1;
@@ -6657,7 +6677,7 @@ async function handleTrainingSafetyStats(url, env) {
         generatedAt,
         windowHours,
         cutoffAt: cutoffIso,
-        totals: { openBlocked, closeBlocked },
+        totals: { openBlocked, closeBlocked, manualBlocked }, // B.14 P1.2
         byCode,
         topSymbols,
         recentEvents,
@@ -6821,8 +6841,8 @@ function isAuthoritativeClosedTradeRow(row) {
   return status === "closed" && closedAtMs > 0 && Number.isFinite(exitPrice) && exitPrice > 0;
 }
 
-function tradesPayload(configured, positions = [], history = [], message = null) {
-  return ok({ configured, positions, history }, configured ? "worker_supabase" : "worker_local_only", nowIso(), "live", message);
+function tradesPayload(configured, positions = [], history = [], message = null, extra = {}) {
+  return ok({ configured, positions, history, ...extra }, configured ? "worker_supabase" : "worker_local_only", nowIso(), "live", message);
 }
 
 async function handleTradesState(env) {
@@ -6894,8 +6914,86 @@ async function handleTradesSync(request, env) {
   const positions = normalizeTrainingPositions(inputPositions);
   const history = normalizeTrainingTrades(inputHistory);
 
+  // B.14 P0.1 — Safety gate sur ouvertures MANUELLES NOUVELLES. Le moteur
+  // auto passe par handleOpportunities qui applique deja evaluateExecution
+  // Safety en amont ; ici on ferme le trou cote /api/trades/sync utilise
+  // pour les opens manuels par l'UI. Une position est gatee si elle remplit
+  // les 2 conditions :
+  //   - source manuelle (tradeSourceServer === "manual", inclut le defaut)
+  //   - NOUVELLE en DB (id absent de TRADE_TABLES.positions)
+  // Les UPDATE de positions existantes passent sans controle car la safety
+  // gate auto a deja tire au moment de l'ouverture. evaluateExecutionSafety
+  // reste source unique de verite — pas de duplication de logique.
+  let blockedManualOpens = [];
+  let acceptedPositions = inputPositions;
   if (inputPositions.length) {
-    const rows = inputPositions.map(mapPositionForSupabase).filter(r => r.id);
+    const candidateIds = inputPositions.map(p => p?.id).filter(Boolean).map(id => String(id));
+    const knownIds = await listExistingPositionIds(env, candidateIds);
+    const ctxGate = createBudgetContext("manual_open_gate");
+    const filtered = [];
+    for (const pos of inputPositions) {
+      const id = pos?.id ? String(pos.id) : null;
+      const isNew = !id || !knownIds.has(id);
+      const isManual = tradeSourceServer(pos) === "manual";
+      if (!isNew || !isManual) { filtered.push(pos); continue; }
+      const symbol = String(pos?.symbol || "").toUpperCase();
+      if (!symbol) { filtered.push(pos); continue; }
+      try {
+        const payload = await withTimeout(
+          buildStableMarketPayload(symbol, env, ctxGate, false),
+          8000,
+          `manual_gate:${symbol}`
+        );
+        const safety = evaluateExecutionSafety(payload);
+        if (!safety.safe) {
+          const blocked = {
+            symbol,
+            position_id: id,
+            code: safety.code,
+            reasons: safety.reasons || [safety.code],
+            human: safety.human,
+            source_used: payload?.sourceUsed || null,
+            quoted_at: payload?.liveContext?.quotedAt || null,
+            validation_status: payload?.liveContext?.quoteQuality?.validationStatus || null
+          };
+          blockedManualOpens.push(blocked);
+          await logTrainingEvent(env, "manual_open_blocked_unsafe", blocked).catch(() => {});
+          continue;
+        }
+      } catch (e) {
+        // Par prudence : impossible d'evaluer => bloquer.
+        const blocked = {
+          symbol,
+          position_id: id,
+          code: "quote_quality_missing",
+          reasons: ["quote_quality_missing"],
+          human: "Diagnostic quote indisponible — blocage par prudence",
+          source_used: null,
+          quoted_at: null,
+          validation_status: null,
+          gate_error: e instanceof Error ? e.message : String(e)
+        };
+        blockedManualOpens.push(blocked);
+        await logTrainingEvent(env, "manual_open_blocked_unsafe", blocked).catch(() => {});
+        continue;
+      }
+      filtered.push(pos);
+    }
+    acceptedPositions = filtered;
+  }
+
+  // Si tout le batch est bloqué et qu'il n'y a aucun trade fermé non plus,
+  // on renvoie un 409 stable pour que l'UI puisse afficher le motif.
+  if (blockedManualOpens.length && !acceptedPositions.length && !inputHistory.length) {
+    return buildExecutionBlockedResponse({
+      code: blockedManualOpens[0].code,
+      reasons: blockedManualOpens[0].reasons,
+      human: blockedManualOpens[0].human
+    }, { blockedManualOpens });
+  }
+
+  if (acceptedPositions.length) {
+    const rows = acceptedPositions.map(mapPositionForSupabase).filter(r => r.id);
     if (rows.length) {
       await supabaseFetch(env, `${TRADE_TABLES.positions}?on_conflict=id`, {
         method: "POST",
@@ -6926,6 +7024,13 @@ async function handleTradesSync(request, env) {
         console.error("captureTradeFeedback on sync failed:", e.message);
       }
     }
+  }
+  // B.14 P0.1 — Transparence sur blocages partiels. Si au moins une
+  // position du batch a passé la safety gate ET au moins une a été
+  // bloquée, on signale "sync_partial" + blockedManualOpens dans
+  // l'extra pour que l'UI affiche le motif par symbole.
+  if (blockedManualOpens.length) {
+    return tradesPayload(true, positions, history, "sync_partial", { blockedManualOpens });
   }
   return tradesPayload(true, positions, history, "sync_ok");
 }
@@ -7101,6 +7206,24 @@ async function listExistingFeedbackIds(env, tradeIds) {
     return new Set((Array.isArray(rows) ? rows : []).map(r => String(r.trade_id)));
   } catch (e) {
     console.error("listExistingFeedbackIds failed:", e.message);
+    return new Set();
+  }
+}
+
+// B.14 P0.1 — Lookup batch des IDs de position déjà connus en DB. Sert à
+// distinguer dans handleTradesSync : NOUVELLE position (à gater) vs
+// UPDATE de position existante (passe sans contrôle car déjà ouverte avec
+// la safety gate auto). En cas d'erreur DB, on retourne Set vide → toutes
+// les positions seront traitées comme nouvelles → safety gate appliquée
+// partout (défensif par défaut).
+async function listExistingPositionIds(env, positionIds) {
+  if (!supabaseConfigured(env) || !Array.isArray(positionIds) || positionIds.length === 0) return new Set();
+  try {
+    const inList = positionIds.map(id => `"${encodeURIComponent(id)}"`).join(",");
+    const rows = await supabaseFetch(env, `${TRADE_TABLES.positions}?select=id&id=in.(${inList})`);
+    return new Set((Array.isArray(rows) ? rows : []).map(r => String(r.id)));
+  } catch (e) {
+    console.error("listExistingPositionIds failed:", e.message);
     return new Set();
   }
 }
@@ -9612,7 +9735,8 @@ async function handleHealth(request, env) {
       maxStagnantAge: true,
       candlesTooOld: true,
       unsafeRankingDowngrade: true,
-      missingQuotedAtGuard: true // B.13 P0
+      missingQuotedAtGuard: true, // B.13 P0
+      manualExecutionGate: true // B.14 P2
     }
   };
   if (!adminAccess) return ok(basePayload, "worker-v2", nowIso(), "live", null);
