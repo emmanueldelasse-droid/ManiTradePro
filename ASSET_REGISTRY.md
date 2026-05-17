@@ -54,6 +54,18 @@ Sortie : `tools/backtests/output/asset-setup-matrix.{json,md}`.
 
 Cette matrice permet d'identifier les actifs ELITE qui sont en réalité mauvais sur un setup donné (et inversement les actifs BLACKLIST exploitables sur un setup précis). À consulter avant toute décision d'autoriser un trade actif × setup.
 
+## Granularité actif × setup × variante
+
+Une vue encore plus fine (compatibilité par couple actif × setup × variante précise) est produite par :
+
+```text
+tools/backtests/setup-variant-matrix-v1.mjs
+```
+
+Sortie : `tools/backtests/output/setup-variant-matrix.{json,md}`.
+
+Utile pour repérer les cas où **un setup est moyen globalement mais une variante précise est excellente** (ex. SOXL × RS sort AVOID en agrégé, mais `rs_20d_top5_hold5` ressort STRONG). À consulter avant de figer une combinaison actif × setup × variante.
+
 ---
 
 # Catégories
