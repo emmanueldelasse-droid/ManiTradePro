@@ -3162,7 +3162,6 @@ function buildUnsafeReasonShort(qq) {
   if (hasReason("currency_mismatch")) return "Devise live incohérente";
   return "Données live non exploitables";
 }
-__name(buildUnsafeReasonShort, "buildUnsafeReasonShort");
 
 function applyUnsafeDowngrade(payload) {
   const qq = payload?.liveContext?.quoteQuality;
@@ -3226,7 +3225,6 @@ function applyUnsafeDowngrade(payload) {
     }
   };
 }
-__name(applyUnsafeDowngrade, "applyUnsafeDowngrade");
 
 function calcDetailScore(quote, candles, regime = null, env = null, regimeIndicators = null, newsContext = null, claudeNewsMaxWeight = 8, learningContext = null) {
   const closes = (candles || []).map(c => Number(c.close)).filter(v => Number.isFinite(v));
