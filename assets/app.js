@@ -1706,11 +1706,30 @@ function renderTradeConfirmModal() {
     return `<div class="trade-news-warning" role="alert"><span class="nww-icon">⚠️</span><div><div class="nww-head">Événement macro high-impact ${safeText(when)}</div><div class="nww-sub">${safeText(label)} — l'auto-cycle bloque les entrées sur cette fenêtre (±30 min). Ouverture manuelle à tes risques.</div></div></div>`;
   })() : "";
 
+  // B.14 P0.2/P1.3 — blocage manuel si la quote live n'est pas executionSafe.
+  // Le backend refuse aussi (handleTradesSync), mais on bloque AVANT le clic
+  // pour éviter une frustration UX et un POST inutile. Source de vérité :
+  // le payload détail du backend, jamais un recalcul JS.
+  const qq = d?.liveContext?.quoteQuality || null;
+  const executionBlocked = (d?.liveContext?.executionBlocked === true)
+    || (qq && qq.executionSafe === false);
+  const blockedHuman = d?.liveContext?.executionBlockedHuman
+    || (qq ? (qq.validationStatus === "missing_quoted_at" ? "Horodatage prix absent — exécution bloquée"
+         : qq.validationStatus === "eod_snapshot" ? "Dernier prix disponible non exécutable"
+         : qq.validationStatus === "stale" ? "Données live trop anciennes"
+         : qq.validationStatus === "currency_mismatch" ? "Devise live incohérente"
+         : qq.validationStatus === "abnormal_spread" ? "Prix live incohérent"
+         : "Données live non exploitables") : null);
+  const blockedWarning = executionBlocked
+    ? `<div class="trade-news-warning" role="alert" style="border-color:rgba(255,80,80,.45);background:rgba(255,80,80,.12)"><span class="nww-icon">⛔</span><div><div class="nww-head">Exécution bloquée</div><div class="nww-sub">${safeText(blockedHuman || "Données live non exploitables — ouverture bloquée")}</div></div></div>`
+    : "";
+
   return `
     <div class="modal-backdrop" data-cancel-trade-confirm style="position:fixed;inset:0;background:rgba(3,8,20,.72);display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px">
       <div class="card" style="width:min(560px,100%);padding:18px 18px 16px;border:1px solid rgba(255,255,255,.12)" onclick="event.stopPropagation()">
         <div class="section-title"><span>${safeText(title)}</span><span>${safeText(d?.symbol || "—")}</span></div>
         <div class="trade-context-pill ${isCrypto ? "crypto" : "stock"}">${safeText(contextLabel)}</div>
+        ${blockedWarning}
         ${newsWarning}
         <div class="kv" style="margin-top:10px">
           <div class="muted">Actif</div><div>${safeText(d?.symbol || "—")} · ${safeText(d?.name || "")}</div>
@@ -1726,7 +1745,7 @@ function renderTradeConfirmModal() {
         <div class="plan-reason" style="margin-top:12px">${safeText(reason)}</div>
         <div class="trade-actions" style="margin-top:14px">
           <button class="btn" data-cancel-trade-confirm>Annuler</button>
-          <button class="btn trade-btn primary" data-confirm-open-trade>Confirmer le trade</button>
+          <button class="btn trade-btn primary" data-confirm-open-trade${executionBlocked ? " disabled aria-disabled=\"true\" title=\"Exécution bloquée — données live non exploitables\"" : ""}>Confirmer le trade</button>
         </div>
       </div>
     </div>`;
@@ -1774,6 +1793,19 @@ async function confirmTradeFromModal() {
   state.loadingDetail = false;
   if (!refreshed) {
     state.error = "Impossible d'actualiser le prix avant l'ouverture. Réessaie.";
+    render();
+    return;
+  }
+  // B.14 P0.2 — Defense in depth front. Le backend (handleTradesSync) refuse
+  // déjà, mais on bloque avant le POST pour éviter une frustration UX. La
+  // vérification se fait sur le payload détail TOUT JUSTE rafraîchi.
+  const d = state.detail || {};
+  const qq = d?.liveContext?.quoteQuality || null;
+  const executionBlocked = (d?.liveContext?.executionBlocked === true)
+    || (qq && qq.executionSafe === false);
+  if (executionBlocked) {
+    state.error = d?.liveContext?.executionBlockedHuman
+      || "Données live non exploitables — ouverture bloquée.";
     render();
     return;
   }
