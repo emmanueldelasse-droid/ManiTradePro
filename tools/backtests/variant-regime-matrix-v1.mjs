@@ -106,6 +106,9 @@ function extractRegimeRecords(data, source) {
         }
         return;
       }
+      // Pas un array byRegime — peut contenir des objets imbriqués (ex. array
+      // de variant blocks dans Pullback yearly-walkforward). On descend.
+      for (const item of obj) walk(item, year);
       return;
     }
     // Détection branche yearly : la clé du parent est un nombre 4 chiffres
@@ -184,6 +187,9 @@ function extractSymbolRegimeRecords(data, source) {
         }
         return;
       }
+      // Pas un array bySymbolByRegime — peut contenir des objets imbriqués
+      // (ex. array de variant blocks dans Pullback yearly-walkforward). On descend.
+      for (const item of obj) walk(item, year);
       return;
     }
     for (const [key, val] of Object.entries(obj)) {
