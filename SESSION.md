@@ -27,9 +27,9 @@ Ce fichier est la **mémoire vivante du projet** : il résume l'état actuel, ce
 ## Métadonnées
 | Champ | Valeur |
 |-------|--------|
-| **Dernière mise à jour** | 2026-05-16 (vague B.10 — correctifs critiques post-audit safety gate) |
-| **IA utilisée** | Claude (claude-opus-4-7) |
-| **Branche active** | `claude/audit-manitradepro-prs-eydXl` |
+| **Dernière mise à jour** | 2026-05-17 (vague B.11 — durcissement freshness data post-B.10) |
+| **IA utilisée** | Claude (claude-sonnet-4-6) |
+| **Branche active** | `claude/confident-pasteur-nYoiI` |
 | **Repo GitHub** | emmanueldelasse-droid/ManiTradePro |
 | **Déployé sur** | GitHub Pages + Cloudflare Worker (auto-deploy GitHub Actions) |
 | **Worker URL** | `https://manitradepro.emmanueldelasse.workers.dev` |
@@ -80,6 +80,51 @@ ADX · EMA 50/100 · Donchian 55/20 · RSI · ATR · Momentum · Volume · Volat
 
 ## Règle absolue
 > ❌ **JAMAIS** afficher un prix fictif, périmé ou inventé — toujours un état de chargement si les données ne sont pas disponibles
+
+---
+
+## Session 2026-05-17 — Vague B.11 : durcissement freshness data (PR #173, mergée)
+
+6 patchs ciblés pour fermer les 5 trous d'observabilité/safety identifiés lors de l'audit runtime live post-B.10 (verdict 🟡 SAFE MAIS FRAGILE). Périmètre strict, zéro refactor.
+
+### Patchs
+
+**P0.1 — `MAX_STAGNANT_AGE` dans `quoteQualityEngine`**
+Quote actions de 40-45h en marché fermé n'était plus considérée stale → risque gap weekend non couvert. Borne dure 24h ajoutée. `delayed seul` et `marketClosed seul` continuent de ne pas bloquer si l'âge est sous la borne.
+
+**P0.2 — Détection bougies daily périmées**
+ROG.SW scorait sur des bougies de 53 jours (observé en probe runtime). Nouveau flag `candlesTooOld` dans `quoteQuality` (>14j non-crypto / >3j crypto) → `executionSafe=false`, `reasons[]` inclut `candles_too_old`, `validationStatus="candles_too_old"`. `buildStablePayload` bascule en `partial` avec message « Données historiques périmées ». Faux positifs évités : pas de flag si candles vide.
+
+**P1.1 — `canonicalCryptoSymbol` pour route fiche**
+`/api/opportunity-detail/BTCUSDT` retournait partial alors que le scan listait `BTC` live. Mapping `BTCUSDT→BTC`, `ETH-USD→ETH`, etc. Stocks et forex préservés.
+
+**P1.2 — `eodhd` dans `/health.circuits`**
+Le circuit breaker `eodhd` (ajouté en B.10.1) n'était pas exposé dans `/health`. 1 ligne ajoutée pour combler le trou d'observabilité.
+
+**P1.3 — Cohérence `strategies` dans `/health`**
+`strategies.disabled:["mean_reversion"]` contredisait `trainingDefaults.mean_reversion_enabled=true`. Vérité runtime restaurée (enabled inclut mean_reversion, disabled vide). Moteur non touché — observabilité uniquement.
+
+**P2 — `Cache-Control: no-store` si `force=1`**
+`/api/opportunities?force=1` bypassait le cache worker mais retournait `Cache-Control: public, max-age=300`. CDN/navigateur pouvaient resservir du cache. Désormais `force=1` retourne `no-store`. Cron passe `null` → comportement préservé via optional chaining.
+
+**Front + SW**
+Labels FR pour `candles_too_old` dans `validationStatusLabel` + `reasonLabel`. SW bumped v8.2 → v8.3.
+
+### Tests
+
+- `node --check` sur les 3 fichiers : PASS
+- Test statique structurel (8 checks) : PASS
+- Test fonctionnel runtime simulé sur `quoteQualityEngine` : 8/8 cas PASS (marketClosed 40h → stale, candles 53j → candlesTooOld, crypto 5j → candlesTooOld, candles vides → pas de faux positif)
+
+### Verdict après B.11
+
+Reste **🟡 SAFE MAIS FRAGILE**. Les 5 trous d'observabilité/safety sont fermés. Les 3 risques résiduels restent ouverts (race KV cold-start, `quoteAgeSeconds` null possible, mode manuel UI non gated) et continuent de bloquer l'argent réel.
+
+### Fichiers modifiés
+
+- `cloudflare-worker/worker.js` — patchs P0.1, P0.2, P1.1, P1.2, P1.3, P2
+- `assets/app.js` — labels `candles_too_old`
+- `sw.js` — version v8.2 → v8.3
 
 ---
 
