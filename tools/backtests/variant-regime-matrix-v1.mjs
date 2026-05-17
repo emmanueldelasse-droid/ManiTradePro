@@ -1,22 +1,20 @@
 // tools/backtests/variant-regime-matrix-v1.mjs
 //
-// Matrice (variante × régime) pour ManiTradePro.
+// Matrice (variante × régime) pour ManiTradePro — deux niveaux :
 //
-// LIMITE IMPORTANTE (vérifiée sur les JSON présents au moment de l'écriture) :
-// seul `results-relative-strength-rotation-regime-v1.json` expose un breakdown
-// régime, et UNIQUEMENT à un niveau GLOBAL (variant × regimeMode × regime),
-// PAS par actif. Le breakdown per-(symbol × variant × regime individuel) n'existe
-// pas dans les données disponibles. Le script ne l'invente pas — il livre :
+//   1. GLOBAL (variant × regimeMode × regime), source `byRegime[]`.
+//      Reste actif même si `bySymbolByRegime[]` est absent (back-compat).
 //
-//   1. La matrice GLOBALE (variant × regimeMode × regime) tirée de `byRegime`.
-//   2. La comparaison per-(symbol × variant × regimeMode) tirée de `bySymbol`
-//      qui permet de mesurer la dépendance RISK_OFF par actif, sans inventer
-//      de breakdown régime individuel.
+//   2. PER-SYMBOL (symbol × variant × regimeMode × regime), source
+//      `bySymbolByRegime[]`. Présent uniquement quand le backtest source a
+//      été ré-exécuté avec la version qui émet ce champ. Si absent, le moteur
+//      retombe proprement en mode legacy (matrice globale uniquement) et le
+//      signale dans le rapport.
 //
-// Pour obtenir une vraie matrice (variant × asset × regime), il faudrait
-// modifier les scripts de backtest pour exposer un `bySymbolByRegime` array
-// dans le JSON source. Tant que ce n'est pas fait, cette limite est documentée
-// dans le rapport et dans SESSION.md.
+// La comparaison ALL_REGIMES vs NO_RISK_OFF par actif (extraite via le module
+// `lib/backtest-records.mjs`) reste exposée comme troisième vue, utile pour
+// quantifier la dépendance RISK_OFF même sur les sources sans breakdown régime
+// individuel par actif.
 //
 // Sorties :
 //   - tools/backtests/output/variant-regime-matrix.json
@@ -71,7 +69,12 @@ function extractRegimeRecords(data, source) {
   const walk = (obj, year = null) => {
     if (!obj || typeof obj !== "object") return;
     if (Array.isArray(obj)) {
-      if (obj.length && obj[0] && typeof obj[0] === "object" && obj[0].regime && obj[0].variant) {
+      // On accepte un array byRegime (variant + regime, PAS de symbol).
+      // Les arrays bySymbolByRegime (qui ont symbol) sont SKIPPÉS — ils sont
+      // consommés par extractSymbolRegimeRecords pour ne pas mélanger les
+      // deux granularités dans le même agrégat global.
+      const first = obj[0];
+      if (obj.length && first && typeof first === "object" && first.regime && first.variant && !first.symbol) {
         for (const raw of obj) {
           const variant = String(raw.variant || "").trim();
           const regime = String(raw.regime || "").trim();
@@ -135,6 +138,219 @@ function dedupRegimeRecords(records) {
     }
   }
   return out;
+}
+
+// === Extraction des cellules bySymbolByRegime (PER-SYMBOL) ===
+//
+// Spécifique aux JSON qui exposent `bySymbolByRegime[]` (ajouté en mai 2026
+// pour le backtest RS regime). Chaque entry contient {symbol, regimeMode,
+// variant, regime, ...metrics}.
+function extractSymbolRegimeRecords(data, source) {
+  const out = [];
+  const walk = (obj, year = null) => {
+    if (!obj || typeof obj !== "object") return;
+    if (Array.isArray(obj)) {
+      const first = obj[0];
+      if (obj.length && first && typeof first === "object" && first.symbol && first.regime && first.variant) {
+        for (const raw of obj) {
+          const symbol = String(raw.symbol || "").trim().toUpperCase();
+          const variant = String(raw.variant || "").trim();
+          const regime = String(raw.regime || "").trim();
+          const regimeMode = String(raw.regimeMode || "").trim();
+          const trades = toNumberOrNull(raw.trades);
+          if (!symbol || !variant || !regime || !regimeMode) continue;
+          if (trades === null || trades <= 0) continue;
+          let winrate = toNumberOrNull(raw.winrate);
+          if (winrate !== null && winrate > 0 && winrate <= 1) winrate *= 100;
+          out.push({
+            source,
+            symbol,
+            variant,
+            regime,
+            regimeMode,
+            year,
+            setupFamily: inferSetupFamily({ variant, source }),
+            trades,
+            wins: toNumberOrNull(raw.wins),
+            losses: toNumberOrNull(raw.losses),
+            winrate,
+            expectancy: toNumberOrNull(raw.expectancy),
+            profitFactor: toNumberOrNull(raw.profitFactor),
+            totalR: toNumberOrNull(raw.totalR),
+            totalPnl: toNumberOrNull(raw.totalPnl),
+            maxDrawdown: toNumberOrNull(raw.maxDrawdown),
+            longestLossStreak: toNumberOrNull(raw.longestLossStreak),
+          });
+        }
+        return;
+      }
+      return;
+    }
+    for (const [key, val] of Object.entries(obj)) {
+      const yearMatch = /^\d{4}$/.test(key);
+      walk(val, yearMatch ? key : year);
+    }
+  };
+  walk(data);
+  return out;
+}
+
+// Dédup yearly vs overall pour les symbol-records, par (symbol, variant,
+// regimeMode, regime). Yearly prioritaire.
+function dedupSymbolRegimeRecords(records) {
+  const groups = new Map();
+  for (const rec of records) {
+    const key = [rec.symbol, rec.variant, rec.regimeMode, rec.regime].join("|");
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(rec);
+  }
+  const out = [];
+  for (const group of groups.values()) {
+    const hasYearly = group.some(r => r.year !== null);
+    if (hasYearly) {
+      for (const r of group) if (r.year !== null) out.push(r);
+    } else {
+      out.push(...group);
+    }
+  }
+  return out;
+}
+
+// Scoring d'une cellule symbol × variant × regimeMode × regime — seuils de
+// trades bien plus bas que le global (un actif individuel a beaucoup moins
+// de trades qu'une agrégation cross-symbole).
+function scoreSymbolRegimeCell(summary, byYear, regime) {
+  let score = 0;
+  const reasons = [];
+
+  const exp = summary.expectancy ?? 0;
+  const pf = summary.profitFactor ?? 0;
+  const wr = summary.winrate ?? 0;
+  const trades = summary.trades ?? 0;
+  const tr = summary.totalR ?? summary.totalPnl ?? null;
+  const dd = summary.maxDrawdown ?? 0;
+
+  // expectancy (0-30)
+  if (exp >= 1.0) score += 30;
+  else if (exp >= 0.5) score += 25;
+  else if (exp >= 0.2) score += 15;
+  else if (exp > 0) score += 8;
+
+  // profitFactor (0-25)
+  if (pf >= 2.0) score += 25;
+  else if (pf >= 1.5) score += 20;
+  else if (pf >= 1.2) score += 12;
+  else if (pf >= 1.0) score += 5;
+
+  // winrate (0-15)
+  if (wr >= 60) score += 15;
+  else if (wr >= 50) score += 10;
+  else if (wr >= 45) score += 5;
+
+  // sample size adapté per-symbol (0-15)
+  if (trades >= 30) score += 15;
+  else if (trades >= 15) score += 10;
+  else if (trades >= 10) score += 7;
+  else if (trades >= 5) score += 3;
+
+  // drawdown vs gain (0-10)
+  if (tr !== null && tr > 0 && dd > 0) {
+    const ratio = dd / Math.abs(tr);
+    if (ratio < 0.3) score += 10;
+    else if (ratio < 0.5) score += 7;
+    else if (ratio < 1.0) score += 4;
+  } else if (tr !== null && tr > 0 && dd === 0) {
+    score += 8;
+  }
+
+  // bonus stabilité (0-5)
+  const years = Array.from(byYear.values()).map(b => summarizeBucket(b));
+  const profitableYears = years.filter(y => (y.expectancy ?? 0) > 0 && y.trades >= 2).length;
+  const observedYears = years.length;
+  if (observedYears >= 2 && profitableYears >= 2) score += 5;
+
+  // PÉNALITÉS
+  if (trades < 5) { score -= 25; reasons.push("échantillon < 5 trades"); }
+  if (regime === "RISK_OFF" && exp <= 0) { score -= 10; reasons.push("RISK_OFF destructeur"); }
+
+  score = Math.max(0, Math.min(100, Math.round(score)));
+
+  let tier;
+  const blacklistByExp = exp <= 0 && trades >= 10;
+  const blacklistByPf = pf > 0 && pf < 1.0;
+  if (score < 30 || blacklistByExp || blacklistByPf) tier = "AVOID";
+  else if (score >= 70 && pf >= 1.4 && exp > 0 && trades >= 10) tier = "STRONG";
+  else if (score >= 50 && pf >= 1.1 && exp > 0 && trades >= 5) tier = "OK";
+  else tier = "WEAK";
+
+  let confidence;
+  if (trades >= 20 && observedYears >= 2) confidence = "HIGH";
+  else if (trades >= 10) confidence = "MEDIUM";
+  else confidence = "LOW";
+
+  if (exp <= 0 && trades >= 5) reasons.push(`exp ${exp.toFixed(2)}`);
+  if (pf > 0 && pf < 1.0) reasons.push(`PF ${pf.toFixed(2)} < 1`);
+
+  return { score, tier, confidence, profitableYears, observedYears, reason: reasons.join(" ; ") };
+}
+
+// Construction de la matrice per-symbol (symbol × variant × regimeMode × regime).
+// Retourne :
+//   - symbolMatrix[symbol][variant][regimeMode][regime] = cell
+//   - allSymbolCells: tous les cells aplatis
+function buildSymbolRegimeMatrix(symbolRecords) {
+  const deduped = dedupSymbolRegimeRecords(symbolRecords);
+  const cells = new Map();
+  for (const rec of deduped) {
+    const key = [rec.symbol, rec.variant, rec.regimeMode, rec.regime].join("|");
+    if (!cells.has(key)) cells.set(key, { bucket: emptyBucket(), byYear: new Map() });
+    const entry = cells.get(key);
+    pushToBucket(entry.bucket, rec);
+    if (rec.year) {
+      if (!entry.byYear.has(rec.year)) entry.byYear.set(rec.year, emptyBucket());
+      pushToBucket(entry.byYear.get(rec.year), rec);
+    }
+  }
+  const matrix = {};
+  const allCells = [];
+  for (const [key, entry] of cells.entries()) {
+    const [symbol, variant, regimeMode, regime] = key.split("|");
+    const summary = summarizeBucket(entry.bucket);
+    const scored = scoreSymbolRegimeCell(summary, entry.byYear, regime);
+    const yearMetrics = {};
+    for (const [y, b] of entry.byYear.entries()) yearMetrics[y] = summarizeBucket(b);
+
+    const cell = {
+      symbol,
+      setup: inferSetupFamily({ variant }),
+      variant,
+      regimeMode,
+      regime,
+      score: scored.score,
+      tier: scored.tier,
+      confidence: scored.confidence,
+      metrics: {
+        trades: summary.trades,
+        winrate: summary.winrate,
+        expectancy: summary.expectancy,
+        profitFactor: summary.profitFactor,
+        totalR: summary.totalR,
+        totalPnl: summary.totalPnl,
+        maxDrawdown: summary.maxDrawdown,
+        longestLossStreak: summary.longestLossStreak,
+      },
+      byYear: yearMetrics,
+      profitableYears: scored.profitableYears,
+      observedYears: scored.observedYears,
+      reason: scored.reason,
+    };
+    if (!matrix[symbol]) matrix[symbol] = {};
+    if (!matrix[symbol][variant]) matrix[symbol][variant] = {};
+    if (!matrix[symbol][variant][regimeMode]) matrix[symbol][variant][regimeMode] = {};
+    matrix[symbol][variant][regimeMode][regime] = cell;
+    allCells.push(cell);
+  }
+  return { matrix, allCells };
 }
 
 // Bonus / pénalités spécifiques au scoring régime :
@@ -427,9 +643,13 @@ function buildMarkdown(report) {
   // 1. Synthèse
   lines.push("## 1. Synthèse globale");
   lines.push("");
-  lines.push("**Limite importante** : la dimension régime n'est exposée que par `results-relative-strength-rotation-regime-v1.json`. Seules **2 variantes RS** ont un breakdown régime complet (`rs_90d_top10_hold20`, `rs_120d_top10_hold20`). Les autres setups (Pullback, Breakout, etc.) ne sont **pas couverts** par cette matrice.");
+  lines.push("**Limite résiduelle** : la dimension régime n'est exposée que par `results-relative-strength-rotation-regime-v1.json`. Seules **2 variantes RS** ont un breakdown régime complet (`rs_90d_top10_hold20`, `rs_120d_top10_hold20`). Les autres setups (Pullback, Breakout, etc.) ne sont **pas couverts** par cette matrice tant que leurs scripts de backtest n'auront pas été étendus.");
   lines.push("");
-  lines.push("**Limite supplémentaire** : il n'existe **aucune donnée per-(symbol × variant × regime individuel)** dans les JSON disponibles. La matrice globale (`byRegime`) est aggregate (tous symboles confondus). Pour les analyses par actif, la matrice expose uniquement la comparaison (symbol × variant × regimeMode = ALL_REGIMES vs NO_RISK_OFF), ce qui mesure la dépendance RISK_OFF d'un actif sans dire ce qu'il fait précisément en RISK_ON / RANGE / RISK_OFF séparément. Cette dimension est marquée comme non disponible dans le rapport.");
+  if (report.symbolMatrixSummary) {
+    lines.push("**Breakdown per-(symbol × variant × regimeMode × regime) disponible** depuis l'ajout de `bySymbolByRegime[]` à la source RS regime. La matrice per-symbol expose `" + report.symbolMatrixSummary.totalCells + "` cellules sur `" + report.symbolMatrixSummary.uniqueSymbols + "` actifs × `" + report.symbolMatrixSummary.uniqueVariants + "` variantes (cf. sections 7 et 7-bis).");
+  } else {
+    lines.push("**Pas de breakdown per-(symbol × variant × regime individuel) dans les JSON sources actuels.** La matrice expose uniquement les niveaux global (variant × regimeMode × regime) et per-symbol filter mode (ALL_REGIMES vs NO_RISK_OFF). Pour débloquer la dimension manquante, ajouter un champ `bySymbolByRegime[]` dans les sources.");
+  }
   lines.push("");
   lines.push(`- Cellules globales (variant × regimeMode × regime) : **${report.summary.totalCells}**`);
   lines.push(`- Variantes couvertes : ${report.summary.variants.join(", ")}`);
@@ -520,41 +740,75 @@ function buildMarkdown(report) {
   // 7. Cas détaillés
   lines.push("## 7. Cas détaillés par actif");
   lines.push("");
-  lines.push("**Rappel** : la dimension (symbol × variant × regime individuel) n'est pas disponible. Ce qui suit est la comparaison ALL_REGIMES vs NO_RISK_OFF par actif et par variante RS, pour quantifier l'impact RISK_OFF.");
+  if (report.symbolMatrixSummary) {
+    lines.push("Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × regime). Le tableau ci-dessous montre toutes les cellules disponibles pour chaque actif focus, avec le tier calculé localement par cellule.");
+  } else {
+    lines.push("**Rappel** : la dimension (symbol × variant × regime individuel) n'est pas disponible dans les JSON actuels. Ce qui suit est la comparaison ALL_REGIMES vs NO_RISK_OFF par actif et par variante RS, pour quantifier l'impact RISK_OFF.");
+  }
   lines.push("");
   for (const sym of FOCUS_SYMBOLS) {
     lines.push(`### ${sym}`);
     lines.push("");
-    const entries = report.focus[sym];
-    if (!entries || !entries.length) { lines.push("_aucune cellule régime disponible pour cet actif (les autres setups ne sont pas couverts)_"); lines.push(""); continue; }
-    lines.push("| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |");
-    lines.push("|---|---|---:|---:|---:|---:|---:|---:|");
-    for (const e of entries) {
-      const lab = (s, mode) => s ? `| ${e.variant} | ${mode} | ${s.trades} | ${fmt(s.winrate, 1)}% | ${fmt(s.expectancy)} | ${fmt(s.profitFactor)} | ${fmt(s.totalR)} | ${fmt(s.maxDrawdown)} |` : `| ${e.variant} | ${mode} | n/a | n/a | n/a | n/a | n/a | n/a |`;
-      if (e.allRegimes) lines.push(lab(e.allRegimes, "ALL_REGIMES"));
-      if (e.noRiskOff) lines.push(lab(e.noRiskOff, "NO_RISK_OFF"));
-    }
-    // Diff totalR
-    for (const e of entries) {
-      if (e.allRegimes && e.noRiskOff && e.allRegimes.totalR !== null && e.noRiskOff.totalR !== null) {
-        const drop = e.noRiskOff.totalR - e.allRegimes.totalR;
-        const tag = drop > 0 ? `NO_RISK_OFF apporte +${fmt(drop)} totalR (RISK_OFF dégrade)` : `RISK_OFF contribue +${fmt(-drop)} totalR (filtrer le retire)`;
-        lines.push(`> ${e.variant} : ${tag}`);
+    if (report.symbolMatrixSummary) {
+      const cells = report.symbolPerSymbolFocus?.[sym];
+      if (!cells || !cells.length) { lines.push("_aucune cellule per-symbol pour cet actif (probablement jamais sélectionné par les variantes RS)_"); lines.push(""); continue; }
+      lines.push("| Variante | Mode | Régime | Tier | Score | Trades | Winrate | Exp | PF | TotalR | DD | Raison |");
+      lines.push("|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|");
+      for (const c of cells) {
+        lines.push(`| ${c.variant} | ${c.regimeMode} | ${c.regime} | ${c.tier} | ${c.score} | ${c.metrics.trades} | ${fmt(c.metrics.winrate, 1)}% | ${fmt(c.metrics.expectancy)} | ${fmt(c.metrics.profitFactor)} | ${fmt(c.metrics.totalR)} | ${fmt(c.metrics.maxDrawdown)} | ${c.reason || "—"} |`);
       }
+      lines.push("");
+    } else {
+      const entries = report.focus[sym];
+      if (!entries || !entries.length) { lines.push("_aucune cellule régime disponible pour cet actif (les autres setups ne sont pas couverts)_"); lines.push(""); continue; }
+      lines.push("| Variante | Mode | Trades | Winrate | Exp | PF | TotalR | DD |");
+      lines.push("|---|---|---:|---:|---:|---:|---:|---:|");
+      for (const e of entries) {
+        const lab = (s, mode) => s ? `| ${e.variant} | ${mode} | ${s.trades} | ${fmt(s.winrate, 1)}% | ${fmt(s.expectancy)} | ${fmt(s.profitFactor)} | ${fmt(s.totalR)} | ${fmt(s.maxDrawdown)} |` : `| ${e.variant} | ${mode} | n/a | n/a | n/a | n/a | n/a | n/a |`;
+        if (e.allRegimes) lines.push(lab(e.allRegimes, "ALL_REGIMES"));
+        if (e.noRiskOff) lines.push(lab(e.noRiskOff, "NO_RISK_OFF"));
+      }
+      for (const e of entries) {
+        if (e.allRegimes && e.noRiskOff && e.allRegimes.totalR !== null && e.noRiskOff.totalR !== null) {
+          const drop = e.noRiskOff.totalR - e.allRegimes.totalR;
+          const tag = drop > 0 ? `NO_RISK_OFF apporte +${fmt(drop)} totalR (RISK_OFF dégrade)` : `RISK_OFF contribue +${fmt(-drop)} totalR (filtrer le retire)`;
+          lines.push(`> ${e.variant} : ${tag}`);
+        }
+      }
+      lines.push("");
     }
+  }
+
+  // 7-bis. Synthèse de la matrice per-symbol si disponible
+  if (report.symbolMatrixSummary) {
+    lines.push("## 7-bis. Matrice per-symbol (synthèse globale)");
+    lines.push("");
+    lines.push(`- Cellules per-(symbol × variant × regimeMode × regime) : **${report.symbolMatrixSummary.totalCells}**`);
+    lines.push(`- Actifs couverts : ${report.symbolMatrixSummary.uniqueSymbols}`);
+    lines.push(`- Variantes couvertes : ${report.symbolMatrixSummary.uniqueVariants}`);
+    lines.push("");
+    lines.push("Répartition par tier :");
+    lines.push("");
+    lines.push("| Tier | Nombre |");
+    lines.push("|---|---:|");
+    for (const tier of ["STRONG", "OK", "WEAK", "AVOID"]) lines.push(`| ${tier} | ${report.symbolMatrixSummary.byTier[tier]} |`);
     lines.push("");
   }
 
   // 8. Recommandations moteur
   lines.push("## 8. Recommandations moteur");
   lines.push("");
-  lines.push("Sur la base de cette matrice (et compte tenu des limites de couverture) :");
+  lines.push("Sur la base de cette matrice :");
   lines.push("");
   lines.push("- **Mode opérationnel cible : NO_RISK_OFF**. La cellule (variant, RANGE) est systématiquement plus rentable que la cellule (variant, RISK_ON) pour les deux variantes RS couvertes. RANGE est l'environnement le plus favorable pour la rotation momentum.");
-  lines.push("- **Interdire les variantes RS quand le régime macro est RISK_OFF**. Les cellules ALL_REGIMES × RISK_OFF sortent AVOID ou expectancy ≤ 0 pour `rs_90d_top10_hold20` (`rs_120d` est plus résilient mais marginalement).");
-  lines.push("- **Allouer plus en RANGE qu'en RISK_ON** pour les variantes STRONG en RANGE — c'est là que l'expectancy est ~2× supérieure.");
-  lines.push("- **Ne pas conclure pour les autres setups** (Pullback, Breakout, etc.) tant qu'un breakdown régime n'est pas ajouté à leurs JSON de backtest. La matrice setup-variant et la matrice asset-quality restent les sources de vérité pour eux, sans dimension régime.");
-  lines.push("- **Priorité quant à ajouter** : un breakdown `bySymbolByRegime` dans les scripts de backtest. Sans ça, on ne pourra jamais répondre rigoureusement à la question \"NVDA × Pullback en RANGE ?\".");
+  lines.push("- **Interdire les variantes RS quand le régime macro est RISK_OFF**. Les cellules ALL_REGIMES × RISK_OFF sortent AVOID ou expectancy ≤ 0 pour `rs_90d_top10_hold20` (`rs_120d` est plus résilient).");
+  lines.push("- **Allouer plus en RANGE qu'en RISK_ON** pour les variantes STRONG en RANGE.");
+  if (report.symbolMatrixSummary) {
+    lines.push("- **Filtrer par actif × variante × régime** : avec la matrice per-symbol, on peut maintenant interdire un actif sur une combinaison précise (ex. NVDA × rs_90d × RISK_ON sort AVOID per-cell) même si la combinaison globale est OK.");
+  } else {
+    lines.push("- **Priorité quant à ajouter** : un breakdown `bySymbolByRegime` dans les scripts de backtest. Sans ça, la décision per-actif-par-régime reste approximative.");
+  }
+  lines.push("- **Ne pas conclure pour les autres setups** (Pullback, Breakout, etc.) tant qu'un breakdown régime n'est pas ajouté à leurs JSON de backtest.");
   lines.push("");
   return lines.join("\n");
 }
@@ -585,6 +839,7 @@ async function main() {
   console.log(`[variant-regime-matrix] ${files.length} fichier(s) candidat(s)`);
 
   const regimeRecords = [];
+  const symbolRegimeRecords = [];
   const symbolRecords = [];
   for (const file of files) {
     let parsed;
@@ -595,10 +850,14 @@ async function main() {
       continue;
     }
     const regimeRecs = extractRegimeRecords(parsed, basename(file));
-    if (regimeRecs.length) console.log(`  ✓ ${basename(file)} — ${regimeRecs.length} record(s) régime`);
+    if (regimeRecs.length) console.log(`  ✓ ${basename(file)} — ${regimeRecs.length} record(s) régime global`);
     regimeRecords.push(...regimeRecs);
 
-    // Aussi les records bySymbol pour la comparaison per-symbol
+    const symRegRecs = extractSymbolRegimeRecords(parsed, basename(file));
+    if (symRegRecs.length) console.log(`  ✓ ${basename(file)} — ${symRegRecs.length} record(s) symbole × régime`);
+    symbolRegimeRecords.push(...symRegRecs);
+
+    // Aussi les records bySymbol (filter mode) pour la comparaison per-symbol
     const { records } = extractRecords(parsed, basename(file));
     for (const r of records) symbolRecords.push(r);
   }
@@ -608,11 +867,38 @@ async function main() {
     console.error(expectedFormatMessage());
     process.exit(1);
   }
-  console.log(`[variant-regime-matrix] ${regimeRecords.length} record(s) régime au total`);
+  console.log(`[variant-regime-matrix] ${regimeRecords.length} record(s) régime global au total`);
+  console.log(`[variant-regime-matrix] ${symbolRegimeRecords.length} record(s) symbole × régime au total`);
 
   const { matrix, allCells, variants, regimes, regimeModes } = buildRegimeMatrix(regimeRecords);
   const cellsByTier = { STRONG: 0, OK: 0, WEAK: 0, AVOID: 0 };
   for (const c of allCells) cellsByTier[c.tier]++;
+
+  // === Nouvelle matrice per-symbol (si bySymbolByRegime est présent dans la source) ===
+  let symbolMatrix = null;
+  let symbolMatrixSummary = null;
+  let symbolPerSymbolFocus = null;
+  if (symbolRegimeRecords.length) {
+    const built = buildSymbolRegimeMatrix(symbolRegimeRecords);
+    symbolMatrix = built.matrix;
+    const symbolCellsByTier = { STRONG: 0, OK: 0, WEAK: 0, AVOID: 0 };
+    for (const c of built.allCells) symbolCellsByTier[c.tier]++;
+    const uniqueSymbols = new Set(built.allCells.map(c => c.symbol)).size;
+    const uniqueVariants = new Set(built.allCells.map(c => c.variant)).size;
+    symbolMatrixSummary = {
+      totalCells: built.allCells.length,
+      uniqueSymbols,
+      uniqueVariants,
+      byTier: symbolCellsByTier,
+    };
+    symbolPerSymbolFocus = {};
+    for (const sym of FOCUS_SYMBOLS) {
+      const symCells = built.allCells
+        .filter(c => c.symbol === sym)
+        .sort((a, b) => a.variant.localeCompare(b.variant) || a.regimeMode.localeCompare(b.regimeMode) || a.regime.localeCompare(b.regime));
+      symbolPerSymbolFocus[sym] = symCells.length ? symCells : null;
+    }
+  }
 
   const perSymbol = buildPerSymbolFilterComparison(symbolRecords);
   const focus = focusPerSymbol(perSymbol, FOCUS_SYMBOLS);
@@ -622,7 +908,6 @@ async function main() {
   const riskOffDangerous = findRiskOffDangerous(allCells);
   const variantsToBlacklist = findVariantsToBlacklist(allCells);
 
-  // Per-symbol map → objet sérialisable
   const perSymbolObj = {};
   for (const e of perSymbol.values()) {
     if (!perSymbolObj[e.symbol]) perSymbolObj[e.symbol] = [];
@@ -646,9 +931,12 @@ async function main() {
     variantsToBlacklist,
     perSymbol: perSymbolObj,
     focus,
+    symbolMatrix,
+    symbolMatrixSummary,
+    symbolPerSymbolFocus,
     knownLimitations: {
       regimeBreakdownAvailableOnlyForVariants: variants,
-      perSymbolPerRegimeIndividualAvailable: false,
+      perSymbolPerRegimeIndividualAvailable: Boolean(symbolMatrix),
       perSymbolFilterModeAvailable: true,
     },
   };
@@ -661,7 +949,12 @@ async function main() {
   console.log(`  - ${relative(REPO_ROOT, OUTPUT_JSON)}`);
   console.log(`  - ${relative(REPO_ROOT, OUTPUT_MD)}`);
   console.log("");
-  console.log(`Résumé : ${allCells.length} cellules globales — STRONG ${cellsByTier.STRONG}, OK ${cellsByTier.OK}, WEAK ${cellsByTier.WEAK}, AVOID ${cellsByTier.AVOID}`);
+  console.log(`Résumé global : ${allCells.length} cellules — STRONG ${cellsByTier.STRONG}, OK ${cellsByTier.OK}, WEAK ${cellsByTier.WEAK}, AVOID ${cellsByTier.AVOID}`);
+  if (symbolMatrixSummary) {
+    console.log(`Résumé per-symbol : ${symbolMatrixSummary.totalCells} cellules sur ${symbolMatrixSummary.uniqueSymbols} actifs × ${symbolMatrixSummary.uniqueVariants} variants — STRONG ${symbolMatrixSummary.byTier.STRONG}, OK ${symbolMatrixSummary.byTier.OK}, WEAK ${symbolMatrixSummary.byTier.WEAK}, AVOID ${symbolMatrixSummary.byTier.AVOID}`);
+  } else {
+    console.log(`Résumé per-symbol : aucun bySymbolByRegime trouvé — section per-symbol omise (fallback legacy actif)`);
+  }
   console.log(`Variantes robustes multi-régimes : ${robustVariants.length}`);
   console.log(`Variantes RANGE-only : ${rangeOnlyVariants.length}`);
   console.log(`Variantes dangereuses RISK_OFF : ${riskOffDangerous.length}`);

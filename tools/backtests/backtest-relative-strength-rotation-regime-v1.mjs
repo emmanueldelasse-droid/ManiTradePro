@@ -365,6 +365,7 @@ function runAll(allowedYears = null) {
   const rows = [];
   const bySymbol = [];
   const byRegime = [];
+  const bySymbolByRegime = [];
 
   for (const regimeMode of REGIME_MODES) {
     for (const variant of VARIANTS) {
@@ -405,6 +406,25 @@ function runAll(allowedYears = null) {
           symbol,
           ...summarize(st)
         });
+
+        // Breakdown per regime (RISK_ON / RANGE / RISK_OFF) pour CE symbole.
+        // Choix de design : on omet les cellules avec 0 trade pour ne pas
+        // polluer le JSON (cellules vides = combinaison non observée).
+        for (const regime of ["RISK_ON", "RANGE", "RISK_OFF"]) {
+          const sti = st.filter(t => t.regime === regime);
+
+          if (sti.length === 0) {
+            continue;
+          }
+
+          bySymbolByRegime.push({
+            regimeMode: regimeMode.name,
+            variant: variant.name,
+            symbol,
+            regime,
+            ...summarize(sti)
+          });
+        }
       }
     }
   }
@@ -421,11 +441,19 @@ function runAll(allowedYears = null) {
     return b.trades - a.trades;
   });
 
+  bySymbolByRegime.sort((a, b) => {
+    if (a.symbol !== b.symbol) return a.symbol.localeCompare(b.symbol);
+    if (a.variant !== b.variant) return a.variant.localeCompare(b.variant);
+    if (a.regimeMode !== b.regimeMode) return a.regimeMode.localeCompare(b.regimeMode);
+    return a.regime.localeCompare(b.regime);
+  });
+
   return {
     symbolsTested: candlesBySymbol.size,
     rows,
     byRegime,
-    bySymbol
+    bySymbol,
+    bySymbolByRegime
   };
 }
 
