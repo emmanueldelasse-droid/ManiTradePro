@@ -1,6 +1,6 @@
 # Asset × Setup Matrix — ManiTradePro
 
-> Généré le 2026-05-18T07:17:06.222Z par `tools/backtests/asset-setup-matrix-v1.mjs`.
+> Généré le 2026-05-18T07:38:39.479Z par `tools/backtests/asset-setup-matrix-v1.mjs`.
 
 ## 1. Synthèse globale
 
