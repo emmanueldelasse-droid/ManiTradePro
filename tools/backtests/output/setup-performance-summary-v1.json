@@ -1,0 +1,1047 @@
+{
+  "generatedAt": "2026-05-18T13:26:35.881Z",
+  "sources": {
+    "multiSetupGrid": "tools/backtests/results-multi-setup-grid.json",
+    "rsRotation": "tools/backtests/results-relative-strength-rotation-regime-v1.json",
+    "rolling": "tools/backtests/output/rolling-walkforward-validator.json",
+    "tuV1": "tools/backtests/output/tradable-universe.json",
+    "tuV2": "tools/backtests/output/tradable-universe-v2.json",
+    "allocV3": "tools/backtests/output/allocation-plan-v3.json",
+    "setupVariantMatrix": "tools/backtests/output/setup-variant-matrix.json",
+    "variantRegimeMatrix": "tools/backtests/output/variant-regime-matrix.json"
+  },
+  "summary": {
+    "setupsCompared": 5,
+    "bestSetup": "PULLBACK_MOMENTUM",
+    "worstSetup": "VOLATILITY_COMPRESSION",
+    "mostRobust": "PULLBACK_MOMENTUM",
+    "mostOverfitAbs": "PULLBACK_MOMENTUM",
+    "mostOverfitRatio": "PULLBACK_MOMENTUM",
+    "gradesDistribution": {
+      "B": 2,
+      "D": 2,
+      "FAILED": 1
+    }
+  },
+  "grading": {
+    "formula": "PF (max 25) + Expectancy (max 15) + Robustness rolling (max 20) + Temporal stability (max 10) + Survival ALLOW v2 (max 15) + Top variant strength (max 15) − OVERFIT penalty (max -10) → grade A ≥ 70, B ≥ 45, C ≥ 25, D ≥ 10, FAILED < 10",
+    "composantsExplained": {
+      "profitFactor": "PF ≥ 2.0 → 25, ≥ 1.5 → 22, ≥ 1.3 → 14, ≥ 1.1 → 8, ≥ 1.0 → 4, ≥ 0.9 → 2, sinon 0",
+      "expectancy": "E ≥ 1.0 → 15, ≥ 0.5 → 11, ≥ 0.2 → 7, ≥ 0 → 3, sinon 0",
+      "robustnessRolling": "(robust+stable)/evaluated : ≥ 5 % → 20, ≥ 2 % → 15, ≥ 1 % → 10, ≥ 0.5 % → 7, > 0 → 4, 0 → 0",
+      "temporalStability": "fragile / (robust+stable+fragile) : ≤ 50 % → 10, ≤ 70 % → 7, ≤ 90 % → 4, > 90 % → 1",
+      "survivalV2": "allowV2 ≥ 20 → 15, ≥ 10 → 11, ≥ 5 → 8, ≥ 1 → 5, 0 → 0",
+      "topVariantStrength": "Comptes STRONG/OK depuis setup-variant-matrix : STRONG ≥ 20 → 15, ≥ 5 → 11, ≥ 1 → 6, OK ≥ 5 → 3, OK ≥ 1 → 1, sinon 0",
+      "overfitPenalty": "overfit/evaluated : ≥ 5 % → −10, ≥ 2 % → −5, ≥ 1 % → −2, > 0 → −1, 0 → 0"
+    }
+  },
+  "setups": [
+    {
+      "setup": "PULLBACK_MOMENTUM",
+      "grade": "B",
+      "scoreNumber": 63,
+      "breakdown": {
+        "profitFactor": {
+          "value": 1.724,
+          "points": 22,
+          "max": 25
+        },
+        "expectancy": {
+          "value": 0.42,
+          "points": 7,
+          "max": 15
+        },
+        "robustnessRolling": {
+          "robustPlusStable": 31,
+          "evaluated": 6520,
+          "ratio": 0.0048,
+          "points": 4,
+          "max": 20
+        },
+        "temporalStability": {
+          "fragile": 2313,
+          "robustPlusStable": 31,
+          "fragilityRatio": 0.9868,
+          "points": 1,
+          "max": 10
+        },
+        "survivalV2": {
+          "allowV2": 24,
+          "points": 15,
+          "max": 15
+        },
+        "topVariantStrength": {
+          "strongVariants": 344,
+          "okVariants": 560,
+          "points": 15,
+          "max": 15
+        },
+        "overfitPenalty": {
+          "overfit": 51,
+          "evaluated": 6520,
+          "ratio": 0.0078,
+          "points": -1,
+          "min": -10
+        }
+      },
+      "trades": 20683,
+      "wins": 5785,
+      "losses": 11840,
+      "timeouts": 3058,
+      "winratePct": 27.97,
+      "expectancy": 0.42,
+      "profitFactor": 1.724,
+      "maxDrawdown": 93.31,
+      "longestLossStreak": 25,
+      "rolling": {
+        "evaluated": 6520,
+        "robust": 16,
+        "stable": 15,
+        "fragile": 2313,
+        "overfit": 51,
+        "insufficient": 4125
+      },
+      "tradableUniverse": {
+        "allowV1": 328,
+        "reduceV1": 9,
+        "experimentalV1": 146,
+        "blockV1": 7091,
+        "allowV2": 24,
+        "reduceV2": 287,
+        "experimentalV2": 16,
+        "blockV2": 7247,
+        "totalCells": 7574
+      },
+      "allocationV3Survivors": 0,
+      "topVariants": [
+        {
+          "symbol": "ACLS",
+          "variant": "rsi42_58_chg20_0_stop0.5",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 5.776190476190476,
+          "winratePct": 68.42105263157895,
+          "expectancy": 1.1978947368421053,
+          "trades": 57
+        },
+        {
+          "symbol": "CRWD",
+          "variant": "rsi42_58_chg20_5_stop0.5",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 5.671724137931034,
+          "winratePct": 60,
+          "expectancy": 1.2754999999999999,
+          "trades": 60
+        },
+        {
+          "symbol": "CRWD",
+          "variant": "rsi42_58_chg20_3_stop0.5",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 5.957968749999999,
+          "winratePct": 60.60606060606061,
+          "expectancy": 1.3163636363636364,
+          "trades": 66
+        },
+        {
+          "symbol": "PANW",
+          "variant": "rsi42_58_chg20_5_stop0.5",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 3.597826086956522,
+          "winratePct": 60,
+          "expectancy": 1.1645999999999999,
+          "trades": 50
+        },
+        {
+          "symbol": "PANW",
+          "variant": "rsi42_58_chg20_3_stop0.5",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 4.361818181818181,
+          "winratePct": 63.38028169014085,
+          "expectancy": 1.200281690140845,
+          "trades": 71
+        }
+      ],
+      "avoidVariants": [],
+      "bestRegimes": [
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 1607,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 14,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RANGE",
+          "totalCells": 2397,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 778,
+          "overfit": 5,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_ON",
+          "totalCells": 2516,
+          "robust": 16,
+          "stable": 15,
+          "fragile": 1521,
+          "overfit": 46,
+          "goodRatio": 0.0123
+        }
+      ],
+      "worstRegimes": [
+        {
+          "regime": "RISK_ON",
+          "totalCells": 2516,
+          "robust": 16,
+          "stable": 15,
+          "fragile": 1521,
+          "overfit": 46,
+          "goodRatio": 0.0123
+        },
+        {
+          "regime": "RANGE",
+          "totalCells": 2397,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 778,
+          "overfit": 5,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 1607,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 14,
+          "overfit": 0,
+          "goodRatio": 0
+        }
+      ],
+      "notes": [],
+      "failureReason": null
+    },
+    {
+      "setup": "BREAKOUT_EXPANSION",
+      "grade": "D",
+      "scoreNumber": 17,
+      "breakdown": {
+        "profitFactor": {
+          "value": 0.909,
+          "points": 2,
+          "max": 25
+        },
+        "expectancy": {
+          "value": -0.038,
+          "points": 0,
+          "max": 15
+        },
+        "robustnessRolling": {
+          "robustPlusStable": 3,
+          "evaluated": 1266,
+          "ratio": 0.0024,
+          "points": 4,
+          "max": 20
+        },
+        "temporalStability": {
+          "fragile": 379,
+          "robustPlusStable": 3,
+          "fragilityRatio": 0.9921,
+          "points": 1,
+          "max": 10
+        },
+        "survivalV2": {
+          "allowV2": 2,
+          "points": 5,
+          "max": 15
+        },
+        "topVariantStrength": {
+          "strongVariants": 2,
+          "okVariants": 29,
+          "points": 6,
+          "max": 15
+        },
+        "overfitPenalty": {
+          "overfit": 2,
+          "evaluated": 1266,
+          "ratio": 0.0016,
+          "points": -1,
+          "min": -10
+        }
+      },
+      "trades": 9428,
+      "wins": 1973,
+      "losses": 4593,
+      "timeouts": 2862,
+      "winratePct": 20.93,
+      "expectancy": -0.038,
+      "profitFactor": 0.909,
+      "maxDrawdown": 388,
+      "longestLossStreak": 14,
+      "rolling": {
+        "evaluated": 1266,
+        "robust": 1,
+        "stable": 2,
+        "fragile": 379,
+        "overfit": 2,
+        "insufficient": 882
+      },
+      "tradableUniverse": {
+        "allowV1": 11,
+        "reduceV1": 1,
+        "experimentalV1": 3,
+        "blockV1": 1251,
+        "allowV2": 2,
+        "reduceV2": 6,
+        "experimentalV2": 4,
+        "blockV2": 1254,
+        "totalCells": 1266
+      },
+      "allocationV3Survivors": 0,
+      "topVariants": [
+        {
+          "symbol": "GLD",
+          "variant": "breakout_h20_vol1.5_stop1_rr2",
+          "tier": "STRONG",
+          "score": 75,
+          "profitFactor": 2.529787234042553,
+          "winratePct": 53.191489361702125,
+          "expectancy": 0.6180851063829789,
+          "trades": 47
+        },
+        {
+          "symbol": "SMCI",
+          "variant": "breakout_h20_vol1.5_stop1_rr2",
+          "tier": "STRONG",
+          "score": 75,
+          "profitFactor": 3.64,
+          "winratePct": 52,
+          "expectancy": 0.6772,
+          "trades": 25
+        },
+        {
+          "symbol": "CLOU",
+          "variant": "breakout_h20_vol1.2_stop1_rr2",
+          "tier": "OK",
+          "score": 72,
+          "profitFactor": 3.9411764705882355,
+          "winratePct": 58.82352941176471,
+          "expectancy": 0.8235294117647058,
+          "trades": 17
+        },
+        {
+          "symbol": "NVDA",
+          "variant": "breakout_h20_vol1.5_stop1_rr2",
+          "tier": "OK",
+          "score": 68,
+          "profitFactor": 5.126923076923077,
+          "winratePct": 53.84615384615385,
+          "expectancy": 0.6153846153846154,
+          "trades": 13
+        },
+        {
+          "symbol": "AMD",
+          "variant": "breakout_h20_vol1.5_stop1_rr2",
+          "tier": "OK",
+          "score": 67,
+          "profitFactor": 4.0964285714285715,
+          "winratePct": 47.368421052631575,
+          "expectancy": 0.6836842105263158,
+          "trades": 19
+        }
+      ],
+      "avoidVariants": [
+        {
+          "variant": "breakout_h50_vol1.5_stop1.5_rr2.5",
+          "cells": 155,
+          "avoidRatio": 0.8838709677419355,
+          "totalTrades": 1571
+        },
+        {
+          "variant": "breakout_h50_vol1.2_stop1.5_rr2.5",
+          "cells": 158,
+          "avoidRatio": 0.8544303797468354,
+          "totalTrades": 2686
+        }
+      ],
+      "bestRegimes": [
+        {
+          "regime": "RISK_ON",
+          "totalCells": 624,
+          "robust": 1,
+          "stable": 2,
+          "fragile": 331,
+          "overfit": 2,
+          "goodRatio": 0.0048
+        },
+        {
+          "regime": "RANGE",
+          "totalCells": 524,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 44,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 118,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 4,
+          "overfit": 0,
+          "goodRatio": 0
+        }
+      ],
+      "worstRegimes": [
+        {
+          "regime": "RANGE",
+          "totalCells": 524,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 44,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 118,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 4,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_ON",
+          "totalCells": 624,
+          "robust": 1,
+          "stable": 2,
+          "fragile": 331,
+          "overfit": 2,
+          "goodRatio": 0.0048
+        }
+      ],
+      "notes": [
+        "Grade agrégé D, MAIS 2 variante(s) individuelle(s) STRONG existent (top : GLD (STRONG, PF 2.53); SMCI (STRONG, PF 3.64); CLOU (OK, PF 3.94)). L'agrégé est tiré vers le bas par le très grand nombre de variantes AVOID/WEAK sur d'autres actifs. Pour le tradable réel, regarder les variantes isolées plutôt que l'agrégé."
+      ],
+      "failureReason": "PF 0.91"
+    },
+    {
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "grade": "B",
+      "scoreNumber": 48,
+      "breakdown": {
+        "profitFactor": {
+          "value": 1.54,
+          "points": 22,
+          "max": 25
+        },
+        "expectancy": {
+          "value": 0.733,
+          "points": 11,
+          "max": 15
+        },
+        "robustnessRolling": {
+          "robustPlusStable": 0,
+          "evaluated": 420,
+          "ratio": 0,
+          "points": 0,
+          "max": 20
+        },
+        "temporalStability": {
+          "fragile": 59,
+          "robustPlusStable": 0,
+          "fragilityRatio": 1,
+          "points": 1,
+          "max": 10
+        },
+        "survivalV2": {
+          "allowV2": 0,
+          "points": 0,
+          "max": 15
+        },
+        "topVariantStrength": {
+          "strongVariants": 42,
+          "okVariants": 52,
+          "points": 15,
+          "max": 15
+        },
+        "overfitPenalty": {
+          "overfit": 1,
+          "evaluated": 420,
+          "ratio": 0.0024,
+          "points": -1,
+          "min": -10
+        }
+      },
+      "trades": 5025,
+      "wins": 2712,
+      "losses": 2312,
+      "timeouts": 0,
+      "winratePct": 53.97,
+      "expectancy": 0.733,
+      "profitFactor": 1.54,
+      "maxDrawdown": 300.62,
+      "longestLossStreak": 25,
+      "rolling": {
+        "evaluated": 420,
+        "robust": 0,
+        "stable": 0,
+        "fragile": 59,
+        "overfit": 1,
+        "insufficient": 360
+      },
+      "tradableUniverse": {
+        "allowV1": 7,
+        "reduceV1": 0,
+        "experimentalV1": 29,
+        "blockV1": 384,
+        "allowV2": 0,
+        "reduceV2": 7,
+        "experimentalV2": 0,
+        "blockV2": 413,
+        "totalCells": 420
+      },
+      "allocationV3Survivors": 0,
+      "topVariants": [
+        {
+          "symbol": "APP",
+          "variant": "rs_90d_top10_hold20",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 5.813132530120482,
+          "winratePct": 62.65060240963856,
+          "expectancy": 2.2985542168674704,
+          "trades": 83
+        },
+        {
+          "symbol": "APP",
+          "variant": "rs_120d_top10_hold20",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 7.595172413793103,
+          "winratePct": 67.81609195402298,
+          "expectancy": 2.4320689655172414,
+          "trades": 87
+        },
+        {
+          "symbol": "PLTR",
+          "variant": "rs_120d_top10_hold20",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 7.802857142857143,
+          "winratePct": 78.57142857142857,
+          "expectancy": 2.4948571428571427,
+          "trades": 70
+        },
+        {
+          "symbol": "PLTR",
+          "variant": "rs_90d_top10_hold20",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 7.530307692307692,
+          "winratePct": 76.92307692307693,
+          "expectancy": 2.4539999999999997,
+          "trades": 65
+        },
+        {
+          "symbol": "SMCI",
+          "variant": "rs_90d_top10_hold20",
+          "tier": "STRONG",
+          "score": 100,
+          "profitFactor": 2.332786885245902,
+          "winratePct": 60.65573770491803,
+          "expectancy": 1.3544262295081966,
+          "trades": 61
+        }
+      ],
+      "avoidVariants": [],
+      "bestRegimes": [
+        {
+          "regime": "RANGE",
+          "totalCells": 162,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 18,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 105,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 0,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_ON",
+          "totalCells": 153,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 41,
+          "overfit": 1,
+          "goodRatio": 0
+        }
+      ],
+      "worstRegimes": [
+        {
+          "regime": "RISK_ON",
+          "totalCells": 153,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 41,
+          "overfit": 1,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RANGE",
+          "totalCells": 162,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 18,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 105,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 0,
+          "overfit": 0,
+          "goodRatio": 0
+        }
+      ],
+      "notes": [
+        "Trades agrégés sur tous les regimeModes (ALL_REGIMES, NO_RISK_OFF, RISK_ON_ONLY) — léger overcounting structurel.",
+        "Bonne performance backtest, mais 0 cellule ROBUST/STABLE en rolling walk-forward — l'edge n'a pas tenu sur les splits temporels. Risque structurel de fragilité."
+      ],
+      "failureReason": null
+    },
+    {
+      "setup": "MEAN_REVERSION",
+      "grade": "D",
+      "scoreNumber": 23,
+      "breakdown": {
+        "profitFactor": {
+          "value": 1.41,
+          "points": 14,
+          "max": 25
+        },
+        "expectancy": {
+          "value": 0.148,
+          "points": 3,
+          "max": 15
+        },
+        "robustnessRolling": {
+          "robustPlusStable": 0,
+          "evaluated": 988,
+          "ratio": 0,
+          "points": 0,
+          "max": 20
+        },
+        "temporalStability": {
+          "fragile": 126,
+          "robustPlusStable": 0,
+          "fragilityRatio": 1,
+          "points": 1,
+          "max": 10
+        },
+        "survivalV2": {
+          "allowV2": 0,
+          "points": 0,
+          "max": 15
+        },
+        "topVariantStrength": {
+          "strongVariants": 1,
+          "okVariants": 30,
+          "points": 6,
+          "max": 15
+        },
+        "overfitPenalty": {
+          "overfit": 1,
+          "evaluated": 988,
+          "ratio": 0.001,
+          "points": -1,
+          "min": -10
+        }
+      },
+      "trades": 4613,
+      "wins": 1897,
+      "losses": 1664,
+      "timeouts": 1052,
+      "winratePct": 41.12,
+      "expectancy": 0.148,
+      "profitFactor": 1.41,
+      "maxDrawdown": 25.2,
+      "longestLossStreak": 14,
+      "rolling": {
+        "evaluated": 988,
+        "robust": 0,
+        "stable": 0,
+        "fragile": 126,
+        "overfit": 1,
+        "insufficient": 861
+      },
+      "tradableUniverse": {
+        "allowV1": 0,
+        "reduceV1": 0,
+        "experimentalV1": 2,
+        "blockV1": 986,
+        "allowV2": 0,
+        "reduceV2": 0,
+        "experimentalV2": 0,
+        "blockV2": 988,
+        "totalCells": 988
+      },
+      "allocationV3Survivors": 0,
+      "topVariants": [
+        {
+          "symbol": "AKAM",
+          "variant": "meanrev_rsi35_dist4_stop1_rr1.2",
+          "tier": "STRONG",
+          "score": 80,
+          "profitFactor": 2.09,
+          "winratePct": 60,
+          "expectancy": 0.5536666666666666,
+          "trades": 30
+        },
+        {
+          "symbol": "ACLS",
+          "variant": "meanrev_rsi35_dist4_stop1_rr1.2",
+          "tier": "OK",
+          "score": 77,
+          "profitFactor": 3.4421052631578952,
+          "winratePct": 66.66666666666666,
+          "expectancy": 0.5628571428571428,
+          "trades": 21
+        },
+        {
+          "symbol": "GTLB",
+          "variant": "meanrev_rsi35_dist4_stop1_rr1.2",
+          "tier": "OK",
+          "score": 77,
+          "profitFactor": 5.018181818181818,
+          "winratePct": 66.66666666666666,
+          "expectancy": 0.6686666666666667,
+          "trades": 15
+        },
+        {
+          "symbol": "TENB",
+          "variant": "meanrev_rsi35_dist4_stop1_rr1.2",
+          "tier": "OK",
+          "score": 77,
+          "profitFactor": 2.88,
+          "winratePct": 73.33333333333333,
+          "expectancy": 0.6133333333333334,
+          "trades": 15
+        },
+        {
+          "symbol": "JPM",
+          "variant": "meanrev_rsi35_dist4_stop1_rr1.2",
+          "tier": "OK",
+          "score": 73,
+          "profitFactor": 2.4,
+          "winratePct": 80,
+          "expectancy": 0.7619999999999999,
+          "trades": 10
+        }
+      ],
+      "avoidVariants": [
+        {
+          "variant": "meanrev_rsi30_dist7_stop1.5_rr1.5",
+          "cells": 137,
+          "avoidRatio": 0.9197080291970803,
+          "totalTrades": 888
+        },
+        {
+          "variant": "meanrev_rsi30_dist5_stop1_rr1.2",
+          "cells": 141,
+          "avoidRatio": 0.8936170212765957,
+          "totalTrades": 986
+        }
+      ],
+      "bestRegimes": [
+        {
+          "regime": "RANGE",
+          "totalCells": 291,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 55,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 375,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 10,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_ON",
+          "totalCells": 322,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 61,
+          "overfit": 1,
+          "goodRatio": 0
+        }
+      ],
+      "worstRegimes": [
+        {
+          "regime": "RISK_ON",
+          "totalCells": 322,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 61,
+          "overfit": 1,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RANGE",
+          "totalCells": 291,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 55,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 375,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 10,
+          "overfit": 0,
+          "goodRatio": 0
+        }
+      ],
+      "notes": [
+        "Grade agrégé D, MAIS 1 variante(s) individuelle(s) STRONG existent (top : AKAM (STRONG, PF 2.09); ACLS (OK, PF 3.44); GTLB (OK, PF 5.02)). L'agrégé est tiré vers le bas par le très grand nombre de variantes AVOID/WEAK sur d'autres actifs. Pour le tradable réel, regarder les variantes isolées plutôt que l'agrégé."
+      ],
+      "failureReason": "aucune cellule ROBUST/STABLE, aucun ALLOW v2 survivant"
+    },
+    {
+      "setup": "VOLATILITY_COMPRESSION",
+      "grade": "FAILED",
+      "scoreNumber": 4,
+      "breakdown": {
+        "profitFactor": {
+          "value": 0.781,
+          "points": 0,
+          "max": 25
+        },
+        "expectancy": {
+          "value": -0.108,
+          "points": 0,
+          "max": 15
+        },
+        "robustnessRolling": {
+          "robustPlusStable": 0,
+          "evaluated": 315,
+          "ratio": 0,
+          "points": 0,
+          "max": 20
+        },
+        "temporalStability": {
+          "fragile": 9,
+          "robustPlusStable": 0,
+          "fragilityRatio": 1,
+          "points": 1,
+          "max": 10
+        },
+        "survivalV2": {
+          "allowV2": 0,
+          "points": 0,
+          "max": 15
+        },
+        "topVariantStrength": {
+          "strongVariants": 0,
+          "okVariants": 5,
+          "points": 3,
+          "max": 15
+        },
+        "overfitPenalty": {
+          "overfit": 0,
+          "evaluated": 315,
+          "ratio": 0,
+          "points": 0,
+          "min": -10
+        }
+      },
+      "trades": 1265,
+      "wins": 264,
+      "losses": 679,
+      "timeouts": 322,
+      "winratePct": 20.87,
+      "expectancy": -0.108,
+      "profitFactor": 0.781,
+      "maxDrawdown": 119.5,
+      "longestLossStreak": 14,
+      "rolling": {
+        "evaluated": 315,
+        "robust": 0,
+        "stable": 0,
+        "fragile": 9,
+        "overfit": 0,
+        "insufficient": 306
+      },
+      "tradableUniverse": {
+        "allowV1": 0,
+        "reduceV1": 0,
+        "experimentalV1": 2,
+        "blockV1": 313,
+        "allowV2": 0,
+        "reduceV2": 0,
+        "experimentalV2": 0,
+        "blockV2": 315,
+        "totalCells": 315
+      },
+      "allocationV3Survivors": 0,
+      "topVariants": [
+        {
+          "symbol": "JPM",
+          "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+          "tier": "OK",
+          "score": 82,
+          "profitFactor": 2,
+          "winratePct": 66.66666666666666,
+          "expectancy": 1.0527777777777778,
+          "trades": 18
+        },
+        {
+          "symbol": "ORCL",
+          "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+          "tier": "OK",
+          "score": 78,
+          "profitFactor": 6.818181818181818,
+          "winratePct": 78.57142857142857,
+          "expectancy": 1.3571428571428572,
+          "trades": 14
+        },
+        {
+          "symbol": "BNB",
+          "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+          "tier": "OK",
+          "score": 75,
+          "profitFactor": 4.4,
+          "winratePct": 62.5,
+          "expectancy": 0.9375,
+          "trades": 16
+        },
+        {
+          "symbol": "MSFT",
+          "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+          "tier": "OK",
+          "score": 66,
+          "profitFactor": 3.909090909090909,
+          "winratePct": 54.54545454545454,
+          "expectancy": 0.7272727272727273,
+          "trades": 11
+        },
+        {
+          "symbol": "TSM",
+          "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+          "tier": "OK",
+          "score": 66,
+          "profitFactor": 2.25,
+          "winratePct": 50,
+          "expectancy": 0.503,
+          "trades": 10
+        }
+      ],
+      "avoidVariants": [
+        {
+          "variant": "compression_40_ratio0.7_break30_stop1.5_rr2.5",
+          "cells": 69,
+          "avoidRatio": 1,
+          "totalTrades": 306
+        },
+        {
+          "variant": "compression_20_ratio0.65_break20_stop1_rr2",
+          "cells": 71,
+          "avoidRatio": 0.8732394366197183,
+          "totalTrades": 269
+        },
+        {
+          "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+          "cells": 117,
+          "avoidRatio": 0.8547008547008547,
+          "totalTrades": 690
+        }
+      ],
+      "bestRegimes": [
+        {
+          "regime": "RISK_ON",
+          "totalCells": 238,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 8,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RANGE",
+          "totalCells": 67,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 1,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 10,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 0,
+          "overfit": 0,
+          "goodRatio": 0
+        }
+      ],
+      "worstRegimes": [
+        {
+          "regime": "RISK_ON",
+          "totalCells": 238,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 8,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RANGE",
+          "totalCells": 67,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 1,
+          "overfit": 0,
+          "goodRatio": 0
+        },
+        {
+          "regime": "RISK_OFF",
+          "totalCells": 10,
+          "robust": 0,
+          "stable": 0,
+          "fragile": 0,
+          "overfit": 0,
+          "goodRatio": 0
+        }
+      ],
+      "notes": [],
+      "failureReason": "PF 0.78, aucune cellule ROBUST/STABLE, aucun ALLOW v2 survivant"
+    }
+  ]
+}

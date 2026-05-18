@@ -2446,3 +2446,83 @@ Pistes possibles (décision ChatGPT, hors scope de cette PR) :
 - **Stress-test** du moteur v3 quand un plan viable existera, contre `friction-adjusted-report.json`.
 - **Backfill ETF holdings** : propager les sous-jacents des ETFs détenus.
 - **Walk-forward conditionnel au régime** : durcir encore en exigeant un verdict ROBUST aussi dans le régime cible.
+
+---
+
+# Setup Performance Summary v1
+
+Fichier créé :
+
+```text
+tools/backtests/setup-performance-summary-v1.mjs
+```
+
+Synthèse offline qui consolide les performances réelles des 5 setups (Pullback Momentum, Breakout Expansion, RS Rotation, Mean Reversion, Volatility Compression) à partir des sources existantes — sans inventer de métriques, sans toucher au runtime.
+
+Sorties :
+
+- `tools/backtests/output/setup-performance-summary-v1.json`
+- `tools/backtests/output/setup-performance-summary-v1.md`
+
+## Sources consolidées
+
+- `results-multi-setup-grid.json` (stats agrégées Pullback / Breakout / MeanRev / VolComp)
+- `results-relative-strength-rotation-regime-v1.json` (stats RS Rotation par regimeMode)
+- `rolling-walkforward-validator.json` (verdicts par cellule : ROBUST / STABLE / FRAGILE / OVERFIT / INSUFFICIENT_DATA)
+- `tradable-universe.json` (v1) et `tradable-universe-v2.json` (décisions par cellule)
+- `allocation-plan-v3.json` (survivants)
+- `setup-variant-matrix.json` (top variantes + variantes à abandonner)
+- `variant-regime-matrix.json` (pour le contexte régime)
+
+## Système de notation (A / B / C / D / FAILED)
+
+Score sur 100 points, totalement transparent et expliqué composante par composante :
+
+| Composante | Max | Logique |
+|---|---:|---|
+| Profit factor agrégé | 25 | seuils PF (2.0 / 1.5 / 1.3 / 1.1 / 1.0 / 0.9) |
+| Expectancy moyenne pondérée | 15 | seuils 1.0 / 0.5 / 0.2 / 0 |
+| Robustesse rolling | 20 | ratio (robust+stable)/évaluées |
+| Stabilité temporelle | 10 | inverse fragilité |
+| Survie ALLOW v2 | 15 | nombre absolu |
+| Force des top variantes | 15 | comptes STRONG/OK depuis setup-variant-matrix |
+| Pénalité OVERFIT | −10 | ratio overfit/évaluées |
+
+Seuils de grade : A ≥ 70, B ≥ 45, C ≥ 25, D ≥ 10, FAILED < 10.
+
+## Résultat sur le runtime actuel
+
+| Rang | Setup | Grade | Score | PF | Winrate | Robust+Stable | ALLOW v2 |
+|---:|---|---|---:|---:|---:|---:|---:|
+| 1 | Pullback Momentum | **B** | 63/100 | 1.72 | 28.0 % | 31 / 6 520 | 24 |
+| 2 | RS Rotation | **B** | 48/100 | 1.54 | 54.0 % | 0 / 420 | 0 |
+| 3 | Mean Reversion | **D** | 23/100 | 1.41 | 41.1 % | 0 / 988 | 0 |
+| 4 | Breakout Expansion | **D** | 17/100 | 0.91 | 20.9 % | 3 / 1 266 | 2 |
+| 5 | Volatility Compression | **FAILED** | 4/100 | 0.78 | 20.9 % | 0 / 315 | 0 |
+
+## Lectures clés
+
+- **Pullback Momentum** : champion en volume (~21 k trades), PF 1.72, mais 92 %+ des variantes sont FRAGILE → l'edge tient grâce à un petit sous-ensemble (31 cellules ROBUST/STABLE et 24 ALLOW v2). Variantes top concentrées sur ACLS, CRWD, etc.
+- **RS Rotation** : meilleur winrate (54 %) et PF 1.54, mais **0 cellule ROBUST/STABLE** en rolling walk-forward et **0 ALLOW v2** — l'edge ne tient pas sur splits temporels. Note explicite de fragilité ajoutée.
+- **Mean Reversion** : PF 1.41 sur backtest mais 0 cellule survit en rolling. Tier D, proche FAILED.
+- **Breakout Expansion** : grade D agrégé (PF < 1), MAIS variante GLD × breakout_h20_vol1.5 atteint STRONG seule (PF 2.53). À considérer en variantes isolées plutôt qu'en agrégé. Note ajoutée.
+- **Volatility Compression** : FAILED. PF 0.78, 0 robust/stable, 0 ALLOW v2. Setup à abandonner.
+
+## Non-régression
+
+Aucun fichier amont modifié. 3 fichiers ajoutés : le script `.mjs` et ses 2 sorties `.json` / `.md`. Aucun moteur existant touché. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+## Limites assumées
+
+- PF et expectancy agrégés sont pondérés par trades — c'est une approximation faute d'avoir les gains/pertes individuels.
+- Max drawdown = pire DD observé sur les variantes, pas un DD agrégé.
+- RS Rotation : trades sommés sur tous les regimeModes (overcounting léger).
+- Pas de friction modélisée (voir `friction-adjusted-report.json` séparément).
+- Le grade A/B/C/D/FAILED est une heuristique simple, pas une optimisation.
+
+## Prochaine étape recommandée
+
+- Abandonner officiellement Volatility Compression (grade FAILED).
+- Audit anti-look-ahead sur les indicateurs Pullback Momentum (priorité vu le volume).
+- Restreindre une éventuelle tradable-universe-v3 aux setups A/B uniquement.
+- Calibration friction sur les top variantes (GLD × breakout, ACLS × pullback, etc.).
