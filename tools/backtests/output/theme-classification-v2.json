@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-18T10:09:51.155Z",
+  "generatedAt": "2026-05-18T10:21:17.385Z",
   "sources": {
     "allocationPlan": "tools/backtests/output/allocation-plan.json",
     "frictionAdjustedAllocation": "tools/backtests/output/allocation-plan-friction-adjusted.json",

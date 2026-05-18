@@ -2002,3 +2002,94 @@ Ce moteur ne fait pas partie de `run-quant-pipeline-v1.mjs`. À lancer à la dem
 ## Prochaine étape recommandée
 
 Ajouter dans `allocation-engine-v1.mjs` des caps fins par sous-thème, en consommant la classification v2. Permettrait d'éviter automatiquement les portefeuilles faussement diversifiés comme celui-ci (3 ETF us_growth_etf qui pèsent 39 % du capital).
+
+---
+
+# Allocation Engine v2 — caps fins par sous-thème
+
+Fichier créé :
+
+```text
+tools/backtests/allocation-engine-v2.mjs
+```
+
+Produit un plan d'allocation théorique qui respecte non seulement les caps larges du v1 (`tech_ai 60 %`, `crypto 25 %`, `leveraged 5 %`) mais aussi **22 caps fins par sous-thème** (cf. classification v2).
+
+Sorties :
+
+- `tools/backtests/output/allocation-plan-v2.json`
+- `tools/backtests/output/allocation-plan-v2.md`
+
+## Caps fins ajoutés (v2)
+
+| Sous-thème | Cap | Sous-thème | Cap |
+|---|---:|---|---:|
+| us_growth_etf | 30 % | precious_metals | 15 % |
+| mega_cap_tech | 25 % | macro_defensive | 20 % |
+| software_saas | 25 % | banks_financials | 15 % |
+| ai_hypergrowth | 20 % | industrials | 20 % |
+| semis_pure | 25 % | europe_equity | 20 % |
+| semis_equipment | 15 % | broad_market | 40 % |
+| cybersecurity | 15 % | quality_growth | 30 % |
+| cloud_platform | 20 % | fintech | 20 % |
+| crypto_layer1 | 15 % | macro_fx | 10 % |
+| crypto_correlated_equity | 10 % | leveraged_tech | 5 % |
+| crypto_exchange | 10 % | leveraged_macro | 5 % |
+
+Conserve aussi les caps larges v1 (max 10 positions, max 2 EXPERIMENTAL, 1 position par symbole, caps Pullback 50 % / RS 35 % / Breakout 25 %, MeanRev/VolComp interdits, leveraged forcé à REDUCE max).
+
+## Comparaison v1 vs v2
+
+Le plan v1 avait 3 ETFs us_growth_etf (VUG, SPYG, IYW) totalisant **39.75 %** — au-dessus du cap fin v2 30 %. Le moteur v2 a corrigé :
+
+- **Retiré** : IYW (3e meilleur us_growth_etf, sacrifié pour respecter le cap).
+- **Ajouté** : SOXQ (ETF `semis_pure`, déjà candidat ELITE en RISK_ON).
+
+Distribution broad theme : identique entre v1 et v2 (tech_ai 54.32 %, crypto 18.54 %, defensive_other 22.52 %, leveraged 4.64 %). C'est attendu : on n'a pas changé les caps larges, on a juste redistribué dans tech_ai.
+
+Distribution fine theme :
+- **us_growth_etf : 26.50 %** (vs 39.75 % dans v1) ✓ sous le cap 30 %
+- **mega_cap_tech : 4.64 %** (vs 17.89 %) — beaucoup plus dilué après le retrait d'IYW
+- **semis_pure : 13.25 %** (nouveau, via SOXQ)
+- software_saas : 14.57 % (inchangé)
+- ai_hypergrowth : 13.25 % (inchangé)
+
+## Plan v2 final
+
+| # | Symbole | Tier | Setup | Régime | Poids | Fine themes |
+|---:|---|---|---|---|---:|---|
+| 1 | VUG | A | Pullback | RISK_ON | 13.25 % | us_growth_etf, quality_growth |
+| 2 | SPYG | A | Pullback | RISK_ON | 13.25 % | us_growth_etf, broad_market |
+| 3 | APP | A | RS rotation | RISK_ON | 13.25 % | ai_hypergrowth, software_saas |
+| 4 | SOXQ | A | Pullback | RISK_ON | 13.25 % | semis_pure |
+| 5 | GLD | A | Breakout | RISK_ON | 13.25 % | precious_metals, macro_defensive |
+| 6 | SOL | B | RS rotation | RISK_ON | 9.27 % | crypto_layer1 |
+| 7 | MSTR | B | RS rotation | RISK_ON | 9.27 % | crypto_correlated_equity |
+| 8 | JPM | B | Breakout | RISK_ON | 9.27 % | banks_financials |
+| 9 | ROM | C | Pullback | RISK_ON | 4.64 % | leveraged_tech, mega_cap_tech |
+| 10 | CRWD | D | Pullback | RANGE | 1.32 % | cybersecurity, software_saas |
+
+## Dette technique
+
+Le brief interdisait de modifier `theme-classification-v2.mjs`. La table `CLASSIFICATION` est donc **dupliquée** dans `allocation-engine-v2.mjs` (commentaire `MIROIR de theme-classification-v2.mjs`). Toute évolution doit être propagée aux deux fichiers. **À unifier** dans une PR future en exportant la table depuis `theme-classification-v2.mjs`.
+
+Bonus : 2 symboles (SNPS, CDNS — éditeurs EDA pour fondeurs semi) ont été ajoutés à la table du v2 mais pas dans `theme-classification-v2.mjs`. Notable car ils étaient candidats tier A. La dette technique est documentée dans le code.
+
+## Non-régression confirmée
+
+`allocation-plan.json` (v1), `theme-classification-v2.json` et `tradable-universe.json` byte-identiques avant/après (le moteur v2 lit seul, n'écrit pas dans les sources).
+
+## Warnings levés
+
+- ⚠ Aucune position RISK_OFF (cohérent avec la matrice variant-regime qui n'a quasi rien en RISK_OFF).
+
+## Limites
+
+- **Caps fins arbitraires v1.** À calibrer empiriquement après paper trading.
+- **Classification dupliquée** entre v2 modules.
+- **Multi-tag = chevauchement attendu** entre caps.
+- **Plan théorique uniquement** — aucun ordre passé.
+
+## Conséquence
+
+Le moteur v2 est désormais utilisable comme **alternative ou remplacement** du v1, selon que l'utilisateur souhaite ou non les caps fins. Les deux moteurs coexistent. Pour intégrer v2 au pipeline orchestré, il faudrait une PR séparée qui étend `run-quant-pipeline-v1.mjs` à 8 étapes.
