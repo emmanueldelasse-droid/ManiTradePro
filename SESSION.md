@@ -2093,3 +2093,59 @@ Bonus : 2 symboles (SNPS, CDNS — éditeurs EDA pour fondeurs semi) ont été a
 ## Conséquence
 
 Le moteur v2 est désormais utilisable comme **alternative ou remplacement** du v1, selon que l'utilisateur souhaite ou non les caps fins. Les deux moteurs coexistent. Pour intégrer v2 au pipeline orchestré, il faudrait une PR séparée qui étend `run-quant-pipeline-v1.mjs` à 8 étapes.
+
+---
+
+# Refactor : table partagée theme-table.mjs
+
+Fichier créé :
+
+```text
+tools/backtests/lib/theme-table.mjs
+```
+
+Source de vérité unique pour la classification thématique. Exporte :
+- `THEME_CLASSIFICATION` : dict symbol → { themes, confidence }
+- `VALID_THEMES` : set des 22 sous-thèmes autorisés
+- `FINE_THEME_CAPS` : dict cap par sous-thème (utilisé par allocation-engine-v2)
+- `getSymbolThemes(symbol)` : retourne l'entrée brute ou null
+- `classifySymbolThemes(symbol)` : retourne `{ themes, confidence }` normalisé (UNKNOWN si absent)
+
+## Pourquoi
+
+Avant ce refactor, la table `CLASSIFICATION` était dupliquée entre :
+- `tools/backtests/theme-classification-v2.mjs` (l'originale)
+- `tools/backtests/allocation-engine-v2.mjs` (mirror introduit dans la PR allocation v2)
+
+Risque : si une table évoluait sans l'autre, l'analyse de concentration et le plan d'allocation v2 pouvaient diverger silencieusement. C'était de la dette technique documentée à la création du miroir.
+
+## Changements
+
+- **Création** de `tools/backtests/lib/theme-table.mjs` avec tous les exports.
+- **Modification** de `tools/backtests/theme-classification-v2.mjs` : retire la copie locale de `CLASSIFICATION` et `VALID_THEMES`, importe depuis le module partagé. La fonction `classifySymbol` devient un wrapper léger sur `classifySymbolThemes`.
+- **Modification** de `tools/backtests/allocation-engine-v2.mjs` : retire la copie locale de `CLASSIFICATION` et `FINE_THEME_CAPS`, importe depuis le module partagé. La logique de scoring et de caps reste identique.
+
+SNPS et CDNS (EDA software pour fondeurs semi) sont désormais dans la table partagée. Ils étaient absents de l'original `theme-classification-v2.mjs` et présents seulement dans le mirror v2. Cette PR les expose aussi à l'analyse de classification.
+
+## Diff observé sur les outputs
+
+- `allocation-plan-v2.json` : **byte-identique** (modulo `generatedAt`) ✓
+- `allocation-plan.json` : **byte-identique** ✓
+- `theme-classification-v2.json` : **un seul champ change** :
+
+  ```text
+  model.classificationEntries : 179 → 181
+  ```
+
+  C'est attendu — SNPS et CDNS sont maintenant comptés. Aucun `symbolThemes`, aucune `allocationExposure`, aucun `cluster`, aucun `warning` ne change.
+
+## Non-régression confirmée
+
+Pipeline complet relancé : `run-quant-pipeline-v1.mjs` → `friction-model-v1.mjs` → `friction-adjusted-allocation-v2.mjs` → `theme-classification-v2.mjs` → `allocation-engine-v2.mjs`. Tous OK, exit 0, outputs cohérents.
+
+## Conséquence
+
+- Toute évolution future de la classification se fait **uniquement** dans `tools/backtests/lib/theme-table.mjs`.
+- Les deux scripts consommateurs (`theme-classification-v2.mjs` et `allocation-engine-v2.mjs`) restent fidèles à la même source.
+- La dette technique du miroir est levée.
+- Le test de non-régression byte-par-byte sur `allocation-plan-v2.json` confirme qu'aucune décision d'allocation ne change.

@@ -1,6 +1,6 @@
 # Allocation Plan v2 — Fine Theme Caps — ManiTradePro
 
-> Généré le 2026-05-18T10:21:48.662Z par `tools/backtests/allocation-engine-v2.mjs`.
+> Généré le 2026-05-18T10:33:54.504Z par `tools/backtests/allocation-engine-v2.mjs`.
 
 **⚠ Plan théorique uniquement. Aucun ordre n'est passé. Ne pas trader sans validation humaine + paper trading + gestion du risque opérationnelle.**
 

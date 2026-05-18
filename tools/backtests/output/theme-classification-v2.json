@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-18T10:21:17.385Z",
+  "generatedAt": "2026-05-18T10:33:54.339Z",
   "sources": {
     "allocationPlan": "tools/backtests/output/allocation-plan.json",
     "frictionAdjustedAllocation": "tools/backtests/output/allocation-plan-friction-adjusted.json",
@@ -33,7 +33,7 @@
       "software_saas",
       "us_growth_etf"
     ],
-    "classificationEntries": 179,
+    "classificationEntries": 181,
     "disclaimer": "Classification heuristique maintenue à la main. Pas de ML, pas de matrice de covariance réelle. Vise à améliorer les caps et la lisibilité structurelle, pas à fournir une vérité financière."
   },
   "summary": {
