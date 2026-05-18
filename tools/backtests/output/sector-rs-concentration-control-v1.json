@@ -1,0 +1,996 @@
+{
+  "generatedAt": "2026-05-18T16:34:57.005Z",
+  "scope": "Tests de contrôle de concentration pour SECTOR_RELATIVE_STRENGTH v1",
+  "baselineConfig": {
+    "horizon": 60,
+    "topSectors": 1,
+    "topAssetsPerSector": 5,
+    "rebalance": 10,
+    "lookback": 90
+  },
+  "baselineEval": {
+    "label": "baseline",
+    "summary": {
+      "trades": 445,
+      "winrate": 54.61,
+      "expectancyR": 2.3,
+      "profitFactor": 2.157,
+      "maxDrawdownR": 192.98,
+      "totalR": 1023.63
+    },
+    "positiveYears": 5,
+    "validYears": 5,
+    "yearlyPf": {
+      "2021": 1.87,
+      "2022": 1.08,
+      "2023": 1.86,
+      "2024": 2.9,
+      "2025": 2.09
+    },
+    "edgeDecay": 0.68,
+    "top5SharePct": 103.3,
+    "top5": [
+      {
+        "symbol": "APLD",
+        "totalR": 362.71
+      },
+      {
+        "symbol": "APP",
+        "totalR": 272.8
+      },
+      {
+        "symbol": "PLTR",
+        "totalR": 225.14
+      },
+      {
+        "symbol": "NBIS",
+        "totalR": 110.54
+      },
+      {
+        "symbol": "UPST",
+        "totalR": 86.54
+      }
+    ],
+    "correlationVsBaseline": null,
+    "acceptable": false
+  },
+  "tests": {
+    "tickerCap": [
+      {
+        "label": "ticker_cap=10%",
+        "summary": {
+          "trades": 330,
+          "winrate": 44.85,
+          "expectancyR": 0.233,
+          "profitFactor": 1.1,
+          "maxDrawdownR": 301.38,
+          "totalR": 77.01
+        },
+        "positiveYears": 3,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.6,
+          "2022": 1.08,
+          "2023": 1.1,
+          "2024": 1.63,
+          "2025": 0.3
+        },
+        "edgeDecay": 0.48,
+        "top5SharePct": 251.8,
+        "top5": [
+          {
+            "symbol": "SOUN",
+            "totalR": 52.42
+          },
+          {
+            "symbol": "APLD",
+            "totalR": 48.51
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 32.74
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 30.3
+          },
+          {
+            "symbol": "APP",
+            "totalR": 29.92
+          }
+        ],
+        "correlationVsBaseline": 0.818,
+        "acceptable": false
+      },
+      {
+        "label": "ticker_cap=15%",
+        "summary": {
+          "trades": 336,
+          "winrate": 46.13,
+          "expectancyR": 0.341,
+          "profitFactor": 1.148,
+          "maxDrawdownR": 274.28,
+          "totalR": 114.44
+        },
+        "positiveYears": 3,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.65,
+          "2022": 1.08,
+          "2023": 1.13,
+          "2024": 1.67,
+          "2025": 0.56
+        },
+        "edgeDecay": 0.5,
+        "top5SharePct": 184.6,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 56.94
+          },
+          {
+            "symbol": "SOUN",
+            "totalR": 52.42
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 35.77
+          },
+          {
+            "symbol": "APP",
+            "totalR": 33.45
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 32.74
+          }
+        ],
+        "correlationVsBaseline": 0.828,
+        "acceptable": false
+      },
+      {
+        "label": "ticker_cap=20%",
+        "summary": {
+          "trades": 364,
+          "winrate": 45.6,
+          "expectancyR": 0.33,
+          "profitFactor": 1.141,
+          "maxDrawdownR": 251.03,
+          "totalR": 119.96
+        },
+        "positiveYears": 3,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.66,
+          "2022": 1.08,
+          "2023": 1.2,
+          "2024": 1.76,
+          "2025": 0.62
+        },
+        "edgeDecay": 0.54,
+        "top5SharePct": 214,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 57.84
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 56.23
+          },
+          {
+            "symbol": "SOUN",
+            "totalR": 52.42
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 47.42
+          },
+          {
+            "symbol": "APP",
+            "totalR": 42.78
+          }
+        ],
+        "correlationVsBaseline": 0.874,
+        "acceptable": false
+      },
+      {
+        "label": "ticker_cap=25%",
+        "summary": {
+          "trades": 393,
+          "winrate": 45.04,
+          "expectancyR": 0.23,
+          "profitFactor": 1.093,
+          "maxDrawdownR": 260.27,
+          "totalR": 90.5
+        },
+        "positiveYears": 3,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.76,
+          "2022": 1.08,
+          "2023": 1.11,
+          "2024": 1.82,
+          "2025": 0.45
+        },
+        "edgeDecay": 0.67,
+        "top5SharePct": 370.3,
+        "top5": [
+          {
+            "symbol": "BBAI",
+            "totalR": 82.14
+          },
+          {
+            "symbol": "APP",
+            "totalR": 81.59
+          },
+          {
+            "symbol": "APLD",
+            "totalR": 70.66
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 56.13
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 44.59
+          }
+        ],
+        "correlationVsBaseline": 0.839,
+        "acceptable": false
+      }
+    ],
+    "sectorCap": [
+      {
+        "label": "topSectors=2",
+        "summary": {
+          "trades": 890,
+          "winrate": 52.47,
+          "expectancyR": 1.265,
+          "profitFactor": 1.681,
+          "maxDrawdownR": 336.46,
+          "totalR": 1125.86
+        },
+        "positiveYears": 4,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1.4,
+          "2022": 0.94,
+          "2023": 2.28,
+          "2024": 1.63,
+          "2025": 1.68
+        },
+        "edgeDecay": 0.8,
+        "top5SharePct": 104.1,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 441.89
+          },
+          {
+            "symbol": "APP",
+            "totalR": 319.98
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 243.18
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 89.82
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 77.29
+          }
+        ],
+        "correlationVsBaseline": 0.918,
+        "acceptable": false
+      },
+      {
+        "label": "topSectors=3",
+        "summary": {
+          "trades": 1335,
+          "winrate": 53.03,
+          "expectancyR": 0.956,
+          "profitFactor": 1.542,
+          "maxDrawdownR": 609.46,
+          "totalR": 1276.45
+        },
+        "positiveYears": 4,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1.04,
+          "2022": 0.49,
+          "2023": 2.64,
+          "2024": 1.54,
+          "2025": 1.62
+        },
+        "edgeDecay": 0.6,
+        "top5SharePct": 84.5,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 415.36
+          },
+          {
+            "symbol": "APP",
+            "totalR": 293.39
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 256.72
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 59.63
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 52.88
+          }
+        ],
+        "correlationVsBaseline": 0.856,
+        "acceptable": false
+      },
+      {
+        "label": "topSectors=4",
+        "summary": {
+          "trades": 1780,
+          "winrate": 52.47,
+          "expectancyR": 0.817,
+          "profitFactor": 1.493,
+          "maxDrawdownR": 794.43,
+          "totalR": 1453.47
+        },
+        "positiveYears": 4,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1,
+          "2022": 0.4,
+          "2023": 2.73,
+          "2024": 1.46,
+          "2025": 1.47
+        },
+        "edgeDecay": 0.6,
+        "top5SharePct": 76.9,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 406.93
+          },
+          {
+            "symbol": "APP",
+            "totalR": 296.98
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 272.59
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 71.33
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 69.34
+          }
+        ],
+        "correlationVsBaseline": 0.781,
+        "acceptable": false
+      },
+      {
+        "label": "topSectors=2/topAssets=3",
+        "summary": {
+          "trades": 534,
+          "winrate": 51.69,
+          "expectancyR": 0.792,
+          "profitFactor": 1.369,
+          "maxDrawdownR": 384.49,
+          "totalR": 422.81
+        },
+        "positiveYears": 5,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1.75,
+          "2022": 1.14,
+          "2023": 1.32,
+          "2024": 1.1,
+          "2025": 1.53
+        },
+        "edgeDecay": 1.34,
+        "top5SharePct": 179.6,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 240.44
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 158.8
+          },
+          {
+            "symbol": "APP",
+            "totalR": 147.89
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 113.81
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 98.24
+          }
+        ],
+        "correlationVsBaseline": 0.859,
+        "acceptable": false
+      },
+      {
+        "label": "topSectors=2/topAssets=5",
+        "summary": {
+          "trades": 890,
+          "winrate": 52.47,
+          "expectancyR": 1.265,
+          "profitFactor": 1.681,
+          "maxDrawdownR": 336.46,
+          "totalR": 1125.86
+        },
+        "positiveYears": 4,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1.4,
+          "2022": 0.94,
+          "2023": 2.28,
+          "2024": 1.63,
+          "2025": 1.68
+        },
+        "edgeDecay": 0.8,
+        "top5SharePct": 104.1,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 441.89
+          },
+          {
+            "symbol": "APP",
+            "totalR": 319.98
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 243.18
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 89.82
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 77.29
+          }
+        ],
+        "correlationVsBaseline": 0.918,
+        "acceptable": false
+      }
+    ],
+    "sizing": [
+      {
+        "label": "equal (baseline)",
+        "summary": {
+          "trades": 445,
+          "winrate": 54.61,
+          "expectancyR": 2.3,
+          "profitFactor": 2.157,
+          "maxDrawdownR": 192.98,
+          "totalR": 1023.63
+        },
+        "positiveYears": 5,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1.87,
+          "2022": 1.08,
+          "2023": 1.86,
+          "2024": 2.9,
+          "2025": 2.09
+        },
+        "edgeDecay": 0.68,
+        "top5SharePct": 103.3,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 362.71
+          },
+          {
+            "symbol": "APP",
+            "totalR": 272.8
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 225.14
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 110.54
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 86.54
+          }
+        ],
+        "correlationVsBaseline": 1,
+        "acceptable": false
+      },
+      {
+        "label": "inverse_cum_contribution",
+        "summary": {
+          "trades": 445,
+          "winrate": 54.61,
+          "expectancyR": 0.561,
+          "profitFactor": 1.397,
+          "maxDrawdownR": 183.54,
+          "totalR": 249.78
+        },
+        "positiveYears": 4,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.92,
+          "2022": 1.07,
+          "2023": 1.59,
+          "2024": 1.75,
+          "2025": 1.42
+        },
+        "edgeDecay": 0.58,
+        "top5SharePct": 147.4,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 100.5
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 74.35
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 68.87
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 64.16
+          },
+          {
+            "symbol": "APP",
+            "totalR": 60.34
+          }
+        ],
+        "correlationVsBaseline": 0.943,
+        "acceptable": false
+      },
+      {
+        "label": "inverse_volatility (1/ATR)",
+        "summary": {
+          "trades": 445,
+          "winrate": 54.61,
+          "expectancyR": 4.119,
+          "profitFactor": 2.594,
+          "maxDrawdownR": 203.83,
+          "totalR": 1832.91
+        },
+        "positiveYears": 5,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 2.38,
+          "2022": 1.22,
+          "2023": 1.95,
+          "2024": 3.73,
+          "2025": 2.49
+        },
+        "edgeDecay": 0.68,
+        "top5SharePct": 96.9,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 725.44
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 390.31
+          },
+          {
+            "symbol": "APP",
+            "totalR": 375.43
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 155.73
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 129.51
+          }
+        ],
+        "correlationVsBaseline": 0.984,
+        "acceptable": false
+      },
+      {
+        "label": "cooldown_60days_after_win",
+        "summary": {
+          "trades": 377,
+          "winrate": 41.38,
+          "expectancyR": -0.689,
+          "profitFactor": 0.749,
+          "maxDrawdownR": 316.05,
+          "totalR": -259.63
+        },
+        "positiveYears": 1,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.49,
+          "2022": 0.78,
+          "2023": 1.23,
+          "2024": 0.82,
+          "2025": 0.42
+        },
+        "edgeDecay": 0.85,
+        "top5SharePct": null,
+        "top5": [
+          {
+            "symbol": "APP",
+            "totalR": 77.14
+          },
+          {
+            "symbol": "APLD",
+            "totalR": 63.51
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 49.83
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 25.46
+          },
+          {
+            "symbol": "ACLS",
+            "totalR": 12.73
+          }
+        ],
+        "correlationVsBaseline": 0.702,
+        "acceptable": false
+      },
+      {
+        "label": "cooldown_120days_after_win",
+        "summary": {
+          "trades": 317,
+          "winrate": 42.9,
+          "expectancyR": -0.599,
+          "profitFactor": 0.764,
+          "maxDrawdownR": 240.26,
+          "totalR": -189.88
+        },
+        "positiveYears": 1,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.5,
+          "2022": 0.78,
+          "2023": 1.38,
+          "2024": 0.77,
+          "2025": 0.42
+        },
+        "edgeDecay": 0.86,
+        "top5SharePct": null,
+        "top5": [
+          {
+            "symbol": "APP",
+            "totalR": 81.9
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 56.03
+          },
+          {
+            "symbol": "SOUN",
+            "totalR": 19.07
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 16.85
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 16.24
+          }
+        ],
+        "correlationVsBaseline": 0.615,
+        "acceptable": false
+      },
+      {
+        "label": "capped_repeat_10_trades_max",
+        "summary": {
+          "trades": 265,
+          "winrate": 51.7,
+          "expectancyR": 1.038,
+          "profitFactor": 1.502,
+          "maxDrawdownR": 192.98,
+          "totalR": 275.18
+        },
+        "positiveYears": 3,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1.87,
+          "2022": 1.08,
+          "2023": 1.89,
+          "2024": 0.14,
+          "2025": 0.49
+        },
+        "edgeDecay": 7.79,
+        "top5SharePct": 169.4,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 142.62
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 118.81
+          },
+          {
+            "symbol": "APP",
+            "totalR": 93.59
+          },
+          {
+            "symbol": "SMCI",
+            "totalR": 87.22
+          },
+          {
+            "symbol": "AI",
+            "totalR": 23.8
+          }
+        ],
+        "correlationVsBaseline": 0.981,
+        "acceptable": false
+      },
+      {
+        "label": "capped_repeat_20_trades_max",
+        "summary": {
+          "trades": 355,
+          "winrate": 53.24,
+          "expectancyR": 1.855,
+          "profitFactor": 1.942,
+          "maxDrawdownR": 192.98,
+          "totalR": 658.67
+        },
+        "positiveYears": 4,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 1.87,
+          "2022": 1.08,
+          "2023": 1.86,
+          "2024": 2.58,
+          "2025": 0.67
+        },
+        "edgeDecay": 0.79,
+        "top5SharePct": 94.4,
+        "top5": [
+          {
+            "symbol": "APLD",
+            "totalR": 182.21
+          },
+          {
+            "symbol": "SOUN",
+            "totalR": 167.07
+          },
+          {
+            "symbol": "APP",
+            "totalR": 99.23
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 87.35
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 86.22
+          }
+        ],
+        "correlationVsBaseline": 0.942,
+        "acceptable": false
+      }
+    ],
+    "exclusion": [
+      {
+        "label": "sans_top1_APLD",
+        "summary": {
+          "trades": 445,
+          "winrate": 52.81,
+          "expectancyR": 1.753,
+          "profitFactor": 1.901,
+          "maxDrawdownR": 163.57,
+          "totalR": 780.12
+        },
+        "positiveYears": 4,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.82,
+          "2022": 1.08,
+          "2023": 2.23,
+          "2024": 3.23,
+          "2025": 1.17
+        },
+        "edgeDecay": 0.37,
+        "top5SharePct": 105.1,
+        "top5": [
+          {
+            "symbol": "APP",
+            "totalR": 320.6
+          },
+          {
+            "symbol": "PLTR",
+            "totalR": 227.86
+          },
+          {
+            "symbol": "BBAI",
+            "totalR": 111.88
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 103.31
+          },
+          {
+            "symbol": "SMCI",
+            "totalR": 56.55
+          }
+        ],
+        "correlationVsBaseline": 0.924,
+        "acceptable": false
+      },
+      {
+        "label": "sans_top3 (APLD,APP,PLTR)",
+        "summary": {
+          "trades": 443,
+          "winrate": 41.99,
+          "expectancyR": 0.066,
+          "profitFactor": 1.027,
+          "maxDrawdownR": 375.51,
+          "totalR": 29.39
+        },
+        "positiveYears": 2,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.98,
+          "2022": 1.08,
+          "2023": 2.02,
+          "2024": 0.56,
+          "2025": 0.66
+        },
+        "edgeDecay": 1.64,
+        "top5SharePct": 1091.4,
+        "top5": [
+          {
+            "symbol": "SMCI",
+            "totalR": 103.99
+          },
+          {
+            "symbol": "NBIS",
+            "totalR": 99.16
+          },
+          {
+            "symbol": "UPST",
+            "totalR": 76.53
+          },
+          {
+            "symbol": "DDOG",
+            "totalR": 23.99
+          },
+          {
+            "symbol": "NET",
+            "totalR": 17.12
+          }
+        ],
+        "correlationVsBaseline": 0.568,
+        "acceptable": false
+      },
+      {
+        "label": "sans_top5 (APLD,APP,PLTR,NBIS,UPST)",
+        "summary": {
+          "trades": 411,
+          "winrate": 46.96,
+          "expectancyR": -0.121,
+          "profitFactor": 0.943,
+          "maxDrawdownR": 322.69,
+          "totalR": -49.62
+        },
+        "positiveYears": 2,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.91,
+          "2022": 1.08,
+          "2023": 2.13,
+          "2024": 0.34,
+          "2025": 0.62
+        },
+        "edgeDecay": 2.09,
+        "top5SharePct": null,
+        "top5": [
+          {
+            "symbol": "SMCI",
+            "totalR": 139.05
+          },
+          {
+            "symbol": "DDOG",
+            "totalR": 27.34
+          },
+          {
+            "symbol": "NET",
+            "totalR": 25.28
+          },
+          {
+            "symbol": "AVGO",
+            "totalR": 14.86
+          },
+          {
+            "symbol": "SE",
+            "totalR": 13.79
+          }
+        ],
+        "correlationVsBaseline": 0.429,
+        "acceptable": false
+      },
+      {
+        "label": "sans_AI_MOMENTUM_sector",
+        "summary": {
+          "trades": 445,
+          "winrate": 48.09,
+          "expectancyR": -0.477,
+          "profitFactor": 0.737,
+          "maxDrawdownR": 434.91,
+          "totalR": -212.4
+        },
+        "positiveYears": 3,
+        "validYears": 5,
+        "yearlyPf": {
+          "2021": 0.91,
+          "2022": 1.08,
+          "2023": 1.63,
+          "2024": 0.19,
+          "2025": 1.06
+        },
+        "edgeDecay": 2.21,
+        "top5SharePct": null,
+        "top5": [
+          {
+            "symbol": "DDOG",
+            "totalR": 27.34
+          },
+          {
+            "symbol": "MU",
+            "totalR": 22.31
+          },
+          {
+            "symbol": "CRWD",
+            "totalR": 16.53
+          },
+          {
+            "symbol": "UBER",
+            "totalR": 16.45
+          },
+          {
+            "symbol": "ABNB",
+            "totalR": 13.55
+          }
+        ],
+        "correlationVsBaseline": 0.431,
+        "acceptable": false
+      }
+    ]
+  },
+  "acceptableCount": 0,
+  "verdict": "EDGE_DEPENDS_ON_AI_WINNERS",
+  "sources": [
+    "tools/backtests/configs/sector-relative-strength-v1.json",
+    "tools/backtests/output/sector-rs-destruction-tests-v1.json",
+    "tools/backtests/output/sector-relative-strength-reference-v1.json",
+    "tools/backtests/universe-v2.mjs",
+    "data/*.json"
+  ]
+}

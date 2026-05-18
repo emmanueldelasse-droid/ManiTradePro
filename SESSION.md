@@ -3003,3 +3003,99 @@ Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajout�
 4. **Audit anti-look-ahead spécifique SECTOR_RS** (cohérence PR #207/#208).
 5. **Mise à jour SETUPS_REGISTRY.md** : statut `VALIDATED_RESEARCH_CORE_WITH_CAVEAT` ou similaire.
 6. **Pas de passage live** tant que la concentration top 5 n'est pas adressée.
+
+---
+
+# Sector RS Concentration Control v1
+
+Fichier créé :
+
+```text
+tools/backtests/sector-rs-concentration-control-v1.mjs
+```
+
+Tests de mécanismes de contrôle de concentration pour SECTOR_RELATIVE_STRENGTH v1, suite à la faille révélée par PR #213 (top 5 tickers = 103 % du PnL).
+
+Sorties :
+
+- `tools/backtests/output/sector-rs-concentration-control-v1.json`
+- `tools/backtests/output/sector-rs-concentration-control-v1.md` (11 sections)
+
+## Verdict global : **EDGE_DEPENDS_ON_AI_WINNERS**
+
+**0 variante sur 16 testées ne passe simultanément les 4 critères d'acceptation** (PF ≥ 1.3, ≥ 4/5 années positives, top 5 < 70 %, edge decay < ×1.5).
+
+L'edge n'est PAS diversifiable. C'est une dépendance structurelle aux stars AI_MOMENTUM 2024-2025.
+
+## Tests exécutés
+
+### Ticker cap (cap %PnL cumulé causal)
+
+| Cap | PF | Top 5 % | Years+ | Accept |
+|---|---:|---:|---:|---|
+| 10 % | 1.10 | 251.8 | 3/5 | ✗ |
+| 15 % | 1.15 | 184.6 | 3/5 | ✗ |
+| 20 % | 1.14 | 214.0 | 3/5 | ✗ |
+| 25 % | 1.09 | 370.3 | 3/5 | ✗ |
+
+→ Capper le ticker top **augmente** la concentration top 5 car d'autres tickers prennent leur place. Pattern structurel.
+
+### Sector cap (élargir topSectors)
+
+| Variante | PF | Top 5 % | Years+ | Accept |
+|---|---:|---:|---:|---|
+| topSectors=2 | 1.68 | 104.1 | 4/5 | ✗ |
+| topSectors=3 | 1.54 | 84.5 | 4/5 | ✗ |
+| topSectors=4 | 1.49 | 76.9 | 4/5 | ✗ |
+| topSectors=2/topAssets=3 | 1.37 | 179.6 | 5/5 | ✗ |
+| topSectors=2/topAssets=5 | 1.68 | 104.1 | 4/5 | ✗ |
+
+→ `topSectors=4` baisse top5% à 76.9 % (juste au-dessus du critère 70 %), mais PF tombe à 1.49.
+
+### Position sizing
+
+| Sizing | PF | Top 5 % | Years+ | Accept |
+|---|---:|---:|---:|---|
+| equal (baseline) | 2.16 | 103.3 | 5/5 | ✗ |
+| inverse_cum_contribution | 1.40 | 147.4 | 4/5 | ✗ |
+| **inverse_volatility** | **2.59** | 96.9 | 5/5 | ✗ |
+| cooldown_60d | 0.75 | n/a | 1/5 | ✗ |
+| cooldown_120d | 0.76 | n/a | 1/5 | ✗ |
+| capped_repeat_10 | 1.50 | 169.4 | 3/5 | ✗ |
+| capped_repeat_20 | 1.94 | 94.4 | 4/5 | ✗ |
+
+→ Détail notable : `inverse_volatility` augmente le PF à 2.59 (mieux que baseline) mais top5% reste à 96.9 %. Le cooldown tue le setup totalement.
+
+### Exclusion stress (a posteriori, non causal)
+
+| Sans | PF |
+|---|---:|
+| top 1 (APLD) | 1.90 (encore vivant) |
+| top 3 (APLD, APP, PLTR) | 1.03 |
+| top 5 (+ NBIS, UPST) | 0.94 |
+| AI_MOMENTUM secteur entier | 0.74 |
+
+→ La perte d'AI_MOMENTUM tue le setup. L'edge VIENT structurellement des winners IA.
+
+## Conséquences pour SETUPS_REGISTRY.md et la doc
+
+Le statut **VALIDATED_RESEARCH_CORE** de SECTOR_RS doit être révisé. Statut suggéré : **`CONDITIONAL_EDGE_AI_DEPENDENT`** ou **`RESEARCH_CANDIDATE_WITH_CRITICAL_CAVEAT`**.
+
+Implications :
+- Pas un setup live-ready sous sa forme actuelle.
+- Le PF 2.16 vient principalement d'un bull market AI 2024-2025 sur 5 tickers spécifiques.
+- Si AI_MOMENTUM perd son leadership, le setup s'effondre.
+- Sizing extrêmement prudent obligatoire (taille réduite, exposition limitée).
+- Surveillance active de la dispersion sectorielle nécessaire.
+
+## Recommandations
+
+1. **Mettre à jour `docs/setups/SECTOR_RELATIVE_STRENGTH.md`** : ajouter une section "AI dependency revealed" avec ce finding.
+2. **Mettre à jour SETUPS_REGISTRY.md** : nouveau statut révisé.
+3. **PR dédiée** pour un setup alternatif moins AI-dépendant (par exemple en imposant `topSectors >= 3` malgré la baisse de PF).
+4. **POST_EARNINGS_DRIFT et nouveaux setups** deviennent prioritaires — l'écosystème ManiTradePro n'a plus de setup robuste vraiment distribué.
+5. **Pas de passage live** sous quelconque forme tant que ce risque n'est pas adressé.
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
