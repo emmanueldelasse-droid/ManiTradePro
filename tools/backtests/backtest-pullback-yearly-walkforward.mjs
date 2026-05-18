@@ -225,6 +225,62 @@ function loadCandles(symbol) {
     );
 }
 
+// === Régime macro (référence : SPY/QQQ/SMH EMA200) ===========================
+// Même logique que `backtest-relative-strength-rotation-regime-v1.mjs`.
+// RISK_ON  = SPY, QQQ, SMH tous au-dessus de leur EMA200
+// RISK_OFF = SPY, QQQ, SMH tous en-dessous de leur EMA200
+// Sinon    = RANGE
+function buildRegimeByDate() {
+  const required = ["SPY", "QQQ", "SMH"];
+  const market = {};
+
+  for (const symbol of required) {
+    const candles = loadCandles(symbol);
+    if (!candles || !candles.length) {
+      throw new Error(`Missing market regime data: ${symbol}`);
+    }
+    const closes = candles.map(c => c.close);
+    const indexByDate = new Map();
+    for (let i = 0; i < candles.length; i++) indexByDate.set(candles[i].date, i);
+    market[symbol] = { candles, ema200: ema(closes, 200), indexByDate };
+  }
+
+  // Toutes les dates où les 3 indices sont présents
+  const allDates = new Set();
+  for (const m of Object.values(market)) {
+    for (const c of m.candles) allDates.add(c.date);
+  }
+  const commonDates = [...allDates]
+    .filter(d => required.every(s => market[s].indexByDate.has(d)))
+    .sort();
+
+  const regimeByDate = new Map();
+  for (const date of commonDates) {
+    const spyIdx = market.SPY.indexByDate.get(date);
+    const qqqIdx = market.QQQ.indexByDate.get(date);
+    const smhIdx = market.SMH.indexByDate.get(date);
+    if (spyIdx < 200 || qqqIdx < 200 || smhIdx < 200) continue;
+
+    const spyBull = market.SPY.candles[spyIdx].close > market.SPY.ema200[spyIdx];
+    const qqqBull = market.QQQ.candles[qqqIdx].close > market.QQQ.ema200[qqqIdx];
+    const smhBull = market.SMH.candles[smhIdx].close > market.SMH.ema200[smhIdx];
+
+    let regime = "RANGE";
+    if (spyBull && qqqBull && smhBull) regime = "RISK_ON";
+    if (!spyBull && !qqqBull && !smhBull) regime = "RISK_OFF";
+    regimeByDate.set(date, regime);
+  }
+
+  return regimeByDate;
+}
+
+const REGIME_BY_DATE = buildRegimeByDate();
+
+function regimeForDate(date) {
+  if (!date) return "RANGE";
+  return REGIME_BY_DATE.get(date) || "RANGE";
+}
+
 function summarizeTrades(tradeResults) {
   const trades = tradeResults.length;
   const winsArr = tradeResults.filter(r => r.pnl > 0);
@@ -319,11 +375,14 @@ function generateTradesForSymbol(symbol, variant) {
     if (!setup) continue;
 
     const result = simulateTrade(candles.slice(i + 1, i + 11), setup);
+    const entryDate = candles[i]?.date ?? null;
     trades.push({
       symbol,
-      date: candles[i]?.date ?? null,
-      year: yearOfTradeDate(candles[i]?.date),
+      date: entryDate,
+      year: yearOfTradeDate(entryDate),
       variant: variant.name,
+      // regime macro à la date d'entrée — additif, n'influence pas l'ouverture
+      regime: regimeForDate(entryDate),
       result: result.result,
       pnl: result.pnl,
       rr: round(setup.rr)
@@ -362,6 +421,44 @@ function summarizeVariantForYears(variant, years, symbolFilter = SYMBOLS) {
     allTrades.push(...trades);
   }
 
+  // === bySymbolByRegime (additif, mai 2026) ============================
+  // Décomposition per-(symbol, regime) pour cette variante et cette plage
+  // d'années. Le mode `ALL_REGIMES` capte tous les trades (la stratégie
+  // Pullback ne filtre pas par régime à l'entrée). Le mode `NO_RISK_OFF`
+  // est dérivé en retirant les trades dont le régime à l'entrée est
+  // RISK_OFF, ce qui répond à la question "qu'est-ce que cette variante
+  // rapporte si on l'utilise hors marchés bear ?".
+  // Les cellules avec 0 trade sont OMISES (choix de design pour ne pas
+  // polluer le JSON, cohérent avec backtest-relative-strength-rotation-regime-v1).
+  const bySymbolByRegime = [];
+  const symbolsWithTrades = [...new Set(allTrades.map(t => t.symbol))];
+  const modes = [
+    { name: "ALL_REGIMES", keep: () => true },
+    { name: "NO_RISK_OFF", keep: t => t.regime !== "RISK_OFF" }
+  ];
+  for (const symbol of symbolsWithTrades) {
+    const symTrades = allTrades.filter(t => t.symbol === symbol);
+    for (const mode of modes) {
+      const modeTrades = symTrades.filter(mode.keep);
+      for (const regime of ["RISK_ON", "RANGE", "RISK_OFF"]) {
+        const cellTrades = modeTrades.filter(t => t.regime === regime);
+        if (cellTrades.length === 0) continue;
+        bySymbolByRegime.push({
+          symbol,
+          variant: variant.name,
+          regimeMode: mode.name,
+          regime,
+          ...summarizeTrades(cellTrades)
+        });
+      }
+    }
+  }
+  bySymbolByRegime.sort((a, b) => {
+    if (a.symbol !== b.symbol) return a.symbol.localeCompare(b.symbol);
+    if (a.regimeMode !== b.regimeMode) return a.regimeMode.localeCompare(b.regimeMode);
+    return a.regime.localeCompare(b.regime);
+  });
+
   return {
     variant: variant.name,
     years,
@@ -371,6 +468,7 @@ function summarizeVariantForYears(variant, years, symbolFilter = SYMBOLS) {
       if (b.profitFactor !== a.profitFactor) return b.profitFactor - a.profitFactor;
       return b.trades - a.trades;
     }),
+    bySymbolByRegime,
     skippedSymbols
   };
 }

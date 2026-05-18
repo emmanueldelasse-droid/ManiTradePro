@@ -1118,3 +1118,66 @@ Exemple complet : "Aujourd'hui, le bot a une opportunité NVDA. Le tier global N
 ## Prochaine étape recommandée
 
 Étendre `bySymbolByRegime[]` aux autres scripts de backtest (Pullback, Breakout) — même pattern, déclaration locale + boucle inside-loop dans le script générateur. Une fois fait, la matrice per-actif-par-régime couvrira tous les setups, et la priorité #4 du TODO quant (Allocation dynamique) deviendra accessible avec la vraie granularité.
+
+---
+
+# bySymbolByRegime étendu à Pullback — couverture régime per-symbol passe de 2 à 12 variants
+
+## Ce qui a été fait
+
+1. **`tools/backtests/backtest-pullback-yearly-walkforward.mjs`** — addition pure :
+   - Fonction `buildRegimeByDate()` ajoutée (même logique que RS regime : SPY/QQQ/SMH EMA200, RANGE par défaut).
+   - Chaque trade généré reçoit un champ `regime` à la date d'entrée (additif, pas de filtre à l'ouverture).
+   - `summarizeVariantForYears` produit un nouvel agrégat `bySymbolByRegime[]` par variant block (modes `ALL_REGIMES` et `NO_RISK_OFF` = filtre post hoc des trades dont régime ≠ RISK_OFF).
+   - Cellules avec 0 trade omises (cohérent avec le script RS regime).
+2. **`tools/backtests/variant-regime-matrix-v1.mjs`** — fix walker :
+   - Les deux extracteurs (`extractRegimeRecords` et `extractSymbolRegimeRecords`) ne descendaient pas dans les arrays non-reconnus. Pullback expose `overall` comme un array de variant blocks (différent de RS regime qui a `overall` comme objet). Fix : recurse into array elements quand le format n'est pas reconnu.
+   - Non-régression vérifiée avant/après le fix sur les données RS regime (output JSON byte-identique).
+
+## Résultat
+
+| Niveau | Avant | Après |
+|---|---:|---:|
+| Cellules globales | 12 | 12 (inchangé) |
+| Cellules per-symbol | 888 | **8 835** |
+| Actifs couverts | 108 | **180** |
+| Variants couverts | 2 (RS) | **12** (2 RS + 10 Pullback) |
+| Setups couverts | 1 | **2** (RS + Pullback) |
+| STRONG | 103 | **811** |
+| OK | 66 | **1 038** |
+
+## NVDA × Pullback — verrou enfin levé pour ce cas emblématique
+
+Avant : on savait que NVDA × Pullback était STRONG globalement (matrice setup-variant), mais on ne savait pas si c'était spécifiquement bon en RANGE ou si RISK_ON tirait l'agrégat.
+
+Après — extrait des 48 cellules NVDA × Pullback × régime :
+
+| Variante | Régime | Tier | Score | Trades | Exp | PF |
+|---|---|---|---:|---:|---:|---:|
+| `rsi42_58_chg20_3_stop0.1` | RANGE | STRONG | 77 | 19 | 1.03 | 2.77 |
+| `base_rsi42_58_chg20_0_stop0.1` | RANGE | STRONG | 72 | 22 | 0.85 | 2.57 |
+| `rsi42_58_chg20_5_stop0.1` | RANGE | STRONG | 72 | 17 | 1.11 | 2.64 |
+| `base_rsi42_58_chg20_0_stop0.1` | RISK_ON | STRONG | 72 | 10 | 0.93 | 2.66 |
+| `rsi42_58_chg20_5_stop0.1` | RISK_ON | AVOID | 4 | 4 | 0.68 | 0 |
+| `rsi45_55_chg20_0_stop0.1` | RANGE | AVOID | 7 | 12 | -0.22 | 0.80 |
+
+→ Décision possible : autoriser NVDA × Pullback avec stop 0.1 ATR (variantes les plus serrées) en RANGE, plus prudent en RISK_ON, interdire la variante `rsi45_55` qui est trop laxiste.
+
+## Non-régression confirmée
+
+- `results-pullback-yearly-walkforward.json` : tous les champs existants (rows, bySymbol, walkForward, etc.) byte-identiques (modulo `generatedAt`) avant/après. Seul `bySymbolByRegime` est ajouté par variant block.
+- `asset-quality-report`, `asset-setup-matrix`, `setup-variant-matrix` : JSON outputs byte-identiques après re-run.
+- Walker fix sur `variant-regime-matrix-v1.mjs` : vérifié non-régressif sur les données RS regime existantes avant d'avoir le nouveau data Pullback.
+
+## Choix de design documentés
+
+- **Pas de `RISK_ON_ONLY` pour Pullback** : la stratégie Pullback ne filtre pas par régime à l'ouverture, donc ce mode (qui n'aurait gardé que les trades RISK_ON) ne représente pas une variante opérationnelle distincte de `ALL_REGIMES × RISK_ON`. On émet seulement `ALL_REGIMES` (tous les trades) et `NO_RISK_OFF` (trades dont régime ≠ RISK_OFF, dérivé post hoc).
+- **Cellules vides omises** : si `(symbol, variant, regimeMode, regime)` n'a aucun trade, la cellule n'est pas écrite dans le JSON. Évite de polluer le rapport et reste cohérent avec le script RS regime.
+- **Modification chirurgicale** : seul `backtest-pullback-yearly-walkforward.mjs` est modifié. `backtest-pullback-2025.mjs` (8 symboles seulement) et `backtest-pullback-grid-2025.mjs` (pas de breakdown yearly) restent inchangés. Le yearly-walkforward suffit largement à couvrir la dimension régime per-symbol pour Pullback.
+
+## Limites restantes
+
+- **Breakout** et **MEAN_REVERSION** restent sans dimension régime per-symbol. Même pattern à appliquer à `backtest-breakout-v2.mjs` / `backtest-breakout-global.mjs` / `backtest-meanrev-v1.mjs` / `backtest-multi-setup-grid.mjs` quand on aura besoin.
+- Walk-forward strict par régime n'est pas implémenté (priorité #2 du TODO quant).
+- L'effet de levier (SOXL) reste invisible — la matrice ne sait toujours pas qu'un ETF 3× a un profil de risque non-linéaire.
+- 180 actifs couverts pour Pullback (vs 108 pour RS — Pullback est plus inclusif car il ouvre sur tout symbole avec le pattern, alors que RS sélectionne top-N).
