@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-18T07:38:22.526Z",
+  "generatedAt": "2026-05-18T07:51:59.483Z",
   "sources": {
     "assetQuality": "tools/backtests/output/asset-quality-report.json",
     "assetSetup": "tools/backtests/output/asset-setup-matrix.json",
