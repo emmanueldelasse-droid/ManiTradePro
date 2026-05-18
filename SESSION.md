@@ -2928,3 +2928,78 @@ Aucun moteur existant modifié. Aucune source amont modifiée. 4 fichiers ajout�
 - NE PAS ajouter de paramètres exotiques sans audit séparé.
 - NE PAS toucher au runtime.
 - NE PAS activer en live tant que les 5 prochaines étapes ci-dessus ne sont pas exécutées.
+
+---
+
+# Sector RS Destruction Tests v1
+
+Fichier créé :
+
+```text
+tools/backtests/sector-rs-destruction-tests-v1.mjs
+```
+
+Tests de destruction pour SECTOR_RELATIVE_STRENGTH v1 (paramètres gelés, pas d'optimisation, objectif = essayer de casser).
+
+Sorties :
+
+- `tools/backtests/output/sector-rs-destruction-tests-v1.json`
+- `tools/backtests/output/sector-rs-destruction-tests-v1.md` (12 sections)
+
+## Verdict global : **CONDITIONAL_SURVIVAL** (5/6 checks)
+
+Le setup résiste à 5 des 6 tests de destruction, mais une faille majeure est révélée.
+
+## Checks de robustesse
+
+| Check | Critère | Résultat | OK ? |
+|---|---|---|---|
+| PF friction ×2 | ≥ 1.3 | 1.94 | ✓ |
+| PF friction ×3 | ≥ 1.1 | 1.75 | ✓ |
+| Bear 2022 | PF ≥ 0.95 | 1.08 | ✓ |
+| Walk-forward strict | ≥ 2/3 splits | **3/3** | ✓ |
+| Concentration top 5 | < 60 % | **103.3 %** | **✗ FAIL** |
+| Corrélation vs RS Rotation | < 0.85 | 0.252 | ✓ |
+
+## Faille structurelle majeure découverte
+
+**Sans les top 5 tickers (APLD, APP, PLTR, NBIS, UPST), le setup PF tombe à 0.94 et l'expectancy devient négative.**
+
+Les 5 winners cumulés contribuent 103.3 % du PnL total — donc les autres tickers ont une contribution moyenne négative. Tout l'edge vient des stars AI_MOMENTUM. C'est un risque structurel concentré, **pas distribué** sur l'univers.
+
+| Symbole | Trades | Total R |
+|---|---:|---:|
+| APLD | 38 | 362.71 |
+| APP | 40 | 272.80 |
+| PLTR | 45 | 225.14 |
+| NBIS | 19 | 110.54 |
+| UPST | 32 | 86.54 |
+
+## Points positifs majeurs
+
+- **PF friction ×3 = 1.75** : le setup absorbe une triplication des coûts.
+- **Walk-forward strict 3/3 splits passent** : la généralisation hors échantillon est solide (paramètres gelés v1).
+- **Corrélation vs RS Rotation = 0.25** : SECTOR_RS est un VRAI edge distinct, pas une version filtrée de RS Rotation. Complémentarité possible.
+- **Bear 2022 PF = 1.08** : reste marginalement positif dans l'année la plus difficile.
+
+## Implications
+
+Le verdict CONDITIONAL_SURVIVAL maintient le statut `VALIDATED_RESEARCH_CORE` mais **AVEC CAVEAT** :
+
+- La concentration top 5 doit être adressée AVANT tout passage live.
+- Position sizing inverse sur les tickers à forte exposition cumulée est une piste.
+- Diversification thématique : forcer plusieurs secteurs (topSectors ≥ 2) baisse le PF mais réduit la concentration → trade-off à mesurer.
+- Le risque "5 winners crash" doit être stress-testé (Monte Carlo / bootstrap sur les trades).
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+## Prochaines étapes recommandées
+
+1. **Diagnostiquer la concentration** : creuser pourquoi APLD/APP/PLTR/NBIS/UPST dominent. Est-ce une période 2024-2025 spécifique ? Bull AI ?
+2. **Tester position sizing inversé** : limiter la taille sur les tickers déjà exposés cumulés.
+3. **Test multi-sectoriel** : `topSectors = 2` ou `3` même si PF baisse — réduire la concentration.
+4. **Audit anti-look-ahead spécifique SECTOR_RS** (cohérence PR #207/#208).
+5. **Mise à jour SETUPS_REGISTRY.md** : statut `VALIDATED_RESEARCH_CORE_WITH_CAVEAT` ou similaire.
+6. **Pas de passage live** tant que la concentration top 5 n'est pas adressée.
