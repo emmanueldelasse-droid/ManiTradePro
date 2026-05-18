@@ -1,0 +1,1156 @@
+{
+  "generatedAt": "2026-05-18T11:38:03.667Z",
+  "status": "ok",
+  "sources": {
+    "tradableUniverseV2": "tools/backtests/output/tradable-universe-v2.json",
+    "themeTable": "tools/backtests/lib/theme-table.mjs"
+  },
+  "policy": {
+    "baseUnits": {
+      "ALLOW_ROBUST": 1,
+      "ALLOW_STABLE": 0.8,
+      "REDUCE_FRAGILE": 0.35,
+      "EXPERIMENTAL": 0.1
+    },
+    "minPositions": 3,
+    "maxPositions": 10,
+    "maxExperimentalPositions": 2,
+    "setupCaps": {
+      "PULLBACK_MOMENTUM": 0.5,
+      "RELATIVE_STRENGTH_ROTATION": 0.35,
+      "BREAKOUT_EXPANSION": 0.25,
+      "MEAN_REVERSION": 0,
+      "VOLATILITY_COMPRESSION": 0
+    },
+    "broadCaps": {
+      "crypto": 0.2,
+      "leveraged": 0
+    },
+    "fineThemeCaps": {
+      "us_growth_etf": 0.3,
+      "mega_cap_tech": 0.25,
+      "software_saas": 0.25,
+      "ai_hypergrowth": 0.2,
+      "semis_pure": 0.25,
+      "crypto_layer1": 0.1,
+      "crypto_correlated_equity": 0.08,
+      "precious_metals": 0.2,
+      "banks_financials": 0.15
+    },
+    "forbiddenSetups": [
+      "MEAN_REVERSION",
+      "VOLATILITY_COMPRESSION",
+      "UNKNOWN"
+    ],
+    "leveragedForbidden": [
+      "SOXL",
+      "USD",
+      "ROM",
+      "TQQQ",
+      "SQQQ",
+      "UPRO"
+    ],
+    "targetBudgetUnits": 8,
+    "antiPromotion": "v3 ne promeut jamais — BLOCK reste BLOCK, EXPERIMENTAL strict exception encadrée"
+  },
+  "summary": {
+    "candidateCells": 346,
+    "eligibleCells": 334,
+    "dedupedCandidates": 73,
+    "selectedPositions": 10,
+    "allowPositions": 5,
+    "watchPositions": 5,
+    "experimentalPositions": 0,
+    "totalWeight": 100,
+    "byTier": {
+      "A": {
+        "positions": 8,
+        "weightPct": 89.62
+      },
+      "B": {
+        "positions": 2,
+        "weightPct": 10.38
+      },
+      "C": {
+        "positions": 0,
+        "weightPct": 0
+      },
+      "D": {
+        "positions": 0,
+        "weightPct": 0
+      }
+    },
+    "byDecision": {
+      "ALLOW": 5,
+      "REDUCE": 5
+    },
+    "byRollingVerdict": {
+      "ROBUST": 5,
+      "FRAGILE": 5
+    },
+    "bySetup": {
+      "PULLBACK_MOMENTUM": {
+        "positions": 4,
+        "weightPct": 59.24
+      },
+      "BREAKOUT_EXPANSION": {
+        "positions": 3,
+        "weightPct": 25.19
+      },
+      "RELATIVE_STRENGTH_ROTATION": {
+        "positions": 3,
+        "weightPct": 15.57
+      }
+    },
+    "byBroad": {
+      "other": {
+        "positions": 8,
+        "weightPct": 89.62
+      },
+      "crypto": {
+        "positions": 2,
+        "weightPct": 10.38
+      }
+    },
+    "byFineTheme": {
+      "cybersecurity": {
+        "positions": 1,
+        "weightPct": 14.81
+      },
+      "cloud_platform": {
+        "positions": 2,
+        "weightPct": 20
+      },
+      "semis_pure": {
+        "positions": 1,
+        "weightPct": 14.81
+      },
+      "mega_cap_tech": {
+        "positions": 1,
+        "weightPct": 14.81
+      },
+      "software_saas": {
+        "positions": 2,
+        "weightPct": 20
+      },
+      "precious_metals": {
+        "positions": 1,
+        "weightPct": 14.81
+      },
+      "macro_defensive": {
+        "positions": 1,
+        "weightPct": 14.81
+      },
+      "ai_hypergrowth": {
+        "positions": 3,
+        "weightPct": 15.57
+      },
+      "crypto_layer1": {
+        "positions": 1,
+        "weightPct": 5.19
+      },
+      "crypto_correlated_equity": {
+        "positions": 1,
+        "weightPct": 5.19
+      },
+      "industrials": {
+        "positions": 1,
+        "weightPct": 5.19
+      }
+    },
+    "constraintsApplied": [
+      "cap setup PULLBACK_MOMENTUM",
+      "max positions"
+    ]
+  },
+  "positions": [
+    {
+      "rank": 1,
+      "symbol": "VRNS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 1,
+      "baseUnit": 1,
+      "weightPct": 14.81,
+      "broadCategory": "other",
+      "fineThemes": [
+        "cybersecurity"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": []
+    },
+    {
+      "rank": 2,
+      "symbol": "CLOU",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 1,
+      "baseUnit": 1,
+      "weightPct": 14.81,
+      "broadCategory": "other",
+      "fineThemes": [
+        "cloud_platform"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": []
+    },
+    {
+      "rank": 3,
+      "symbol": "PSI",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 1,
+      "baseUnit": 1,
+      "weightPct": 14.81,
+      "broadCategory": "other",
+      "fineThemes": [
+        "semis_pure"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": []
+    },
+    {
+      "rank": 4,
+      "symbol": "GOOGL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 1,
+      "baseUnit": 1,
+      "weightPct": 14.81,
+      "broadCategory": "other",
+      "fineThemes": [
+        "mega_cap_tech",
+        "software_saas"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": []
+    },
+    {
+      "rank": 5,
+      "symbol": "GLD",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h50_vol1.2_stop1.5_rr2.5",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 1,
+      "baseUnit": 1,
+      "weightPct": 14.81,
+      "broadCategory": "other",
+      "fineThemes": [
+        "precious_metals",
+        "macro_defensive"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": []
+    },
+    {
+      "rank": 6,
+      "symbol": "APP",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 3,
+      "baseUnit": 0.35,
+      "weightPct": 5.19,
+      "broadCategory": "other",
+      "fineThemes": [
+        "ai_hypergrowth",
+        "software_saas"
+      ],
+      "fineConfidence": "MEDIUM",
+      "tags": [
+        "reduced_due_to_fragility"
+      ],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": [
+        "FRAGILE en walk-forward roulant — allocation réduite"
+      ]
+    },
+    {
+      "rank": 7,
+      "symbol": "APLD",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 3,
+      "baseUnit": 0.35,
+      "weightPct": 5.19,
+      "broadCategory": "other",
+      "fineThemes": [
+        "ai_hypergrowth",
+        "cloud_platform"
+      ],
+      "fineConfidence": "MEDIUM",
+      "tags": [
+        "reduced_due_to_fragility"
+      ],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": [
+        "FRAGILE en walk-forward roulant — allocation réduite"
+      ]
+    },
+    {
+      "rank": 8,
+      "symbol": "SOL",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "confidence": "HIGH",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 3,
+      "baseUnit": 0.35,
+      "weightPct": 5.19,
+      "broadCategory": "crypto",
+      "fineThemes": [
+        "crypto_layer1"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [
+        "reduced_due_to_fragility"
+      ],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": [
+        "FRAGILE en walk-forward roulant — allocation réduite",
+        "crypto — exposition réduite (cap 20% v3)"
+      ]
+    },
+    {
+      "rank": 9,
+      "symbol": "MSTR",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "confidence": "MEDIUM",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 3,
+      "baseUnit": 0.35,
+      "weightPct": 5.19,
+      "broadCategory": "crypto",
+      "fineThemes": [
+        "crypto_correlated_equity"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [
+        "reduced_due_to_fragility"
+      ],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": [
+        "FRAGILE en walk-forward roulant — allocation réduite",
+        "crypto — exposition réduite (cap 20% v3)"
+      ]
+    },
+    {
+      "rank": 10,
+      "symbol": "SMCI",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "confidence": "MEDIUM",
+      "walkForwardTier": "PASS",
+      "priorityGroup": 3,
+      "baseUnit": 0.35,
+      "weightPct": 5.19,
+      "broadCategory": "other",
+      "fineThemes": [
+        "ai_hypergrowth",
+        "industrials"
+      ],
+      "fineConfidence": "HIGH",
+      "tags": [
+        "reduced_due_to_fragility"
+      ],
+      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
+      "risks": [
+        "FRAGILE en walk-forward roulant — allocation réduite"
+      ]
+    }
+  ],
+  "rejectedCandidates": [
+    {
+      "symbol": "PH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 5.00 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "KLAC",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 5.00 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "DOCN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 5.00 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "ABNB",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "STABLE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.80 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "WCLD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "STABLE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.80 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "AMZN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "STABLE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.80 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "BOTZ",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "STABLE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.80 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "VUG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SPYG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "IYW",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SOXQ",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "FICO",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "IGM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "ANET",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "DELL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "PANW",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "MA",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SIE",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SMH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SPY",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "XSD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SHOP",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "TYL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "FTEC",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "XLK",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SLAB",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "AMAT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SAP",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SOXX",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "VGT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "BKNG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "DT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "SNPS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "BNB",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "HUBS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "NFLX",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "TER",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "XSW",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "AAPL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "WM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "PATH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "GEN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "CAMT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "MPWR",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "TSM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "COST",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "ASML",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "CRWD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "ROKU",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "RMBS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "ACLS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "CDNS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "JPM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "MU",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% (futur 4.35 u vs cap 4.00 u)"
+    },
+    {
+      "symbol": "NVDA",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h50_vol1.2_stop1.5_rr2.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ORCL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SWKS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "STM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "PLTR",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "COIN",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "CHKP",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ETN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "QQQ",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "EXPERIMENTAL",
+      "rollingVerdict": "INSUFFICIENT_DATA",
+      "compositeTier": "B",
+      "reason": "max 10 positions atteintes"
+    }
+  ],
+  "comparison": {
+    "v1": {
+      "available": true,
+      "removedFromPrev": [
+        "VUG",
+        "SPYG",
+        "IYW",
+        "JPM",
+        "ROM",
+        "CRWD"
+      ],
+      "addedVsPrev": [
+        "VRNS",
+        "CLOU",
+        "PSI",
+        "GOOGL",
+        "APLD",
+        "SMCI"
+      ],
+      "broadDelta": {
+        "tech_ai": {
+          "prev": 54.32,
+          "v3": 0,
+          "delta": -54.32
+        },
+        "defensive_other": {
+          "prev": 22.52,
+          "v3": 0,
+          "delta": -22.52
+        },
+        "crypto": {
+          "prev": 18.54,
+          "v3": 10.38,
+          "delta": -8.16
+        },
+        "leveraged": {
+          "prev": 4.64,
+          "v3": 0,
+          "delta": -4.64
+        },
+        "other": {
+          "prev": 0,
+          "v3": 89.62,
+          "delta": 89.62
+        }
+      }
+    },
+    "v2": {
+      "available": true,
+      "removedFromPrev": [
+        "VUG",
+        "SPYG",
+        "SOXQ",
+        "JPM",
+        "ROM",
+        "CRWD"
+      ],
+      "addedVsPrev": [
+        "VRNS",
+        "CLOU",
+        "PSI",
+        "GOOGL",
+        "APLD",
+        "SMCI"
+      ],
+      "broadDelta": {
+        "tech_ai": {
+          "prev": 54.32,
+          "v3": 0,
+          "delta": -54.32
+        },
+        "defensive_other": {
+          "prev": 22.52,
+          "v3": 0,
+          "delta": -22.52
+        },
+        "crypto": {
+          "prev": 18.54,
+          "v3": 10.38,
+          "delta": -8.16
+        },
+        "leveraged": {
+          "prev": 4.64,
+          "v3": 0,
+          "delta": -4.64
+        },
+        "other": {
+          "prev": 0,
+          "v3": 89.62,
+          "delta": 89.62
+        }
+      }
+    }
+  },
+  "warnings": [
+    "Toutes les positions sont en régime RISK_ON — concentration régime.",
+    "Aucune position RISK_OFF — pas de couverture explicite si bascule macro.",
+    "5 position(s) FRAGILE retenue(s) — allocation réduite explicite (reduced_due_to_fragility)."
+  ]
+}

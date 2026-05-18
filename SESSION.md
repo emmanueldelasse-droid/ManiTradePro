@@ -2352,3 +2352,104 @@ C'est une **remise en question forte** du plan d'allocation actuel. Le plan v2 d
 ## Conséquence opérationnelle
 
 `tradable-universe-v2.json` est le nouvel input recommandé pour toute décision d'allocation visant un horizon réel. Une PR future devra créer un `allocation-engine-v3` (ou adapter v1/v2) pour consommer cette source plus restrictive. Le portefeuille résultant sera bien plus petit (probablement 5-10 positions maximum vu les 26 cellules ALLOW v2 réparties sur ~10 symboles).
+
+---
+
+# Allocation Engine v3 — depuis Tradable Universe v2
+
+Fichier créé :
+
+```text
+tools/backtests/allocation-engine-v3.mjs
+```
+
+Reconstruit un plan d'allocation directement depuis `tradable-universe-v2.json` (univers durci par rolling walk-forward), au lieu de partir de `tradable-universe.json` (v1) comme v1/v2.
+
+Sorties :
+
+- `tools/backtests/output/allocation-plan-v3.json`
+- `tools/backtests/output/allocation-plan-v3.md`
+
+## Règles de sélection v3
+
+Priorité (anti-promotion stricte, v3 ne promeut jamais) :
+
+| # | Couple | Base unit | Conditions |
+|---|---|---:|---|
+| 1 | ALLOW + ROBUST | 1.00 | aucune |
+| 2 | ALLOW + STABLE | 0.80 | aucune |
+| 3 | REDUCE/WATCH + FRAGILE | 0.35 | tier A/B uniquement, tag `reduced_due_to_fragility` |
+| 4 | EXPERIMENTAL | 0.10 | tier A/B + WF unique PASS + **ni crypto ni leveraged** |
+
+Pour tout le reste : interdit.
+
+## Contraintes hard v3
+
+- 3 à 10 positions (status `warning` si < 3, sinon `ok`).
+- Max 2 EXPERIMENTAL.
+- Max 1 position par symbole.
+- Setups : Pullback ≤ 50 %, RS Rotation ≤ 35 %, Breakout ≤ 25 %, MeanRev / VolComp **interdits**.
+- Crypto total ≤ 20 %.
+- Leveraged total **0 %** (interdit en v3 même si v2 le tolère).
+- Caps fins : us_growth_etf 30 %, mega_cap_tech 25 %, software_saas 25 %, ai_hypergrowth 20 %, semis_pure 25 %, crypto_layer1 10 %, crypto_correlated_equity 8 %, precious_metals 20 %, banks_financials 15 %.
+- Support des deux noms `WATCH` et `REDUCE` (alias) sans casser.
+
+## Résultats du premier run (10 878 cellules univers v2)
+
+- 346 cellules non-BLOCK
+- 334 éligibles priorité 1-4
+- 73 cellules après dédoublonnage par symbole
+- **10 positions** sélectionnées, status `ok`
+
+### Plan v3
+
+| # | Symbole | Decision | Rolling | Tier | Setup | Régime | Poids |
+|---:|---|---|---|---|---|---|---:|
+| 1 | VRNS | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
+| 2 | CLOU | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
+| 3 | PSI | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
+| 4 | GOOGL | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
+| 5 | GLD | ALLOW | ROBUST | A | Breakout | RISK_ON | 14.81 % |
+| 6 | APP | REDUCE | FRAGILE | A | RS Rotation | RISK_ON | 5.19 % |
+| 7 | APLD | REDUCE | FRAGILE | A | RS Rotation | RISK_ON | 5.19 % |
+| 8 | SOL | REDUCE | FRAGILE | A | Breakout | RISK_ON | 5.19 % |
+| 9 | MSTR | REDUCE | FRAGILE | B | RS Rotation | RISK_ON | 5.19 % |
+| 10 | SMCI | REDUCE | FRAGILE | B | Breakout | RISK_ON | 5.19 % |
+
+→ 5 ALLOW ROBUST + 5 REDUCE FRAGILE (marquées `reduced_due_to_fragility`). 0 EXPERIMENTAL. 0 leveraged.
+
+### Évolution vs v1/v2
+
+| Catégorie | v1 | v2 | v3 |
+|---|---:|---:|---:|
+| Positions | 10 | 10 | 10 |
+| tech_ai (large) | 54.3 % | 54.3 % | _réparti sur sous-thèmes_ |
+| crypto | 18.5 % | 18.5 % | 10.4 % |
+| leveraged | 4.6 % | 4.6 % | 0.0 % |
+| Positions FRAGILE explicites | 0 | 0 | 5 |
+
+**Symboles retirés vs v1** : VUG, SPYG, IYW, JPM, ROM, CRWD (tous FRAGILE ou INSUFFICIENT en rolling).
+**Symboles ajoutés vs v1** : VRNS, CLOU, PSI, GOOGL, APLD, SMCI (ROBUST/FRAGILE tier A/B).
+**Symbole survivant aux trois plans** : GLD × Breakout × RISK_ON (seule position ALLOW v2 du plan v1).
+
+## Limite assumée
+
+Cap setup PULLBACK_MOMENTUM ≤ 50 % apparaît à 59.2 % dans le plan final, et BREAKOUT_EXPANSION ≤ 25 % à 25.2 %. C'est l'effet greedy : la construction applique les caps en parts du `TARGET_BUDGET` = 8.0 unités, mais le portefeuille ne se remplit qu'à 6.75 unités (mix ROBUST/FRAGILE), donc les pourcentages normalisés sont mécaniquement plus élevés que les seuils budgétaires. Documenté section 10 du rapport markdown.
+
+## Non-régression confirmée
+
+`tradable-universe.json`, `tradable-universe-v2.json`, `rolling-walkforward-validator.json`, `theme-classification-v2.json`, `allocation-plan.json`, `allocation-plan-v2.json` byte-identiques avant/après (modulo `generatedAt`). Le moteur v3 lit seul, n'écrit que `allocation-plan-v3.{json,md}`.
+
+## Aucun impact runtime
+
+- Cloudflare Worker : inchangé.
+- Frontend PWA : inchangé.
+- Providers de marché : inchangés.
+- Paper trading live, broker, ordres, endpoints : inchangés.
+
+## Prochaine étape recommandée
+
+- **Stress-test** ce plan v3 contre `friction-adjusted-report.json` pour mesurer l'érosion edge après coûts.
+- **Backfill ETF holdings** : propager les sous-jacents des ETFs détenus pour vérifier qu'aucun cap fin n'est dépassé une fois la transparence appliquée.
+- **Corrélations inter-positions** : ajouter une couche corrélation 2024-2025.
+- **Walk-forward conditionnel au régime** : durcir encore en exigeant un verdict ROBUST aussi dans le régime cible.
