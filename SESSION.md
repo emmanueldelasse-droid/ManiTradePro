@@ -2352,3 +2352,97 @@ C'est une **remise en question forte** du plan d'allocation actuel. Le plan v2 d
 ## Conséquence opérationnelle
 
 `tradable-universe-v2.json` est le nouvel input recommandé pour toute décision d'allocation visant un horizon réel. Une PR future devra créer un `allocation-engine-v3` (ou adapter v1/v2) pour consommer cette source plus restrictive. Le portefeuille résultant sera bien plus petit (probablement 5-10 positions maximum vu les 26 cellules ALLOW v2 réparties sur ~10 symboles).
+
+---
+
+# Allocation Engine v3 — depuis Tradable Universe v2
+
+Fichier créé :
+
+```text
+tools/backtests/allocation-engine-v3.mjs
+```
+
+Reconstruit un plan d'allocation directement depuis `tradable-universe-v2.json` (univers durci par rolling walk-forward), au lieu de partir de `tradable-universe.json` (v1) comme v1/v2.
+
+Sorties :
+
+- `tools/backtests/output/allocation-plan-v3.json`
+- `tools/backtests/output/allocation-plan-v3.md`
+
+## Règles de sélection v3
+
+Priorité (anti-promotion stricte, v3 ne promeut jamais) :
+
+| # | Couple | Base unit | Conditions |
+|---|---|---:|---|
+| 1 | ALLOW + ROBUST | 1.00 | aucune |
+| 2 | ALLOW + STABLE | 0.80 | aucune |
+| 3 | REDUCE/WATCH + FRAGILE | 0.35 | tier A/B uniquement, tag `reduced_due_to_fragility` |
+| 4 | EXPERIMENTAL | 0.10 | tier A/B + WF unique PASS + **ni crypto ni leveraged** |
+
+Pour tout le reste : interdit.
+
+## Contraintes hard v3
+
+- 3 à 10 positions (status `warning` si < 3, `ok` si ≥ 3, `failed` si violation post-normalisation ou portefeuille vide).
+- Max 2 EXPERIMENTAL.
+- Max 1 position par symbole.
+- Setups : Pullback ≤ 50 %, RS Rotation ≤ 35 %, Breakout ≤ 25 %, MeanRev / VolComp **interdits**.
+- Crypto total ≤ 20 %.
+- Leveraged total **0 %** (interdit en v3 même si v2 le tolère).
+- Caps fins : us_growth_etf 30 %, mega_cap_tech 25 %, software_saas 25 %, ai_hypergrowth 20 %, semis_pure 25 %, crypto_layer1 10 %, crypto_correlated_equity 8 %, precious_metals 20 %, banks_financials 15 %.
+- Support des deux noms `WATCH` et `REDUCE` (alias).
+
+## Contrôle post-normalisation des caps hard
+
+Garantie centrale du moteur : **`allocation-plan-v3.json` ne contient JAMAIS de cap hard dépassé**.
+
+1. Construction greedy initiale (TARGET_BUDGET = 8.0 unités).
+2. Détection des caps violés sur les **poids finaux normalisés** (setup, broad, fines).
+3. Retrait itératif de la position la moins prioritaire qui contribue à la pire violation (priorityGroup DESC → tier DESC → confidence DESC → alpha ASC).
+4. Après chaque retrait, tentative de **swap-in** : ajout d'un candidat du pool dédupliqué qui ne crée AUCUNE violation lorsqu'il est testé sur le nouveau total.
+5. Renormalisation et bouclage jusqu'à plus de violation ou portefeuille vide.
+6. `status = "failed"` si une violation finale demeure ou si portefeuille vide ; `warning` si 0 < positions < 3 ; `ok` sinon.
+
+## Résultat final du run (10 878 cellules univers v2)
+
+- 346 cellules non-BLOCK · 334 éligibles priorité 1-4 · 73 dédupliquées par symbole.
+- Greedy initial : 10 positions, mais Pullback 59.26 % et Breakout 25.19 % dépassent leurs caps.
+- Contrôle post-normalisation : 10 retraits, 0 swap-in en 11 itérations.
+- **Plan final publié : 0 position, `status = "failed"`, aucun cap dépassé puisqu'aucun plan invalide n'est jamais publié.**
+
+### Pourquoi 0 position : diagnostic mathématique
+
+Ce n'est **pas un bug du moteur**, c'est une **contrainte trop stricte par rapport au pool v2 actuel**.
+
+Recherche aléatoire (200 000 essais de portefeuilles de 3 à 10 positions parmi 73 candidats) : **0 portefeuille viable**.
+
+Cause :
+- Somme des caps setups = 110 % (≥ 100 %, théoriquement faisable avec 3 setups).
+- Mais le pool v2 ne contient qu'**1 seul Breakout ROBUST (GLD)** et **4 RS Rotation FRAGILE** dont 2 (MSTR, COIN) déclenchent `crypto_correlated_equity ≤ 8 %`.
+- Toute combinaison testée viole soit Pullback 50 %, soit Breakout 25 %, soit crypto_correlated_equity 8 %, soit ai_hypergrowth 20 %.
+
+Pistes possibles (décision ChatGPT, hors scope de cette PR) :
+- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permettrait d'inclure MSTR à 8.6 %).
+- Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne marge pour GLD + 1 Breakout FRAGILE).
+- Étendre `tradable-universe-v2` (attendre que d'autres setups remontent en ROBUST/STABLE).
+- Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0).
+
+## Non-régression confirmée
+
+`tradable-universe.json`, `tradable-universe-v2.json`, `rolling-walkforward-validator.json`, `theme-classification-v2.json`, `allocation-plan.json`, `allocation-plan-v2.json` byte-identiques avant/après (modulo `generatedAt`). Le moteur v3 lit seul, n'écrit que `allocation-plan-v3.{json,md}`.
+
+## Aucun impact runtime
+
+- Cloudflare Worker : inchangé.
+- Frontend PWA : inchangé.
+- Providers de marché : inchangés.
+- Paper trading live, broker, ordres, endpoints : inchangés.
+
+## Prochaine étape recommandée
+
+- **Décider de la politique de cap** : conserver les seuils actuels (et accepter `failed` jusqu'à enrichissement du pool) ou relâcher un cap précis. À traiter dans une PR séparée.
+- **Stress-test** du moteur v3 quand un plan viable existera, contre `friction-adjusted-report.json`.
+- **Backfill ETF holdings** : propager les sous-jacents des ETFs détenus.
+- **Walk-forward conditionnel au régime** : durcir encore en exigeant un verdict ROBUST aussi dans le régime cible.
