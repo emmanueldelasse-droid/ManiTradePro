@@ -1,0 +1,753 @@
+{
+  "generatedAt": "2026-05-18T17:01:27.369Z",
+  "scope": "Test honnête du nouveau setup TREND_PULLBACK_DYNAMIC_SUPPORT (vs ancien Pullback INVALID_BACKTEST)",
+  "philosophy": "Acheter des leaders en tendance forte pendant une respiration contrôlée, avec confirmation de reprise. Exécution NEXT_OPEN systématique. Friction obligatoire.",
+  "signalDescription": {
+    "trendFilter": "close > EMA50, EMA50 > EMA100, momentum 60j > minMomentum, RS positive",
+    "pullback": "low touche zone EMA20 (ou EMA50) sur 10 derniers jours, pullback -2% à -15%",
+    "confirmation": "close > high veille, bougie verte, close > EMA20",
+    "entry": "open[i+1]",
+    "stopOptions": [
+      "swing_low_minus_atr",
+      "ema50",
+      "atr_2"
+    ],
+    "exitOptions": [
+      "fixed_hold",
+      "trailing_ema20",
+      "trailing_atr",
+      "trend_break"
+    ]
+  },
+  "baseline": {
+    "minMomentum60": 5,
+    "supportType": "EMA20",
+    "pullbackWindow": 10,
+    "stopType": "swing_low_minus_atr",
+    "exit": "fixed_hold",
+    "horizon": 20,
+    "regime": "NO_RISK_OFF",
+    "universe": "mixed"
+  },
+  "baselineEval": {
+    "label": "baseline",
+    "cfg": {
+      "minMomentum60": 5,
+      "supportType": "EMA20",
+      "pullbackWindow": 10,
+      "stopType": "swing_low_minus_atr",
+      "exit": "fixed_hold",
+      "horizon": 20,
+      "regime": "NO_RISK_OFF",
+      "universe": "mixed"
+    },
+    "summary": {
+      "trades": 7334,
+      "winrate": 44.52,
+      "expectancyR": 0.038,
+      "profitFactor": 1.045,
+      "maxDrawdownR": 482.47,
+      "totalR": 277.34
+    },
+    "yearly": {
+      "2021": 0.34,
+      "2022": 0.1,
+      "2023": 1.02,
+      "2024": 1.58,
+      "2025": 1.06
+    },
+    "yearsPositive": 3,
+    "validYears": 5,
+    "edgeDecay": 0.2,
+    "top5SharePct": 203.4,
+    "meetsMin": false
+  },
+  "variantResults": [
+    {
+      "label": "baseline",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7334,
+        "winrate": 44.52,
+        "expectancyR": 0.038,
+        "profitFactor": 1.045,
+        "maxDrawdownR": 482.47,
+        "totalR": 277.34
+      },
+      "yearly": {
+        "2021": 0.34,
+        "2022": 0.1,
+        "2023": 1.02,
+        "2024": 1.58,
+        "2025": 1.06
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.2,
+      "top5SharePct": 203.4,
+      "meetsMin": false
+    },
+    {
+      "label": "exit=trailing_ema20",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "trailing_ema20",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7334,
+        "winrate": 29.98,
+        "expectancyR": -0.017,
+        "profitFactor": 0.973,
+        "maxDrawdownR": 539.41,
+        "totalR": -126.5
+      },
+      "yearly": {
+        "2021": 0.54,
+        "2022": 0.11,
+        "2023": 0.93,
+        "2024": 1.35,
+        "2025": 0.86
+      },
+      "yearsPositive": 1,
+      "validYears": 5,
+      "edgeDecay": 0.34,
+      "top5SharePct": null,
+      "meetsMin": false
+    },
+    {
+      "label": "exit=trailing_atr",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "trailing_atr",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7334,
+        "winrate": 36.08,
+        "expectancyR": -0.106,
+        "profitFactor": 0.842,
+        "maxDrawdownR": 944.35,
+        "totalR": -777.93
+      },
+      "yearly": {
+        "2021": 0.34,
+        "2022": 0.11,
+        "2023": 0.91,
+        "2024": 0.98,
+        "2025": 0.98
+      },
+      "yearsPositive": 0,
+      "validYears": 5,
+      "edgeDecay": 0.27,
+      "top5SharePct": null,
+      "meetsMin": false
+    },
+    {
+      "label": "exit=trend_break",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "trend_break",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7334,
+        "winrate": 40.4,
+        "expectancyR": 0.059,
+        "profitFactor": 1.076,
+        "maxDrawdownR": 410.84,
+        "totalR": 430.54
+      },
+      "yearly": {
+        "2021": 0.42,
+        "2022": 0.12,
+        "2023": 1.01,
+        "2024": 1.53,
+        "2025": 1.09
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.25,
+      "top5SharePct": 129.7,
+      "meetsMin": false
+    },
+    {
+      "label": "stop=ema50",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "ema50",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7324,
+        "winrate": 42.6,
+        "expectancyR": 0.07,
+        "profitFactor": 1.089,
+        "maxDrawdownR": 383.12,
+        "totalR": 513.58
+      },
+      "yearly": {
+        "2021": 0.38,
+        "2022": 0.12,
+        "2023": 1.06,
+        "2024": 1.56,
+        "2025": 1.1
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.22,
+      "top5SharePct": 108.9,
+      "meetsMin": false
+    },
+    {
+      "label": "stop=atr_2",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "atr_2",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7345,
+        "winrate": 37.35,
+        "expectancyR": 0.012,
+        "profitFactor": 1.016,
+        "maxDrawdownR": 392.03,
+        "totalR": 90.24
+      },
+      "yearly": {
+        "2021": 0.4,
+        "2022": 0.12,
+        "2023": 0.98,
+        "2024": 1.45,
+        "2025": 1.01
+      },
+      "yearsPositive": 2,
+      "validYears": 5,
+      "edgeDecay": 0.25,
+      "top5SharePct": 506,
+      "meetsMin": false
+    },
+    {
+      "label": "support=EMA50",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA50",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 4818,
+        "winrate": 45.6,
+        "expectancyR": 0.12,
+        "profitFactor": 1.146,
+        "maxDrawdownR": 191.9,
+        "totalR": 579.72
+      },
+      "yearly": {
+        "2021": 0.48,
+        "2022": 0.11,
+        "2023": 1.1,
+        "2024": 1.84,
+        "2025": 1.12
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.25,
+      "top5SharePct": 90.1,
+      "meetsMin": false
+    },
+    {
+      "label": "horizon=10",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 10,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7475,
+        "winrate": 46.73,
+        "expectancyR": -0.014,
+        "profitFactor": 0.976,
+        "maxDrawdownR": 352.25,
+        "totalR": -106.46
+      },
+      "yearly": {
+        "2021": 0.48,
+        "2022": 0.1,
+        "2023": 1.12,
+        "2024": 1.17,
+        "2025": 1.02
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.31,
+      "top5SharePct": null,
+      "meetsMin": false
+    },
+    {
+      "label": "horizon=40",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 40,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7196,
+        "winrate": 39.49,
+        "expectancyR": 0.168,
+        "profitFactor": 1.151,
+        "maxDrawdownR": 584.81,
+        "totalR": 1210.91
+      },
+      "yearly": {
+        "2021": 0.22,
+        "2022": 0.15,
+        "2023": 1.45,
+        "2024": 1.46,
+        "2025": 1.11
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.15,
+      "top5SharePct": 99.1,
+      "meetsMin": false
+    },
+    {
+      "label": "universe=ai_software",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "ai_software"
+      },
+      "summary": {
+        "trades": 1705,
+        "winrate": 46.86,
+        "expectancyR": 0.193,
+        "profitFactor": 1.192,
+        "maxDrawdownR": 158.05,
+        "totalR": 328.73
+      },
+      "yearly": {
+        "2021": 0.09,
+        "2022": 0.26,
+        "2023": 1.35,
+        "2024": 1.9,
+        "2025": 0.95
+      },
+      "yearsPositive": 2,
+      "validYears": 5,
+      "edgeDecay": 0.08,
+      "top5SharePct": 120.5,
+      "meetsMin": false
+    },
+    {
+      "label": "universe=semis",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "semis"
+      },
+      "summary": {
+        "trades": 2032,
+        "winrate": 41.83,
+        "expectancyR": -0.162,
+        "profitFactor": 0.83,
+        "maxDrawdownR": 412.56,
+        "totalR": -329.43
+      },
+      "yearly": {
+        "2021": 0.39,
+        "2022": 0.03,
+        "2023": 0.7,
+        "2024": 1.08,
+        "2025": 1.31
+      },
+      "yearsPositive": 2,
+      "validYears": 5,
+      "edgeDecay": 0.22,
+      "top5SharePct": null,
+      "meetsMin": false
+    },
+    {
+      "label": "universe=megacaps",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "megacaps"
+      },
+      "summary": {
+        "trades": 1375,
+        "winrate": 45.53,
+        "expectancyR": 0.04,
+        "profitFactor": 1.066,
+        "maxDrawdownR": 115.84,
+        "totalR": 55.43
+      },
+      "yearly": {
+        "2021": 0.16,
+        "2022": 0.1,
+        "2023": 1.24,
+        "2024": 1.76,
+        "2025": 0.98
+      },
+      "yearsPositive": 2,
+      "validYears": 5,
+      "edgeDecay": 0.1,
+      "top5SharePct": 419.5,
+      "meetsMin": false
+    },
+    {
+      "label": "universe=etfs",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "etfs"
+      },
+      "summary": {
+        "trades": 1164,
+        "winrate": 44.33,
+        "expectancyR": -0.159,
+        "profitFactor": 0.739,
+        "maxDrawdownR": 186.02,
+        "totalR": -185.39
+      },
+      "yearly": {
+        "2021": 0.06,
+        "2022": 0,
+        "2023": 0.58,
+        "2024": 1.38,
+        "2025": 0.77
+      },
+      "yearsPositive": 1,
+      "validYears": 5,
+      "edgeDecay": 0.05,
+      "top5SharePct": null,
+      "meetsMin": false
+    },
+    {
+      "label": "regime=ALL",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "ALL",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 7722,
+        "winrate": 44.6,
+        "expectancyR": 0.047,
+        "profitFactor": 1.056,
+        "maxDrawdownR": 409.02,
+        "totalR": 363.56
+      },
+      "yearly": {
+        "2021": 0.34,
+        "2022": 0.42,
+        "2023": 1.08,
+        "2024": 1.58,
+        "2025": 1.07
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.28,
+      "top5SharePct": 155.2,
+      "meetsMin": false
+    },
+    {
+      "label": "regime=RISK_ON_ONLY",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "RISK_ON_ONLY",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 5490,
+        "winrate": 44.03,
+        "expectancyR": 0.016,
+        "profitFactor": 1.018,
+        "maxDrawdownR": 477.78,
+        "totalR": 85.33
+      },
+      "yearly": {
+        "2021": 0.34,
+        "2022": 0.06,
+        "2023": 0.52,
+        "2024": 1.56,
+        "2025": 1.09
+      },
+      "yearsPositive": 2,
+      "validYears": 5,
+      "edgeDecay": 0.22,
+      "top5SharePct": 543.6,
+      "meetsMin": false
+    },
+    {
+      "label": "minMomentum60=0",
+      "cfg": {
+        "minMomentum60": 0,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 8372,
+        "winrate": 44.43,
+        "expectancyR": 0.034,
+        "profitFactor": 1.041,
+        "maxDrawdownR": 522.65,
+        "totalR": 280.9
+      },
+      "yearly": {
+        "2021": 0.35,
+        "2022": 0.14,
+        "2023": 1.06,
+        "2024": 1.54,
+        "2025": 1.01
+      },
+      "yearsPositive": 3,
+      "validYears": 5,
+      "edgeDecay": 0.22,
+      "top5SharePct": 207.9,
+      "meetsMin": false
+    },
+    {
+      "label": "minMomentum60=10",
+      "cfg": {
+        "minMomentum60": 10,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 5913,
+        "winrate": 44.43,
+        "expectancyR": 0.032,
+        "profitFactor": 1.036,
+        "maxDrawdownR": 577.82,
+        "totalR": 189.96
+      },
+      "yearly": {
+        "2021": 0.3,
+        "2022": 0.07,
+        "2023": 0.95,
+        "2024": 1.59,
+        "2025": 1.13
+      },
+      "yearsPositive": 2,
+      "validYears": 5,
+      "edgeDecay": 0.17,
+      "top5SharePct": 269.2,
+      "meetsMin": false
+    },
+    {
+      "label": "minMomentum60=20",
+      "cfg": {
+        "minMomentum60": 20,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed"
+      },
+      "summary": {
+        "trades": 3399,
+        "winrate": 42.95,
+        "expectancyR": 0.017,
+        "profitFactor": 1.017,
+        "maxDrawdownR": 623.3,
+        "totalR": 58.43
+      },
+      "yearly": {
+        "2021": 0.4,
+        "2022": 0.07,
+        "2023": 0.91,
+        "2024": 1.45,
+        "2025": 1.14
+      },
+      "yearsPositive": 2,
+      "validYears": 5,
+      "edgeDecay": 0.24,
+      "top5SharePct": 778.2,
+      "meetsMin": false
+    },
+    {
+      "label": "friction_x2",
+      "cfg": {
+        "minMomentum60": 5,
+        "supportType": "EMA20",
+        "pullbackWindow": 10,
+        "stopType": "swing_low_minus_atr",
+        "exit": "fixed_hold",
+        "horizon": 20,
+        "regime": "NO_RISK_OFF",
+        "universe": "mixed",
+        "frictionFn": "x2"
+      },
+      "summary": {
+        "trades": 7334,
+        "winrate": 41.91,
+        "expectancyR": -0.088,
+        "profitFactor": 0.903,
+        "maxDrawdownR": 1024.08,
+        "totalR": -646.26
+      },
+      "yearly": {
+        "2021": 0.3,
+        "2022": 0.09,
+        "2023": 0.87,
+        "2024": 1.36,
+        "2025": 0.92
+      },
+      "yearsPositive": 1,
+      "validYears": 5,
+      "edgeDecay": 0.21,
+      "top5SharePct": null,
+      "meetsMin": false
+    }
+  ],
+  "walkForward": {
+    "splits": [
+      {
+        "split": "S1 → test 2023",
+        "trades": 2257,
+        "winrate": 43.86,
+        "expectancyR": 0.019,
+        "profitFactor": 1.023,
+        "maxDrawdownR": 177.33,
+        "totalR": 41.79,
+        "passed": true
+      },
+      {
+        "split": "S2 → test 2024",
+        "trades": 2569,
+        "winrate": 51.97,
+        "expectancyR": 0.389,
+        "profitFactor": 1.575,
+        "maxDrawdownR": 93.33,
+        "totalR": 998.68,
+        "passed": true
+      },
+      {
+        "split": "S3 → test 2025",
+        "trades": 1729,
+        "winrate": 46.39,
+        "expectancyR": 0.048,
+        "profitFactor": 1.055,
+        "maxDrawdownR": 136.78,
+        "totalR": 82.73,
+        "passed": true
+      }
+    ],
+    "passed": 3,
+    "totalSplits": 3
+  },
+  "oldPullbackComparison": {
+    "current_PF": 1.73,
+    "next_open_PF": 0.98,
+    "retouch_ema20_PF": 0.73,
+    "verdict": "INVALID_BACKTEST (PR #207)"
+  },
+  "verdict": "FRAGILE",
+  "minMetCheck": {
+    "pf_min_1_3": false,
+    "years_min_4_of_5": false,
+    "walk_forward_2of3": true,
+    "top5_below_80": false,
+    "edgeDecayOk": true
+  },
+  "sources": [
+    "tools/backtests/output/pullback-lookahead-audit-v1.json (référence)",
+    "tools/backtests/output/setup-execution-bias-audit-v1.json (référence)",
+    "tools/backtests/output/rs-rotation-robustness-lab-v1.json (référence)",
+    "tools/backtests/output/new-setup-discovery-lab-v1.json (référence)",
+    "tools/backtests/universe-v2.mjs",
+    "data/*.json (OHLC 2021-2025)"
+  ]
+}
