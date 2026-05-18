@@ -2149,3 +2149,114 @@ Pipeline complet relancé : `run-quant-pipeline-v1.mjs` → `friction-model-v1.m
 - Les deux scripts consommateurs (`theme-classification-v2.mjs` et `allocation-engine-v2.mjs`) restent fidèles à la même source.
 - La dette technique du miroir est levée.
 - Le test de non-régression byte-par-byte sur `allocation-plan-v2.json` confirme qu'aucune décision d'allocation ne change.
+
+---
+
+# Rolling Walk-Forward Validator v1 — robustesse temporelle
+
+Fichier créé :
+
+```text
+tools/backtests/rolling-walkforward-validator-v1.mjs
+```
+
+Étend `walk-forward-regime-validator-v1` (qui n'utilisait qu'un seul split 2021-2023 / 2024-2025) en testant 3 splits walk-forward indépendants.
+
+Sorties :
+
+- `tools/backtests/output/rolling-walkforward-validator.json`
+- `tools/backtests/output/rolling-walkforward-validator.md`
+
+## Splits utilisés
+
+Les données disponibles sont 2021-2025 (multi-grid et RS), 2022-2025 (Pullback). Le brief suggérait des splits avec TRAIN 2020-* mais 2020 n'est pas dans les sources. Splits adaptés :
+
+| Split | TRAIN | TEST | Type |
+|---|---|---|---|
+| S1 | 2021-2022 | 2023 | expanding |
+| S2 | 2021-2023 | 2024 | expanding (≡ split unique élargi) |
+| S3 | 2022-2024 | 2025 | rolling |
+
+## Logique de verdict
+
+- **ROBUST** : PASS sur 100 % des splits valides ET variance faible (exp rel stddev < 0.5).
+- **STABLE** : PASS ≥ 75 % des splits valides.
+- **FRAGILE** : PASS partiel ou variance élevée.
+- **OVERFIT** : train consistant positif mais test échoue ≥ 50 % des splits.
+- **INSUFFICIENT_DATA** : < 2 splits valides.
+
+Mêmes seuils PASS/FAIL que le validateur unique (test exp > 0, test PF ≥ 1.1, drawdown ≤ 2× totalR).
+
+Le moteur ne **promeut jamais** — confirme, dégrade ou invalide.
+
+## Résultats du premier run
+
+| Verdict | Cellules | % |
+|---|---:|---:|
+| ROBUST | 17 | 0.2 % |
+| STABLE | 17 | 0.2 % |
+| FRAGILE | 2 886 | 30.4 % |
+| OVERFIT | 55 | 0.6 % |
+| INSUFFICIENT_DATA | 6 534 | 68.7 % |
+
+**9 509 cellules** évaluées au total (mode canonique ALL_REGIMES, identique au validateur unique).
+
+## Cellules ROBUST notables
+
+Sur les 17 ROBUST, toutes en RISK_ON :
+- **GLD × Breakout × RISK_ON** ← déjà tier A dans le plan v1, confirmé.
+- ASML × Pullback × RISK_ON.
+- DOCN × Pullback × RISK_ON (5 variantes).
+- KLAC × Pullback × RISK_ON.
+- PH × Pullback × RISK_ON (exp rel stddev 0.02 — extrêmement stable).
+- VRNS × Pullback × RISK_ON.
+
+Aucun des ROBUST n'est dans le plan d'allocation v1 actuel sauf GLD. Cela suggère que le plan v1 (basé sur tier composite ELITE) n'optimise PAS la robustesse temporelle. C'est un axe d'amélioration possible.
+
+## Cellules OVERFIT notables (alerte !)
+
+55 cellules détectées comme OVERFIT — train positif mais test échoue. À retirer du tradable-universe si on intègre ce validateur :
+
+- **SMCI × RS × RISK_ON** : alerte importante — proche du plan v1 (SMCI était tier B Breakout, pas RS, donc pas dans le plan, mais marqueur de fragilité).
+- AMZN × Pullback × RISK_ON.
+- CDNS × Pullback × RISK_ON (3 variantes — l'ajout de la PR de classification refactor expose maintenant CDNS, et le rolling validator dit "FAIL").
+- JPM × Pullback × RISK_ON (2 variantes — note : JPM × Breakout × RISK_ON était dans le plan v1 ; le Pullback × JPM est OVERFIT).
+- META × Pullback × RISK_ON.
+
+## Plan d'allocation v1 vs rolling verdict
+
+Croisement avec les 10 positions du plan v1 :
+
+| Position v1 | Cellule | Rolling verdict |
+|---|---|---|
+| VUG × Pullback × RISK_ON | rsi42_58_chg20_3_stop0.1 | FRAGILE |
+| SPYG × Pullback × RISK_ON | rsi42_58_chg20_3_stop0.1 | FRAGILE |
+| APP × RS rotation × RISK_ON | rs_90d_top10_hold20 | FRAGILE |
+| IYW × Pullback × RISK_ON | rsi42_58_chg20_3_stop0.1 | FRAGILE |
+| **GLD × Breakout × RISK_ON** | breakout_h50_vol1.2_stop1.5_rr2.5 | **ROBUST** ✓ |
+| SOL × RS × RISK_ON | rs_90d_top10_hold20 | INSUFFICIENT_DATA |
+| MSTR × RS × RISK_ON | rs_90d_top10_hold20 | INSUFFICIENT_DATA |
+| JPM × Breakout × RISK_ON | breakout_h20_vol1.2_stop1_rr2 | FRAGILE |
+| ROM × Pullback × RISK_ON | rsi42_58_chg20_3_stop0.1 | INSUFFICIENT_DATA |
+| CRWD × Pullback × RANGE | rsi42_58_chg20_3_stop0.1 | INSUFFICIENT_DATA |
+
+→ Seul **GLD × Breakout** est ROBUST dans le plan d'allocation actuel. Tous les autres sont soit FRAGILE soit INSUFFICIENT_DATA. **C'est une remise en question importante** des décisions d'allocation v1 sous l'angle de la robustesse temporelle.
+
+## Non-régression
+
+`walk-forward-regime-validator.json` byte-identique avant/après. Le nouveau validateur ne touche aucun moteur existant. Pipeline complet relancé sans régression.
+
+## Limites
+
+- **5 ans de données** : 3 splits, suffisant pour détecter les overfits massifs mais pas pour une mesure de robustesse statistique fine.
+- **2020 manquant** : décale les splits du brief original (TRAIN 2020-* → impossibles).
+- **Drift "indéterminé"** : la majorité des cellules ROBUST ont seulement 2 splits valides (manque parfois S3 par data Pullback 2025 partielle), donc le drift n'est pas calculé.
+- **Mêmes seuils PASS/FAIL** que le validateur unique — volontairement strict.
+- **Pas d'intégration au pipeline orchestré** dans cette PR. À utiliser comme filtre amont manuel.
+- **Pas de propagation** : `tradable-universe.json` et `allocation-plan*.json` ne sont pas modifiés.
+
+## Conséquence opérationnelle
+
+La grande majorité des positions du plan v1 sont FRAGILE ou INSUFFICIENT_DATA au sens du rolling walk-forward. La validation actuelle (`walk-forward-regime-validator-v1`) se contente d'un seul split — celui-ci détecte les overfits évidents mais pas la fragilité temporelle.
+
+**Recommandation pour une PR future** : étendre `tradable-universe-v1` pour exiger un verdict ROBUST ou STABLE en rolling walk-forward en plus du PASS unique. Cela durcirait la sélection mais réduirait drastiquement le nombre de cellules tradables (passerait de 346 ALLOW à probablement < 50).
