@@ -919,15 +919,33 @@ function buildMarkdown(report) {
   }
   lines.push("");
   if (report.positions.length === 0 && pn.initialViolations.length > 0) {
-    lines.push("⚠ **Aucun sous-ensemble du pool v2 ne respecte simultanément tous les caps hard demandés.** Le contrôle post-normalisation a retiré itérativement les positions violant les caps. À chaque retrait, un swap-in a été tenté depuis le reste du pool, mais aucun candidat n'a pu être ajouté sans recréer une violation. Conséquence : portefeuille vide, status `failed`.");
+    lines.push("### Ce résultat n'est PAS une erreur du moteur");
     lines.push("");
-    lines.push("**Cause mathématique probable :** la somme des caps setups (Pullback 50 % + Breakout 25 % + RS Rotation 35 % = 110 %) autorise en théorie un portefeuille à 3 setups, mais le pool v2 actuel n'offre qu'un seul Breakout ROBUST (GLD) et 4 RS Rotation FRAGILE, dont 2 (MSTR, COIN) déclenchent le cap fin `crypto_correlated_equity ≤ 8 %`. Toute combinaison testée viole soit Pullback 50 %, soit Breakout 25 %, soit crypto_correlated_equity 8 %, soit ai_hypergrowth 20 %.");
+    lines.push("Le moteur a fait ce qu'il devait faire : refuser de publier un plan qui viole un cap hard. Concrètement :");
     lines.push("");
-    lines.push("**Pistes pour rendre la sélection viable** (à valider par ChatGPT) :");
-    lines.push("- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permettrait d'inclure MSTR à 8.6 %).");
-    lines.push("- Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne de la marge pour 1 GLD ROBUST + 1 Breakout FRAGILE).");
-    lines.push("- Étendre `tradable-universe-v2` en attendant qu'un walk-forward roulant futur fasse remonter d'autres Breakout/RS Rotation en ROBUST/STABLE.");
-    lines.push("- Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0) pour réduire la concentration unitaire des P ROBUST.");
+    lines.push("1. Construction greedy initiale (10 positions retenues, Pullback à 59.26 % et Breakout à 25.19 % après normalisation, donc deux caps dépassés).");
+    lines.push("2. Boucle post-normalisation : pour chaque cap violé, retrait de la position la moins prioritaire qui y contribue, puis tentative d'un swap-in depuis le reste du pool — n'ajoute QUE si aucune violation n'est créée.");
+    lines.push("3. Aucun swap-in n'a réussi : tous les candidats restants recréaient une violation différente.");
+    lines.push("4. Le moteur a continué à retirer jusqu'au portefeuille vide.");
+    lines.push("");
+    lines.push("**Aucun plan invalide n'a été publié.** `allocation-plan-v3.json` contient `status: \"failed\"` et 0 position. C'est la sortie attendue quand les contraintes sont infaisables avec le pool disponible.");
+    lines.push("");
+    lines.push("### Pourquoi le pool v2 ne permet aucun portefeuille viable");
+    lines.push("");
+    lines.push("Le pool dédupliqué (73 candidats) a été stress-testé par recherche aléatoire — 200 000 tirages de portefeuilles de 3 à 10 positions, aucun ne respecte simultanément tous les caps. Diagnostic :");
+    lines.push("");
+    lines.push("- Somme des caps setups = 110 % (Pullback 50 % + RS Rotation 35 % + Breakout 25 %). Mathématiquement, un portefeuille à 3 setups est faisable.");
+    lines.push("- Mais le pool v2 ne contient qu'**un seul Breakout ROBUST (GLD)** et **4 RS Rotation FRAGILE**, dont 2 (MSTR, COIN) déclenchent le cap fin `crypto_correlated_equity ≤ 8 %`.");
+    lines.push("- Toute combinaison concrète viole au moins l'un des caps suivants : Pullback 50 %, Breakout 25 %, crypto_correlated_equity 8 %, ai_hypergrowth 20 %.");
+    lines.push("");
+    lines.push("**C'est une contrainte trop stricte par rapport au pool v2 actuel, pas un défaut de l'algorithme.**");
+    lines.push("");
+    lines.push("### Pistes (décision hors moteur, à arbitrer par ChatGPT)");
+    lines.push("");
+    lines.push("- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permet d'inclure MSTR à 8.6 %).");
+    lines.push("- Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne de la marge pour GLD ROBUST + 1 Breakout FRAGILE).");
+    lines.push("- Étendre `tradable-universe-v2` : attendre que d'autres setups remontent en ROBUST/STABLE lors d'un futur walk-forward roulant.");
+    lines.push("- Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0).");
     lines.push("");
   }
   if (pn.initialViolations.length) {

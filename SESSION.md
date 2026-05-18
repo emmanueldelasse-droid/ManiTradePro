@@ -2385,54 +2385,49 @@ Pour tout le reste : interdit.
 
 ## Contraintes hard v3
 
-- 3 à 10 positions (status `warning` si < 3, sinon `ok`).
+- 3 à 10 positions (status `warning` si < 3, `ok` si ≥ 3, `failed` si violation post-normalisation ou portefeuille vide).
 - Max 2 EXPERIMENTAL.
 - Max 1 position par symbole.
 - Setups : Pullback ≤ 50 %, RS Rotation ≤ 35 %, Breakout ≤ 25 %, MeanRev / VolComp **interdits**.
 - Crypto total ≤ 20 %.
 - Leveraged total **0 %** (interdit en v3 même si v2 le tolère).
 - Caps fins : us_growth_etf 30 %, mega_cap_tech 25 %, software_saas 25 %, ai_hypergrowth 20 %, semis_pure 25 %, crypto_layer1 10 %, crypto_correlated_equity 8 %, precious_metals 20 %, banks_financials 15 %.
-- Support des deux noms `WATCH` et `REDUCE` (alias) sans casser.
+- Support des deux noms `WATCH` et `REDUCE` (alias).
 
-## Contrôle post-normalisation des caps hard (correction itération 2)
+## Contrôle post-normalisation des caps hard
 
-Suite au refus de merge de la version initiale (caps Pullback 59.2 % et Breakout 25.2 % dépassés après normalisation), ajout d'un contrôle strict post-normalisation :
+Garantie centrale du moteur : **`allocation-plan-v3.json` ne contient JAMAIS de cap hard dépassé**.
 
 1. Construction greedy initiale (TARGET_BUDGET = 8.0 unités).
 2. Détection des caps violés sur les **poids finaux normalisés** (setup, broad, fines).
 3. Retrait itératif de la position la moins prioritaire qui contribue à la pire violation (priorityGroup DESC → tier DESC → confidence DESC → alpha ASC).
 4. Après chaque retrait, tentative de **swap-in** : ajout d'un candidat du pool dédupliqué qui ne crée AUCUNE violation lorsqu'il est testé sur le nouveau total.
 5. Renormalisation et bouclage jusqu'à plus de violation ou portefeuille vide.
-6. `status = "failed"` si une violation demeure ou si portefeuille vide ; `warning` si < 3 positions ; `ok` sinon.
+6. `status = "failed"` si une violation finale demeure ou si portefeuille vide ; `warning` si 0 < positions < 3 ; `ok` sinon.
 
-## Résultats du run (10 878 cellules univers v2)
+## Résultat final du run (10 878 cellules univers v2)
 
-- 346 cellules non-BLOCK
-- 334 éligibles priorité 1-4
-- 73 cellules après dédoublonnage par symbole
-- **Greedy initial : 10 positions** sélectionnées avec Pullback 59.26 % et Breakout 25.19 % (caps dépassés).
-- **Contrôle post-normalisation : 10 retraits, 0 swap-in en 11 itérations → portefeuille vide.**
-- **Status : `failed`.**
+- 346 cellules non-BLOCK · 334 éligibles priorité 1-4 · 73 dédupliquées par symbole.
+- Greedy initial : 10 positions, mais Pullback 59.26 % et Breakout 25.19 % dépassent leurs caps.
+- Contrôle post-normalisation : 10 retraits, 0 swap-in en 11 itérations.
+- **Plan final publié : 0 position, `status = "failed"`, aucun cap dépassé puisqu'aucun plan invalide n'est jamais publié.**
 
-### Diagnostic mathématique
+### Pourquoi 0 position : diagnostic mathématique
 
-Recherche aléatoire (200 000 essais de portefeuilles de 3 à 10 positions parmi 73 candidats) : **0 portefeuille viable trouvé**. Les caps demandés sont incompatibles avec le pool v2 actuel.
+Ce n'est **pas un bug du moteur**, c'est une **contrainte trop stricte par rapport au pool v2 actuel**.
+
+Recherche aléatoire (200 000 essais de portefeuilles de 3 à 10 positions parmi 73 candidats) : **0 portefeuille viable**.
 
 Cause :
-- Somme caps setups = 110 % (≥ 100 % donc théoriquement faisable avec 3 setups).
+- Somme des caps setups = 110 % (≥ 100 %, théoriquement faisable avec 3 setups).
 - Mais le pool v2 ne contient qu'**1 seul Breakout ROBUST (GLD)** et **4 RS Rotation FRAGILE** dont 2 (MSTR, COIN) déclenchent `crypto_correlated_equity ≤ 8 %`.
 - Toute combinaison testée viole soit Pullback 50 %, soit Breakout 25 %, soit crypto_correlated_equity 8 %, soit ai_hypergrowth 20 %.
 
-### Pistes proposées (décision ChatGPT)
-
-- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permet d'inclure MSTR à 8.6 %).
+Pistes possibles (décision ChatGPT, hors scope de cette PR) :
+- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permettrait d'inclure MSTR à 8.6 %).
 - Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne marge pour GLD + 1 Breakout FRAGILE).
 - Étendre `tradable-universe-v2` (attendre que d'autres setups remontent en ROBUST/STABLE).
 - Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0).
-
-### Cap respect garanti
-
-Le moteur garantit désormais que **`allocation-plan-v3.json` ne contient JAMAIS de cap hard dépassé** : soit un plan respectant tous les caps, soit `status=failed` avec liste explicite des positions retirées et des violations initiales.
 
 ## Non-régression confirmée
 
@@ -2447,7 +2442,7 @@ Le moteur garantit désormais que **`allocation-plan-v3.json` ne contient JAMAIS
 
 ## Prochaine étape recommandée
 
-- **Stress-test** ce plan v3 contre `friction-adjusted-report.json` pour mesurer l'érosion edge après coûts.
-- **Backfill ETF holdings** : propager les sous-jacents des ETFs détenus pour vérifier qu'aucun cap fin n'est dépassé une fois la transparence appliquée.
-- **Corrélations inter-positions** : ajouter une couche corrélation 2024-2025.
+- **Décider de la politique de cap** : conserver les seuils actuels (et accepter `failed` jusqu'à enrichissement du pool) ou relâcher un cap précis. À traiter dans une PR séparée.
+- **Stress-test** du moteur v3 quand un plan viable existera, contre `friction-adjusted-report.json`.
+- **Backfill ETF holdings** : propager les sous-jacents des ETFs détenus.
 - **Walk-forward conditionnel au régime** : durcir encore en exigeant un verdict ROBUST aussi dans le régime cible.

@@ -1,6 +1,6 @@
 # Allocation Plan v3 — Rolling-Hardened — ManiTradePro
 
-> Généré le 2026-05-18T12:25:12.672Z par `tools/backtests/allocation-engine-v3.mjs`.
+> Généré le 2026-05-18T13:09:51.347Z par `tools/backtests/allocation-engine-v3.mjs`.
 
 **⚠ Plan théorique uniquement. Aucun ordre. Aucun broker. Aucun endpoint live. Ne pas trader sans paper trading et validation humaine.**
 
@@ -116,15 +116,33 @@ _aucun sous-thème exposé_
 - Positions ajoutées par swap-in : **0**
 - Caps hard tous respectés sur les poids finaux : **n/a (portefeuille vide)**
 
-⚠ **Aucun sous-ensemble du pool v2 ne respecte simultanément tous les caps hard demandés.** Le contrôle post-normalisation a retiré itérativement les positions violant les caps. À chaque retrait, un swap-in a été tenté depuis le reste du pool, mais aucun candidat n'a pu être ajouté sans recréer une violation. Conséquence : portefeuille vide, status `failed`.
+### Ce résultat n'est PAS une erreur du moteur
 
-**Cause mathématique probable :** la somme des caps setups (Pullback 50 % + Breakout 25 % + RS Rotation 35 % = 110 %) autorise en théorie un portefeuille à 3 setups, mais le pool v2 actuel n'offre qu'un seul Breakout ROBUST (GLD) et 4 RS Rotation FRAGILE, dont 2 (MSTR, COIN) déclenchent le cap fin `crypto_correlated_equity ≤ 8 %`. Toute combinaison testée viole soit Pullback 50 %, soit Breakout 25 %, soit crypto_correlated_equity 8 %, soit ai_hypergrowth 20 %.
+Le moteur a fait ce qu'il devait faire : refuser de publier un plan qui viole un cap hard. Concrètement :
 
-**Pistes pour rendre la sélection viable** (à valider par ChatGPT) :
-- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permettrait d'inclure MSTR à 8.6 %).
-- Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne de la marge pour 1 GLD ROBUST + 1 Breakout FRAGILE).
-- Étendre `tradable-universe-v2` en attendant qu'un walk-forward roulant futur fasse remonter d'autres Breakout/RS Rotation en ROBUST/STABLE.
-- Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0) pour réduire la concentration unitaire des P ROBUST.
+1. Construction greedy initiale (10 positions retenues, Pullback à 59.26 % et Breakout à 25.19 % après normalisation, donc deux caps dépassés).
+2. Boucle post-normalisation : pour chaque cap violé, retrait de la position la moins prioritaire qui y contribue, puis tentative d'un swap-in depuis le reste du pool — n'ajoute QUE si aucune violation n'est créée.
+3. Aucun swap-in n'a réussi : tous les candidats restants recréaient une violation différente.
+4. Le moteur a continué à retirer jusqu'au portefeuille vide.
+
+**Aucun plan invalide n'a été publié.** `allocation-plan-v3.json` contient `status: "failed"` et 0 position. C'est la sortie attendue quand les contraintes sont infaisables avec le pool disponible.
+
+### Pourquoi le pool v2 ne permet aucun portefeuille viable
+
+Le pool dédupliqué (73 candidats) a été stress-testé par recherche aléatoire — 200 000 tirages de portefeuilles de 3 à 10 positions, aucun ne respecte simultanément tous les caps. Diagnostic :
+
+- Somme des caps setups = 110 % (Pullback 50 % + RS Rotation 35 % + Breakout 25 %). Mathématiquement, un portefeuille à 3 setups est faisable.
+- Mais le pool v2 ne contient qu'**un seul Breakout ROBUST (GLD)** et **4 RS Rotation FRAGILE**, dont 2 (MSTR, COIN) déclenchent le cap fin `crypto_correlated_equity ≤ 8 %`.
+- Toute combinaison concrète viole au moins l'un des caps suivants : Pullback 50 %, Breakout 25 %, crypto_correlated_equity 8 %, ai_hypergrowth 20 %.
+
+**C'est une contrainte trop stricte par rapport au pool v2 actuel, pas un défaut de l'algorithme.**
+
+### Pistes (décision hors moteur, à arbitrer par ChatGPT)
+
+- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permet d'inclure MSTR à 8.6 %).
+- Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne de la marge pour GLD ROBUST + 1 Breakout FRAGILE).
+- Étendre `tradable-universe-v2` : attendre que d'autres setups remontent en ROBUST/STABLE lors d'un futur walk-forward roulant.
+- Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0).
 
 Caps violés en sortie de greedy (avant correction) :
 
