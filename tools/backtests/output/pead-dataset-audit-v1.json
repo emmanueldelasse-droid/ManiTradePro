@@ -1,0 +1,74 @@
+{
+  "generatedAt": "2026-05-18T17:13:01.024Z",
+  "scope": "Audit des datasets disponibles pour POST_EARNINGS_DRIFT (PEAD). Pas de backtest dans ce script.",
+  "universeSize": 191,
+  "ohlcAudit": {
+    "symbolsWithOhlc": 160,
+    "symbolsWithoutOhlc": 31,
+    "missingSymbols": [
+      "DIA",
+      "XLE",
+      "XLF",
+      "XLV",
+      "XLI",
+      "XLP",
+      "XLY",
+      "XLB",
+      "XLU",
+      "XLRE",
+      "XLC",
+      "EWJ",
+      "EWZ",
+      "FXI",
+      "EEM",
+      "VGK",
+      "FEZ",
+      "INDA",
+      "EWT",
+      "EWY",
+      "SLV",
+      "USO",
+      "UNG",
+      "DBA",
+      "IEF",
+      "HYG",
+      "LQD",
+      "TQQQ",
+      "KO",
+      "PG",
+      "JNJ"
+    ],
+    "coveragePct": 83.8,
+    "ohlcFieldsDetected": [
+      "time",
+      "open",
+      "high",
+      "low",
+      "close",
+      "volume"
+    ],
+    "sampleDateRange": {
+      "candleCount": 1255,
+      "firstDate": "2021-01-04",
+      "lastDate": "2025-12-31",
+      "hasOpen": true,
+      "hasVolume": true
+    }
+  },
+  "earningsAudit": {
+    "paths": [],
+    "filenameHits": [],
+    "hasEarningsData": false
+  },
+  "readiness": {
+    "score": 25,
+    "level": "DATA_INSUFFICIENT",
+    "ohlcCoveragePct": 83.8,
+    "hasEarnings": false
+  },
+  "verdict": "DATA_INSUFFICIENT",
+  "sources": [
+    "tools/backtests/universe-v2.mjs (univers)",
+    "data/*.json (OHLC daily)"
+  ]
+}

@@ -3169,3 +3169,110 @@ Améliore l'ancien Pullback (PF 0.98 NEXT_OPEN → 1.045 baseline) mais reste fr
 ## Non-régression
 
 Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+---
+
+# PEAD Research Foundation v1
+
+Fichiers créés :
+
+```text
+docs/research/POST_EARNINGS_DRIFT_FOUNDATION.md   (doc architecture, 12 sections)
+docs/research/PEAD_DATA_REQUIREMENTS.md           (spec dataset, 10 sections)
+tools/backtests/configs/post-earnings-drift-research-v1.json   (config recherche)
+tools/backtests/pead-dataset-audit-v1.mjs         (audit script)
+tools/backtests/output/pead-dataset-audit-v1.json
+tools/backtests/output/pead-dataset-audit-v1.md
+```
+
+Fondation de recherche pour le futur moteur POST_EARNINGS_DRIFT (PEAD). **Pas un moteur PEAD final.** Réponse à la question : « Avons-nous les données nécessaires pour tester sérieusement PEAD sans tricher ? »
+
+## Verdict du dataset audit : **DATA_INSUFFICIENT** (25/100)
+
+| Critère | Statut |
+|---|---|
+| OHLC coverage | 83.8 % (160/191 symboles) ✓ |
+| Earnings data dans repo | **NON** ✗ |
+| Score | 25/100 |
+
+Aucun fichier earnings dans `data/`, `tools/` ou ailleurs dans le repo. Les fichiers OHLC ne contiennent que `time, open, high, low, close, volume` — pas d'EPS surprise, pas de date earnings.
+
+## Architecture PEAD proposée (à valider)
+
+### Signal
+- Surprise EPS ≥ +5 % (calibrable)
+- Gap d'ouverture ≥ +3 %
+- Volume anormal ≥ ×1.5 vs moyenne 21j
+- Régime ≠ RISK_OFF
+- Relative strength positive
+
+### Entrée
+- Pre-market earnings → entry = `open[T+1]`
+- Post-market earnings → entry = `open[T+2]`
+- **JAMAIS** trade le jour même de la publication.
+
+### Exits testés
+fixed_hold (20/40/60/90j), momentum_decay, atr_trailing, relative_strength_decay, next_earnings_minus_5.
+
+### Risk model
+Max 8 positions simultanées, max 30 % par secteur, volatility scaling, stop loss `min(entry - 2*ATR, entry * 0.92)`.
+
+## Anti-look-ahead obligatoire (documenté)
+
+- Timezone explicite obligatoire.
+- `sourceConsensusDate` doit être < `publishedAt` (sinon look-ahead).
+- Validation manuelle sur 20 earnings random avant utilisation source.
+- Séparation stricte signal-time / execution-time.
+
+## Sources comparées
+
+| Source | Coût | Look-ahead risk | Recommandation |
+|---|---|---|---|
+| SEC EDGAR | gratuit | très faible | dates filings |
+| Alpha Vantage | gratuit-$50 | faible | estimates + dates |
+| Polygon Advanced | $79/mois | très faible | production |
+| EODHD | $30-$80/mois | modéré | OK (déjà utilisé pour OHLC) |
+| FMP | $19-$50/mois | modéré | alternative |
+| Yahoo Finance | gratuit | élevé | éviter |
+
+**Recommandation Phase 1** : SEC EDGAR + Alpha Vantage (gratuit), suffisant pour démarrer.
+**Recommandation Phase 2** : Polygon Advanced ($79/mois) si edge confirmé.
+
+## Critères de validation pour le futur moteur PEAD
+
+- Trades ≥ 200 sur 5 ans
+- PF post-friction ≥ 1.3
+- Années positives ≥ 4/5
+- Walk-forward ≥ 2/3 splits
+- **Top 5 ticker share < 60 %** (PEAD doit être distribué, c'est tout son intérêt vs SECTOR_RS AI-dépendant)
+- Edge decay < ×1.5
+- Inflation PF < ×1.05
+- Bear 2022 PF ≥ 0.9
+
+## Décision politique requise (avant PR suivante)
+
+1. Phase 1 gratuite (SEC EDGAR + Alpha Vantage) ou Phase 2 payante (Polygon $79/mois) ?
+2. Si payante : qui gère l'abonnement ?
+3. Volume historique cible (5 ans recommandé) ?
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 6 nouveaux fichiers (2 docs + 1 config + 1 script + 2 outputs). Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+## Interdictions explicites
+
+- NE PAS construire le moteur PEAD complet dans cette PR.
+- NE PAS télécharger de données externes dans cette PR.
+- NE PAS modifier le runtime.
+- NE PAS activer en live.
+- NE PAS promettre des résultats avant le backtest.
+
+## Prochaines étapes documentées
+
+1. Cette PR : foundation + audit dataset existant.
+2. PR future : décision sourcing + script d'ingestion earnings.
+3. PR future : `pead-signal-detect-v1.mjs` (génération de signaux).
+4. PR future : `pead-backtest-v1.mjs` (backtest complet).
+5. PR future : audit anti-look-ahead spécifique PEAD.
+6. PR future : destruction tests PEAD.
+7. PR future : formalisation v1 si tous les critères passent.

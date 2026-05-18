@@ -1,0 +1,121 @@
+{
+  "setupId": "POST_EARNINGS_DRIFT",
+  "version": "research_v1",
+  "status": "RESEARCH_FOUNDATION",
+  "originatingPR": 216,
+  "frozenAt": null,
+  "description": "Configuration de recherche pour le futur moteur PEAD. PAS un setup tradable. Ces paramètres définissent les seuils proposés pour le premier backtest, à valider après ingestion des données earnings.",
+  "signalCriteria": {
+    "surpriseEpsMinPct": 5,
+    "surpriseEpsMaxPct": 50,
+    "gapOpenMinPct": 3,
+    "gapOpenMaxPct": 15,
+    "volumeMultiplierMin": 1.5,
+    "volumeAvgLookback": 21,
+    "relativeStrengthMinLookback": 90,
+    "regimeFilter": "NO_RISK_OFF"
+  },
+  "execution": {
+    "entryTiming": "open[T+2]",
+    "preMarketEntryTiming": "open[T+1]",
+    "postMarketEntryTiming": "open[T+2]",
+    "notes": "T = jour de publication earnings. Si post-market, on attend que la digestion gap+volume ait lieu à T+1, on entre à T+2."
+  },
+  "exits": {
+    "tested": ["fixed_hold_20", "fixed_hold_40", "fixed_hold_60", "fixed_hold_90", "momentum_decay", "atr_trailing", "relative_strength_decay", "next_earnings_minus_5"]
+  },
+  "riskModel": {
+    "maxGapEntryPct": 15,
+    "maxSimultaneousPositions": 8,
+    "maxPositionsPerSector": 3,
+    "sectorConcentrationCapPct": 30,
+    "volatilityScaling": {
+      "enabled": true,
+      "refAtr": 5.0,
+      "minSize": 0.5,
+      "maxSize": 2.0
+    },
+    "stopLoss": "min(entry - 2 * ATR, entry * 0.92)"
+  },
+  "friction": {
+    "roundTripPct": 0.30,
+    "overnightGapPenaltyPctPerDay": 0.02,
+    "conversionToR": "5% = 1R",
+    "formula": "frictionR = (0.30 + 0.02 * holdDays) / 5"
+  },
+  "validationCriteria": {
+    "tradesMin": 200,
+    "profitFactorPostFrictionMin": 1.3,
+    "yearsPositiveMin": 4,
+    "yearsPositiveOf": 5,
+    "walkForwardSplitsMin": 2,
+    "walkForwardSplitsOf": 3,
+    "top5TickerShareMaxPct": 60,
+    "edgeDecayMax": 1.5,
+    "executionInflationMax": 1.05,
+    "bear2022PfMin": 0.9
+  },
+  "antiLookAheadChecks": [
+    "publishedAt avec timezone explicite (UTC ou ET)",
+    "publishedAt clairement pre-market ou post-market, pas pendant la séance",
+    "estimateEPS figé AVANT publishedAt (cf. sourceConsensusDate)",
+    "Aucun usage de prix entre publishedAt et entry date",
+    "Test manuel sur 20 earnings random avant validation source"
+  ],
+  "dataRequirements": {
+    "essentialFields": [
+      "symbol",
+      "publishedAt (ISO 8601 + timezone)",
+      "type (pre_market | post_market | intraday)",
+      "actualEPS",
+      "estimateEPS",
+      "sourceConsensusDate"
+    ],
+    "importantFields": [
+      "revenueActual",
+      "revenueEstimate",
+      "fiscalQuarter"
+    ],
+    "alreadyAvailable": [
+      "OHLC daily (data/{SYMBOL}_2025.json)",
+      "Régime marché (calculable depuis SPY+QQQ+SMH)",
+      "Mapping secteur (tools/backtests/universe-v2.mjs)"
+    ],
+    "missing": [
+      "earnings publication dates",
+      "EPS actual",
+      "EPS estimate (pre-publication consensus)",
+      "pre/post-market timing"
+    ]
+  },
+  "proposedDataSources": [
+    {
+      "name": "SEC EDGAR + Alpha Vantage (Phase 1 gratuite)",
+      "cost": "$0/mois",
+      "lookAheadRisk": "low",
+      "recommendation": "DÉMARRAGE"
+    },
+    {
+      "name": "Polygon Advanced (Phase 2 production)",
+      "cost": "$79/mois",
+      "lookAheadRisk": "very_low",
+      "recommendation": "Si edge confirmé en Phase 1"
+    }
+  ],
+  "interdictions": [
+    "Ne PAS construire le moteur PEAD complet dans cette PR",
+    "Ne PAS télécharger des données externes dans cette PR",
+    "Ne PAS modifier le runtime",
+    "Ne PAS activer en live",
+    "Ne PAS promettre des résultats avant le backtest"
+  ],
+  "nextSteps": [
+    "Décision politique : Phase 1 (gratuit) ou Phase 2 (payant) ?",
+    "PR suivante : script d'ingestion earnings depuis source choisie",
+    "PR suivante : pead-signal-detect-v1 (génération de signaux, pas de backtest)",
+    "PR suivante : pead-backtest-v1 (backtest complet avec friction)",
+    "PR suivante : audit anti-look-ahead spécifique PEAD",
+    "PR suivante : destruction tests PEAD",
+    "PR suivante : formalisation v1 si critères passent"
+  ]
+}
