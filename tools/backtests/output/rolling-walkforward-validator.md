@@ -1,6 +1,6 @@
 # Rolling Walk-Forward Validator — ManiTradePro
 
-> Généré le 2026-05-18T10:49:55.512Z par `tools/backtests/rolling-walkforward-validator-v1.mjs`.
+> Généré le 2026-05-18T11:16:51.550Z par `tools/backtests/rolling-walkforward-validator-v1.mjs`.
 
 **⚠ Validateur de robustesse temporelle.** Teste chaque cellule (symbol × setup × variant × regime) sur plusieurs splits walk-forward indépendants. Le moteur ne **promeut jamais** — il confirme, dégrade ou invalide.
 
