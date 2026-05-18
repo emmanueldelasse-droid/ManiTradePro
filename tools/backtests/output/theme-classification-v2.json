@@ -1,0 +1,503 @@
+{
+  "generatedAt": "2026-05-18T10:09:51.155Z",
+  "sources": {
+    "allocationPlan": "tools/backtests/output/allocation-plan.json",
+    "frictionAdjustedAllocation": "tools/backtests/output/allocation-plan-friction-adjusted.json",
+    "tradableUniverse": "tools/backtests/output/tradable-universe.json"
+  },
+  "status": "ok",
+  "model": {
+    "version": "v2",
+    "type": "heuristic_manual",
+    "validThemes": [
+      "ai_hypergrowth",
+      "banks_financials",
+      "broad_market",
+      "cloud_platform",
+      "crypto_correlated_equity",
+      "crypto_exchange",
+      "crypto_layer1",
+      "cybersecurity",
+      "europe_equity",
+      "fintech",
+      "industrials",
+      "leveraged_macro",
+      "leveraged_tech",
+      "macro_defensive",
+      "macro_fx",
+      "mega_cap_tech",
+      "precious_metals",
+      "quality_growth",
+      "semis_equipment",
+      "semis_pure",
+      "software_saas",
+      "us_growth_etf"
+    ],
+    "classificationEntries": 179,
+    "disclaimer": "Classification heuristique maintenue à la main. Pas de ML, pas de matrice de covariance réelle. Vise à améliorer les caps et la lisibilité structurelle, pas à fournir une vérité financière."
+  },
+  "summary": {
+    "classifiedSymbols": 10,
+    "unknownSymbols": 0,
+    "detectedThemes": [
+      "ai_hypergrowth",
+      "banks_financials",
+      "broad_market",
+      "crypto_correlated_equity",
+      "crypto_layer1",
+      "cybersecurity",
+      "leveraged_tech",
+      "macro_defensive",
+      "mega_cap_tech",
+      "precious_metals",
+      "quality_growth",
+      "software_saas",
+      "us_growth_etf"
+    ],
+    "topThemeExposureOriginal": [
+      {
+        "theme": "us_growth_etf",
+        "weightPct": 39.75,
+        "positions": 3
+      },
+      {
+        "theme": "mega_cap_tech",
+        "weightPct": 17.89,
+        "positions": 2
+      },
+      {
+        "theme": "software_saas",
+        "weightPct": 14.57,
+        "positions": 2
+      },
+      {
+        "theme": "quality_growth",
+        "weightPct": 13.25,
+        "positions": 1
+      },
+      {
+        "theme": "broad_market",
+        "weightPct": 13.25,
+        "positions": 1
+      },
+      {
+        "theme": "ai_hypergrowth",
+        "weightPct": 13.25,
+        "positions": 1
+      },
+      {
+        "theme": "precious_metals",
+        "weightPct": 13.25,
+        "positions": 1
+      },
+      {
+        "theme": "macro_defensive",
+        "weightPct": 13.25,
+        "positions": 1
+      },
+      {
+        "theme": "crypto_layer1",
+        "weightPct": 9.27,
+        "positions": 1
+      },
+      {
+        "theme": "crypto_correlated_equity",
+        "weightPct": 9.27,
+        "positions": 1
+      }
+    ],
+    "topThemeExposureAdjusted": [
+      {
+        "theme": "us_growth_etf",
+        "weightPct": 43.26,
+        "positions": 3
+      },
+      {
+        "theme": "mega_cap_tech",
+        "weightPct": 18.21,
+        "positions": 2
+      },
+      {
+        "theme": "quality_growth",
+        "weightPct": 14.42,
+        "positions": 1
+      },
+      {
+        "theme": "broad_market",
+        "weightPct": 14.42,
+        "positions": 1
+      },
+      {
+        "theme": "software_saas",
+        "weightPct": 14.27,
+        "positions": 2
+      },
+      {
+        "theme": "ai_hypergrowth",
+        "weightPct": 12.98,
+        "positions": 1
+      },
+      {
+        "theme": "precious_metals",
+        "weightPct": 12.98,
+        "positions": 1
+      },
+      {
+        "theme": "macro_defensive",
+        "weightPct": 12.98,
+        "positions": 1
+      },
+      {
+        "theme": "crypto_correlated_equity",
+        "weightPct": 9.08,
+        "positions": 1
+      },
+      {
+        "theme": "banks_financials",
+        "weightPct": 9.08,
+        "positions": 1
+      }
+    ]
+  },
+  "symbolThemes": {
+    "VUG": {
+      "themes": [
+        "us_growth_etf",
+        "quality_growth"
+      ],
+      "confidence": "HIGH"
+    },
+    "SPYG": {
+      "themes": [
+        "us_growth_etf",
+        "broad_market"
+      ],
+      "confidence": "HIGH"
+    },
+    "APP": {
+      "themes": [
+        "ai_hypergrowth",
+        "software_saas"
+      ],
+      "confidence": "MEDIUM"
+    },
+    "IYW": {
+      "themes": [
+        "us_growth_etf",
+        "mega_cap_tech"
+      ],
+      "confidence": "HIGH"
+    },
+    "GLD": {
+      "themes": [
+        "precious_metals",
+        "macro_defensive"
+      ],
+      "confidence": "HIGH"
+    },
+    "SOL": {
+      "themes": [
+        "crypto_layer1"
+      ],
+      "confidence": "HIGH"
+    },
+    "MSTR": {
+      "themes": [
+        "crypto_correlated_equity"
+      ],
+      "confidence": "HIGH"
+    },
+    "JPM": {
+      "themes": [
+        "banks_financials"
+      ],
+      "confidence": "HIGH"
+    },
+    "ROM": {
+      "themes": [
+        "leveraged_tech",
+        "mega_cap_tech"
+      ],
+      "confidence": "HIGH"
+    },
+    "CRWD": {
+      "themes": [
+        "cybersecurity",
+        "software_saas"
+      ],
+      "confidence": "HIGH"
+    }
+  },
+  "allocationExposure": {
+    "original": {
+      "us_growth_etf": {
+        "positions": 3,
+        "weightPct": 39.75,
+        "symbols": [
+          "VUG",
+          "SPYG",
+          "IYW"
+        ]
+      },
+      "quality_growth": {
+        "positions": 1,
+        "weightPct": 13.25,
+        "symbols": [
+          "VUG"
+        ]
+      },
+      "broad_market": {
+        "positions": 1,
+        "weightPct": 13.25,
+        "symbols": [
+          "SPYG"
+        ]
+      },
+      "ai_hypergrowth": {
+        "positions": 1,
+        "weightPct": 13.25,
+        "symbols": [
+          "APP"
+        ]
+      },
+      "software_saas": {
+        "positions": 2,
+        "weightPct": 14.57,
+        "symbols": [
+          "APP",
+          "CRWD"
+        ]
+      },
+      "mega_cap_tech": {
+        "positions": 2,
+        "weightPct": 17.89,
+        "symbols": [
+          "IYW",
+          "ROM"
+        ]
+      },
+      "precious_metals": {
+        "positions": 1,
+        "weightPct": 13.25,
+        "symbols": [
+          "GLD"
+        ]
+      },
+      "macro_defensive": {
+        "positions": 1,
+        "weightPct": 13.25,
+        "symbols": [
+          "GLD"
+        ]
+      },
+      "crypto_layer1": {
+        "positions": 1,
+        "weightPct": 9.27,
+        "symbols": [
+          "SOL"
+        ]
+      },
+      "crypto_correlated_equity": {
+        "positions": 1,
+        "weightPct": 9.27,
+        "symbols": [
+          "MSTR"
+        ]
+      },
+      "banks_financials": {
+        "positions": 1,
+        "weightPct": 9.27,
+        "symbols": [
+          "JPM"
+        ]
+      },
+      "leveraged_tech": {
+        "positions": 1,
+        "weightPct": 4.64,
+        "symbols": [
+          "ROM"
+        ]
+      },
+      "cybersecurity": {
+        "positions": 1,
+        "weightPct": 1.32,
+        "symbols": [
+          "CRWD"
+        ]
+      }
+    },
+    "frictionAdjusted": {
+      "us_growth_etf": {
+        "positions": 3,
+        "weightPct": 43.26,
+        "symbols": [
+          "VUG",
+          "SPYG",
+          "IYW"
+        ]
+      },
+      "quality_growth": {
+        "positions": 1,
+        "weightPct": 14.42,
+        "symbols": [
+          "VUG"
+        ]
+      },
+      "broad_market": {
+        "positions": 1,
+        "weightPct": 14.42,
+        "symbols": [
+          "SPYG"
+        ]
+      },
+      "ai_hypergrowth": {
+        "positions": 1,
+        "weightPct": 12.98,
+        "symbols": [
+          "APP"
+        ]
+      },
+      "software_saas": {
+        "positions": 2,
+        "weightPct": 14.27,
+        "symbols": [
+          "APP",
+          "CRWD"
+        ]
+      },
+      "mega_cap_tech": {
+        "positions": 2,
+        "weightPct": 18.21,
+        "symbols": [
+          "IYW",
+          "ROM"
+        ]
+      },
+      "precious_metals": {
+        "positions": 1,
+        "weightPct": 12.98,
+        "symbols": [
+          "GLD"
+        ]
+      },
+      "macro_defensive": {
+        "positions": 1,
+        "weightPct": 12.98,
+        "symbols": [
+          "GLD"
+        ]
+      },
+      "crypto_layer1": {
+        "positions": 1,
+        "weightPct": 7.56,
+        "symbols": [
+          "SOL"
+        ]
+      },
+      "crypto_correlated_equity": {
+        "positions": 1,
+        "weightPct": 9.08,
+        "symbols": [
+          "MSTR"
+        ]
+      },
+      "banks_financials": {
+        "positions": 1,
+        "weightPct": 9.08,
+        "symbols": [
+          "JPM"
+        ]
+      },
+      "leveraged_tech": {
+        "positions": 1,
+        "weightPct": 3.79,
+        "symbols": [
+          "ROM"
+        ]
+      },
+      "cybersecurity": {
+        "positions": 1,
+        "weightPct": 1.29,
+        "symbols": [
+          "CRWD"
+        ]
+      }
+    }
+  },
+  "clusters": {
+    "original": [
+      {
+        "type": "multi_position_theme",
+        "theme": "us_growth_etf",
+        "positions": 3,
+        "symbols": [
+          "VUG",
+          "SPYG",
+          "IYW"
+        ],
+        "weightPct": 39.75
+      },
+      {
+        "type": "multi_position_theme",
+        "theme": "software_saas",
+        "positions": 2,
+        "symbols": [
+          "APP",
+          "CRWD"
+        ],
+        "weightPct": 14.57
+      },
+      {
+        "type": "multi_position_theme",
+        "theme": "mega_cap_tech",
+        "positions": 2,
+        "symbols": [
+          "IYW",
+          "ROM"
+        ],
+        "weightPct": 17.89
+      }
+    ],
+    "frictionAdjusted": [
+      {
+        "type": "multi_position_theme",
+        "theme": "us_growth_etf",
+        "positions": 3,
+        "symbols": [
+          "VUG",
+          "SPYG",
+          "IYW"
+        ],
+        "weightPct": 43.26
+      },
+      {
+        "type": "multi_position_theme",
+        "theme": "software_saas",
+        "positions": 2,
+        "symbols": [
+          "APP",
+          "CRWD"
+        ],
+        "weightPct": 14.27
+      },
+      {
+        "type": "multi_position_theme",
+        "theme": "mega_cap_tech",
+        "positions": 2,
+        "symbols": [
+          "IYW",
+          "ROM"
+        ],
+        "weightPct": 18.21
+      }
+    ]
+  },
+  "warnings": {
+    "original": [
+      "Sous-thème \"us_growth_etf\" représente 39.75 % du portefeuille (3 positions : VUG, SPYG, IYW) — concentration cachée derrière le cap large tech_ai 60 %."
+    ],
+    "frictionAdjusted": [
+      "Sous-thème \"us_growth_etf\" représente 43.26 % du portefeuille (3 positions : VUG, SPYG, IYW) — concentration cachée derrière le cap large tech_ai 60 %."
+    ]
+  }
+}
