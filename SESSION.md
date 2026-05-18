@@ -2661,3 +2661,38 @@ Après les deux audits (PR #207 + cette PR) :
 ## Non-régression
 
 Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+---
+
+# Setups Registry Cleanup v1
+
+Mise à jour documentaire de `SETUPS_REGISTRY.md` suite aux audits PR #207 (Pullback) et PR #208 (3 autres setups). **Aucun code modifié, aucun moteur touché, aucun runtime impacté.**
+
+## Statuts officiels post-audit
+
+| Setup | Statut officiel | Raison |
+|---|---|---|
+| PULLBACK_MOMENTUM | DEAD / DO_NOT_TRADE | INVALID_BACKTEST (PR #207) |
+| BREAKOUT_EXPANSION | DEAD_AGGREGATED / ONLY_GLD_RESEARCH_EXCEPTION | INVALID agrégé (PR #208), GLD seule exception |
+| MEAN_REVERSION | EXPERIMENTAL_ONLY / FRICTION_REQUIRED | MEDIUM_RISK (PR #208), edge marginal |
+| RELATIVE_STRENGTH_ROTATION | RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED | CLEAN exécution mais fragile rolling |
+| VOLATILITY_COMPRESSION | DEAD / ABANDONED | FAILED (PF 0.78) |
+| GLD_BREAKOUT_ISOLATED | CONDITIONAL_RESEARCH_CANDIDATE | n=47, edge réel mais échantillon faible |
+
+## Ce que le registre dit désormais
+
+- **Tous les anciens statuts VALIDATED sont annulés.** Les fiches détaillées restent comme archives historiques mais leurs métriques (winrate, expectancy, PF) ne doivent plus être utilisées telles quelles.
+- **0 setup officiellement VALIDATED** dans le registre actuel.
+- **Aucun setup ne peut être activé live** tant qu'une PR de correction code + robustness + friction ne qualifie pas au moins 1 setup en VALIDATED selon la nouvelle règle.
+- Section "Post execution-bias audit status" en tête de fichier qui fait autorité — explique pourquoi anciens scores invalides, pourquoi Pullback invalidé, pourquoi RS Rotation seul candidat propre exécution, pourquoi GLD breakout exception isolée.
+- Nouveaux critères de validation future : inflation PF < ×1.05 vs NEXT_OPEN, cellules ROBUST/STABLE en rolling, PF post-friction ≥ 1.2.
+
+## Non-régression
+
+Documentation pure. Aucun moteur, aucun runtime. 1 seul fichier modifié (SETUPS_REGISTRY.md) + SESSION.md.
+
+## Prochaine étape recommandée
+
+- Audit friction sur RS Rotation et GLD breakout (`friction-model-v1` appliqué).
+- PR walk-forward conditionnel régime pour RS Rotation (essayer de remonter 0/0 à un nombre significatif de cellules ROBUST/STABLE).
+- Décision politique : faut-il corriger le code Pullback/Breakout pour mesurer l'edge réel post-correction, ou abandonner définitivement et passer à de nouveaux setups ?
