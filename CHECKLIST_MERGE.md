@@ -127,6 +127,19 @@ Cf. `GPT_ROLE.md` pour le rôle de chaque IA et le workflow complet.
 
 ---
 
+## Transparence agents Claude Code
+
+Pour toute PR, indiquer explicitement si un agent ou skill Claude Code a été utilisé. Cela évite qu'une délégation invisible influence un merge.
+
+- [ ] Agent ou skill utilisé : déclaré dans le body de la PR (ou absence explicite).
+- [ ] Tâche réellement déléguée : décrite (rôle, périmètre, limites).
+- [ ] Vérification humaine Claude effectuée après l'agent (relecture, tests).
+- [ ] Pour une PR quant ou importante : validation ChatGPT obtenue malgré (ou en plus de) l'usage d'un agent.
+
+Cf. `GPT_ROLE.md` section *Claude Code Agents & Skills Governance* pour la liste complète des agents disponibles, leurs limites, et les cas d'usage interdits.
+
+---
+
 ## Mémo de fin
 
 Quand la checklist est intégralement validée :

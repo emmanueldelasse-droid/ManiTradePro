@@ -157,3 +157,9 @@ Avant toute réflexion stratégique ou validation importante :
 ```text
 GPT_ROLE.md
 ```
+
+## Agents et skills Claude Code
+
+- La liste complète des agents et skills disponibles, leur rôle, leurs limites et les règles de délégation sont documentés dans `GPT_ROLE.md` (section *Claude Code Agents & Skills Governance*).
+- **Toute utilisation d'un agent dans une PR doit être déclarée explicitement** dans le body : agent utilisé, tâche déléguée, résultat, limites éventuelles.
+- Les moteurs quant restent implémentés directement par Claude, sans délégation à un agent isolé. Les agents ne remplacent jamais la revue ChatGPT.
