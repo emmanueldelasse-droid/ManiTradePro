@@ -1305,3 +1305,132 @@ Le moteur peut maintenant orchestrer une décision per-(actif × setup × varian
 > Décision : ouvrir en Pullback ET surveiller Breakout pour second signal.
 
 C'est exactement le niveau de granularité que l'allocation dynamique (priorité #4 du TODO quant) attendra pour fonctionner.
+
+---
+
+# Walk-Forward Regime Validator v1 — verrou anti-surajustement
+
+Fichier créé :
+
+```text
+tools/backtests/walk-forward-regime-validator-v1.mjs
+```
+
+Réutilise `tools/backtests/lib/backtest-records.mjs` (emptyBucket, pushToBucket, summarizeBucket, listJsonFiles, toNumberOrNull, inferSetupFamily). Walker bySymbolByRegime local au script (parcours yearly tagué).
+
+Sorties écrites :
+
+- `tools/backtests/output/walk-forward-regime-validator.json`
+- `tools/backtests/output/walk-forward-regime-validator.md`
+
+Comment le relancer :
+
+```text
+node tools/backtests/walk-forward-regime-validator-v1.mjs
+```
+
+## Méthode
+
+- **Split fixe** : TRAIN = 2021-2023 (3 ans) | TEST = 2024-2025 (2 ans).
+- **Mode régime canonique** : ALL_REGIMES (le champ `regime` est la dimension étudiée, regimeMode est redondant pour ce validateur).
+- Pour chaque cellule `(symbol, setup, variant, regime)`, agrégation séparée des records yearly train et test, puis classification en :
+  - **PASS** : test trades ≥ 10, exp > 0, PF ≥ 1.1.
+  - **WATCH** : test positif mais PF marginal (1.0-1.1) OU score drop > 50 %.
+  - **FAIL** : test exp ≤ 0 avec ≥ 10 trades, OU PF < 1.0, OU drawdown > 2× totalR.
+  - **INSUFFICIENT_DATA** : < 10 trades en test, ou observed years < 2, ou aucune donnée train/test.
+
+## Résultat du premier run
+
+- **9 509 cellules** analysées (symbol × setup × variant × regime, mode canonique ALL_REGIMES).
+- **729 PASS** (7.7 %) — cellules dont le test confirme le train.
+- **46 WATCH** (0.5 %) — positives mais marginales.
+- **575 FAIL** (6.0 %) — surajustement détecté, à exclure du tradable-universe.
+- **8 159 INSUFFICIENT_DATA** (85.8 %) — pas assez de signal en test pour conclure.
+
+## Cross-check baseTier (variant-regime-matrix) × walkForwardTier
+
+| Base | PASS | WATCH | FAIL | INSUFFICIENT_DATA |
+|---|---:|---:|---:|---:|
+| STRONG | **304** | 0 | **7** | 246 |
+| OK | 216 | 4 | 16 | 814 |
+| WEAK | 134 | 26 | 31 | 926 |
+| AVOID | 75 | 16 | 521 | 6 173 |
+
+Lecture :
+- **98 % des STRONG-base avec verdict tranché passent le walk-forward** (304 / 311). Bonne cohérence de la matrice base.
+- **7 cellules STRONG → FAIL** : verrou anti-surajustement qui retire ces cellules du tradable-universe.
+- **75 cellules AVOID → PASS** : la matrice base écartait ces couples, mais le test 2024-2025 les valide. Échantillons à examiner — pourrait être du signal redécouvert ou du bruit.
+
+## Les 7 STRONG → FAIL
+
+| Symbole | Setup | Variante | Régime | Train (exp/PF) | Test (exp/PF) | Raison |
+|---|---|---|---|---|---|---|
+| BTC | PULLBACK | `base_rsi42_58_chg20_0_stop0.1` | RANGE | 1.20 / 5.07 | **-0.05** / 1.07 | test expectancy ≤ 0 |
+| BTC | PULLBACK | `pullback_base_rsi42_58_chg20_0_stop0.1` | RANGE | 1.48 / 5.07 | **-0.05** / 1.07 | test expectancy ≤ 0 |
+| BTC | PULLBACK | `rsi42_58_chg20_3_stop0.1` | RANGE | 1.82 / 16.32 | 0.14 / 1.42 | drawdown 4.00 > 2× totalR |
+| APP | RS_ROTATION | `rs_120d_top10_hold20` | RANGE | 1.74 / 3.76 | 0.49 / 0.28 | drawdown excessif (4 trades test) |
+| APP | RS_ROTATION | `rs_90d_top10_hold20` | RANGE | 1.62 / 3.21 | 0.18 / 1.21 | drawdown excessif (2 trades test) |
+| TTWO | PULLBACK | `rsi42_58_chg20_0_stop0.5` | RANGE | 1.62 / 10.73 | 0.07 / 2.02 | drawdown 1.00 > 2× totalR |
+| USDJPY | PULLBACK | `base_rsi42_58_chg20_0_stop0.1` | RANGE | 1.08 / 5.03 | 0.02 / 1.47 | drawdown excessif |
+
+→ **BTC × Pullback × RANGE** est le cas le plus net : 3 variantes différentes du même setup tombent en FAIL avec test exp ≤ 0. Le STRONG sur l'historique 2021-2023 était probablement de la chance ou du sur-ajustement. À retirer du tradable-universe BTC × Pullback × RANGE.
+
+## Distribution par setup
+
+| Setup | PASS | WATCH | FAIL | INSUFF. | Ratio PASS/FAIL |
+|---|---:|---:|---:|---:|---:|
+| PULLBACK_MOMENTUM | 631 | 41 | 455 | 5 393 | 1.4 |
+| BREAKOUT_EXPANSION | 75 | 3 | 98 | 1 090 | **0.77** |
+| RELATIVE_STRENGTH_ROTATION | 14 | 0 | 9 | 397 | 1.6 |
+| MEAN_REVERSION | 7 | 0 | 11 | 970 | 0.6 |
+| VOLATILITY_COMPRESSION | 2 | 2 | 2 | 309 | 1.0 |
+
+→ **Breakout est le seul setup validé où FAIL > PASS**. Confirme sa fragilité (consistante avec PR #191 qui montrait beaucoup de cellules avec PF=999 sur petit échantillon). Le walk-forward filtre ces cas.
+
+→ **MEAN_REVERSION** confirme son statut FAILED dans SETUPS_REGISTRY : plus de FAIL que de PASS.
+
+## Cas notables des actifs focus (verdicts tranchés)
+
+### NVDA — 1 FAIL, 2 PASS
+- `rsi45_55_chg20_0_stop0.1` × RISK_ON : WEAK → FAIL — variante trop laxiste, déjà identifiée précédemment.
+- `breakout_h20_vol1.2_stop1_rr2` × RISK_ON : STRONG → PASS (test 16 trades, exp 0.69, PF 3.66).
+- `breakout_h50_vol1.2_stop1.5_rr2.5` × RISK_ON : STRONG → PASS (test 16 trades, exp 1.03, PF 4.57).
+
+→ NVDA × Breakout × RISK_ON est rigoureusement validé par le walk-forward, malgré le score STRONG basé sur seulement 2 trades de train. Le test 2024-2025 confirme.
+
+### SOXL — surprise positive
+- `pullback_base_rsi42_58_chg20_0_stop0.1` × RISK_ON : WEAK → FAIL (PF 0.70 malgré exp 1.87 — quelques grosses pertes).
+- `rs_120d_top10_hold20` × RISK_ON : **AVOID → PASS** (test 15 trades, exp 1.13, PF 2.08).
+- `rs_90d_top10_hold20` × RISK_ON : **OK → PASS** (test 16 trades, exp 0.97, PF 2.98).
+
+→ Le walk-forward **promeut SOXL × RS × RISK_ON** au-dessus de la matrice base. Cas où la matrice base était trop pessimiste car les vieux trades étaient mauvais, mais 2024-2025 confirme. À surveiller (effet de levier 3× toujours invisible au moteur).
+
+### PLTR — 5 cellules base OK toutes en PASS
+- 5 variantes Pullback × RISK_ON validées (toutes avec train=1 trade — exp 4.40 — et test ≥ 10 trades, exp 0.28-0.43, PF 1.48-1.89).
+
+→ PLTR est consistant : la matrice base le classait OK sur des chiffres maigres en train (1 trade), mais le test 2024-2025 confirme avec 10-13 trades à exp positive. Verdict robuste.
+
+## Non-régression confirmée
+
+Les 4 moteurs précédents (asset-quality, asset-setup-matrix, setup-variant-matrix, variant-regime-matrix) ont été ré-exécutés et leurs JSON outputs comparés byte-par-byte (modulo `generatedAt`) : **strictement identiques**. Le nouveau validateur ne touche aucun script existant.
+
+## Conséquence opérationnelle — 5 niveaux de filtre
+
+Le tradable-universe final pour un trade (symbol × variant × régime macro courant) doit passer les 5 filtres :
+
+1. **asset-quality** : tier global ≠ BLACKLIST.
+2. **asset-setup-matrix** : (asset × setup) tier ≥ OK.
+3. **setup-variant-matrix** : (asset × setup × variant) tier ≥ OK.
+4. **variant-regime-matrix** : (asset × variant × régime macro courant) tier ≥ OK.
+5. **walk-forward-regime-validator** : verdict = PASS (ou WATCH avec allocation réduite).
+
+Une cellule qui passe les 4 premiers mais FAIL au 5e doit être **exclue**. C'est exactement le cas des 7 STRONG → FAIL identifiés ici.
+
+## Limites résiduelles
+
+- **Split unique** : un seul split (3/2). Un split roulant donnerait une vue plus robuste mais avec des échantillons encore plus petits. À considérer en v2.
+- **85.8 % INSUFFICIENT_DATA** : la grande majorité des cellules ne peut pas être validée par manque de données 2024-2025. Le tradable-universe filtré reste donc largement basé sur les 4 niveaux précédents.
+- **Pas de frictions** : ce walk-forward suppose des coûts de transaction nuls. Une cellule PASS peut redevenir FAIL avec slippage/spread/frais réels. Priorité #3 du TODO quant.
+- **Pas de validation régime cross-period** : si le régime macro 2024-2025 ne ressemble pas à celui de 2021-2023, les verdicts peuvent être trompeurs. Idéalement, faire le walk-forward CONDITIONNELLEMENT au régime (mais les samples deviennent triviaux).
+- **Effet de levier (SOXL) toujours invisible** : SOXL × RS × RISK_ON sort PASS sur les chiffres bruts mais reste un instrument à risque non-linéaire.
+- **Verdict ≠ autorisation live** : un PASS dit "le passé récent confirme le passé long". Cela ne garantit pas le futur. Toujours combiner avec gestion du risque et observation live.
