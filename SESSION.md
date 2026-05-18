@@ -3276,3 +3276,118 @@ Aucun moteur existant modifié. Aucune source amont modifiée. 6 nouveaux fichie
 5. PR future : audit anti-look-ahead spécifique PEAD.
 6. PR future : destruction tests PEAD.
 7. PR future : formalisation v1 si tous les critères passent.
+
+---
+
+# Research Framework Freeze v1
+
+PR de **gel méthodologique pur** (documentation + gouvernance). Aucun moteur. Aucun runtime. Pas de nouveau setup.
+
+Fichiers créés :
+
+```text
+docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md     (13 sections, fait autorité)
+docs/research/SETUP_VALIDATION_CHECKLIST.md       (13 sections A-M, 66 items à cocher)
+docs/research/ANTI_LOOKAHEAD_RULES.md             (9 sections, mémoire des erreurs PR #207)
+docs/research/DATASET_GOVERNANCE.md               (11 sections, règles données)
+```
+
+## Mission
+
+> Comment empêcher ManiTradePro de repartir dans des faux setups et des backtests trompeurs ?
+
+Réponse : un cadre méthodologique strict, documenté et opposable. C'est ce que pose cette PR.
+
+## État honnête du projet au 2026-05-18
+
+**Aucun setup n'est `LIVE_READY`.** Bilan officiel :
+
+| Setup | Statut effectif |
+|---|---|
+| PULLBACK_MOMENTUM | DEAD / DO_NOT_TRADE |
+| BREAKOUT_EXPANSION (agrégé) | DEAD_AGGREGATED |
+| MEAN_REVERSION | EXPERIMENTAL_ONLY |
+| RS_ROTATION simple | RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED |
+| VOLATILITY_COMPRESSION | DEAD / ABANDONED |
+| SECTOR_RELATIVE_STRENGTH v1 | EDGE_DEPENDS_ON_AI_WINNERS |
+| TREND_PULLBACK_DYNAMIC_SUPPORT v1 | FRAGILE |
+| POST_EARNINGS_DRIFT | DATA_INSUFFICIENT |
+
+## Ce qui reste réellement prometteur
+
+- **PEAD** : seule piste structurellement distincte de momentum. Demande dataset earnings non disponible.
+- **RS Rotation simple** : crédible côté exécution mais fragile temporellement. Walk-forward conditionnel régime à faire avant tout passage live.
+
+## Règles imposées par ce gel
+
+### Exécution obligatoire
+- `entry = open[i+1]` (NEXT_OPEN) systématique
+- Stop / TP sur fenêtres EXCLUANT bougie signal
+- Friction obligatoire dès le 1er test (`(0.30 + 0.02 × holdDays) / 5 R`)
+
+### 10 critères minimum pour VALIDATED_RESEARCH_CORE
+- PF post-friction ≥ 1.3
+- Années positives ≥ 4/5
+- Walk-forward ≥ 2/3 splits
+- Inflation PF < ×1.05
+- Edge decay < ×1.5
+- **Top 5 ticker share < 60 %** (nouveau, leçon SECTOR_RS)
+- Stress friction ×2 PF ≥ 1.1
+- Audit anti-look-ahead spécifique passé
+- Trades ≥ 100 sur 5 ans
+- Single-symbol max share < 25 %
+
+### Critères LIVE_READY (différents et supplémentaires)
+- Shadow live ≥ 1 mois
+- Paper trading ≥ 3-6 mois
+- Tracking slippage réel
+- Stabilité multi-régimes (≥ 1 RISK_OFF traversé)
+- Monitoring runtime + dashboard
+- Kill-switch
+- Drawdown controls
+- Portfolio management multi-setup
+- Conformité réglementaire
+
+### Interdictions officielles
+- Optimisation massive de paramètres (> 50 combinaisons sans hypothèse)
+- Cherry-picking de tickers ou de périodes
+- Suppression de friction "pour voir"
+- Suppression de losing years
+- Présentation marketing du PF
+- Annonces LIVE_READY prématurées
+
+### Pipeline de recherche imposé (10 étapes)
+1. Hypothèse documentée
+2. Dataset audit
+3. Prototype simple (1 baseline)
+4. Audit anti-look-ahead
+5. Friction test
+6. Walk-forward strict
+7. Concentration analysis
+8. Stress tests
+9. Classification
+10. Shadow live éventuel
+
+### Cadence imposée
+- Maximum 1 nouvelle famille de setup par 2 semaines
+- Pas de PR de "polissage" sans valeur incrémentale claire
+
+## Classification officielle des setups (8 statuts)
+
+VALIDATED_RESEARCH_CORE | CONDITIONAL_EDGE | EXPERIMENTAL_ONLY | FRAGILE | DEAD | INVALID_BACKTEST | DATA_INSUFFICIENT | RESEARCH_FOUNDATION
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 4 documents ajoutés + SESSION.md. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+## Conséquence opérationnelle
+
+Toute PR future de recherche doit :
+1. Référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` dans son body.
+2. Inclure la checklist `SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+3. Si déviation : marquer explicitement `⚠ DÉVIATION FRAMEWORK FREEZE v1` + justification.
+
+Ce gel met fin à la phase d'exploration tous azimuts. La prochaine PR doit être :
+- soit une décision politique sur le sourcing PEAD,
+- soit une PR strictement conforme au framework,
+- soit une mise à jour du framework lui-même via PR v2 explicite.
