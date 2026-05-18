@@ -1573,3 +1573,23 @@ tools/backtests/output/tradable-universe.json
 ```
 
 et émettre des positions pondérées par tier (A/B/C/D) en respectant des contraintes globales (max N positions simultanées, max exposition par secteur/crypto, max exposition leveraged, etc.). C'est l'étape qui transforme la recherche quant en décisions de sizing concrètes.
+
+---
+
+# Documentation gouvernance agents Claude Code
+
+Documentation ajoutée dans :
+- `GPT_ROLE.md` : section *Claude Code Agents & Skills Governance* + sous-section *Quantitative Governance*. Liste les 7 agents (bug-hunter, claude, claude-code-guide, Explore, general-purpose, Plan, statusline-setup) et les skills, avec rôle, limites, outils, cas d'usage interdits.
+- `CLAUDE.md` : rappel court pointant vers `GPT_ROLE.md` + règle de déclaration en PR.
+- `CHECKLIST_MERGE.md` : nouvelle section *Transparence agents Claude Code* avec checklist obligatoire.
+
+But : que ChatGPT (validateur) sache exactement ce que Claude peut déléguer en arrière-plan et ce qui reste sous responsabilité directe. Empêche qu'une délégation invisible influence un merge quant.
+
+Règles posées :
+- Les agents ne valident jamais les décisions quant.
+- Les agents ne peuvent pas auto-merger.
+- Toute utilisation d'agent dans une PR doit être déclarée.
+- Les moteurs quant restent implémentés directement par Claude, pas par un agent isolé.
+- Aucun merge important sans `GO MERGE` explicite ChatGPT.
+
+Aucun impact runtime. Aucun impact quant. Documentation uniquement.
