@@ -1,6 +1,6 @@
 # Asset Quality Report — ManiTradePro
 
-> Généré le 2026-05-18T07:38:38.474Z par `tools/backtests/asset-quality-engine-v1.mjs`.
+> Généré le 2026-05-18T07:51:55.239Z par `tools/backtests/asset-quality-engine-v1.mjs`.
 
 ## Synthèse
 

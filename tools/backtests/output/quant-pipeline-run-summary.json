@@ -1,0 +1,62 @@
+{
+  "generatedAt": "2026-05-18T07:51:54.525Z",
+  "status": "ok",
+  "totalDurationMs": 5215,
+  "steps": [
+    {
+      "name": "asset-quality-engine-v1",
+      "command": "node tools/backtests/asset-quality-engine-v1.mjs",
+      "durationMs": 757,
+      "output": "tools/backtests/output/asset-quality-report.json",
+      "outputExists": true,
+      "outputModified": true,
+      "status": "ok"
+    },
+    {
+      "name": "asset-setup-matrix-v1",
+      "command": "node tools/backtests/asset-setup-matrix-v1.mjs",
+      "durationMs": 726,
+      "output": "tools/backtests/output/asset-setup-matrix.json",
+      "outputExists": true,
+      "outputModified": true,
+      "status": "ok"
+    },
+    {
+      "name": "setup-variant-matrix-v1",
+      "command": "node tools/backtests/setup-variant-matrix-v1.mjs",
+      "durationMs": 835,
+      "output": "tools/backtests/output/setup-variant-matrix.json",
+      "outputExists": true,
+      "outputModified": true,
+      "status": "ok"
+    },
+    {
+      "name": "variant-regime-matrix-v1",
+      "command": "node tools/backtests/variant-regime-matrix-v1.mjs",
+      "durationMs": 1222,
+      "output": "tools/backtests/output/variant-regime-matrix.json",
+      "outputExists": true,
+      "outputModified": true,
+      "status": "ok"
+    },
+    {
+      "name": "walk-forward-regime-validator-v1",
+      "command": "node tools/backtests/walk-forward-regime-validator-v1.mjs",
+      "durationMs": 944,
+      "output": "tools/backtests/output/walk-forward-regime-validator.json",
+      "outputExists": true,
+      "outputModified": true,
+      "status": "ok"
+    },
+    {
+      "name": "tradable-universe-v1",
+      "command": "node tools/backtests/tradable-universe-v1.mjs",
+      "durationMs": 728,
+      "output": "tools/backtests/output/tradable-universe.json",
+      "outputExists": true,
+      "outputModified": true,
+      "status": "ok"
+    }
+  ],
+  "finalOutput": "tools/backtests/output/tradable-universe.json"
+}

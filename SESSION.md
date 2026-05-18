@@ -1593,3 +1593,41 @@ Règles posées :
 - Aucun merge important sans `GO MERGE` explicite ChatGPT.
 
 Aucun impact runtime. Aucun impact quant. Documentation uniquement.
+
+---
+
+# Orchestrateur quant pipeline v1
+
+Fichier créé :
+
+```text
+tools/backtests/run-quant-pipeline-v1.mjs
+```
+
+Lance séquentiellement les 6 moteurs quant :
+
+1. asset-quality-engine-v1
+2. asset-setup-matrix-v1
+3. setup-variant-matrix-v1
+4. variant-regime-matrix-v1
+5. walk-forward-regime-validator-v1
+6. tradable-universe-v1
+
+Sorties :
+
+- `tools/backtests/output/quant-pipeline-run-summary.json`
+- `tools/backtests/output/quant-pipeline-run-summary.md`
+
+Comportement :
+- Stop net à la première erreur (les étapes suivantes sont marquées `skipped`, pas exécutées).
+- Pour chaque étape : durée mesurée, vérification que l'output attendu existe ET a été modifié pendant le run (mtime > avant). Si non, l'étape est marquée FAIL même si le script renvoie code 0.
+- Exit code 1 si une étape échoue, 0 sinon.
+- Pas de dépendance externe — Node natif (`spawn`).
+
+Durée du premier run sur l'état actuel des sources : **5.2 secondes** (l'orchestrateur ne relance PAS les backtests sources eux-mêmes, qui prennent ~2m23s pour le multi-grid ; il relance les 6 moteurs d'analyse en aval). Pour rafraîchir aussi les backtests sources, les relancer manuellement avant l'orchestrateur.
+
+Non-régression : tous les outputs régénérés par le pipeline sont byte-identiques aux snapshots pré-run (modulo `generatedAt`).
+
+Usage typique :
+- Après un nouveau backtest (RS regime / Pullback / multi-setup-grid), relancer ce pipeline pour rafraîchir les 6 moteurs et le tradable-universe en une commande.
+- Vérifier `quant-pipeline-run-summary.md` pour le statut, les durées et les éventuelles erreurs.

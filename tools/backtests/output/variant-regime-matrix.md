@@ -1,6 +1,6 @@
 # Variant × Regime Matrix — ManiTradePro
 
-> Généré le 2026-05-18T07:38:41.589Z par `tools/backtests/variant-regime-matrix-v1.mjs`.
+> Généré le 2026-05-18T07:51:57.798Z par `tools/backtests/variant-regime-matrix-v1.mjs`.
 
 ## 1. Synthèse globale
 
