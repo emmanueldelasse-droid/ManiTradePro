@@ -1,6 +1,6 @@
 # Friction-Adjusted Report — ManiTradePro
 
-> Généré le 2026-05-18T09:57:02.516Z par `tools/backtests/friction-model-v1.mjs`.
+> Généré le 2026-05-18T10:09:50.872Z par `tools/backtests/friction-model-v1.mjs`.
 
 **⚠ Modèle heuristique v1.** Aucune donnée broker réelle, aucun carnet d'ordre live, aucun barème réel. Les pourcentages sont des hypothèses prudentes par classe d'actif. À recalibrer après paper trading live. Ne pas confondre avec une simulation d'exécution.
 

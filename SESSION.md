@@ -1926,3 +1926,79 @@ Allocation-plan.json et friction-adjusted-report.json sont byte-identiques avant
 - Pas de propagation : ce plan ajusté n'est pas re-bouclé dans `tradable-universe.json`.
 - La renormalisation peut concentrer le portefeuille si beaucoup de positions sont retirées. À surveiller.
 - `Verdict ajusté ≠ autorisation live.`
+
+---
+
+# Theme Classification v2 — concentration cachée révélée
+
+Fichier créé :
+
+```text
+tools/backtests/theme-classification-v2.mjs
+```
+
+Remplace les thèmes larges (`tech_ai`, `crypto`, `defensive_other`) par des sous-thèmes fins (`semis_pure`, `ai_hypergrowth`, `software_saas`, `cybersecurity`, `crypto_layer1`, `us_growth_etf`, etc.) pour révéler la **concentration cachée** dans le portefeuille.
+
+Sorties :
+
+- `tools/backtests/output/theme-classification-v2.json`
+- `tools/backtests/output/theme-classification-v2.md`
+
+## Méthode
+
+- **22 sous-thèmes** définis dans le vocabulaire.
+- **Classification manuelle** maintenue dans le code (CLASSIFICATION dict). Pas de ML, pas de scraping, pas de matrice de covariance — heuristique experte.
+- **Multi-tags par symbole** (NVDA = semis_pure + ai_hypergrowth + mega_cap_tech).
+- Confidence par entrée : HIGH / MEDIUM / LOW / UNKNOWN.
+- La somme des % par thème peut dépasser 100 % (multi-tags), c'est volontaire.
+
+## Découverte clé sur le plan actuel
+
+| Thème | Positions | Poids original | Poids friction-ajusté |
+|---|---:|---:|---:|
+| **us_growth_etf** | 3 (VUG, SPYG, IYW) | **39.75 %** | **43.26 %** |
+| mega_cap_tech | 2 (IYW, ROM) | 17.89 % | 18.21 % |
+| software_saas | 2 (APP, CRWD) | 14.57 % | 14.27 % |
+| crypto_layer1 | 1 (SOL) | 9.27 % | 7.56 % |
+| crypto_correlated_equity | 1 (MSTR) | 9.27 % | 9.08 % |
+| banks_financials | 1 (JPM) | 9.27 % | 9.08 % |
+| precious_metals + macro_defensive | 1 (GLD) | 13.25 % | 12.98 % |
+| leveraged_tech | 1 (ROM) | 4.64 % | 3.79 % |
+| ai_hypergrowth | 1 (APP) | 13.25 % | 12.98 % |
+| quality_growth | 1 (VUG) | 13.25 % | 14.42 % |
+| broad_market | 1 (SPYG) | 13.25 % | 14.42 % |
+| cybersecurity | 1 (CRWD) | 1.32 % | 1.29 % |
+
+→ Le cap `tech_ai 60 %` était respecté (54.32 % original) mais **3 ETF us_growth_etf à eux seuls totalisent 39.75 %** du portefeuille (43.26 % après friction). Le cap large masque cette concentration.
+
+→ Recommandation : ajouter dans `allocation-engine` un cap fin `us_growth_etf ≤ 30 %` et `mega_cap_tech ≤ 25 %` pour bloquer ce type de portefeuille faussement diversifié.
+
+## Warnings levés
+
+- **Sous-thème `us_growth_etf` à 39.75 % (43.26 % après friction)** — concentration cachée derrière le cap large tech_ai 60 %.
+- 3 chevauchements ETF détectés : VUG / SPYG / IYW partagent `us_growth_etf` et `mega_cap_tech`.
+
+## Couverture
+
+- 10 symboles du plan : **10 classifiés HIGH/MEDIUM, 0 inconnus**.
+- 13 sous-thèmes détectés dans le plan actuel.
+- ~180 symboles couverts dans la table de classification (univers ManiTradePro).
+
+## Non-régression confirmée
+
+`allocation-plan.json` et `allocation-plan-friction-adjusted.json` byte-identiques avant/après. Le moteur lit seul.
+
+## Volontairement non intégré au pipeline
+
+Ce moteur ne fait pas partie de `run-quant-pipeline-v1.mjs`. À lancer à la demande quand on veut analyser la concentration thématique fine. Permet de garder la chaîne principale agnostique de la classification.
+
+## Limites
+
+- **Heuristique v2** : classification manuelle, pas de mesure de corrélation réalisée.
+- Toute évolution de l'univers doit être commitée dans le dict `CLASSIFICATION`.
+- Pas de backfill des holdings ETF (QQQ ≈ 40 % mega_cap_tech mais cette exposition cachée n'est pas propagée).
+- Pas d'intégration dans les caps de l'allocation engine. À ajouter dans une PR future si on veut bloquer les portefeuilles us_growth_etf > 30 %.
+
+## Prochaine étape recommandée
+
+Ajouter dans `allocation-engine-v1.mjs` des caps fins par sous-thème, en consommant la classification v2. Permettrait d'éviter automatiquement les portefeuilles faussement diversifiés comme celui-ci (3 ETF us_growth_etf qui pèsent 39 % du capital).

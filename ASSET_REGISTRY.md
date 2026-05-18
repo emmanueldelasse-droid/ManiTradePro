@@ -78,6 +78,18 @@ Sortie : `tools/backtests/output/variant-regime-matrix.{json,md}`.
 
 **Limite à connaître** : la dimension régime n'est exposée que par un seul fichier de backtest (RS rotation regime), et uniquement à un niveau global (pas per-symbol-per-regime individuel). La matrice livre la classification (variant × regime) globale et la comparaison (symbol × variant × ALL_REGIMES vs NO_RISK_OFF) par actif. Pour la décision per-actif-par-régime exacte, un breakdown `bySymbolByRegime` dans les scripts de backtest sera nécessaire.
 
+## Classification thématique fine (v2)
+
+Une classification multi-tags par sous-thème (22 catégories : `semis_pure`, `ai_hypergrowth`, `software_saas`, `cybersecurity`, `crypto_layer1`, `us_growth_etf`, etc.) est maintenue par :
+
+```text
+tools/backtests/theme-classification-v2.mjs
+```
+
+Sortie : `tools/backtests/output/theme-classification-v2.{json,md}`.
+
+Utile pour révéler la concentration cachée que les caps larges du moteur d'allocation (tech_ai 60 %, crypto 25 %, etc.) ne détectent pas. Exemple actuel : 3 ETF `us_growth_etf` totalisent 39 % du portefeuille, masqués sous le tag tech_ai.
+
 ---
 
 # Catégories

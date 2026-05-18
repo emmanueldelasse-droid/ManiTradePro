@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-05-18T09:56:52.850Z",
+  "generatedAt": "2026-05-18T10:09:43.607Z",
   "status": "ok",
-  "totalDurationMs": 9515,
+  "totalDurationMs": 7113,
   "steps": [
     {
       "name": "asset-quality-engine-v1",
       "command": "node tools/backtests/asset-quality-engine-v1.mjs",
-      "durationMs": 2841,
+      "durationMs": 921,
       "output": "tools/backtests/output/asset-quality-report.json",
       "outputExists": true,
       "outputModified": true,
@@ -15,7 +15,7 @@
     {
       "name": "asset-setup-matrix-v1",
       "command": "node tools/backtests/asset-setup-matrix-v1.mjs",
-      "durationMs": 1033,
+      "durationMs": 965,
       "output": "tools/backtests/output/asset-setup-matrix.json",
       "outputExists": true,
       "outputModified": true,
@@ -24,7 +24,7 @@
     {
       "name": "setup-variant-matrix-v1",
       "command": "node tools/backtests/setup-variant-matrix-v1.mjs",
-      "durationMs": 1143,
+      "durationMs": 1392,
       "output": "tools/backtests/output/setup-variant-matrix.json",
       "outputExists": true,
       "outputModified": true,
@@ -33,7 +33,7 @@
     {
       "name": "variant-regime-matrix-v1",
       "command": "node tools/backtests/variant-regime-matrix-v1.mjs",
-      "durationMs": 2205,
+      "durationMs": 1707,
       "output": "tools/backtests/output/variant-regime-matrix.json",
       "outputExists": true,
       "outputModified": true,
@@ -42,7 +42,7 @@
     {
       "name": "walk-forward-regime-validator-v1",
       "command": "node tools/backtests/walk-forward-regime-validator-v1.mjs",
-      "durationMs": 1339,
+      "durationMs": 1149,
       "output": "tools/backtests/output/walk-forward-regime-validator.json",
       "outputExists": true,
       "outputModified": true,
@@ -51,7 +51,7 @@
     {
       "name": "tradable-universe-v1",
       "command": "node tools/backtests/tradable-universe-v1.mjs",
-      "durationMs": 768,
+      "durationMs": 812,
       "output": "tools/backtests/output/tradable-universe.json",
       "outputExists": true,
       "outputModified": true,
@@ -60,7 +60,7 @@
     {
       "name": "allocation-engine-v1",
       "command": "node tools/backtests/allocation-engine-v1.mjs",
-      "durationMs": 167,
+      "durationMs": 163,
       "output": "tools/backtests/output/allocation-plan.json",
       "outputExists": true,
       "outputModified": true,
