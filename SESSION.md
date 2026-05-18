@@ -2599,3 +2599,65 @@ Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajout�
 - Pas d'audit anti-look-ahead pour les autres setups dans cette PR.
 - Pas de friction modélisée dans la simulation.
 - Survivorship audit limité aux symboles UNIVERSE sans OHLC ; les delistés hors univers ne sont pas mesurables sans liste externe.
+
+---
+
+# Setup Execution Bias Audit v1
+
+Fichier créé :
+
+```text
+tools/backtests/setup-execution-bias-audit-v1.mjs
+```
+
+Audit symétrique de l'audit Pullback (PR #207) appliqué aux 3 setups restants : BREAKOUT_EXPANSION, MEAN_REVERSION, RELATIVE_STRENGTH_ROTATION. Pour chaque setup : analyse statique du code + re-simulation avec plusieurs modèles d'entrée alternatifs.
+
+Sorties :
+
+- `tools/backtests/output/setup-execution-bias-audit-v1.json`
+- `tools/backtests/output/setup-execution-bias-audit-v1.md` (14 sections)
+
+## Verdicts par setup
+
+| Setup | Severity | PF CURRENT | PF réaliste | Inflation |
+|---|---|---:|---:|---:|
+| BREAKOUT_EXPANSION | **INVALID_BACKTEST** | 0.92 | 0.91 | ×1.01 |
+| MEAN_REVERSION | **MEDIUM_RISK** | 1.43 | 1.21 | ×1.19 |
+| RELATIVE_STRENGTH_ROTATION | **CLEAN** | 1.58 | 1.57 | ×1.01 |
+
+Pour mémoire : PULLBACK_MOMENTUM = INVALID_BACKTEST (PR #207).
+
+## Lectures clés
+
+- **Breakout** est INVALID — non pas à cause d'un look-ahead massif, mais parce que **le PF agrégé est déjà sous 1**, même avec les biais en place. L'inflation ×1.01 montre que le code Breakout n'a pas de bias d'exécution significatif (`highestHigh` exclut déjà la bougie i, vol MA exclut la bougie i). L'edge n'existe simplement pas à l'échelle de toutes les variantes.
+
+- **GLD × breakout_h20_vol1.5_stop1_rr2** (variante phare, seule STRONG) garde un edge réel : PF 2.38 → 1.80 en NEXT_OPEN. Sur 47 trades seulement, donc statistiquement faible, mais une exception positive dans un setup globalement mort.
+
+- **Mean Reversion** est MEDIUM_RISK : PF 1.43 → 1.21 sans look-ahead. Edge marginal, à confirmer après application de la friction. Déjà grade D dans setup-performance-summary-v1, l'audit confirme la fragilité.
+
+- **RS Rotation** est CLEAN au sens exécution : aucune inflation significative (×1.01). L'edge backtest (PF 1.58) résiste à l'exécution open-suivant. **Mais** le rolling walk-forward montre toujours 0 cellule ROBUST/STABLE — fragilité temporelle indépendante du bias d'exécution. Deux problèmes distincts.
+
+## Synthèse globale
+
+Après les deux audits (PR #207 + cette PR) :
+
+| Setup | Look-ahead audit | Verdict |
+|---|---|---|
+| PULLBACK_MOMENTUM | INVALID_BACKTEST | edge gonflé par entry=ema20 + fenêtres incluant bougie i |
+| BREAKOUT_EXPANSION | INVALID_BACKTEST | edge inexistant à l'agrégé (PF<1), GLD seule exception |
+| MEAN_REVERSION | MEDIUM_RISK | edge marginal, faible inflation, déjà grade D |
+| RELATIVE_STRENGTH_ROTATION | CLEAN | exécution propre, mais fragilité temporelle séparée |
+| VOLATILITY_COMPRESSION | (déjà FAILED) | non audité — PF 0.78 dans setup-performance-summary |
+
+## Recommandation stratégique
+
+3 setups sur 5 sont en HIGH_RISK ou INVALID. La quantité de patches isolés pour corriger Pullback et Breakout devient discutable. L'approche pragmatique :
+
+1. **Conserver RS Rotation** comme seul setup CLEAN execution-wise, mais retravailler sa robustesse temporelle (rolling walk-forward 0/0).
+2. **Conserver GLD × Breakout** comme variante isolée à étudier (single-symbol edge).
+3. **Abandonner Pullback Momentum, Breakout agrégé, Mean Reversion, Volatility Compression** dans une PR séparée mettant à jour `SETUPS_REGISTRY.md`.
+4. **Repenser l'architecture d'exécution** pour les futurs setups : `entry = open[i+1]` systématique, stops sans bougie i, indicateurs causaux par construction.
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
