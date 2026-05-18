@@ -1181,3 +1181,127 @@ Après — extrait des 48 cellules NVDA × Pullback × régime :
 - Walk-forward strict par régime n'est pas implémenté (priorité #2 du TODO quant).
 - L'effet de levier (SOXL) reste invisible — la matrice ne sait toujours pas qu'un ETF 3× a un profil de risque non-linéaire.
 - 180 actifs couverts pour Pullback (vs 108 pour RS — Pullback est plus inclusif car il ouvre sur tout symbole avec le pattern, alors que RS sélectionne top-N).
+
+---
+
+# bySymbolByRegime étendu à Breakout + autres setups du grid — couverture régime per-symbol complète
+
+## Ce qui a été fait
+
+Modification additive de `tools/backtests/backtest-multi-setup-grid.mjs` (le seul script du grid qui écrit un JSON, les autres font console.log). Le grid couvre 4 setups : `PULLBACK_MOMENTUM`, `BREAKOUT_EXPANSION`, `MEAN_REVERSION`, `VOLATILITY_COMPRESSION`. L'ajout profite donc à Breakout (objectif principal) et bonus aux 2 setups non-prioritaires (utile pour les blacklister rigoureusement régime par régime).
+
+- `buildRegimeByDate()` ajoutée (logique identique aux 2 précédents scripts : SPY/QQQ/SMH EMA200, RANGE par défaut). Adaptée à la structure `c.time` du script.
+- Champ `regime` tagué à chaque trade dans `runSetupVariantOnSymbol`.
+- `runAll` produit un nouvel agrégat `bySymbolByRegime[]` dans `overall` et `yearly[year]`, modes `ALL_REGIMES` et `NO_RISK_OFF` (post-hoc). Pas de `RISK_ON_ONLY` car aucun setup du grid ne filtre par régime à l'ouverture.
+- Cellules avec 0 trade omises.
+- Walker `variant-regime-matrix-v1.mjs` non modifié — le fix de la PR #190 suffit pour la structure overall-as-object du grid.
+
+## Résultat global
+
+| Niveau | PR #189 | PR #190 | **Maintenant** |
+|---|---:|---:|---:|
+| Cellules globales | 12 | 12 | 12 |
+| Cellules per-symbol | 888 | 8 835 | **17 088** |
+| Actifs couverts | 108 | 180 | **181** |
+| Variants couverts | 2 | 12 | **27** |
+| Setups couverts | 1 (RS) | 2 (+ Pullback) | **5** (+ Breakout + MeanRev + VolComp) |
+| STRONG per-symbol | 103 | 811 | **1 128** |
+| OK per-symbol | 66 | 1 038 | **2 003** |
+
+## Analyse Breakout par régime
+
+### Distribution NO_RISK_OFF (RANGE vs RISK_ON)
+
+| Régime | STRONG | OK | WEAK | AVOID | Total | % exploitable |
+|---|---:|---:|---:|---:|---:|---:|
+| RANGE | 3 | 44 | 64 | 413 | 524 | **9 %** |
+| RISK_ON | 9 | 53 | 72 | 490 | 624 | **10 %** |
+
+→ **Surprise** : Breakout n'est **pas particulièrement meilleur en RANGE qu'en RISK_ON** (contrairement à RS rotation où RANGE > RISK_ON). Les deux régimes ont un taux similaire de cellules exploitables (~10 %). Cette découverte invalide l'intuition initiale.
+
+### Toxicité RISK_OFF confirmée
+
+| Régime | STRONG | OK | WEAK | AVOID | Cellules | Exp pondérée |
+|---|---:|---:|---:|---:|---:|---:|
+| RISK_OFF (mode ALL_REGIMES) | 0 | 7 | 4 | 107 | 118 | 0.10 |
+
+→ **90 % des cellules Breakout en RISK_OFF sont AVOID**. Seules 7 cellules OK (toutes avec peu de trades). Breakout doit être bloqué macro en RISK_OFF — confirme l'hypothèse.
+
+### Comparaison h20 vs h50
+
+| Famille | STRONG | OK | Total cellules | % STRONG+OK |
+|---|---:|---:|---:|---:|
+| breakout_h20 | 9 | 63 | 581 | **12 %** |
+| breakout_h50 | 3 | 34 | 567 | **7 %** |
+
+→ **h20 nettement supérieur à h50**. Cohérent avec la matrice setup-variant qui listait toutes les variantes h50 dans les "variantes à abandonner".
+
+## Cas notables des actifs focus
+
+### NVDA × Breakout — 4 cellules STRONG/OK toutes en RISK_ON
+
+| Variante | Régime | Tier | Trades | Exp | PF |
+|---|---|---|---:|---:|---:|
+| breakout_h20_vol1.2_stop1_rr2 | RISK_ON | STRONG (70) | 18 | 0.50 | 3.25 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | RISK_ON | STRONG (70) | 18 | 0.86 | 4.06 |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | RISK_ON | OK (68) | 9 | 1.06 | 8.33 |
+
+→ **NVDA × Breakout fonctionne en RISK_ON, pas en RANGE**. Comportement opposé à NVDA × Pullback (qui fonctionne en RANGE). Le moteur peut maintenant orchestrer : NVDA → Pullback si RANGE, Breakout si RISK_ON.
+
+### SOL × Breakout — 5 cellules STRONG/OK, 3 en RANGE
+
+| Variante | Régime | Tier | Trades | Exp |
+|---|---|---|---:|---:|
+| breakout_h50_vol1.5_stop1.5_rr2.5 | RANGE | STRONG (70) | 22 | 0.87 |
+| breakout_h20_vol1.5_stop1_rr2 | RANGE | STRONG (70) | 23 | 0.70 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | RANGE | OK (65) | 26 | 0.79 |
+| breakout_h20_vol1.2_stop1_rr2 | RANGE | OK (65) | 27 | 0.63 |
+| breakout_h20_vol1.2_stop1_rr2 | RISK_ON | OK (55) | 33 | 0.30 |
+
+→ SOL × Breakout est plus polyvalent que NVDA — exploitable dans plusieurs régimes.
+
+### COIN, MSTR × Breakout — exclusivement RISK_ON
+
+Similaire à NVDA : leurs cellules STRONG/OK sont concentrées en RISK_ON. Cohérent (crypto-correlated, leveraged stocks).
+
+### ASML × Breakout — aucune cellule exploitable
+
+ASML est listé dans SETUPS_REGISTRY comme actif Breakout-compatible, mais la matrice per-régime ne retrouve **aucune cellule STRONG/OK** pour ASML × Breakout, quel que soit le régime. **L'intuition initiale est invalidée par les chiffres.** ASML reste exploitable en Pullback (cf. matrices précédentes) mais pas en Breakout.
+
+### BTC × Breakout — 1 cellule OK seulement
+
+Une seule cellule (breakout_h50 × RANGE, exp 0.21, PF 1.84). BTC × Breakout est marginal. À privilégier sur d'autres setups.
+
+### SMH × Breakout — 2 cellules OK en RISK_ON (échantillons très petits)
+
+SMH × Breakout n'a pas assez d'échantillon pour conclure. Pullback reste le setup de référence pour SMH.
+
+## Non-régression confirmée
+
+- `results-multi-setup-grid.json` : tous les champs existants byte-identiques (modulo `createdAt`). Seul `bySymbolByRegime` ajouté.
+- `asset-quality-report`, `asset-setup-matrix`, `setup-variant-matrix` : JSON outputs byte-identiques après re-run.
+- Walker `variant-regime-matrix-v1.mjs` non modifié — le fix de la PR #190 suffit.
+
+## Limites résiduelles
+
+- **MEAN_REVERSION et VOLATILITY_COMPRESSION** sont maintenant couverts par hasard (le multi-grid les inclut). Utile pour les blacklister rigoureusement, pas pour les promouvoir.
+- **Walk-forward strict par régime** : toujours pas implémenté (priorité #2 du TODO quant). Une cellule STRONG sur l'historique reste susceptible de surajustement, surtout pour Breakout dont certaines variantes ont des PF = 999 (zéro pertes sur petit échantillon).
+- **Effet de levier (SOXL)** : reste invisible au moteur.
+- **Échantillons petits** : beaucoup de cellules Breakout × Régime ont < 20 trades. La confiance HIGH/MEDIUM/LOW dans le scoring est utile mais ne remplace pas un walk-forward.
+
+## Conséquence opérationnelle
+
+Le moteur peut maintenant orchestrer une décision per-(actif × setup × variante × régime) pour les 2 setups validés (Pullback, RS, et désormais Breakout). Exemple complet :
+
+> Opportunité NVDA aujourd'hui. Régime macro actuel : RANGE.
+> - NVDA × Pullback × RANGE : STRONG (plusieurs variantes) → autorisé
+> - NVDA × Breakout × RANGE : AVOID → bloqué (les STRONG NVDA × Breakout sont en RISK_ON)
+> - NVDA × RS × RANGE : AVOID → bloqué
+> Décision : ouvrir en Pullback uniquement.
+
+> Opportunité NVDA demain. Régime macro bascule en RISK_ON.
+> - NVDA × Pullback × RISK_ON : 1 STRONG, 1 AVOID, 1 WEAK selon variante → choisir variante STRONG
+> - NVDA × Breakout × RISK_ON : 4 STRONG/OK → AUTORISÉ
+> Décision : ouvrir en Pullback ET surveiller Breakout pour second signal.
+
+C'est exactement le niveau de granularité que l'allocation dynamique (priorité #4 du TODO quant) attendra pour fonctionner.

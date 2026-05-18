@@ -1,12 +1,12 @@
 # Variant × Regime Matrix — ManiTradePro
 
-> Généré le 2026-05-17T23:03:15.086Z par `tools/backtests/variant-regime-matrix-v1.mjs`.
+> Généré le 2026-05-18T06:32:12.112Z par `tools/backtests/variant-regime-matrix-v1.mjs`.
 
 ## 1. Synthèse globale
 
 **Limite résiduelle** : la dimension régime n'est exposée que par `results-relative-strength-rotation-regime-v1.json`. Seules **2 variantes RS** ont un breakdown régime complet (`rs_90d_top10_hold20`, `rs_120d_top10_hold20`). Les autres setups (Pullback, Breakout, etc.) ne sont **pas couverts** par cette matrice tant que leurs scripts de backtest n'auront pas été étendus.
 
-**Breakdown per-(symbol × variant × regimeMode × regime) disponible** depuis l'ajout de `bySymbolByRegime[]` à la source RS regime. La matrice per-symbol expose `8835` cellules sur `180` actifs × `12` variantes (cf. sections 7 et 7-bis).
+**Breakdown per-(symbol × variant × regimeMode × regime) disponible** depuis l'ajout de `bySymbolByRegime[]` à la source RS regime. La matrice per-symbol expose `17088` cellules sur `181` actifs × `27` variantes (cf. sections 7 et 7-bis).
 
 - Cellules globales (variant × regimeMode × regime) : **12**
 - Variantes couvertes : rs_120d_top10_hold20, rs_90d_top10_hold20
@@ -83,6 +83,60 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | STRONG | 72 | 10 | 40.0% | 0.93 | 2.66 | n/a | 2.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 72 | 22 | 27.3% | 0.85 | 2.57 | n/a | 9.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | STRONG | 72 | 10 | 40.0% | 0.93 | 2.66 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 23 | 6 | 33.3% | 0.17 | 1.33 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | STRONG | 70 | 18 | 50.0% | 0.50 | 3.25 | n/a | 3.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 23 | 6 | 33.3% | 0.17 | 1.33 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | STRONG | 70 | 18 | 50.0% | 0.50 | 3.25 | n/a | 3.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RANGE | WEAK | 35 | 4 | 50.0% | 0.50 | 2.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_ON | OK | 63 | 9 | 55.6% | 0.67 | 6.67 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RANGE | WEAK | 35 | 4 | 50.0% | 0.50 | 2.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RISK_ON | OK | 63 | 9 | 55.6% | 0.67 | 6.67 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 3 | 6 | 0.0% | -0.33 | 0.00 | n/a | 2.00 | exp -0.33 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | STRONG | 70 | 18 | 50.0% | 0.86 | 4.06 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 3 | 6 | 0.0% | -0.33 | 0.00 | n/a | 2.00 | exp -0.33 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | STRONG | 70 | 18 | 50.0% | 0.86 | 4.06 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 0 | 4 | 0.0% | -0.50 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | OK | 68 | 9 | 55.6% | 1.06 | 8.33 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 4 | 0.0% | -0.50 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | OK | 68 | 9 | 55.6% | 1.06 | 8.33 | n/a | 2.00 | — |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 10 | 15 | 20.0% | -0.16 | 0.60 | n/a | 5.00 | exp -0.16 ; PF 0.60 < 1 |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 15 | 20.0% | -0.16 | 0.60 | n/a | 5.00 | exp -0.16 ; PF 0.60 < 1 |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RANGE | AVOID | 20 | 1 | 100.0% | 1.50 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 15 | 6.7% | -0.37 | 0.21 | n/a | 7.00 | exp -0.37 ; PF 0.21 < 1 |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RANGE | AVOID | 20 | 1 | 100.0% | 1.50 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 15 | 6.7% | -0.37 | 0.21 | n/a | 7.00 | exp -0.37 ; PF 0.21 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 20 | 2 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 6 | 33.3% | -0.27 | 0.30 | n/a | 3.00 | RISK_OFF destructeur ; exp -0.27 ; PF 0.30 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 15 | 17 | 29.4% | 0.00 | 1.00 | n/a | 5.00 | exp 0.00 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 20 | 2 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 17 | 29.4% | 0.00 | 1.00 | n/a | 5.00 | exp 0.00 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | OK | 65 | 22 | 27.3% | 0.85 | 2.57 | n/a | 9.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 3 | 33.3% | 0.61 | 1.92 | n/a | 2.00 | échantillon < 5 trades |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | OK | 62 | 11 | 36.4% | 0.75 | 2.42 | n/a | 2.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | OK | 65 | 22 | 27.3% | 0.85 | 2.57 | n/a | 9.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | OK | 62 | 11 | 36.4% | 0.75 | 2.42 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | STRONG | 70 | 19 | 31.6% | 1.03 | 2.77 | n/a | 9.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_OFF | WEAK | 40 | 2 | 50.0% | 1.42 | 3.83 | n/a | 1.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | OK | 58 | 9 | 33.3% | 0.80 | 2.20 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 70 | 19 | 31.6% | 1.03 | 2.77 | n/a | 9.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | OK | 58 | 9 | 33.3% | 0.80 | 2.20 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | OK | 57 | 10 | 40.0% | 0.74 | 2.79 | n/a | 4.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_OFF | WEAK | 35 | 2 | 50.0% | 0.62 | 2.24 | n/a | 1.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 48 | 8 | 50.0% | 1.19 | 0.91 | n/a | 2.00 | PF 0.91 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | OK | 57 | 10 | 40.0% | 0.74 | 2.79 | n/a | 4.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 48 | 8 | 50.0% | 1.19 | 0.91 | n/a | 2.00 | PF 0.91 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | OK | 65 | 17 | 29.4% | 1.11 | 2.64 | n/a | 9.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_OFF | WEAK | 40 | 2 | 50.0% | 1.42 | 3.83 | n/a | 1.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 0 | 4 | 25.0% | 0.68 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | OK | 65 | 17 | 29.4% | 1.11 | 2.64 | n/a | 9.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 0 | 4 | 25.0% | 0.68 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | OK | 57 | 10 | 40.0% | 0.74 | 2.79 | n/a | 4.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_OFF | WEAK | 35 | 2 | 50.0% | 0.62 | 2.24 | n/a | 1.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 20 | 4 | 75.0% | 2.45 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | OK | 57 | 10 | 40.0% | 0.74 | 2.79 | n/a | 4.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 20 | 4 | 75.0% | 2.45 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
 | rs_120d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 50 | 19 | 63.2% | -0.11 | 6.78 | -2.08 | 29.98 | exp -0.11 |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 13 | 7 | 57.1% | -3.89 | 0.23 | -27.27 | 35.20 | exp -3.89 ; PF 0.23 < 1 |
 | rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 50 | 19 | 63.2% | -0.11 | 6.78 | -2.08 | 29.98 | exp -0.11 |
@@ -146,6 +200,48 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 62 | 13 | 69.2% | 1.87 | 0.70 | n/a | 3.00 | PF 0.70 < 1 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | WEAK | 56 | 5 | 80.0% | 2.14 | n/a | n/a | 0.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 62 | 13 | 69.2% | 1.87 | 0.70 | n/a | 3.00 | PF 0.70 < 1 |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 12 | 10 | 30.0% | -0.10 | 1.00 | n/a | 2.00 | exp -0.10 |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 12 | 10 | 30.0% | -0.10 | 1.00 | n/a | 2.00 | exp -0.10 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 20 | 1 | 100.0% | 2.50 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 7 | 10 | 10.0% | -0.35 | 0.30 | n/a | 3.00 | exp -0.35 ; PF 0.30 < 1 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 20 | 1 | 100.0% | 2.50 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 7 | 10 | 10.0% | -0.35 | 0.30 | n/a | 3.00 | exp -0.35 ; PF 0.30 < 1 |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 0 | 4 | 50.0% | 0.10 | 0.80 | n/a | 1.00 | échantillon < 5 trades ; PF 0.80 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | OK | 68 | 5 | 80.0% | 0.76 | 3.60 | n/a | 1.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 0 | 4 | 50.0% | 0.10 | 0.80 | n/a | 1.00 | échantillon < 5 trades ; PF 0.80 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | WEAK | 48 | 5 | 80.0% | 2.14 | n/a | n/a | 0.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 2 | 100.0% | 5.19 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | WEAK | 65 | 15 | 66.7% | 1.67 | 1.00 | n/a | 3.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | WEAK | 48 | 5 | 80.0% | 2.14 | n/a | n/a | 0.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | WEAK | 65 | 15 | 66.7% | 1.67 | 1.00 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | AVOID | 20 | 4 | 75.0% | 2.08 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 7.72 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | WEAK | 62 | 10 | 70.0% | 1.95 | 1.06 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 20 | 4 | 75.0% | 2.08 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | WEAK | 62 | 10 | 70.0% | 1.95 | 1.06 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | AVOID | 15 | 2 | 50.0% | 1.31 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 3.31 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 48 | 9 | 66.7% | 1.17 | 0.69 | n/a | 2.00 | PF 0.69 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 15 | 2 | 50.0% | 1.31 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 48 | 9 | 66.7% | 1.17 | 0.69 | n/a | 2.00 | PF 0.69 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | AVOID | 20 | 4 | 75.0% | 2.08 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 7.72 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | OK | 73 | 8 | 75.0% | 2.36 | 1.87 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 20 | 4 | 75.0% | 2.08 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | OK | 73 | 8 | 75.0% | 2.36 | 1.87 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | AVOID | 15 | 2 | 50.0% | 1.31 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 3.31 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | OK | 65 | 8 | 75.0% | 1.45 | 1.22 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 15 | 2 | 50.0% | 1.31 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | OK | 65 | 8 | 75.0% | 1.45 | 1.22 | n/a | 1.00 | — |
 | rs_120d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 28 | 1 | 100.0% | 1.58 | n/a | 1.58 | 0.00 | échantillon < 5 trades |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 40 | 19 | 47.4% | -0.20 | 1.64 | -3.81 | 14.69 | exp -0.20 |
 | rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 28 | 1 | 100.0% | 1.58 | n/a | 1.58 | 0.00 | échantillon < 5 trades |
@@ -211,6 +307,62 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 15 | 38 | 13.2% | -0.46 | 0.51 | n/a | 9.14 | exp -0.46 ; PF 0.51 < 1 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 10 | 20 | 25.0% | -0.09 | 0.88 | n/a | 12.00 | exp -0.09 ; PF 0.88 < 1 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 38 | 13.2% | -0.46 | 0.51 | n/a | 9.14 | exp -0.46 ; PF 0.51 < 1 |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | OK | 57 | 12 | 41.7% | 0.67 | 4.58 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | WEAK | 43 | 20 | 30.0% | 0.10 | 1.50 | n/a | 3.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | OK | 57 | 12 | 41.7% | 0.67 | 4.58 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | WEAK | 43 | 20 | 30.0% | 0.10 | 1.50 | n/a | 3.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RANGE | WEAK | 38 | 9 | 22.2% | 0.22 | 1.78 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_ON | OK | 57 | 11 | 45.5% | 0.46 | 2.27 | n/a | 1.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RANGE | WEAK | 38 | 9 | 22.2% | 0.22 | 1.78 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RISK_ON | OK | 57 | 11 | 45.5% | 0.46 | 2.27 | n/a | 1.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | WEAK | 43 | 9 | 55.6% | 1.39 | n/a | n/a | 0.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 20 | 15.0% | -0.07 | 0.56 | n/a | 3.00 | exp -0.07 ; PF 0.56 < 1 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | WEAK | 43 | 9 | 55.6% | 1.39 | n/a | n/a | 0.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 20 | 15.0% | -0.07 | 0.56 | n/a | 3.00 | exp -0.07 ; PF 0.56 < 1 |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 28 | 6 | 33.3% | 0.83 | n/a | n/a | 0.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 15 | 11 | 18.2% | 0.00 | 0.55 | n/a | 2.00 | PF 0.55 < 1 |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 28 | 6 | 33.3% | 0.83 | n/a | n/a | 0.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 11 | 18.2% | 0.00 | 0.55 | n/a | 2.00 | PF 0.55 < 1 |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 20 | 4 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 7 | 14 | 28.6% | -0.09 | 0.80 | n/a | 6.00 | exp -0.09 ; PF 0.80 < 1 |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 20 | 4 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 7 | 14 | 28.6% | -0.09 | 0.80 | n/a | 6.00 | exp -0.09 ; PF 0.80 < 1 |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RANGE | AVOID | 20 | 4 | 100.0% | 1.50 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_ON | AVOID | 7 | 14 | 21.4% | -0.04 | 0.90 | n/a | 5.00 | exp -0.04 ; PF 0.90 < 1 |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RANGE | AVOID | 20 | 4 | 100.0% | 1.50 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RISK_ON | AVOID | 7 | 14 | 21.4% | -0.04 | 0.90 | n/a | 5.00 | exp -0.04 ; PF 0.90 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 20 | 4 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 5 | 40.0% | -0.12 | 0.84 | n/a | 1.00 | RISK_OFF destructeur ; exp -0.12 ; PF 0.84 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_ON | WEAK | 30 | 16 | 37.5% | 0.08 | 1.20 | n/a | 6.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 20 | 4 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | WEAK | 30 | 16 | 37.5% | 0.08 | 1.20 | n/a | 6.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | AVOID | 10 | 20 | 25.0% | -0.09 | 0.88 | n/a | 12.00 | exp -0.09 ; PF 0.88 < 1 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_OFF | WEAK | 48 | 6 | 66.7% | 5.36 | n/a | n/a | 0.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 20 | 43 | 18.6% | -0.27 | 0.90 | n/a | 9.14 | exp -0.27 ; PF 0.90 < 1 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 10 | 20 | 25.0% | -0.09 | 0.88 | n/a | 12.00 | exp -0.09 ; PF 0.88 < 1 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 20 | 43 | 18.6% | -0.27 | 0.90 | n/a | 9.14 | exp -0.27 ; PF 0.90 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | AVOID | 10 | 16 | 25.0% | -0.08 | 0.91 | n/a | 9.00 | exp -0.08 ; PF 0.91 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_OFF | WEAK | 48 | 5 | 60.0% | 6.01 | n/a | n/a | 0.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 25 | 31 | 19.4% | -0.21 | 1.02 | n/a | 8.14 | exp -0.21 |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 10 | 16 | 25.0% | -0.08 | 0.91 | n/a | 9.00 | exp -0.08 ; PF 0.91 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 25 | 31 | 19.4% | -0.21 | 1.02 | n/a | 8.14 | exp -0.21 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | AVOID | 3 | 9 | 11.1% | -0.68 | 0.24 | n/a | 7.00 | exp -0.68 ; PF 0.24 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 3 | 100.0% | 4.12 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | WEAK | 43 | 26 | 23.1% | 0.03 | 1.81 | n/a | 7.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 3 | 9 | 11.1% | -0.68 | 0.24 | n/a | 7.00 | exp -0.68 ; PF 0.24 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | WEAK | 43 | 26 | 23.1% | 0.03 | 1.81 | n/a | 7.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | AVOID | 7 | 10 | 20.0% | -0.14 | 0.82 | n/a | 5.00 | exp -0.14 ; PF 0.82 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 5 | 3 | 33.3% | 2.38 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 15 | 22 | 13.6% | -0.35 | 1.00 | n/a | 8.00 | exp -0.35 |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 7 | 10 | 20.0% | -0.14 | 0.82 | n/a | 5.00 | exp -0.14 ; PF 0.82 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 22 | 13.6% | -0.35 | 1.00 | n/a | 8.00 | exp -0.35 |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | AVOID | 3 | 6 | 16.7% | -0.52 | 0.40 | n/a | 4.00 | exp -0.52 ; PF 0.40 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 3.46 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 22 | 18.2% | -0.04 | 0.81 | n/a | 6.00 | exp -0.04 ; PF 0.81 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 3 | 6 | 16.7% | -0.52 | 0.40 | n/a | 4.00 | exp -0.52 ; PF 0.40 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 22 | 18.2% | -0.04 | 0.81 | n/a | 6.00 | exp -0.04 ; PF 0.81 < 1 |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | AVOID | 13 | 1 | 100.0% | 0.45 | n/a | 0.45 | 0.00 | échantillon < 5 trades |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | OK | 72 | 5 | 60.0% | 0.64 | 5.82 | 3.23 | 2.30 | — |
 | rs_120d_top10_hold20 | NO_RISK_OFF | RISK_ON | OK | 72 | 5 | 60.0% | 0.64 | 5.82 | 3.23 | 2.30 | — |
@@ -274,6 +426,55 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | OK | 59 | 14 | 42.9% | 0.61 | 1.59 | n/a | 3.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 82 | 10 | 50.0% | 2.87 | 9.80 | n/a | 2.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | OK | 59 | 14 | 42.9% | 0.61 | 1.59 | n/a | 3.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 7 | 12 | 25.0% | 0.00 | 0.67 | n/a | 5.00 | exp 0.00 ; PF 0.67 < 1 |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | WEAK | 30 | 27 | 29.6% | 0.11 | 1.36 | n/a | 5.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 7 | 12 | 25.0% | 0.00 | 0.67 | n/a | 5.00 | exp 0.00 ; PF 0.67 < 1 |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | WEAK | 30 | 27 | 29.6% | 0.11 | 1.36 | n/a | 5.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RANGE | WEAK | 35 | 9 | 33.3% | 0.33 | 1.33 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_ON | WEAK | 35 | 22 | 31.8% | 0.18 | 1.41 | n/a | 4.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RANGE | WEAK | 35 | 9 | 33.3% | 0.33 | 1.33 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RISK_ON | WEAK | 35 | 22 | 31.8% | 0.18 | 1.41 | n/a | 4.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 7 | 11 | 9.1% | -0.05 | 0.68 | n/a | 3.00 | exp -0.05 ; PF 0.68 < 1 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 22 | 22 | 18.2% | -0.00 | 1.34 | n/a | 6.00 | exp -0.00 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 7 | 11 | 9.1% | -0.05 | 0.68 | n/a | 3.00 | exp -0.05 ; PF 0.68 < 1 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 22 | 22 | 18.2% | -0.00 | 1.34 | n/a | 6.00 | exp -0.00 |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RANGE | WEAK | 31 | 8 | 12.5% | 0.19 | 1.88 | n/a | 1.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | WEAK | 38 | 17 | 23.5% | 0.18 | 1.63 | n/a | 3.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | WEAK | 31 | 8 | 12.5% | 0.19 | 1.88 | n/a | 1.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | WEAK | 38 | 17 | 23.5% | 0.18 | 1.63 | n/a | 3.00 | — |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | WEAK | 45 | 3 | 66.7% | 1.00 | 4.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | WEAK | 45 | 3 | 66.7% | 1.00 | 4.00 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RANGE | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | WEAK | 30 | 3 | 66.7% | 0.47 | 2.40 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | WEAK | 40 | 4 | 75.0% | 0.65 | 3.60 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 3 | 6 | 0.0% | -0.83 | 0.00 | n/a | 4.00 | exp -0.83 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | WEAK | 30 | 3 | 66.7% | 0.47 | 2.40 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 3 | 6 | 0.0% | -0.83 | 0.00 | n/a | 4.00 | exp -0.83 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | STRONG | 72 | 10 | 50.0% | 2.87 | 9.80 | n/a | 2.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | OK | 52 | 14 | 42.9% | 0.61 | 1.59 | n/a | 3.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 72 | 10 | 50.0% | 2.87 | 9.80 | n/a | 2.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | OK | 52 | 14 | 42.9% | 0.61 | 1.59 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | STRONG | 72 | 10 | 50.0% | 2.87 | 9.80 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | OK | 57 | 13 | 46.2% | 0.73 | 1.89 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 72 | 10 | 50.0% | 2.87 | 9.80 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | OK | 57 | 13 | 46.2% | 0.73 | 1.89 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | STRONG | 72 | 10 | 50.0% | 1.34 | 4.90 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | OK | 73 | 8 | 87.5% | 1.80 | 10.92 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | STRONG | 72 | 10 | 50.0% | 1.34 | 4.90 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | OK | 73 | 8 | 87.5% | 1.80 | 10.92 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | OK | 58 | 9 | 44.4% | 2.93 | 9.80 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | OK | 52 | 10 | 40.0% | 0.63 | 1.53 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | OK | 58 | 9 | 44.4% | 2.93 | 9.80 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | OK | 52 | 10 | 40.0% | 0.63 | 1.53 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | OK | 58 | 9 | 44.4% | 1.30 | 4.90 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | OK | 73 | 7 | 85.7% | 1.82 | 10.92 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | OK | 58 | 9 | 44.4% | 1.30 | 4.90 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | OK | 73 | 7 | 85.7% | 1.82 | 10.92 | n/a | 1.00 | — |
 | rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 89 | 13 | 76.9% | 1.44 | 2.49 | 18.70 | 5.79 | — |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | WEAK | 55 | 3 | 66.7% | 4.10 | 65.79 | 12.31 | 0.19 | échantillon < 5 trades |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 95 | 21 | 81.0% | 2.99 | 9.35 | 62.88 | 6.62 | — |
@@ -331,6 +532,61 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 15 | 25 | 20.0% | -0.27 | 0.66 | n/a | 10.00 | exp -0.27 ; PF 0.66 < 1 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | OK | 52 | 7 | 42.9% | 0.70 | 1.43 | n/a | 2.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 25 | 20.0% | -0.27 | 0.66 | n/a | 10.00 | exp -0.27 ; PF 0.66 < 1 |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 0 | 4 | 0.0% | -0.25 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | OK | 55 | 28 | 39.3% | 0.39 | 2.13 | n/a | 5.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 0 | 4 | 0.0% | -0.25 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | OK | 55 | 28 | 39.3% | 0.39 | 2.13 | n/a | 5.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 0 | 3 | 0.0% | -0.33 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_ON | OK | 55 | 19 | 36.8% | 0.42 | 2.70 | n/a | 3.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 0 | 3 | 0.0% | -0.33 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RISK_ON | OK | 55 | 19 | 36.8% | 0.42 | 2.70 | n/a | 3.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 0 | 3 | 0.0% | -0.33 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | OK | 65 | 25 | 40.0% | 0.76 | 4.38 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 3 | 0.0% | -0.33 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | OK | 65 | 25 | 40.0% | 0.76 | 4.38 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 0 | 2 | 0.0% | -0.50 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | OK | 65 | 17 | 29.4% | 0.50 | 3.90 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 2 | 0.0% | -0.50 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | OK | 65 | 17 | 29.4% | 0.50 | 3.90 | n/a | 2.00 | — |
+| compression_20_ratio0.65_break20_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.65_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_20_ratio0.65_break20_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.65_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 0 | 3 | 33.3% | 0.33 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 0 | 3 | 33.3% | 0.33 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 15 | 2 | 50.0% | 1.25 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 2 | 50.0% | 1.25 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 3 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RANGE | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 3 | 33.3% | 0.50 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | AVOID | 15 | 3 | 66.7% | 0.80 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 15 | 40.0% | -0.12 | 0.67 | n/a | 5.80 | RISK_OFF destructeur ; exp -0.12 ; PF 0.67 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | AVOID | 15 | 3 | 66.7% | 0.80 | 0.00 | n/a | 0.00 | échantillon < 5 trades |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | WEAK | 45 | 7 | 42.9% | 0.70 | 1.43 | n/a | 2.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 15 | 25 | 20.0% | -0.27 | 0.66 | n/a | 10.00 | exp -0.27 ; PF 0.66 < 1 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | WEAK | 45 | 7 | 42.9% | 0.70 | 1.43 | n/a | 2.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 25 | 20.0% | -0.27 | 0.66 | n/a | 10.00 | exp -0.27 ; PF 0.66 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | WEAK | 45 | 7 | 42.9% | 0.70 | 1.43 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 15 | 24 | 20.8% | -0.24 | 0.73 | n/a | 10.00 | exp -0.24 ; PF 0.73 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | WEAK | 45 | 7 | 42.9% | 0.70 | 1.43 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 24 | 20.8% | -0.24 | 0.73 | n/a | 10.00 | exp -0.24 ; PF 0.73 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | AVOID | 0 | 3 | 33.3% | 0.13 | 1.19 | n/a | 2.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 17 | 17.6% | -0.16 | 0.85 | n/a | 4.00 | exp -0.16 ; PF 0.85 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 3 | 33.3% | 0.13 | 1.19 | n/a | 2.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 17 | 17.6% | -0.16 | 0.85 | n/a | 4.00 | exp -0.16 ; PF 0.85 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | AVOID | 18 | 5 | 40.0% | 0.32 | 0.00 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 15 | 22 | 22.7% | -0.17 | 0.88 | n/a | 10.00 | exp -0.17 ; PF 0.88 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 18 | 5 | 40.0% | 0.32 | 0.00 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 22 | 22.7% | -0.17 | 0.88 | n/a | 10.00 | exp -0.17 ; PF 0.88 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 22 | 15 | 20.0% | -0.05 | 1.25 | n/a | 3.00 | exp -0.05 |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 22 | 15 | 20.0% | -0.05 | 1.25 | n/a | 3.00 | exp -0.05 |
 | rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 90 | 18 | 61.1% | 1.46 | 3.15 | 26.27 | 7.06 | — |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | WEAK | 55 | 3 | 66.7% | 4.15 | 8.16 | 12.46 | 1.74 | échantillon < 5 trades |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 95 | 25 | 72.0% | 2.89 | 9.51 | 72.12 | 6.59 | — |
@@ -389,6 +645,68 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 27 | 17 | 17.6% | -0.03 | 1.49 | n/a | 4.00 | exp -0.03 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 32 | 7 | 42.9% | 0.66 | 0.67 | n/a | 4.00 | PF 0.67 < 1 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 27 | 17 | 17.6% | -0.03 | 1.49 | n/a | 4.00 | exp -0.03 |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 23 | 17 | 29.4% | 0.00 | 1.09 | n/a | 4.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_OFF | OK | 63 | 6 | 50.0% | 0.83 | 6.00 | n/a | 1.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | STRONG | 72 | 13 | 61.5% | 0.92 | 6.15 | n/a | 1.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 23 | 17 | 29.4% | 0.00 | 1.09 | n/a | 4.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | STRONG | 72 | 13 | 61.5% | 0.92 | 6.15 | n/a | 1.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RANGE | WEAK | 34 | 10 | 40.0% | 0.20 | 1.47 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 15 | 4 | 50.0% | 1.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_ON | STRONG | 72 | 11 | 63.6% | 1.00 | 5.73 | n/a | 1.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RANGE | WEAK | 34 | 10 | 40.0% | 0.20 | 1.47 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RISK_ON | STRONG | 72 | 11 | 63.6% | 1.00 | 5.73 | n/a | 1.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | OK | 50 | 15 | 26.7% | 0.27 | 2.22 | n/a | 3.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 3 | 33.3% | 0.83 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | OK | 67 | 12 | 50.0% | 0.92 | 4.17 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | OK | 50 | 15 | 26.7% | 0.27 | 2.22 | n/a | 3.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | OK | 67 | 12 | 50.0% | 0.92 | 4.17 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RANGE | WEAK | 43 | 9 | 33.3% | 0.39 | 4.17 | n/a | 3.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 2 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | OK | 62 | 11 | 45.5% | 0.78 | 3.41 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | WEAK | 43 | 9 | 33.3% | 0.39 | 4.17 | n/a | 3.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | OK | 62 | 11 | 45.5% | 0.78 | 3.41 | n/a | 2.00 | — |
+| compression_20_ratio0.65_break20_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 2 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RANGE | WEAK | 40 | 4 | 75.0% | 0.65 | 2.40 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 10 | 21 | 23.8% | -0.19 | 0.60 | n/a | 8.00 | exp -0.19 ; PF 0.60 < 1 |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RANGE | WEAK | 40 | 4 | 75.0% | 0.65 | 2.40 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 21 | 23.8% | -0.19 | 0.60 | n/a | 8.00 | exp -0.19 ; PF 0.60 < 1 |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RANGE | AVOID | 0 | 4 | 25.0% | 0.13 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 21 | 14.3% | -0.12 | 0.64 | n/a | 6.00 | exp -0.12 ; PF 0.64 < 1 |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 4 | 25.0% | 0.13 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 21 | 14.3% | -0.12 | 0.64 | n/a | 6.00 | exp -0.12 ; PF 0.64 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | OK | 73 | 5 | 80.0% | 0.76 | 2.40 | n/a | 1.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 20 | 1 | 100.0% | 1.20 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 28 | 29 | 34.5% | 0.04 | 1.10 | n/a | 8.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | OK | 73 | 5 | 80.0% | 0.76 | 2.40 | n/a | 1.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 28 | 29 | 34.5% | 0.04 | 1.10 | n/a | 8.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | AVOID | 28 | 7 | 42.9% | 0.66 | 0.67 | n/a | 4.00 | PF 0.67 < 1 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 12 | 0.0% | -0.83 | 0.00 | n/a | 10.00 | RISK_OFF destructeur ; exp -0.83 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 27 | 20 | 15.0% | -0.13 | 1.27 | n/a | 4.00 | exp -0.13 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 28 | 7 | 42.9% | 0.66 | 0.67 | n/a | 4.00 | PF 0.67 < 1 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 27 | 20 | 15.0% | -0.13 | 1.27 | n/a | 4.00 | exp -0.13 |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | AVOID | 28 | 7 | 42.9% | 0.66 | 0.67 | n/a | 4.00 | PF 0.67 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 11 | 0.0% | -0.82 | 0.00 | n/a | 9.00 | RISK_OFF destructeur ; exp -0.82 |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 20 | 19 | 15.8% | -0.08 | 1.18 | n/a | 4.00 | exp -0.08 |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 28 | 7 | 42.9% | 0.66 | 0.67 | n/a | 4.00 | PF 0.67 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 20 | 19 | 15.8% | -0.08 | 1.18 | n/a | 4.00 | exp -0.08 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | AVOID | 28 | 7 | 42.9% | 0.57 | 0.93 | n/a | 2.00 | PF 0.93 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 11 | 0.0% | -0.82 | 0.00 | n/a | 9.00 | RISK_OFF destructeur ; exp -0.82 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 15 | 6.7% | -0.50 | 0.42 | n/a | 4.00 | exp -0.50 ; PF 0.42 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 28 | 7 | 42.9% | 0.57 | 0.93 | n/a | 2.00 | PF 0.93 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 15 | 6.7% | -0.50 | 0.42 | n/a | 4.00 | exp -0.50 ; PF 0.42 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | AVOID | 28 | 7 | 42.9% | 0.66 | 0.67 | n/a | 4.00 | PF 0.67 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 10 | 0.0% | -0.80 | 0.00 | n/a | 8.00 | RISK_OFF destructeur ; exp -0.80 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | WEAK | 35 | 17 | 17.6% | 0.03 | 1.34 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | AVOID | 28 | 7 | 42.9% | 0.66 | 0.67 | n/a | 4.00 | PF 0.67 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | WEAK | 35 | 17 | 17.6% | 0.03 | 1.34 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | AVOID | 28 | 7 | 42.9% | 0.57 | 0.93 | n/a | 2.00 | PF 0.93 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 10 | 0.0% | -0.80 | 0.00 | n/a | 8.00 | RISK_OFF destructeur ; exp -0.80 |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 7 | 14 | 7.1% | -0.46 | 0.45 | n/a | 4.00 | exp -0.46 ; PF 0.45 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | AVOID | 28 | 7 | 42.9% | 0.57 | 0.93 | n/a | 2.00 | PF 0.93 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 7 | 14 | 7.1% | -0.46 | 0.45 | n/a | 4.00 | exp -0.46 ; PF 0.45 < 1 |
 | rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 90 | 20 | 65.0% | 1.54 | 2.59 | 30.87 | 8.91 | — |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_OFF | STRONG | 82 | 12 | 58.3% | 1.71 | 2.71 | 20.50 | 5.09 | — |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 23 | 15 | 46.7% | 0.19 | 0.99 | 2.87 | 17.91 | PF 0.99 < 1 |
@@ -455,6 +773,67 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 35 | 18 | 16.7% | -0.01 | 2.19 | n/a | 7.00 | exp -0.01 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 75 | 28 | 35.7% | 0.58 | 3.07 | n/a | 4.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 35 | 18 | 16.7% | -0.01 | 2.19 | n/a | 7.00 | exp -0.01 |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | WEAK | 35 | 21 | 23.8% | 0.09 | 1.26 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 28 | 39 | 23.1% | 0.02 | 1.10 | n/a | 7.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | WEAK | 35 | 21 | 23.8% | 0.09 | 1.26 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 28 | 39 | 23.1% | 0.02 | 1.10 | n/a | 7.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RANGE | WEAK | 47 | 14 | 28.6% | 0.28 | 1.86 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | 0.00 | 0.00 | n/a | 0.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 15 | 25 | 20.0% | -0.04 | 1.19 | n/a | 4.00 | exp -0.04 |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RANGE | WEAK | 47 | 14 | 28.6% | 0.28 | 1.86 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 15 | 25 | 20.0% | -0.04 | 1.19 | n/a | 4.00 | exp -0.04 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | OK | 50 | 19 | 21.1% | 0.21 | 1.84 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 24 | 12.5% | -0.18 | 0.62 | n/a | 6.00 | exp -0.18 ; PF 0.62 < 1 |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | OK | 50 | 19 | 21.1% | 0.21 | 1.84 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 24 | 12.5% | -0.18 | 0.62 | n/a | 6.00 | exp -0.18 ; PF 0.62 < 1 |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RANGE | WEAK | 47 | 12 | 25.0% | 0.29 | 1.67 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 10 | 18 | 11.1% | -0.11 | 0.72 | n/a | 3.00 | exp -0.11 ; PF 0.72 < 1 |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | WEAK | 47 | 12 | 25.0% | 0.29 | 1.67 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 18 | 11.1% | -0.11 | 0.72 | n/a | 3.00 | exp -0.11 ; PF 0.72 < 1 |
+| compression_20_ratio0.65_break20_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| compression_20_ratio0.65_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.65_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades ; RISK_OFF destructeur |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | WEAK | 45 | 4 | 75.0% | 1.25 | 6.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 20 | 1 | 100.0% | 2.00 | n/a | n/a | 0.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | WEAK | 45 | 4 | 75.0% | 1.25 | 6.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | ALL_REGIMES | RANGE | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RANGE | OK | 62 | 10 | 50.0% | 0.40 | 2.10 | n/a | 1.00 | — |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 6 | 0.0% | -0.67 | 0.00 | n/a | 4.00 | RISK_OFF destructeur ; exp -0.67 |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RANGE | OK | 62 | 10 | 50.0% | 0.40 | 2.10 | n/a | 1.00 | — |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RANGE | WEAK | 32 | 10 | 30.0% | 0.25 | 1.13 | n/a | 1.00 | — |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 6 | 0.0% | -0.50 | 0.00 | n/a | 3.00 | RISK_OFF destructeur ; exp -0.50 |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RANGE | WEAK | 32 | 10 | 30.0% | 0.25 | 1.13 | n/a | 1.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | WEAK | 45 | 19 | 52.6% | 0.42 | 1.11 | n/a | 2.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | AVOID | 0 | 10 | 20.0% | -0.36 | 0.40 | n/a | 6.00 | RISK_OFF destructeur ; exp -0.36 ; PF 0.40 < 1 |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 10 | 4 | 50.0% | 0.10 | 1.20 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | WEAK | 45 | 19 | 52.6% | 0.42 | 1.11 | n/a | 2.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 4 | 50.0% | 0.10 | 1.20 | n/a | 1.00 | échantillon < 5 trades |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | STRONG | 70 | 30 | 40.0% | 0.77 | 3.07 | n/a | 4.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | WEAK | 48 | 21 | 19.0% | 0.06 | 2.22 | n/a | 7.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 70 | 30 | 40.0% | 0.77 | 3.07 | n/a | 4.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | WEAK | 48 | 21 | 19.0% | 0.06 | 2.22 | n/a | 7.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | STRONG | 75 | 20 | 45.0% | 1.23 | 8.87 | n/a | 4.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 7 | 14 | 7.1% | -0.21 | 0.87 | n/a | 4.00 | exp -0.21 ; PF 0.87 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 75 | 20 | 45.0% | 1.23 | 8.87 | n/a | 4.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 7 | 14 | 7.1% | -0.21 | 0.87 | n/a | 4.00 | exp -0.21 ; PF 0.87 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | OK | 62 | 11 | 36.4% | 0.66 | 3.77 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 8 | 9 | 11.1% | -0.09 | 1.19 | n/a | 2.00 | exp -0.09 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | OK | 62 | 11 | 36.4% | 0.66 | 3.77 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 8 | 9 | 11.1% | -0.09 | 1.19 | n/a | 2.00 | exp -0.09 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | OK | 54 | 14 | 42.9% | 1.32 | 1.29 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 27 | 12 | 8.3% | -0.08 | 1.69 | n/a | 3.00 | exp -0.08 |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | OK | 54 | 14 | 42.9% | 1.32 | 1.29 | n/a | 3.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 27 | 12 | 8.3% | -0.08 | 1.69 | n/a | 3.00 | exp -0.08 |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | OK | 53 | 9 | 33.3% | 0.66 | 1.57 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 8 | 9 | 11.1% | -0.09 | 1.19 | n/a | 2.00 | exp -0.09 |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | OK | 53 | 9 | 33.3% | 0.66 | 1.57 | n/a | 1.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 8 | 9 | 11.1% | -0.09 | 1.19 | n/a | 2.00 | exp -0.09 |
 | rs_120d_top10_hold20 | ALL_REGIMES | RANGE | AVOID | 28 | 3 | 100.0% | 2.29 | n/a | 6.87 | 0.00 | échantillon < 5 trades |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | AVOID | 0 | 4 | 25.0% | -0.42 | 0.00 | -1.67 | 1.63 | échantillon < 5 trades |
 | rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | AVOID | 28 | 3 | 100.0% | 2.29 | n/a | 6.87 | 0.00 | échantillon < 5 trades |
@@ -510,6 +889,63 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 | base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 10 | 21 | 19.0% | -0.31 | 0.84 | n/a | 10.29 | exp -0.31 ; PF 0.84 < 1 |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | STRONG | 75 | 17 | 41.2% | 0.88 | 4.05 | n/a | 2.00 | — |
 | base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 21 | 19.0% | -0.31 | 0.84 | n/a | 10.29 | exp -0.31 ; PF 0.84 < 1 |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RANGE | OK | 65 | 27 | 44.4% | 0.63 | 4.59 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | ALL_REGIMES | RISK_ON | OK | 55 | 33 | 39.4% | 0.30 | 1.61 | n/a | 4.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RANGE | OK | 65 | 27 | 44.4% | 0.63 | 4.59 | n/a | 2.00 | — |
+| breakout_h20_vol1.2_stop1_rr2 | NO_RISK_OFF | RISK_ON | OK | 55 | 33 | 39.4% | 0.30 | 1.61 | n/a | 4.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RANGE | STRONG | 70 | 23 | 47.8% | 0.70 | 4.26 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | ALL_REGIMES | RISK_ON | WEAK | 42 | 22 | 36.4% | 0.22 | 1.30 | n/a | 3.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RANGE | STRONG | 70 | 23 | 47.8% | 0.70 | 4.26 | n/a | 2.00 | — |
+| breakout_h20_vol1.5_stop1_rr2 | NO_RISK_OFF | RISK_ON | WEAK | 42 | 22 | 36.4% | 0.22 | 1.30 | n/a | 3.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RANGE | OK | 65 | 26 | 42.3% | 0.79 | 5.58 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | WEAK | 35 | 18 | 22.2% | 0.11 | 1.29 | n/a | 3.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | OK | 65 | 26 | 42.3% | 0.79 | 5.58 | n/a | 2.00 | — |
+| breakout_h50_vol1.2_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | WEAK | 35 | 18 | 22.2% | 0.11 | 1.29 | n/a | 3.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RANGE | STRONG | 70 | 22 | 45.5% | 0.87 | 5.06 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | ALL_REGIMES | RISK_ON | AVOID | 20 | 14 | 21.4% | 0.11 | 0.94 | n/a | 2.00 | PF 0.94 < 1 |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | STRONG | 70 | 22 | 45.5% | 0.87 | 5.06 | n/a | 2.00 | — |
+| breakout_h50_vol1.5_stop1.5_rr2.5 | NO_RISK_OFF | RISK_ON | AVOID | 20 | 14 | 21.4% | 0.11 | 0.94 | n/a | 2.00 | PF 0.94 < 1 |
+| compression_20_ratio0.65_break20_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_20_ratio0.65_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | AVOID | 8 | 6 | 33.3% | 0.00 | 1.11 | n/a | 3.00 | exp 0.00 |
+| compression_20_ratio0.65_break20_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 0 | 1 | 0.0% | -1.00 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| compression_20_ratio0.65_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | AVOID | 8 | 6 | 33.3% | 0.00 | 1.11 | n/a | 3.00 | exp 0.00 |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RANGE | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | ALL_REGIMES | RISK_ON | WEAK | 47 | 12 | 41.7% | 0.33 | 1.67 | n/a | 3.00 | — |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RANGE | AVOID | 0 | 2 | 0.0% | -1.00 | 0.00 | n/a | 2.00 | échantillon < 5 trades |
+| compression_20_ratio0.75_break20_stop1_rr2 | NO_RISK_OFF | RISK_ON | WEAK | 47 | 12 | 41.7% | 0.33 | 1.67 | n/a | 3.00 | — |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | ALL_REGIMES | RANGE | WEAK | 48 | 5 | 80.0% | 2.00 | n/a | n/a | 0.00 | — |
+| compression_40_ratio0.7_break30_stop1.5_rr2.5 | NO_RISK_OFF | RANGE | WEAK | 48 | 5 | 80.0% | 2.00 | n/a | n/a | 0.00 | — |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RANGE | OK | 73 | 8 | 62.5% | 0.50 | 2.00 | n/a | 1.00 | — |
+| meanrev_rsi30_dist5_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | WEAK | 43 | 6 | 33.3% | 0.23 | 2.40 | n/a | 1.00 | — |
+| meanrev_rsi30_dist5_stop1_rr1.2 | NO_RISK_OFF | RANGE | OK | 73 | 8 | 62.5% | 0.50 | 2.00 | n/a | 1.00 | — |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RANGE | OK | 68 | 8 | 50.0% | 0.50 | 2.50 | n/a | 1.00 | — |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | ALL_REGIMES | RISK_OFF | WEAK | 31 | 6 | 16.7% | 0.08 | 1.50 | n/a | 1.00 | — |
+| meanrev_rsi30_dist7_stop1.5_rr1.5 | NO_RISK_OFF | RANGE | OK | 68 | 8 | 50.0% | 0.50 | 2.50 | n/a | 1.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RANGE | OK | 57 | 20 | 60.0% | 0.42 | 1.40 | n/a | 2.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_OFF | WEAK | 47 | 11 | 45.5% | 0.27 | 1.60 | n/a | 2.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | ALL_REGIMES | RISK_ON | AVOID | 0 | 3 | 33.3% | -0.27 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RANGE | OK | 57 | 20 | 60.0% | 0.42 | 1.40 | n/a | 2.00 | — |
+| meanrev_rsi35_dist4_stop1_rr1.2 | NO_RISK_OFF | RISK_ON | AVOID | 0 | 3 | 33.3% | -0.27 | 0.00 | n/a | 1.00 | échantillon < 5 trades |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RANGE | OK | 65 | 19 | 42.1% | 0.82 | 3.79 | n/a | 2.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 10 | 21 | 19.0% | -0.31 | 0.84 | n/a | 10.29 | exp -0.31 ; PF 0.84 < 1 |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RANGE | OK | 65 | 19 | 42.1% | 0.82 | 3.79 | n/a | 2.00 | — |
+| pullback_base_rsi42_58_chg20_0_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 21 | 19.0% | -0.31 | 0.84 | n/a | 10.29 | exp -0.31 ; PF 0.84 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RANGE | OK | 65 | 17 | 41.2% | 0.85 | 4.55 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 10 | 19 | 15.8% | -0.44 | 0.54 | n/a | 9.29 | exp -0.44 ; PF 0.54 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RANGE | OK | 65 | 17 | 41.2% | 0.85 | 4.55 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 19 | 15.8% | -0.44 | 0.54 | n/a | 9.29 | exp -0.44 ; PF 0.54 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RANGE | OK | 55 | 15 | 33.3% | 0.31 | 4.64 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 7 | 13 | 7.7% | -0.70 | 0.21 | n/a | 7.00 | exp -0.70 ; PF 0.21 < 1 |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RANGE | OK | 55 | 15 | 33.3% | 0.31 | 4.64 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_3_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 7 | 13 | 7.7% | -0.70 | 0.21 | n/a | 7.00 | exp -0.70 ; PF 0.21 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RANGE | OK | 65 | 16 | 37.5% | 0.80 | 4.63 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | ALL_REGIMES | RISK_ON | AVOID | 10 | 19 | 15.8% | -0.44 | 0.54 | n/a | 9.29 | exp -0.44 ; PF 0.54 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RANGE | OK | 65 | 16 | 37.5% | 0.80 | 4.63 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.1 | NO_RISK_OFF | RISK_ON | AVOID | 10 | 19 | 15.8% | -0.44 | 0.54 | n/a | 9.29 | exp -0.44 ; PF 0.54 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RANGE | OK | 55 | 15 | 33.3% | 0.31 | 4.64 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | ALL_REGIMES | RISK_ON | AVOID | 7 | 13 | 7.7% | -0.70 | 0.21 | n/a | 7.00 | exp -0.70 ; PF 0.21 < 1 |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RANGE | OK | 55 | 15 | 33.3% | 0.31 | 4.64 | n/a | 2.00 | — |
+| pullback_rsi42_58_chg20_5_stop0.5 | NO_RISK_OFF | RISK_ON | AVOID | 7 | 13 | 7.7% | -0.70 | 0.21 | n/a | 7.00 | exp -0.70 ; PF 0.21 < 1 |
 | rs_120d_top10_hold20 | ALL_REGIMES | RANGE | STRONG | 92 | 12 | 83.3% | 7.32 | 12.62 | 87.89 | 4.21 | — |
 | rs_120d_top10_hold20 | ALL_REGIMES | RISK_ON | STRONG | 77 | 16 | 37.5% | 1.67 | 2.08 | 26.78 | 10.17 | — |
 | rs_120d_top10_hold20 | NO_RISK_OFF | RANGE | STRONG | 92 | 12 | 83.3% | 7.32 | 12.62 | 87.89 | 4.21 | — |
@@ -559,18 +995,18 @@ Source : `bySymbolByRegime[]` (vraie matrice symbol × variant × regimeMode × 
 
 ## 7-bis. Matrice per-symbol (synthèse globale)
 
-- Cellules per-(symbol × variant × regimeMode × regime) : **8835**
-- Actifs couverts : 180
-- Variantes couvertes : 12
+- Cellules per-(symbol × variant × regimeMode × regime) : **17088**
+- Actifs couverts : 181
+- Variantes couvertes : 27
 
 Répartition par tier :
 
 | Tier | Nombre |
 |---|---:|
-| STRONG | 811 |
-| OK | 1038 |
-| WEAK | 1142 |
-| AVOID | 5844 |
+| STRONG | 1128 |
+| OK | 2003 |
+| WEAK | 2091 |
+| AVOID | 11866 |
 
 ## 8. Recommandations moteur
 
