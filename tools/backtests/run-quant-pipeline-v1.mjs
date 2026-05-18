@@ -1,15 +1,25 @@
 // tools/backtests/run-quant-pipeline-v1.mjs
 //
-// Orchestrateur offline qui relance les 6 moteurs quant dans le bon ordre :
+// Orchestrateur offline qui relance les 7 moteurs d'analyse quant dans l'ordre :
 //   1. asset-quality-engine-v1
 //   2. asset-setup-matrix-v1
 //   3. setup-variant-matrix-v1
 //   4. variant-regime-matrix-v1
 //   5. walk-forward-regime-validator-v1
 //   6. tradable-universe-v1
+//   7. allocation-engine-v1
 //
-// But : garantir que tradable-universe.json est généré à partir de sources
+// But : garantir que allocation-plan.json est généré à partir de sources
 // fraîches et cohérentes. Stoppe net à la première erreur.
+//
+// IMPORTANT : l'orchestrateur ne relance PAS les backtests sources eux-mêmes
+// (backtest-relative-strength-rotation-regime-v1.mjs,
+//  backtest-pullback-yearly-walkforward.mjs,
+//  backtest-multi-setup-grid.mjs).
+// Ceux-ci prennent ~3 minutes au total et sont à relancer manuellement
+// uniquement quand l'univers ou les paramètres de stratégie changent.
+// L'orchestrateur couvre la couche d'analyse en aval des backtests, y compris
+// le plan d'allocation théorique final.
 //
 // Sorties :
 //   - tools/backtests/output/quant-pipeline-run-summary.json
@@ -64,9 +74,14 @@ const STEPS = [
     script: "tools/backtests/tradable-universe-v1.mjs",
     output: "tools/backtests/output/tradable-universe.json",
   },
+  {
+    name: "allocation-engine-v1",
+    script: "tools/backtests/allocation-engine-v1.mjs",
+    output: "tools/backtests/output/allocation-plan.json",
+  },
 ];
 
-const FINAL_OUTPUT = "tools/backtests/output/tradable-universe.json";
+const FINAL_OUTPUT = "tools/backtests/output/allocation-plan.json";
 
 // Récupère le mtime en ms d'un fichier, ou null si introuvable.
 async function mtimeMs(path) {

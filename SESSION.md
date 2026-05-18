@@ -1736,3 +1736,40 @@ Le pipeline complet quant ManiTradePro est désormais :
 Point d'entrée final : `tools/backtests/output/allocation-plan.json`.
 
 Tout reste offline, aucun connecteur broker, aucun ordre. La transition vers le réel reste conditionnée à : paper trading live validé, gestion du risque opérationnelle, kill-switch testé, connecteur broker.
+
+---
+
+# Orchestrateur quant pipeline étendu — allocation incluse
+
+Modification de `tools/backtests/run-quant-pipeline-v1.mjs` pour inclure `allocation-engine-v1.mjs` comme **7e étape**. Avant cette PR, le pipeline s'arrêtait à `tradable-universe.json` — donc `allocation-plan.json` pouvait être obsolète tandis que `tradable-universe.json` était à jour.
+
+Désormais, le pipeline relance dans l'ordre :
+
+1. asset-quality-engine-v1
+2. asset-setup-matrix-v1
+3. setup-variant-matrix-v1
+4. variant-regime-matrix-v1
+5. walk-forward-regime-validator-v1
+6. tradable-universe-v1
+7. **allocation-engine-v1** (ajouté)
+
+Nouveau `finalOutput` :
+
+```text
+tools/backtests/output/allocation-plan.json
+```
+
+Modification minimale du script (commentaires d'en-tête + entrée dans `STEPS` + `FINAL_OUTPUT`). Le comportement de l'orchestrateur (stop à la première erreur, vérification triple par étape : exit code 0, output existe, output modifié pendant le run) est strictement préservé.
+
+Durée totale du pipeline étendu sur l'état actuel : **8.2 secondes** (vs 5.2 s avant — l'allocation engine ajoute ~140 ms, le reste de la variation est jitter d'exécution).
+
+Non-régression byte-par-byte vérifiée pour les 7 outputs (modulo `generatedAt`) :
+- asset-quality-report.json ✓
+- asset-setup-matrix.json ✓
+- setup-variant-matrix.json ✓
+- variant-regime-matrix.json ✓
+- walk-forward-regime-validator.json ✓
+- tradable-universe.json ✓
+- allocation-plan.json ✓
+
+L'orchestrateur ne relance toujours pas les backtests sources (RS regime / Pullback yearly-walkforward / multi-setup-grid). Ceux-ci restent à lancer manuellement quand l'univers ou les paramètres changent.
