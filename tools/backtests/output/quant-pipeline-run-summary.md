@@ -1,21 +1,22 @@
 # Quant Pipeline Run Summary
 
-> Généré le 2026-05-18T08:25:06.748Z par `tools/backtests/run-quant-pipeline-v1.mjs`.
+> Généré le 2026-05-18T08:49:53.360Z par `tools/backtests/run-quant-pipeline-v1.mjs`.
 
 **Statut global : ✓ OK**
 
-Durée totale : 6.7 s
+Durée totale : 8.2 s
 
 ## Étapes
 
 | # | Moteur | Statut | Durée | Output | Output modifié |
 |---:|---|---|---:|---|---|
-| 1 | asset-quality-engine-v1 | ✓ OK | 1.6 s | `tools/backtests/output/asset-quality-report.json` | ✓ |
-| 2 | asset-setup-matrix-v1 | ✓ OK | 630 ms | `tools/backtests/output/asset-setup-matrix.json` | ✓ |
-| 3 | setup-variant-matrix-v1 | ✓ OK | 1.2 s | `tools/backtests/output/setup-variant-matrix.json` | ✓ |
-| 4 | variant-regime-matrix-v1 | ✓ OK | 1.8 s | `tools/backtests/output/variant-regime-matrix.json` | ✓ |
-| 5 | walk-forward-regime-validator-v1 | ✓ OK | 863 ms | `tools/backtests/output/walk-forward-regime-validator.json` | ✓ |
-| 6 | tradable-universe-v1 | ✓ OK | 575 ms | `tools/backtests/output/tradable-universe.json` | ✓ |
+| 1 | asset-quality-engine-v1 | ✓ OK | 2.3 s | `tools/backtests/output/asset-quality-report.json` | ✓ |
+| 2 | asset-setup-matrix-v1 | ✓ OK | 807 ms | `tools/backtests/output/asset-setup-matrix.json` | ✓ |
+| 3 | setup-variant-matrix-v1 | ✓ OK | 1.5 s | `tools/backtests/output/setup-variant-matrix.json` | ✓ |
+| 4 | variant-regime-matrix-v1 | ✓ OK | 1.7 s | `tools/backtests/output/variant-regime-matrix.json` | ✓ |
+| 5 | walk-forward-regime-validator-v1 | ✓ OK | 1.0 s | `tools/backtests/output/walk-forward-regime-validator.json` | ✓ |
+| 6 | tradable-universe-v1 | ✓ OK | 810 ms | `tools/backtests/output/tradable-universe.json` | ✓ |
+| 7 | allocation-engine-v1 | ✓ OK | 138 ms | `tools/backtests/output/allocation-plan.json` | ✓ |
 
 ## Outputs vérifiés
 
@@ -25,13 +26,14 @@ Durée totale : 6.7 s
 - ✓ `tools/backtests/output/variant-regime-matrix.json` (modifié pendant ce run : oui)
 - ✓ `tools/backtests/output/walk-forward-regime-validator.json` (modifié pendant ce run : oui)
 - ✓ `tools/backtests/output/tradable-universe.json` (modifié pendant ce run : oui)
+- ✓ `tools/backtests/output/allocation-plan.json` (modifié pendant ce run : oui)
 
 ## Prochaine étape recommandée
 
 Le tradable universe est à jour. Point d'entrée pour le futur allocation-engine :
 
 ```text
-tools/backtests/output/tradable-universe.json
+tools/backtests/output/allocation-plan.json
 ```
 
 Pour mettre à jour après un nouveau backtest : relancer ce même pipeline.
