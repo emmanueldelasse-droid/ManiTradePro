@@ -1,6 +1,6 @@
 # Setup × Variant Matrix — ManiTradePro
 
-> Généré le 2026-05-18T10:49:49.450Z par `tools/backtests/setup-variant-matrix-v1.mjs`.
+> Généré le 2026-05-18T11:16:44.868Z par `tools/backtests/setup-variant-matrix-v1.mjs`.
 
 ## 1. Synthèse globale
 

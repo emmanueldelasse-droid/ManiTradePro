@@ -2260,3 +2260,95 @@ Croisement avec les 10 positions du plan v1 :
 La grande majorité des positions du plan v1 sont FRAGILE ou INSUFFICIENT_DATA au sens du rolling walk-forward. La validation actuelle (`walk-forward-regime-validator-v1`) se contente d'un seul split — celui-ci détecte les overfits évidents mais pas la fragilité temporelle.
 
 **Recommandation pour une PR future** : étendre `tradable-universe-v1` pour exiger un verdict ROBUST ou STABLE en rolling walk-forward en plus du PASS unique. Cela durcirait la sélection mais réduirait drastiquement le nombre de cellules tradables (passerait de 346 ALLOW à probablement < 50).
+
+---
+
+# Tradable Universe v2 — durci par rolling walk-forward
+
+Fichier créé :
+
+```text
+tools/backtests/tradable-universe-v2.mjs
+```
+
+Combine `tradable-universe.json` (v1) et `rolling-walkforward-validator.json` pour produire un univers tradable beaucoup plus exigeant temporellement.
+
+Sorties :
+
+- `tools/backtests/output/tradable-universe-v2.json`
+- `tools/backtests/output/tradable-universe-v2.md`
+
+## Règles de transition v1 → v2
+
+| Rolling verdict | Effet sur la décision |
+|---|---|
+| ROBUST | confirme la décision v1 (pas de promotion) |
+| STABLE | confirme la décision v1 |
+| FRAGILE | dégrade d'un cran (ALLOW→REDUCE, REDUCE→EXPERIMENTAL, EXPERIMENTAL→BLOCK) |
+| OVERFIT | BLOCK |
+| INSUFFICIENT_DATA | EXPERIMENTAL si v1=ALLOW + tier A/B + WF unique PASS, sinon BLOCK |
+
+**Règle absolue** : le rolling ne promeut jamais. v1 BLOCK reste BLOCK.
+
+## Résultats du premier run (10 878 cellules)
+
+| Décision | v1 | v2 | Delta |
+|---|---:|---:|---:|
+| ALLOW | 346 | **26** | **−320** |
+| REDUCE | 10 | 300 | +290 |
+| EXPERIMENTAL | 182 | 20 | −162 |
+| BLOCK | 10 340 | 10 532 | +192 |
+
+→ **92.5 % des ALLOW v1 disparaissent.** Le rolling walk-forward est très exigeant, et la grande majorité des cellules ALLOW v1 sont FRAGILE (dégradées en REDUCE) ou INSUFFICIENT_DATA (BLOCK).
+
+## Les 26 cellules ALLOW v2 (toutes tier A, toutes RISK_ON)
+
+| # | Symbole | Setup | Variante | Rolling | Splits |
+|---:|---|---|---|---|---|
+| Cellules ROBUST (14) | VRNS, CLOU (2), PSI, GOOGL, PH (2), KLAC (2), DOCN (3), GLD | Pullback ou Breakout | base/rsi variantes | ROBUST | 2/2 |
+| Cellules STABLE (12) | VRNS (2), GOOGL, ABNB (2), WCLD, AMZN (2), KLAC, BOTZ, GLD, DOCN | Pullback ou Breakout | base/rsi variantes | STABLE | 2/2 |
+
+## Croisement avec le plan d'allocation v1
+
+Sur les 10 positions du plan d'allocation v1, **une seule survit en ALLOW v2** :
+
+| Position v1 | Rolling verdict | Decision v2 |
+|---|---|---|
+| **GLD × Breakout × RISK_ON** | ROBUST | **ALLOW** ✓ |
+| VUG × Pullback × RISK_ON | FRAGILE | REDUCE |
+| SPYG × Pullback × RISK_ON | FRAGILE | REDUCE |
+| APP × RS rotation × RISK_ON | FRAGILE | REDUCE |
+| IYW × Pullback × RISK_ON | FRAGILE | REDUCE |
+| SOL × RS × RISK_ON | INSUFFICIENT | EXPERIMENTAL (exception WF PASS) |
+| MSTR × RS × RISK_ON | INSUFFICIENT | EXPERIMENTAL (exception WF PASS) |
+| JPM × Breakout × RISK_ON | FRAGILE | REDUCE |
+| ROM × Pullback × RISK_ON | INSUFFICIENT | BLOCK (pas tier A/B en v1) |
+| CRWD × Pullback × RANGE | INSUFFICIENT | BLOCK |
+
+C'est une **remise en question forte** du plan d'allocation actuel. Le plan v2 d'allocation devra être recalculé sur `tradable-universe-v2.json` pour refléter cette vue robuste.
+
+## Non-régression confirmée
+
+`tradable-universe.json` (v1) et `rolling-walkforward-validator.json` byte-identiques avant/après. Le moteur v2 lit seul, n'écrit pas dans les sources.
+
+## Robustness tier (nouveauté v2)
+
+| Tier | Sens | Cellules |
+|---|---|---:|
+| CONFIRMED | rolling ROBUST/STABLE, decisionV1 préservé | 34 |
+| EXCEPTION | rolling INSUFFICIENT mais exception EXPERIMENTAL | 20 |
+| DEGRADED | rolling FRAGILE, dégradation d'un cran | 290 |
+| REMOVED | OVERFIT, FRAGILE→BLOCK, INSUFFICIENT sans exception, v1=BLOCK | 10 524 |
+| UNEVALUATED | aucun rolling verdict (cellules absentes de l'évaluation rolling) | 10 |
+
+## Limites résiduelles
+
+- **3 splits walk-forward seulement** : pas un test statistique robuste, mais un filtre anti-overfit minimal.
+- **INSUFFICIENT_DATA = ~70 %** : la majorité des cellules ne sont pas testables → tombent en BLOCK sauf exception.
+- **Pas de recalcul allocation dans cette PR.**
+- **Pas d'intégration au pipeline orchestré** : à utiliser à la demande.
+- **Verdict v2 ≠ autorisation live.** Toujours valider manuellement avant tout passage en réel.
+
+## Conséquence opérationnelle
+
+`tradable-universe-v2.json` est le nouvel input recommandé pour toute décision d'allocation visant un horizon réel. Une PR future devra créer un `allocation-engine-v3` (ou adapter v1/v2) pour consommer cette source plus restrictive. Le portefeuille résultant sera bien plus petit (probablement 5-10 positions maximum vu les 26 cellules ALLOW v2 réparties sur ~10 symboles).

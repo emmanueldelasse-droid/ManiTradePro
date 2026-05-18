@@ -1,6 +1,6 @@
 # Allocation Plan — ManiTradePro
 
-> Généré le 2026-05-18T10:49:54.781Z par `tools/backtests/allocation-engine-v1.mjs`.
+> Généré le 2026-05-18T11:16:50.817Z par `tools/backtests/allocation-engine-v1.mjs`.
 
 **⚠ Plan théorique uniquement. Aucun ordre n'est passé. Aucun connecteur broker n'est touché. Ne pas trader sans validation humaine + paper trading + gestion du risque opérationnelle.**
 
