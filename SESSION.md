@@ -1848,3 +1848,81 @@ Tradable-universe.json et allocation-plan.json sont byte-identiques avant/après
 ## Conséquence opérationnelle
 
 Avant tout passage à un trading réel ou paper trading live, l'utilisateur doit lire le `friction-adjusted-report.md` et accepter explicitement chaque dégradation suggérée. Le modèle de friction est un **garde-fou de prudence**, pas une vérité.
+
+---
+
+# Friction-Adjusted Allocation v2 — plan final ajusté
+
+Fichier créé :
+
+```text
+tools/backtests/friction-adjusted-allocation-v2.mjs
+```
+
+Applique les suggestions du `friction-model-v1` au `allocation-plan.json` existant et produit un plan ajusté plus prudent.
+
+Sorties :
+
+- `tools/backtests/output/allocation-plan-friction-adjusted.json`
+- `tools/backtests/output/allocation-plan-friction-adjusted.md`
+
+## Logique
+
+1. Lit `allocation-plan.json` (10 positions) et `friction-adjusted-report.json`.
+2. Mappe la suggestion de friction par position (par `symbol|setup|regime|rank`).
+3. Applique le multiplier : `normal × 1.00` / `reduce_10_pct × 0.90` / `reduce_25_pct × 0.75` / `remove_candidate × 0`.
+4. Filtre les positions retirées dans une liste `removedPositions[]` séparée.
+5. Renormalise les positions actives restantes à 100 %.
+6. Calcule la pénalité brute totale (avant renormalisation) = 100 % − somme des poids ajustés bruts.
+
+## Contraintes respectées
+
+- `allocation-plan.json` n'est **PAS** modifié sur disque.
+- `friction-adjusted-report.json` n'est **PAS** modifié sur disque.
+- Aucune position n'a son poids brut augmenté avant renormalisation.
+- Si toutes les positions sont retirées, `status = "failed"` et exit code 1.
+
+## Résultat du premier run
+
+- 10 positions originales → **10 actives + 0 retirées**
+- **7 positions réduites** : APP, GLD, SOL, MSTR, JPM, ROM, CRWD
+- **3 positions inchangées** : VUG, SPYG, IYW (friction 0.15 %, profil ETF tech US large liquide)
+- Pénalité brute totale : **8.11 %** du portefeuille original
+- Aucun warning levé (toutes positions ≥ 1 %, aucune > 25 %)
+
+| # | Symbole | Tier | Ajustement | Poids orig. → ajusté norm. |
+|---:|---|---|---|---|
+| 1 | VUG | A | normal | 13.25 % → 14.42 % |
+| 2 | SPYG | A | normal | 13.25 % → 14.42 % |
+| 3 | APP | A | reduce_10_pct | 13.25 % → 12.98 % |
+| 4 | IYW | A | normal | 13.25 % → 14.42 % |
+| 5 | GLD | A | reduce_10_pct | 13.25 % → 12.98 % |
+| 6 | SOL | B | reduce_25_pct | 9.27 % → 7.56 % |
+| 7 | MSTR | B | reduce_10_pct | 9.27 % → 9.08 % |
+| 8 | JPM | B | reduce_10_pct | 9.27 % → 9.08 % |
+| 9 | ROM | C | reduce_25_pct | 4.64 % → 3.79 % |
+| 10 | CRWD | D | reduce_10_pct | 1.32 % → 1.29 % |
+
+Note structurelle : VUG, SPYG, IYW **gagnent du poids relatif** (13.25 → 14.42 %) sans qu'aucune promotion n'ait lieu — c'est une conséquence mécanique de la renormalisation après réduction des 7 autres positions.
+
+## Distribution ajustée
+
+- tech_ai : 57.53 % (57 % vs 54.32 % original, hausse mécanique)
+- defensive_other : 22.06 %
+- crypto : 16.64 % (vs 18.54 %, baisse due à reduce_25 sur SOL)
+- leveraged : 3.79 % (vs 4.64 %, baisse due à reduce_25 sur ROM)
+
+## Non-régression confirmée
+
+Allocation-plan.json et friction-adjusted-report.json sont byte-identiques avant/après (le moteur lit seul, n'écrit pas dans les sources).
+
+## Intégration au pipeline
+
+**Volontairement non intégré** au `run-quant-pipeline-v1.mjs` à ce stade. Le user peut l'activer dans une PR future si désiré. La séparation permet d'examiner l'impact friction sans qu'il devienne automatique.
+
+## Limites
+
+- Hérite des limites de `friction-model-v1` : modèle heuristique V1, pas de données broker réelles.
+- Pas de propagation : ce plan ajusté n'est pas re-bouclé dans `tradable-universe.json`.
+- La renormalisation peut concentrer le portefeuille si beaucoup de positions sont retirées. À surveiller.
+- `Verdict ajusté ≠ autorisation live.`

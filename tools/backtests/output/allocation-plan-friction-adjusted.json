@@ -1,0 +1,234 @@
+{
+  "generatedAt": "2026-05-18T09:57:02.615Z",
+  "sources": {
+    "allocationPlan": "tools/backtests/output/allocation-plan.json",
+    "frictionReport": "tools/backtests/output/friction-adjusted-report.json"
+  },
+  "status": "ok",
+  "summary": {
+    "originalPositions": 10,
+    "activePositions": 10,
+    "removedPositions": 0,
+    "positionsReduced": 7,
+    "originalTotalWeight": 100.02,
+    "preNormalizedTotalWeight": 91.91,
+    "adjustedTotalWeight": 100.02,
+    "totalFrictionPenaltyPct": 8.11,
+    "byTheme": {
+      "tech_ai": {
+        "positions": 5,
+        "weightPct": 57.53
+      },
+      "defensive_other": {
+        "positions": 2,
+        "weightPct": 22.06
+      },
+      "crypto": {
+        "positions": 2,
+        "weightPct": 16.64
+      },
+      "leveraged": {
+        "positions": 1,
+        "weightPct": 3.79
+      }
+    },
+    "bySetup": {
+      "PULLBACK_MOMENTUM": {
+        "positions": 5,
+        "weightPct": 48.34
+      },
+      "RELATIVE_STRENGTH_ROTATION": {
+        "positions": 3,
+        "weightPct": 29.62
+      },
+      "BREAKOUT_EXPANSION": {
+        "positions": 2,
+        "weightPct": 22.06
+      }
+    }
+  },
+  "positions": [
+    {
+      "rank": 1,
+      "symbol": "VUG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "theme": "tech_ai",
+      "originalWeightPct": 13.25,
+      "frictionProfile": "low",
+      "totalFrictionPct": 0.15,
+      "contextualPenalties": [],
+      "adjustment": "normal",
+      "preNormalizedWeightPct": 13.25,
+      "adjustedWeightPct": 14.42,
+      "reason": "friction faible, poids conservé"
+    },
+    {
+      "rank": 2,
+      "symbol": "SPYG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "theme": "tech_ai",
+      "originalWeightPct": 13.25,
+      "frictionProfile": "low",
+      "totalFrictionPct": 0.15,
+      "contextualPenalties": [],
+      "adjustment": "normal",
+      "preNormalizedWeightPct": 13.25,
+      "adjustedWeightPct": 14.42,
+      "reason": "friction faible, poids conservé"
+    },
+    {
+      "rank": 3,
+      "symbol": "APP",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "theme": "tech_ai",
+      "originalWeightPct": 13.25,
+      "frictionProfile": "medium",
+      "totalFrictionPct": 0.32,
+      "contextualPenalties": [],
+      "adjustment": "reduce_10_pct",
+      "preNormalizedWeightPct": 11.925,
+      "adjustedWeightPct": 12.98,
+      "reason": "friction modérée, poids réduit 10 %"
+    },
+    {
+      "rank": 4,
+      "symbol": "IYW",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "theme": "tech_ai",
+      "originalWeightPct": 13.25,
+      "frictionProfile": "low",
+      "totalFrictionPct": 0.15,
+      "contextualPenalties": [],
+      "adjustment": "normal",
+      "preNormalizedWeightPct": 13.25,
+      "adjustedWeightPct": 14.42,
+      "reason": "friction faible, poids conservé"
+    },
+    {
+      "rank": 5,
+      "symbol": "GLD",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.5_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "theme": "defensive_other",
+      "originalWeightPct": 13.25,
+      "frictionProfile": "low",
+      "totalFrictionPct": 0.25,
+      "contextualPenalties": [
+        "breakout : +0.10% slippage timing"
+      ],
+      "adjustment": "reduce_10_pct",
+      "preNormalizedWeightPct": 11.925,
+      "adjustedWeightPct": 12.98,
+      "reason": "friction modérée, poids réduit 10 %"
+    },
+    {
+      "rank": 6,
+      "symbol": "SOL",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "theme": "crypto",
+      "originalWeightPct": 9.27,
+      "frictionProfile": "high",
+      "totalFrictionPct": 0.8,
+      "contextualPenalties": [
+        "crypto : +0.10% spread + slippage"
+      ],
+      "adjustment": "reduce_25_pct",
+      "preNormalizedWeightPct": 6.9525,
+      "adjustedWeightPct": 7.56,
+      "reason": "friction élevée, poids réduit 25 %"
+    },
+    {
+      "rank": 7,
+      "symbol": "MSTR",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "theme": "crypto",
+      "originalWeightPct": 9.27,
+      "frictionProfile": "medium",
+      "totalFrictionPct": 0.32,
+      "contextualPenalties": [],
+      "adjustment": "reduce_10_pct",
+      "preNormalizedWeightPct": 8.343,
+      "adjustedWeightPct": 9.08,
+      "reason": "friction modérée, poids réduit 10 %"
+    },
+    {
+      "rank": 8,
+      "symbol": "JPM",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "theme": "defensive_other",
+      "originalWeightPct": 9.27,
+      "frictionProfile": "low",
+      "totalFrictionPct": 0.25,
+      "contextualPenalties": [
+        "breakout : +0.10% slippage timing"
+      ],
+      "adjustment": "reduce_10_pct",
+      "preNormalizedWeightPct": 8.343,
+      "adjustedWeightPct": 9.08,
+      "reason": "friction modérée, poids réduit 10 %"
+    },
+    {
+      "rank": 9,
+      "symbol": "ROM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "C",
+      "theme": "leveraged",
+      "originalWeightPct": 4.64,
+      "frictionProfile": "high",
+      "totalFrictionPct": 0.9,
+      "contextualPenalties": [
+        "leveraged : +0.20% gap amplifié"
+      ],
+      "adjustment": "reduce_25_pct",
+      "preNormalizedWeightPct": 3.48,
+      "adjustedWeightPct": 3.79,
+      "reason": "friction élevée, poids réduit 25 %"
+    },
+    {
+      "rank": 10,
+      "symbol": "CRWD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "theme": "tech_ai",
+      "originalWeightPct": 1.32,
+      "frictionProfile": "low",
+      "totalFrictionPct": 0.25,
+      "contextualPenalties": [
+        "EXPERIMENTAL : +0.10% prudence"
+      ],
+      "adjustment": "reduce_10_pct",
+      "preNormalizedWeightPct": 1.188,
+      "adjustedWeightPct": 1.29,
+      "reason": "friction modérée, poids réduit 10 %"
+    }
+  ],
+  "removedPositions": [],
+  "warnings": []
+}

@@ -1,6 +1,6 @@
 # Walk-Forward Regime Validator — ManiTradePro
 
-> Généré le 2026-05-18T09:21:56.876Z par `tools/backtests/walk-forward-regime-validator-v1.mjs`.
+> Généré le 2026-05-18T09:57:01.138Z par `tools/backtests/walk-forward-regime-validator-v1.mjs`.
 
 Split : TRAIN = 2021-2022-2023 | TEST = 2024-2025.
 
