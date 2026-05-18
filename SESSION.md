@@ -1773,3 +1773,78 @@ Non-régression byte-par-byte vérifiée pour les 7 outputs (modulo `generatedAt
 - allocation-plan.json ✓
 
 L'orchestrateur ne relance toujours pas les backtests sources (RS regime / Pullback yearly-walkforward / multi-setup-grid). Ceux-ci restent à lancer manuellement quand l'univers ou les paramètres changent.
+
+---
+
+# Friction Model v1 — couche heuristique anti-overconfiance
+
+Fichier créé :
+
+```text
+tools/backtests/friction-model-v1.mjs
+```
+
+Estime l'impact des frais, spread, slippage et gaps sur le tradable universe et le plan d'allocation. **Modèle heuristique v1, pas une simulation d'exécution.**
+
+Sorties :
+
+- `tools/backtests/output/friction-adjusted-report.json`
+- `tools/backtests/output/friction-adjusted-report.md`
+
+## Politique
+
+- 4 profils : `low` (0.15 %), `medium` (0.32 %), `high` (0.70 %), `extreme` (1.35 %) — total par trade round-trip.
+- Classification asset class → profil :
+  - ETF large liquide, US large cap, FX → `low`
+  - semi/IA volatile, europe, crypto_correlated, defensive_other → `medium`
+  - crypto pur, leveraged → `high`
+- Pénalités contextuelles additionnelles : breakout +0.10%, crypto +0.10%, leveraged +0.20%, EXPERIMENTAL +0.10%, RISK_OFF +0.15%, LOW confidence +0.05%, WF INSUFFICIENT_DATA +0.05%.
+- Dégradation décision : < 0.25% inchangé, 0.25-0.50% un cran (ALLOW→REDUCE), 0.50-1.00% deux crans, > 1.00% trois crans (jusqu'à BLOCK).
+- Le modèle ne **PROMEUT JAMAIS** : friction = maintenir ou dégrader.
+- Allocation suggestion : normal / reduce_10_pct / reduce_25_pct / remove_candidate.
+- Le plan d'allocation original n'est PAS modifié sur disque (lecture seule).
+
+## Résultat du premier run
+
+Sur 10 878 cellules du tradable universe :
+- 360 cellules inchangées
+- 159 `ALLOW → REDUCE` (friction modérée, surtout semi/IA)
+- 9 `ALLOW → EXPERIMENTAL` (friction élevée, crypto/leveraged)
+- 7 `REDUCE → BLOCK` (friction très élevée)
+- 3 `EXPERIMENTAL → BLOCK` (friction extrême)
+
+Distribution finale ajustée : 178 ALLOW / 162 REDUCE / 188 EXPERIMENTAL / 10 350 BLOCK (vs 346 / 10 / 182 / 10 340 avant).
+
+## Impact sur allocation-plan (10 positions)
+
+| # | Symbole | Tier | Friction | Suggestion | Poids orig. → norm. ajusté |
+|---:|---|---|---:|---|---|
+| 1 | VUG | A | 0.150% | normal | 13.25% → 14.42% |
+| 2 | SPYG | A | 0.150% | normal | 13.25% → 14.42% |
+| 3 | APP | A | 0.320% | reduce_10_pct | 13.25% → 12.98% |
+| 4 | IYW | A | 0.150% | normal | 13.25% → 14.42% |
+| 5 | GLD | A | 0.250% | reduce_10_pct | 13.25% → 12.98% (pénalité breakout) |
+| 6 | SOL | B | 0.800% | reduce_25_pct | 9.27% → 7.56% (crypto+slippage) |
+| 7 | MSTR | B | 0.320% | reduce_10_pct | 9.27% → 9.07% |
+| 8 | JPM | B | 0.250% | reduce_10_pct | 9.27% → 9.07% (pénalité breakout) |
+| 9 | ROM | C | 0.900% | reduce_25_pct | 4.64% → 3.79% (leveraged+gap) |
+| 10 | CRWD | D | 0.250% | reduce_10_pct | 1.32% → 1.29% (EXPERIMENTAL) |
+
+**3 positions** restent `normal` : VUG, SPYG, IYW — les ETF tech US large liquides en Pullback RISK_ON.
+**7 positions** suggérées en dégradation : APP, GLD, SOL, MSTR, JPM, ROM, CRWD.
+
+## Non-régression confirmée
+
+Tradable-universe.json et allocation-plan.json sont byte-identiques avant/après (le moteur de friction lit seul, n'écrit pas dans ces fichiers). Vérifié explicitement.
+
+## Limites résiduelles
+
+- **Modèle heuristique v1**, pas de données broker réelles. À recalibrer empiriquement après paper trading live.
+- **Pas de market impact** : la taille de l'ordre n'influence pas le slippage.
+- **Pas de barème broker spécifique** : commissions et spreads génériques.
+- **Pas de propagation arrière** : les cellules dégradées ne sont pas réintégrées dans tradable-universe.json ni allocation-plan.json. Le rapport friction est une couche aval, pas une réécriture.
+- **Classification asset class best-effort** : tout actif non listé tombe en `defensive_other` profil medium.
+
+## Conséquence opérationnelle
+
+Avant tout passage à un trading réel ou paper trading live, l'utilisateur doit lire le `friction-adjusted-report.md` et accepter explicitement chaque dégradation suggérée. Le modèle de friction est un **garde-fou de prudence**, pas une vérité.
