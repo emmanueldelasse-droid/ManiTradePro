@@ -1,21 +1,21 @@
 # Quant Pipeline Run Summary
 
-> Généré le 2026-05-18T07:51:54.525Z par `tools/backtests/run-quant-pipeline-v1.mjs`.
+> Généré le 2026-05-18T08:25:06.748Z par `tools/backtests/run-quant-pipeline-v1.mjs`.
 
 **Statut global : ✓ OK**
 
-Durée totale : 5.2 s
+Durée totale : 6.7 s
 
 ## Étapes
 
 | # | Moteur | Statut | Durée | Output | Output modifié |
 |---:|---|---|---:|---|---|
-| 1 | asset-quality-engine-v1 | ✓ OK | 757 ms | `tools/backtests/output/asset-quality-report.json` | ✓ |
-| 2 | asset-setup-matrix-v1 | ✓ OK | 726 ms | `tools/backtests/output/asset-setup-matrix.json` | ✓ |
-| 3 | setup-variant-matrix-v1 | ✓ OK | 835 ms | `tools/backtests/output/setup-variant-matrix.json` | ✓ |
-| 4 | variant-regime-matrix-v1 | ✓ OK | 1.2 s | `tools/backtests/output/variant-regime-matrix.json` | ✓ |
-| 5 | walk-forward-regime-validator-v1 | ✓ OK | 944 ms | `tools/backtests/output/walk-forward-regime-validator.json` | ✓ |
-| 6 | tradable-universe-v1 | ✓ OK | 728 ms | `tools/backtests/output/tradable-universe.json` | ✓ |
+| 1 | asset-quality-engine-v1 | ✓ OK | 1.6 s | `tools/backtests/output/asset-quality-report.json` | ✓ |
+| 2 | asset-setup-matrix-v1 | ✓ OK | 630 ms | `tools/backtests/output/asset-setup-matrix.json` | ✓ |
+| 3 | setup-variant-matrix-v1 | ✓ OK | 1.2 s | `tools/backtests/output/setup-variant-matrix.json` | ✓ |
+| 4 | variant-regime-matrix-v1 | ✓ OK | 1.8 s | `tools/backtests/output/variant-regime-matrix.json` | ✓ |
+| 5 | walk-forward-regime-validator-v1 | ✓ OK | 863 ms | `tools/backtests/output/walk-forward-regime-validator.json` | ✓ |
+| 6 | tradable-universe-v1 | ✓ OK | 575 ms | `tools/backtests/output/tradable-universe.json` | ✓ |
 
 ## Outputs vérifiés
 

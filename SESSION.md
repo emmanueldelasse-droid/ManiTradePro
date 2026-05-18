@@ -1631,3 +1631,108 @@ Non-régression : tous les outputs régénérés par le pipeline sont byte-ident
 Usage typique :
 - Après un nouveau backtest (RS regime / Pullback / multi-setup-grid), relancer ce pipeline pour rafraîchir les 6 moteurs et le tradable-universe en une commande.
 - Vérifier `quant-pipeline-run-summary.md` pour le statut, les durées et les éventuelles erreurs.
+
+---
+
+# Allocation Engine v1 — premier plan théorique
+
+Fichier créé :
+
+```text
+tools/backtests/allocation-engine-v1.mjs
+```
+
+Consomme `tradable-universe.json` et produit un plan d'allocation théorique.
+
+Sorties :
+
+- `tools/backtests/output/allocation-plan.json`
+- `tools/backtests/output/allocation-plan.md`
+
+**Règle absolue rappelée dans le rapport** : ce moteur ne passe aucun ordre, ne prépare aucun ordre broker, ne touche aucun endpoint live. Il produit un plan théorique destiné à informer une décision humaine.
+
+## Politique d'allocation
+
+- Unités de base par tier : A=1.0, B=0.7, C=0.35, D=0.10.
+- Max positions : 10.
+- Max EXPERIMENTAL : 2.
+- 1 position par symbole maximum.
+- Caps thème : crypto 25 %, tech_ai 60 %, leveraged 5 %.
+- Caps setup : Pullback 50 %, RS 35 %, Breakout 25 %, MeanRev/VolComp 0 % (interdits en allocation principale).
+- Leveraged ETF (SOXL, USD, ROM, TQQQ, SQQQ, UPRO) : forcés en profil REDUCE max, jamais en allocation normale.
+
+## Détail technique des caps
+
+Les caps sont exprimés en fraction du **budget cible** (`10 × tier B = 7.0 unités`), pas du portefeuille courant. Sans budget cible, le 1er candidat tech_ai à 1.0 unit serait à 100 % de son thème et rejeté à tort. Si le portefeuille n'atteint pas le budget cible (moins de 10 positions), les % réels peuvent dépasser les caps cibles — un warning explicite est levé pour transparence.
+
+## Résultat du premier run
+
+10 positions sélectionnées sur 135 candidates dédoublonnées (de 538 cellules `decision != BLOCK`).
+
+| # | Symbole | Tier | Setup | Régime | Poids | Thème |
+|---:|---|---|---|---|---:|---|
+| 1 | VUG | A | PULLBACK_MOMENTUM | RISK_ON | 13.25% | tech_ai |
+| 2 | SPYG | A | PULLBACK_MOMENTUM | RISK_ON | 13.25% | tech_ai |
+| 3 | APP | A | RELATIVE_STRENGTH_ROTATION | RISK_ON | 13.25% | tech_ai |
+| 4 | IYW | A | PULLBACK_MOMENTUM | RISK_ON | 13.25% | tech_ai |
+| 5 | GLD | A | BREAKOUT_EXPANSION | RISK_ON | 13.25% | defensive_other |
+| 6 | SOL | B | RELATIVE_STRENGTH_ROTATION | RISK_ON | 9.27% | crypto |
+| 7 | MSTR | B | RELATIVE_STRENGTH_ROTATION | RISK_ON | 9.27% | crypto |
+| 8 | JPM | B | BREAKOUT_EXPANSION | RISK_ON | 9.27% | defensive_other |
+| 9 | ROM | C | PULLBACK_MOMENTUM | RISK_ON | 4.64% | leveraged |
+| 10 | CRWD | D | PULLBACK_MOMENTUM | RANGE | 1.32% | tech_ai |
+
+## Exposition vérifiée
+
+- tech_ai : 54.32 % (cap 60 %) ✓
+- defensive_other : 22.52 % (pas de cap)
+- crypto : 18.54 % (cap 25 %) ✓
+- leveraged : 4.64 % (cap 5 %) ✓
+- Pullback : 45.71 % (cap 50 %) ✓
+- RS : 31.79 % (cap 35 %) ✓
+- Breakout : 22.52 % (cap 25 %) ✓
+- MeanRev / VolComp : 0 % ✓
+
+## Warnings levés
+
+- ⚠ Aucune position RISK_OFF dans le plan — pas de couverture explicite si le régime macro bascule. Cohérent avec la matrice variant-regime qui montre que RISK_OFF est très majoritairement AVOID/INSUFFICIENT_DATA.
+- ⚠ 3 ETF tech proches (VUG, SPYG, IYW) — corrélation élevée probable. Une classification thématique v2 plus fine pourrait grouper ces ETF dans un sous-thème "us_growth_etf" et appliquer un cap interne.
+
+## Rejets par filtre (résumé)
+
+Sur les 125 candidates non sélectionnées :
+
+- cap thème tech_ai : 54
+- max 10 positions : 49
+- cap setup Pullback 50 % : 13
+- setup non prioritaire (MeanRev / VolComp) : 4
+- cap setup Breakout 25 % : 1
+- doublons symbole : 1
+- cap thème crypto : 1
+- cap thème leveraged : 1
+
+## Non-régression confirmée
+
+Le pipeline complet (`run-quant-pipeline-v1.mjs`) a été relancé après création de l'allocation engine. Toutes les sources (6 moteurs amont) sont byte-identiques au snapshot pré-run. L'allocation engine est purement aval, ne modifie aucun fichier en amont.
+
+## Limites résiduelles
+
+- Pas de coût de transaction modélisé (priorité #3 du TODO quant).
+- Classification thématique large et best-effort (tech_ai 60 % couvre semi + IA + tech + cloud + cyber — c'est large).
+- Caps statiques v1, à calibrer empiriquement après paper trading live.
+- Pas de rebalancing dynamique : photo à l'instant T.
+- Verdict ALLOW dans tradable-universe ≠ autorisation live. Ce plan informe, il ne décide pas.
+
+## Conséquence opérationnelle
+
+Le pipeline complet quant ManiTradePro est désormais :
+
+```text
+1. Backtests sources (RS regime / Pullback yearly-walkforward / multi-setup-grid) [~3 min]
+2. run-quant-pipeline-v1.mjs (6 moteurs d'analyse) [~5 s]
+3. allocation-engine-v1.mjs (plan théorique 10 positions max) [< 1 s]
+```
+
+Point d'entrée final : `tools/backtests/output/allocation-plan.json`.
+
+Tout reste offline, aucun connecteur broker, aucun ordre. La transition vers le réel reste conditionnée à : paper trading live validé, gestion du risque opérationnelle, kill-switch testé, connecteur broker.

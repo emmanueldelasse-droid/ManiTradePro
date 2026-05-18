@@ -1,0 +1,1288 @@
+{
+  "generatedAt": "2026-05-18T08:25:13.808Z",
+  "source": "tools/backtests/output/tradable-universe.json",
+  "status": "ok",
+  "policy": {
+    "baseUnits": {
+      "A": 1,
+      "B": 0.7,
+      "C": 0.35,
+      "D": 0.1
+    },
+    "caps": {
+      "maxPositions": 10,
+      "maxExperimentalPositions": 2,
+      "byTheme": {
+        "crypto": 0.25,
+        "tech_ai": 0.6,
+        "leveraged": 0.05
+      },
+      "bySetup": {
+        "PULLBACK_MOMENTUM": 0.5,
+        "RELATIVE_STRENGTH_ROTATION": 0.35,
+        "BREAKOUT_EXPANSION": 0.25,
+        "MEAN_REVERSION": 0,
+        "VOLATILITY_COMPRESSION": 0
+      }
+    },
+    "nonPrioritySetups": [
+      "MEAN_REVERSION",
+      "VOLATILITY_COMPRESSION"
+    ],
+    "leveragedEtfs": [
+      "SOXL",
+      "USD",
+      "ROM",
+      "TQQQ",
+      "SQQQ",
+      "UPRO"
+    ]
+  },
+  "summary": {
+    "candidateCells": 538,
+    "dedupedCandidates": 135,
+    "selectedPositions": 10,
+    "totalWeight": 100.02,
+    "byTier": {
+      "A": {
+        "positions": 5,
+        "weightPct": 66.25
+      },
+      "B": {
+        "positions": 3,
+        "weightPct": 27.81
+      },
+      "C": {
+        "positions": 1,
+        "weightPct": 4.64
+      },
+      "D": {
+        "positions": 1,
+        "weightPct": 1.32
+      }
+    },
+    "bySetup": {
+      "PULLBACK_MOMENTUM": {
+        "positions": 5,
+        "weightPct": 45.71
+      },
+      "RELATIVE_STRENGTH_ROTATION": {
+        "positions": 3,
+        "weightPct": 31.79
+      },
+      "BREAKOUT_EXPANSION": {
+        "positions": 2,
+        "weightPct": 22.52
+      }
+    },
+    "byTheme": {
+      "tech_ai": {
+        "positions": 5,
+        "weightPct": 54.32
+      },
+      "defensive_other": {
+        "positions": 2,
+        "weightPct": 22.52
+      },
+      "crypto": {
+        "positions": 2,
+        "weightPct": 18.54
+      },
+      "leveraged": {
+        "positions": 1,
+        "weightPct": 4.64
+      }
+    },
+    "constraintsApplied": [
+      "cap thème tech_ai",
+      "cap setup PULLBACK_MOMENTUM",
+      "cap setup BREAKOUT_EXPANSION",
+      "duplicate symbol",
+      "cap thème crypto",
+      "cap thème leveraged",
+      "max positions",
+      "setup non prioritaire interdit"
+    ]
+  },
+  "positions": [
+    {
+      "rank": 1,
+      "symbol": "VUG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "weightPct": 13.25,
+      "allocationProfile": "normal",
+      "theme": "tech_ai",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 2,
+      "symbol": "SPYG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "weightPct": 13.25,
+      "allocationProfile": "normal",
+      "theme": "tech_ai",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 3,
+      "symbol": "APP",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "weightPct": 13.25,
+      "allocationProfile": "normal",
+      "theme": "tech_ai",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 4,
+      "symbol": "IYW",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "weightPct": 13.25,
+      "allocationProfile": "normal",
+      "theme": "tech_ai",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 5,
+      "symbol": "GLD",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.5_stop1_rr2",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "weightPct": 13.25,
+      "allocationProfile": "normal",
+      "theme": "defensive_other",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 6,
+      "symbol": "SOL",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "B",
+      "baseUnit": 0.7,
+      "weightPct": 9.27,
+      "allocationProfile": "normal",
+      "theme": "crypto",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 7,
+      "symbol": "MSTR",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "B",
+      "baseUnit": 0.7,
+      "weightPct": 9.27,
+      "allocationProfile": "normal",
+      "theme": "crypto",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 8,
+      "symbol": "JPM",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "decision": "ALLOW",
+      "compositeTier": "B",
+      "baseUnit": 0.7,
+      "weightPct": 9.27,
+      "allocationProfile": "normal",
+      "theme": "defensive_other",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023"
+      ],
+      "risks": []
+    },
+    {
+      "rank": 9,
+      "symbol": "ROM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "decision": "REDUCE",
+      "compositeTier": "C",
+      "baseUnit": 0.35,
+      "weightPct": 4.64,
+      "allocationProfile": "reduced",
+      "theme": "leveraged",
+      "reasons": [
+        "WF PASS — test 2024-2025 confirme train 2021-2023",
+        "cap : ETF leveragé (ROM) → max REDUCE"
+      ],
+      "risks": [
+        "ETF à effet de levier — profil de risque non-linéaire, le moteur ne le détecte pas seul"
+      ]
+    },
+    {
+      "rank": 10,
+      "symbol": "CRWD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "decision": "EXPERIMENTAL",
+      "compositeTier": "D",
+      "baseUnit": 0.1,
+      "weightPct": 1.32,
+      "allocationProfile": "micro",
+      "theme": "tech_ai",
+      "reasons": [
+        "WF insuffisant mais base très forte (variant-regime STRONG + asset-quality ELITE/CORE + confidence ≥ MEDIUM)"
+      ],
+      "risks": []
+    }
+  ],
+  "rejectedCandidates": [
+    {
+      "symbol": "SOXQ",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "VRNS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "APLD",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "CLOU",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "FICO",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "ABNB",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "IGM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "PSI",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "ANET",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "PANW",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "XSD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "DELL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "GOOGL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "MA",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "SIE",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "SMH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "SPY",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "SHOP",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "SLAB",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "XLK",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "SOXX",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "WCLD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "FTEC",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "VGT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "TYL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "PH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "KLAC",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "AMAT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "SAP",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "BKNG",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "DT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "AMZN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "SNPS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "DOCN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "BNB",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "HUBS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "NFLX",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "TER",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "XSW",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "PATH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "AAPL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "WM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "GEN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "BOTZ",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "CAMT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "MPWR",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "TSM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "BNB",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "COST",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "ASML",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "JPM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 4.00)"
+    },
+    {
+      "symbol": "SOL",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap setup BREAKOUT_EXPANSION dépasserait 25% du budget cible (1.75 unités, futur 2.00)"
+    },
+    {
+      "symbol": "CDNS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "A",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 5.00)"
+    },
+    {
+      "symbol": "CRWD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "ROKU",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "RMBS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "QQQ",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "ACLS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "MU",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "SMCI",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "NVDA",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h50_vol1.2_stop1.5_rr2.5",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "ORCL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "SWKS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "MSTR",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.5_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "symbole MSTR déjà en portefeuille (1 position max par symbole)"
+    },
+    {
+      "symbol": "STM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "PLTR",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "COIN",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème crypto dépasserait 25% du budget cible (1.75 unités, futur 2.10)"
+    },
+    {
+      "symbol": "CHKP",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap thème tech_ai dépasserait 60% du budget cible (4.20 unités, futur 4.70)"
+    },
+    {
+      "symbol": "ETN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "B",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 3.70)"
+    },
+    {
+      "symbol": "USD",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "C",
+      "reason": "cap thème leveraged dépasserait 5% du budget cible (0.35 unités, futur 0.70)"
+    },
+    {
+      "symbol": "GLD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "C",
+      "reason": "symbole GLD déjà en portefeuille (1 position max par symbole)"
+    },
+    {
+      "symbol": "LIN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "C",
+      "reason": "cap setup PULLBACK_MOMENTUM dépasserait 50% du budget cible (3.50 unités, futur 3.70)"
+    },
+    {
+      "symbol": "VRNS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "PLTR",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SMCI",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "AXP",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "USD",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "CYBR",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "BTC",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "pullback_rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ETH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "NVDA",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SPY",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SOL",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h50_vol1.5_stop1.5_rr2.5",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "CYBR",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "JPM",
+      "setup": "VOLATILITY_COMPRESSION",
+      "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "setup non prioritaire (VOLATILITY_COMPRESSION) interdit en allocation principale"
+    },
+    {
+      "symbol": "PDD",
+      "setup": "MEAN_REVERSION",
+      "variant": "meanrev_rsi35_dist4_stop1_rr1.2",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "setup non prioritaire (MEAN_REVERSION) interdit en allocation principale"
+    },
+    {
+      "symbol": "ETN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ACLS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ANET",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "CAMT",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SOL",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ACLS",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ETH",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "AVAX",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "UPST",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "PLTR",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SMCI",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "TER",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "FICO",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "AEHR",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_OFF",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "APLD",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "PH",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "GOOGL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.5",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "BNB",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SOXX",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SOXQ",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "PDD",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "FICO",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "NBIS",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "RMBS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SENT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_OFF",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "CAMT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "AMAT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SMCI",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RISK_OFF",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "KLAC",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_5_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "PLTR",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "BNB",
+      "setup": "VOLATILITY_COMPRESSION",
+      "variant": "compression_20_ratio0.75_break20_stop1_rr2",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "setup non prioritaire (VOLATILITY_COMPRESSION) interdit en allocation principale"
+    },
+    {
+      "symbol": "LINK",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_120d_top10_hold20",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "STM",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_3_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "SENT",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "TYL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "AMZN",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RANGE",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "GLD",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_OFF",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "NVDA",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "max 10 positions atteintes"
+    },
+    {
+      "symbol": "ACLS",
+      "setup": "MEAN_REVERSION",
+      "variant": "meanrev_rsi35_dist4_stop1_rr1.2",
+      "regime": "RISK_ON",
+      "compositeTier": "D",
+      "reason": "setup non prioritaire (MEAN_REVERSION) interdit en allocation principale"
+    }
+  ],
+  "warnings": [
+    "Aucune position RISK_OFF dans le plan — le portefeuille n'a pas de couverture explicite si le régime macro bascule en RISK_OFF.",
+    "3 ETF tech sélectionnés (VUG, SPYG, IYW) — risque de doublon d'exposition, vérifier la corrélation entre eux."
+  ]
+}

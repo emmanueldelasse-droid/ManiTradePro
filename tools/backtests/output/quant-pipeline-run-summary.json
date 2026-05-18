@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-05-18T07:51:54.525Z",
+  "generatedAt": "2026-05-18T08:25:06.748Z",
   "status": "ok",
-  "totalDurationMs": 5215,
+  "totalDurationMs": 6720,
   "steps": [
     {
       "name": "asset-quality-engine-v1",
       "command": "node tools/backtests/asset-quality-engine-v1.mjs",
-      "durationMs": 757,
+      "durationMs": 1650,
       "output": "tools/backtests/output/asset-quality-report.json",
       "outputExists": true,
       "outputModified": true,
@@ -15,7 +15,7 @@
     {
       "name": "asset-setup-matrix-v1",
       "command": "node tools/backtests/asset-setup-matrix-v1.mjs",
-      "durationMs": 726,
+      "durationMs": 630,
       "output": "tools/backtests/output/asset-setup-matrix.json",
       "outputExists": true,
       "outputModified": true,
@@ -24,7 +24,7 @@
     {
       "name": "setup-variant-matrix-v1",
       "command": "node tools/backtests/setup-variant-matrix-v1.mjs",
-      "durationMs": 835,
+      "durationMs": 1218,
       "output": "tools/backtests/output/setup-variant-matrix.json",
       "outputExists": true,
       "outputModified": true,
@@ -33,7 +33,7 @@
     {
       "name": "variant-regime-matrix-v1",
       "command": "node tools/backtests/variant-regime-matrix-v1.mjs",
-      "durationMs": 1222,
+      "durationMs": 1782,
       "output": "tools/backtests/output/variant-regime-matrix.json",
       "outputExists": true,
       "outputModified": true,
@@ -42,7 +42,7 @@
     {
       "name": "walk-forward-regime-validator-v1",
       "command": "node tools/backtests/walk-forward-regime-validator-v1.mjs",
-      "durationMs": 944,
+      "durationMs": 863,
       "output": "tools/backtests/output/walk-forward-regime-validator.json",
       "outputExists": true,
       "outputModified": true,
@@ -51,7 +51,7 @@
     {
       "name": "tradable-universe-v1",
       "command": "node tools/backtests/tradable-universe-v1.mjs",
-      "durationMs": 728,
+      "durationMs": 575,
       "output": "tools/backtests/output/tradable-universe.json",
       "outputExists": true,
       "outputModified": true,
