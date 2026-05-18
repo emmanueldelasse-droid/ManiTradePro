@@ -1,0 +1,922 @@
+{
+  "generatedAt": "2026-05-18T14:09:11.372Z",
+  "scope": "Audit look-ahead / execution / temporal leakage / survivorship sur BREAKOUT_EXPANSION, MEAN_REVERSION, RELATIVE_STRENGTH_ROTATION",
+  "sources": [
+    "tools/backtests/backtest-multi-setup-grid.mjs",
+    "tools/backtests/backtest-relative-strength-rotation-regime-v1.mjs",
+    "tools/backtests/universe-v2.mjs",
+    "data/*.json (OHLC quotidiens 2021-2025)",
+    "tools/backtests/output/setup-performance-summary-v1.json (référence)",
+    "tools/backtests/output/pullback-lookahead-audit-v1.json (référence)",
+    "tools/backtests/output/rolling-walkforward-validator.json (référence)",
+    "tools/backtests/output/setup-variant-matrix.json (référence)"
+  ],
+  "survivorship": {
+    "declaredUniverseSize": 191,
+    "dataFilesAvailable": 182,
+    "missingDataSymbols": [
+      "DIA",
+      "XLE",
+      "XLF",
+      "XLV",
+      "XLI",
+      "XLP",
+      "XLY",
+      "XLB",
+      "XLU",
+      "XLRE",
+      "XLC",
+      "EWJ",
+      "EWZ",
+      "FXI",
+      "EEM",
+      "VGK",
+      "FEZ",
+      "INDA",
+      "EWT",
+      "EWY",
+      "SLV",
+      "USO",
+      "UNG",
+      "DBA",
+      "IEF",
+      "HYG",
+      "LQD",
+      "TQQQ",
+      "KO",
+      "PG",
+      "JNJ"
+    ],
+    "dataFilesNotInUniverse": [
+      "ANET",
+      "CDNS",
+      "CFLT",
+      "DELL",
+      "EURUSD",
+      "GBPUSD",
+      "GEN",
+      "HCP",
+      "IGM",
+      "INTC",
+      "PATH",
+      "PAYX",
+      "RBRK",
+      "SENT",
+      "SIE",
+      "SNPS",
+      "SPLK",
+      "SPYG",
+      "USDJPY",
+      "VUG",
+      "XSW",
+      "ZEN"
+    ]
+  },
+  "setups": {
+    "BREAKOUT_EXPANSION": {
+      "models": [
+        "CURRENT",
+        "NEXT_OPEN",
+        "SIGNAL_CLOSE",
+        "NO_SIGNAL_CANDLE_LOW_STOP",
+        "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP"
+      ],
+      "variants": [
+        "breakout_h20_vol1.2_stop1_rr2",
+        "breakout_h20_vol1.5_stop1_rr2",
+        "breakout_h50_vol1.2_stop1.5_rr2.5",
+        "breakout_h50_vol1.5_stop1.5_rr2.5"
+      ],
+      "staticFindings": [
+        {
+          "id": "B1",
+          "component": "highestHigh (fenêtre lookback)",
+          "codeRef": "candles.slice(-(variant.lookback + 1), -1)",
+          "description": "Fenêtre EXCLUT déjà la bougie signal. highestHigh est calculé sur les `lookback` jours strictement antérieurs.",
+          "severity": "LOW",
+          "verdict": "SAFE"
+        },
+        {
+          "id": "B2",
+          "component": "entry = lastCandle.close",
+          "codeRef": "const entry = lastCandle.close",
+          "description": "L'entrée est le close de la bougie signal. Réaliste UNIQUEMENT si on accepte un MOC order (Market On Close) ou si on attend l'open suivant. Si pas de MOC dispo en réel, l'entrée effective est open[i+1].",
+          "severity": "MEDIUM",
+          "verdict": "RISKY (selon mode d'exécution)"
+        },
+        {
+          "id": "B3",
+          "component": "stop = min(lastCandle.low, entry - atr*x)",
+          "codeRef": "Math.min(lastCandle.low, entry - atr * variant.stopAtr)",
+          "description": "Le stop utilise low[i] qui est connu en fin de jour. Si l'entrée est intraday (impossible sans tick data), le low[i] serait postérieur. En MOC ou post-close, low[i] est OK.",
+          "severity": "LOW",
+          "verdict": "RISKY (selon mode d'exécution)"
+        },
+        {
+          "id": "B4",
+          "component": "ATR calcul",
+          "codeRef": "averageRange(candles, 14)",
+          "description": "ATR inclut TR de la bougie i (TR utilise high[i], low[i], close[i-1]). Tout est connu en fin de jour, OK.",
+          "severity": "LOW",
+          "verdict": "SAFE"
+        },
+        {
+          "id": "B5",
+          "component": "volumeMA",
+          "codeRef": "volumeMA(candles.slice(0, -1), 20)",
+          "description": "Volume MA calculé sur fenêtre EXCLUANT bougie i. Pas de look-ahead.",
+          "severity": "LOW",
+          "verdict": "SAFE"
+        }
+      ],
+      "byVariantModel": {
+        "breakout_h20_vol1.2_stop1_rr2": {
+          "CURRENT": {
+            "trades": 3279,
+            "wins": 891,
+            "losses": 1744,
+            "timeouts": 644,
+            "winrate": 27.17,
+            "expectancy": 0.012,
+            "profitFactor": 1.022,
+            "maxDrawdown": 100,
+            "totalPnl": 38
+          },
+          "NEXT_OPEN": {
+            "trades": 3279,
+            "wins": 806,
+            "losses": 1703,
+            "timeouts": 770,
+            "winrate": 24.58,
+            "expectancy": -0.028,
+            "profitFactor": 0.947,
+            "maxDrawdown": 182,
+            "totalPnl": -91
+          },
+          "SIGNAL_CLOSE": {
+            "trades": 3279,
+            "wins": 891,
+            "losses": 1744,
+            "timeouts": 644,
+            "winrate": 27.17,
+            "expectancy": 0.012,
+            "profitFactor": 1.022,
+            "maxDrawdown": 100,
+            "totalPnl": 38
+          },
+          "NO_SIGNAL_CANDLE_LOW_STOP": {
+            "trades": 3279,
+            "wins": 1096,
+            "losses": 1946,
+            "timeouts": 237,
+            "winrate": 33.42,
+            "expectancy": 0.075,
+            "profitFactor": 1.126,
+            "maxDrawdown": 43,
+            "totalPnl": 246
+          },
+          "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+            "trades": 3279,
+            "wins": 1002,
+            "losses": 2024,
+            "timeouts": 253,
+            "winrate": 30.56,
+            "expectancy": -0.006,
+            "profitFactor": 0.99,
+            "maxDrawdown": 132,
+            "totalPnl": -20
+          }
+        },
+        "breakout_h20_vol1.5_stop1_rr2": {
+          "CURRENT": {
+            "trades": 1892,
+            "wins": 513,
+            "losses": 953,
+            "timeouts": 426,
+            "winrate": 27.11,
+            "expectancy": 0.039,
+            "profitFactor": 1.077,
+            "maxDrawdown": 64,
+            "totalPnl": 73
+          },
+          "NEXT_OPEN": {
+            "trades": 1892,
+            "wins": 459,
+            "losses": 929,
+            "timeouts": 504,
+            "winrate": 24.26,
+            "expectancy": -0.006,
+            "profitFactor": 0.988,
+            "maxDrawdown": 97,
+            "totalPnl": -11
+          },
+          "SIGNAL_CLOSE": {
+            "trades": 1892,
+            "wins": 513,
+            "losses": 953,
+            "timeouts": 426,
+            "winrate": 27.11,
+            "expectancy": 0.039,
+            "profitFactor": 1.077,
+            "maxDrawdown": 64,
+            "totalPnl": 73
+          },
+          "NO_SIGNAL_CANDLE_LOW_STOP": {
+            "trades": 1892,
+            "wins": 652,
+            "losses": 1122,
+            "timeouts": 118,
+            "winrate": 34.46,
+            "expectancy": 0.096,
+            "profitFactor": 1.162,
+            "maxDrawdown": 48,
+            "totalPnl": 182
+          },
+          "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+            "trades": 1892,
+            "wins": 597,
+            "losses": 1166,
+            "timeouts": 129,
+            "winrate": 31.55,
+            "expectancy": 0.015,
+            "profitFactor": 1.024,
+            "maxDrawdown": 79,
+            "totalPnl": 28
+          }
+        },
+        "breakout_h50_vol1.2_stop1.5_rr2.5": {
+          "CURRENT": {
+            "trades": 2686,
+            "wins": 357,
+            "losses": 1217,
+            "timeouts": 1112,
+            "winrate": 13.29,
+            "expectancy": -0.121,
+            "profitFactor": 0.733,
+            "maxDrawdown": 388,
+            "totalPnl": -324.5
+          },
+          "NEXT_OPEN": {
+            "trades": 2686,
+            "wins": 321,
+            "losses": 1190,
+            "timeouts": 1175,
+            "winrate": 11.95,
+            "expectancy": -0.144,
+            "profitFactor": 0.674,
+            "maxDrawdown": 441,
+            "totalPnl": -387.5
+          },
+          "SIGNAL_CLOSE": {
+            "trades": 2686,
+            "wins": 357,
+            "losses": 1217,
+            "timeouts": 1112,
+            "winrate": 13.29,
+            "expectancy": -0.121,
+            "profitFactor": 0.733,
+            "maxDrawdown": 388,
+            "totalPnl": -324.5
+          },
+          "NO_SIGNAL_CANDLE_LOW_STOP": {
+            "trades": 2686,
+            "wins": 442,
+            "losses": 1345,
+            "timeouts": 899,
+            "winrate": 16.46,
+            "expectancy": -0.089,
+            "profitFactor": 0.822,
+            "maxDrawdown": 325,
+            "totalPnl": -240
+          },
+          "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+            "trades": 2686,
+            "wins": 411,
+            "losses": 1366,
+            "timeouts": 909,
+            "winrate": 15.3,
+            "expectancy": -0.126,
+            "profitFactor": 0.752,
+            "maxDrawdown": 412,
+            "totalPnl": -338.5
+          }
+        },
+        "breakout_h50_vol1.5_stop1.5_rr2.5": {
+          "CURRENT": {
+            "trades": 1571,
+            "wins": 212,
+            "losses": 679,
+            "timeouts": 680,
+            "winrate": 13.49,
+            "expectancy": -0.095,
+            "profitFactor": 0.781,
+            "maxDrawdown": 199.5,
+            "totalPnl": -149
+          },
+          "NEXT_OPEN": {
+            "trades": 1571,
+            "wins": 185,
+            "losses": 660,
+            "timeouts": 726,
+            "winrate": 11.78,
+            "expectancy": -0.126,
+            "profitFactor": 0.701,
+            "maxDrawdown": 239.5,
+            "totalPnl": -197.5
+          },
+          "SIGNAL_CLOSE": {
+            "trades": 1571,
+            "wins": 212,
+            "losses": 679,
+            "timeouts": 680,
+            "winrate": 13.49,
+            "expectancy": -0.095,
+            "profitFactor": 0.781,
+            "maxDrawdown": 199.5,
+            "totalPnl": -149
+          },
+          "NO_SIGNAL_CANDLE_LOW_STOP": {
+            "trades": 1571,
+            "wins": 286,
+            "losses": 785,
+            "timeouts": 500,
+            "winrate": 18.2,
+            "expectancy": -0.045,
+            "profitFactor": 0.911,
+            "maxDrawdown": 158,
+            "totalPnl": -70
+          },
+          "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+            "trades": 1571,
+            "wins": 263,
+            "losses": 802,
+            "timeouts": 506,
+            "winrate": 16.74,
+            "expectancy": -0.092,
+            "profitFactor": 0.82,
+            "maxDrawdown": 207.5,
+            "totalPnl": -144.5
+          }
+        }
+      },
+      "global": {
+        "CURRENT": {
+          "trades": 9428,
+          "wins": 1973,
+          "losses": 4593,
+          "timeouts": 2862,
+          "winrate": 20.93,
+          "expectancy": -0.038,
+          "profitFactor": 0.921,
+          "maxDrawdown": 525,
+          "totalPnl": -362.5
+        },
+        "NEXT_OPEN": {
+          "trades": 9428,
+          "wins": 1771,
+          "losses": 4482,
+          "timeouts": 3175,
+          "winrate": 18.78,
+          "expectancy": -0.073,
+          "profitFactor": 0.847,
+          "maxDrawdown": 732.5,
+          "totalPnl": -687
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 9428,
+          "wins": 1973,
+          "losses": 4593,
+          "timeouts": 2862,
+          "winrate": 20.93,
+          "expectancy": -0.038,
+          "profitFactor": 0.921,
+          "maxDrawdown": 525,
+          "totalPnl": -362.5
+        },
+        "NO_SIGNAL_CANDLE_LOW_STOP": {
+          "trades": 9428,
+          "wins": 2476,
+          "losses": 5198,
+          "timeouts": 1754,
+          "winrate": 26.26,
+          "expectancy": 0.013,
+          "profitFactor": 1.023,
+          "maxDrawdown": 380.5,
+          "totalPnl": 118
+        },
+        "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+          "trades": 9428,
+          "wins": 2273,
+          "losses": 5358,
+          "timeouts": 1797,
+          "winrate": 24.11,
+          "expectancy": -0.05,
+          "profitFactor": 0.911,
+          "maxDrawdown": 553,
+          "totalPnl": -475
+        }
+      },
+      "severity": {
+        "level": "INVALID_BACKTEST",
+        "justification": "PF CURRENT 0.92 / PF réaliste 0.91 = ×1.01 (réaliste sous le break-even)"
+      },
+      "gldFocus": {
+        "CURRENT": {
+          "trades": 47,
+          "wins": 25,
+          "losses": 21,
+          "timeouts": 1,
+          "winrate": 53.19,
+          "expectancy": 0.617,
+          "profitFactor": 2.381,
+          "maxDrawdown": 4,
+          "totalPnl": 29
+        },
+        "NEXT_OPEN": {
+          "trades": 47,
+          "wins": 18,
+          "losses": 20,
+          "timeouts": 9,
+          "winrate": 38.3,
+          "expectancy": 0.34,
+          "profitFactor": 1.8,
+          "maxDrawdown": 5,
+          "totalPnl": 16
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 47,
+          "wins": 25,
+          "losses": 21,
+          "timeouts": 1,
+          "winrate": 53.19,
+          "expectancy": 0.617,
+          "profitFactor": 2.381,
+          "maxDrawdown": 4,
+          "totalPnl": 29
+        },
+        "NO_SIGNAL_CANDLE_LOW_STOP": {
+          "trades": 47,
+          "wins": 23,
+          "losses": 24,
+          "timeouts": 0,
+          "winrate": 48.94,
+          "expectancy": 0.468,
+          "profitFactor": 1.917,
+          "maxDrawdown": 4,
+          "totalPnl": 22
+        },
+        "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+          "trades": 47,
+          "wins": 24,
+          "losses": 20,
+          "timeouts": 3,
+          "winrate": 51.06,
+          "expectancy": 0.596,
+          "profitFactor": 2.4,
+          "maxDrawdown": 5,
+          "totalPnl": 28
+        }
+      }
+    },
+    "MEAN_REVERSION": {
+      "models": [
+        "CURRENT",
+        "NEXT_OPEN",
+        "SIGNAL_CLOSE",
+        "NO_SIGNAL_CANDLE_LOW_STOP",
+        "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP"
+      ],
+      "variants": [
+        "meanrev_rsi30_dist5_stop1_rr1.2",
+        "meanrev_rsi35_dist4_stop1_rr1.2",
+        "meanrev_rsi30_dist7_stop1.5_rr1.5"
+      ],
+      "staticFindings": [
+        {
+          "id": "M1",
+          "component": "greenReversal",
+          "codeRef": "lastCandle.close > lastCandle.open && lastCandle.close > prevCandle.close",
+          "description": "Condition utilise close[i], open[i], close[i-1]. Toutes connues en fin de jour. OK signal post-close.",
+          "severity": "LOW",
+          "verdict": "SAFE"
+        },
+        {
+          "id": "M2",
+          "component": "entry = lastCandle.close",
+          "codeRef": "const entry = lastCandle.close",
+          "description": "Même remarque que Breakout B2 : réaliste si MOC, sinon NEXT_OPEN.",
+          "severity": "MEDIUM",
+          "verdict": "RISKY (selon mode d'exécution)"
+        },
+        {
+          "id": "M3",
+          "component": "stop = min(lastCandle.low, entry - atr*x)",
+          "codeRef": "Math.min(lastCandle.low, entry - atr * variant.stopAtr)",
+          "description": "Idem Breakout B3. low[i] connu en fin de jour, OK post-close.",
+          "severity": "LOW",
+          "verdict": "RISKY (selon mode d'exécution)"
+        }
+      ],
+      "byVariantModel": {
+        "meanrev_rsi30_dist5_stop1_rr1.2": {
+          "CURRENT": {
+            "trades": 1098,
+            "wins": 462,
+            "losses": 374,
+            "timeouts": 262,
+            "winrate": 42.08,
+            "expectancy": 0.164,
+            "profitFactor": 1.482,
+            "maxDrawdown": 24.8,
+            "totalPnl": 180.4
+          },
+          "NEXT_OPEN": {
+            "trades": 1098,
+            "wins": 405,
+            "losses": 380,
+            "timeouts": 313,
+            "winrate": 36.89,
+            "expectancy": 0.097,
+            "profitFactor": 1.279,
+            "maxDrawdown": 32.4,
+            "totalPnl": 106
+          },
+          "SIGNAL_CLOSE": {
+            "trades": 1098,
+            "wins": 462,
+            "losses": 374,
+            "timeouts": 262,
+            "winrate": 42.08,
+            "expectancy": 0.164,
+            "profitFactor": 1.482,
+            "maxDrawdown": 24.8,
+            "totalPnl": 180.4
+          },
+          "NO_SIGNAL_CANDLE_LOW_STOP": {
+            "trades": 1098,
+            "wins": 445,
+            "losses": 397,
+            "timeouts": 256,
+            "winrate": 40.53,
+            "expectancy": 0.125,
+            "profitFactor": 1.345,
+            "maxDrawdown": 27.2,
+            "totalPnl": 137
+          },
+          "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+            "trades": 1098,
+            "wins": 404,
+            "losses": 422,
+            "timeouts": 272,
+            "winrate": 36.79,
+            "expectancy": 0.057,
+            "profitFactor": 1.149,
+            "maxDrawdown": 51.6,
+            "totalPnl": 62.8
+          }
+        },
+        "meanrev_rsi35_dist4_stop1_rr1.2": {
+          "CURRENT": {
+            "trades": 2989,
+            "wins": 1377,
+            "losses": 1175,
+            "timeouts": 437,
+            "winrate": 46.07,
+            "expectancy": 0.16,
+            "profitFactor": 1.406,
+            "maxDrawdown": 26.4,
+            "totalPnl": 477.4
+          },
+          "NEXT_OPEN": {
+            "trades": 2989,
+            "wins": 1290,
+            "losses": 1173,
+            "timeouts": 526,
+            "winrate": 43.16,
+            "expectancy": 0.125,
+            "profitFactor": 1.32,
+            "maxDrawdown": 20.2,
+            "totalPnl": 375
+          },
+          "SIGNAL_CLOSE": {
+            "trades": 2989,
+            "wins": 1377,
+            "losses": 1175,
+            "timeouts": 437,
+            "winrate": 46.07,
+            "expectancy": 0.16,
+            "profitFactor": 1.406,
+            "maxDrawdown": 26.4,
+            "totalPnl": 477.4
+          },
+          "NO_SIGNAL_CANDLE_LOW_STOP": {
+            "trades": 2989,
+            "wins": 1360,
+            "losses": 1222,
+            "timeouts": 407,
+            "winrate": 45.5,
+            "expectancy": 0.137,
+            "profitFactor": 1.336,
+            "maxDrawdown": 29.4,
+            "totalPnl": 410
+          },
+          "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+            "trades": 2989,
+            "wins": 1307,
+            "losses": 1255,
+            "timeouts": 427,
+            "winrate": 43.73,
+            "expectancy": 0.105,
+            "profitFactor": 1.25,
+            "maxDrawdown": 29.6,
+            "totalPnl": 313.4
+          }
+        },
+        "meanrev_rsi30_dist7_stop1.5_rr1.5": {
+          "CURRENT": {
+            "trades": 987,
+            "wins": 240,
+            "losses": 241,
+            "timeouts": 506,
+            "winrate": 24.32,
+            "expectancy": 0.121,
+            "profitFactor": 1.494,
+            "maxDrawdown": 21.5,
+            "totalPnl": 119
+          },
+          "NEXT_OPEN": {
+            "trades": 987,
+            "wins": 198,
+            "losses": 242,
+            "timeouts": 547,
+            "winrate": 20.06,
+            "expectancy": 0.056,
+            "profitFactor": 1.227,
+            "maxDrawdown": 33.5,
+            "totalPnl": 55
+          },
+          "SIGNAL_CLOSE": {
+            "trades": 987,
+            "wins": 240,
+            "losses": 241,
+            "timeouts": 506,
+            "winrate": 24.32,
+            "expectancy": 0.121,
+            "profitFactor": 1.494,
+            "maxDrawdown": 21.5,
+            "totalPnl": 119
+          },
+          "NO_SIGNAL_CANDLE_LOW_STOP": {
+            "trades": 987,
+            "wins": 233,
+            "losses": 239,
+            "timeouts": 515,
+            "winrate": 23.61,
+            "expectancy": 0.112,
+            "profitFactor": 1.462,
+            "maxDrawdown": 21,
+            "totalPnl": 110.5
+          },
+          "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+            "trades": 987,
+            "wins": 195,
+            "losses": 265,
+            "timeouts": 527,
+            "winrate": 19.76,
+            "expectancy": 0.028,
+            "profitFactor": 1.104,
+            "maxDrawdown": 55.5,
+            "totalPnl": 27.5
+          }
+        }
+      },
+      "global": {
+        "CURRENT": {
+          "trades": 5074,
+          "wins": 2079,
+          "losses": 1790,
+          "timeouts": 1205,
+          "winrate": 40.97,
+          "expectancy": 0.153,
+          "profitFactor": 1.434,
+          "maxDrawdown": 26.4,
+          "totalPnl": 776.8
+        },
+        "NEXT_OPEN": {
+          "trades": 5074,
+          "wins": 1893,
+          "losses": 1795,
+          "timeouts": 1386,
+          "winrate": 37.31,
+          "expectancy": 0.106,
+          "profitFactor": 1.299,
+          "maxDrawdown": 38.9,
+          "totalPnl": 536
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 5074,
+          "wins": 2079,
+          "losses": 1790,
+          "timeouts": 1205,
+          "winrate": 40.97,
+          "expectancy": 0.153,
+          "profitFactor": 1.434,
+          "maxDrawdown": 26.4,
+          "totalPnl": 776.8
+        },
+        "NO_SIGNAL_CANDLE_LOW_STOP": {
+          "trades": 5074,
+          "wins": 2038,
+          "losses": 1858,
+          "timeouts": 1178,
+          "winrate": 40.17,
+          "expectancy": 0.13,
+          "profitFactor": 1.354,
+          "maxDrawdown": 29.4,
+          "totalPnl": 657.5
+        },
+        "NEXT_OPEN_NO_SIGNAL_CANDLE_STOP": {
+          "trades": 5074,
+          "wins": 1906,
+          "losses": 1942,
+          "timeouts": 1226,
+          "winrate": 37.56,
+          "expectancy": 0.08,
+          "profitFactor": 1.208,
+          "maxDrawdown": 60.9,
+          "totalPnl": 403.7
+        }
+      },
+      "severity": {
+        "level": "MEDIUM_RISK",
+        "justification": "PF CURRENT 1.43 / PF réaliste 1.21 = ×1.19"
+      }
+    },
+    "RELATIVE_STRENGTH_ROTATION": {
+      "models": [
+        "CURRENT",
+        "NEXT_OPEN_ENTRY_ONLY",
+        "NEXT_OPEN_BOTH"
+      ],
+      "variants": [
+        "rs_90d_top10_hold20",
+        "rs_120d_top10_hold20"
+      ],
+      "staticFindings": [
+        {
+          "id": "R1",
+          "component": "momentum sur lookback days",
+          "codeRef": "const now = candles[idx].close; const past = candles[idx - variant.lookback].close",
+          "description": "Momentum = (close[i] - close[i-lookback]) / close[i-lookback]. Causal.",
+          "severity": "LOW",
+          "verdict": "SAFE"
+        },
+        {
+          "id": "R2",
+          "component": "entry = candles[idx].close, exit = candles[idx + holdDays].close",
+          "codeRef": "const now = candles[idx].close (entry); const exit = candles[idx + variant.holdDays].close",
+          "description": "Entry au close[i] et exit au close[i+holdDays]. Comme Breakout/MeanRev, réaliste si MOC à l'entrée ET à la sortie. En réel, sans MOC, l'exécution est open[i+1] et open[i+1+holdDays]. Risque modéré.",
+          "severity": "MEDIUM",
+          "verdict": "RISKY (selon mode d'exécution)"
+        },
+        {
+          "id": "R3",
+          "component": "ranking inter-symboles à la date i",
+          "codeRef": "candidates.sort((a, b) => b.momentum - a.momentum)",
+          "description": "Le ranking nécessite le close[i] de TOUS les symboles, donc impossible à exécuter intraday. Doit être fait après cloture du marché, et l'exécution sera open[i+1] en pratique.",
+          "severity": "MEDIUM",
+          "verdict": "RISKY (ranking post-close, exécution open suivant)"
+        },
+        {
+          "id": "R4",
+          "component": "pnl = pnlPct / 5 (convention R)",
+          "codeRef": "const pnl = c.pnlPct / 5",
+          "description": "Conversion arbitraire : 5 % = 1R. Pas de look-ahead mais le rapport R/Risk n'a pas de sens absolu — c'est juste une normalisation.",
+          "severity": "LOW",
+          "verdict": "SAFE (convention documentée)"
+        },
+        {
+          "id": "R5",
+          "component": "overcounting regimeMode",
+          "codeRef": "Le moteur produit 3 regimeModes (ALL_REGIMES, NO_RISK_OFF, RISK_ON_ONLY)",
+          "description": "Les trades sont comptés trois fois dans certaines agrégations downstream (cf. setup-performance-summary). Pas un bias de calcul mais un risque d'interprétation.",
+          "severity": "LOW",
+          "verdict": "SAFE (déjà documenté ailleurs)"
+        }
+      ],
+      "byModelVariant": {
+        "CURRENT": {
+          "rs_90d_top10_hold20": {
+            "trades": 1091,
+            "wins": 593,
+            "losses": 498,
+            "timeouts": 0,
+            "winrate": 54.35,
+            "expectancy": 0.754,
+            "profitFactor": 1.575,
+            "maxDrawdown": 300.62,
+            "totalPnl": 822.64
+          },
+          "rs_120d_top10_hold20": {
+            "trades": 1049,
+            "wins": 578,
+            "losses": 470,
+            "timeouts": 1,
+            "winrate": 55.1,
+            "expectancy": 0.789,
+            "profitFactor": 1.589,
+            "maxDrawdown": 254.7,
+            "totalPnl": 827.5
+          }
+        },
+        "NEXT_OPEN_ENTRY_ONLY": {
+          "rs_90d_top10_hold20": {
+            "trades": 1091,
+            "wins": 582,
+            "losses": 505,
+            "timeouts": 4,
+            "winrate": 53.35,
+            "expectancy": 0.7,
+            "profitFactor": 1.522,
+            "maxDrawdown": 300.03,
+            "totalPnl": 763.87
+          },
+          "rs_120d_top10_hold20": {
+            "trades": 1049,
+            "wins": 567,
+            "losses": 476,
+            "timeouts": 6,
+            "winrate": 54.05,
+            "expectancy": 0.756,
+            "profitFactor": 1.557,
+            "maxDrawdown": 254.42,
+            "totalPnl": 793.51
+          }
+        },
+        "NEXT_OPEN_BOTH": {
+          "rs_90d_top10_hold20": {
+            "trades": 1091,
+            "wins": 590,
+            "losses": 499,
+            "timeouts": 2,
+            "winrate": 54.08,
+            "expectancy": 0.736,
+            "profitFactor": 1.551,
+            "maxDrawdown": 285.22,
+            "totalPnl": 803.33
+          },
+          "rs_120d_top10_hold20": {
+            "trades": 1049,
+            "wins": 580,
+            "losses": 468,
+            "timeouts": 1,
+            "winrate": 55.29,
+            "expectancy": 0.808,
+            "profitFactor": 1.598,
+            "maxDrawdown": 245.61,
+            "totalPnl": 847.52
+          }
+        }
+      },
+      "global": {
+        "CURRENT": {
+          "trades": 2140,
+          "wins": 1171,
+          "losses": 968,
+          "timeouts": 1,
+          "winrate": 54.72,
+          "expectancy": 0.771,
+          "profitFactor": 1.582,
+          "maxDrawdown": 300.62,
+          "totalPnl": 1650.14
+        },
+        "NEXT_OPEN_ENTRY_ONLY": {
+          "trades": 2140,
+          "wins": 1149,
+          "losses": 981,
+          "timeouts": 10,
+          "winrate": 53.69,
+          "expectancy": 0.728,
+          "profitFactor": 1.539,
+          "maxDrawdown": 300.03,
+          "totalPnl": 1557.38
+        },
+        "NEXT_OPEN_BOTH": {
+          "trades": 2140,
+          "wins": 1170,
+          "losses": 967,
+          "timeouts": 3,
+          "winrate": 54.67,
+          "expectancy": 0.771,
+          "profitFactor": 1.574,
+          "maxDrawdown": 285.22,
+          "totalPnl": 1650.85
+        }
+      },
+      "severity": {
+        "level": "CLEAN",
+        "justification": "PF CURRENT 1.58 / PF réaliste 1.57 = ×1.01"
+      }
+    }
+  }
+}
