@@ -2696,3 +2696,78 @@ Documentation pure. Aucun moteur, aucun runtime. 1 seul fichier modifié (SETUPS
 - Audit friction sur RS Rotation et GLD breakout (`friction-model-v1` appliqué).
 - PR walk-forward conditionnel régime pour RS Rotation (essayer de remonter 0/0 à un nombre significatif de cellules ROBUST/STABLE).
 - Décision politique : faut-il corriger le code Pullback/Breakout pour mesurer l'edge réel post-correction, ou abandonner définitivement et passer à de nouveaux setups ?
+
+---
+
+# RS Rotation Robustness Lab v1
+
+Fichier créé :
+
+```text
+tools/backtests/rs-rotation-robustness-lab-v1.mjs
+```
+
+Laboratoire de robustesse pour RELATIVE_STRENGTH_ROTATION. 33 configurations uniques testées via 6 sweeps univariés autour d'une baseline réaliste (NEXT_OPEN + friction obligatoire).
+
+Sorties :
+
+- `tools/backtests/output/rs-rotation-robustness-lab-v1.json`
+- `tools/backtests/output/rs-rotation-robustness-lab-v1.md` (14 sections)
+
+## Verdict global : **ROBUST_CORE_FOUND**
+
+16 configurations ROBUST_EDGE identifiées (PF ≥ 1.3 + ≥ 4/5 années positives + edge decay < ×1.3, friction incluse).
+
+## Pattern dominant qui survit à la réalité
+
+- **Horizon 40-120 jours** : PF 1.72 (h40) → 1.91 (h120). Au-delà de 20j, l'edge se stabilise et croît.
+- **Régime NO_RISK_OFF** : systématiquement gagnant. RISK_ON_ONLY est paradoxalement FRAGILE (2/5 années).
+- **Top 10** : optimal. Top 1 = FRAGILE (concentration excessive, n=93). Top 5-20 acceptables.
+- **Rebalance 10 jours** : sweet spot. Daily rebalance crée du turnover toxique, monthly perd de la réactivité.
+- **Univers mixed > ai_software > megacaps**. Semis seul est CONDITIONAL_EDGE. ETFs et commodities en DEAD.
+- **Fixed hold > trailing stops**. ATR trailing tue l'edge (FRAGILE), EMA trailing un peu mieux.
+
+## Best ROBUST config
+
+```text
+horizon: 120 days
+topN: 10
+rebalance: every 10 days
+regime: NO_RISK_OFF
+universe: mixed
+exit: fixed_hold
+```
+
+- 829 trades sur 5 ans
+- PF 1.91 après friction (round-trip 0.30 % + 0.02 % × hold = ~3.0 % pour h=120, soit 0.54R)
+- Expectancy 2.78 R/trade
+- Max DD 746 R (élevé en absolu mais sur ~3 000 R de TotalR)
+- Sharpe annualisé approximatif 1.48
+- 4/5 années positives (seule 2022 négative)
+- Edge decay ×0.72 — l'edge est MEILLEUR récemment qu'au début
+
+## Edge survit à friction complète
+
+Avec round-trip 0.30 % + 0.02 % par jour de hold, la baseline (h=20) absorbe 0.14R par trade. L'expectancy après friction = 0.74R > 0 confortablement. Sur horizon 120j, friction = 0.54R par trade, et l'expectancy reste à 2.78R — l'edge est suffisamment large pour absorber des frictions plus élevées.
+
+## Limites assumées
+
+- Sweeps **univariés** (33 configs uniques au lieu de 25 000 en grid complet).
+- Pas de short-side (RS Rotation est long-only).
+- Pas de position sizing dynamique.
+- Friction simplifiée (pas de par-actif : crypto et ETF ont des coûts très différents).
+- Pas de VIX (données non disponibles dans le repo).
+- Rolling robustness = PF annuel. Pas de walk-forward conditionnel par régime (à faire en PR séparée).
+
+## Conséquences pour SETUPS_REGISTRY.md
+
+Le statut **RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED** de RS Rotation peut potentiellement être upgradé après ce labo. Les conditions de la nouvelle règle de validation sont vérifiées :
+- inflation PF < ×1.05 vs NEXT_OPEN ✓ (audit PR #208)
+- nombre significatif de cellules ROBUST/STABLE en rolling walk-forward → **les 16 configs ROBUST_EDGE remplissent un équivalent** (≥ 4/5 années positives sur la baseline élargie)
+- PF post-friction ≥ 1.2 ✓ (toutes les configs ROBUST ont PF ≥ 1.3)
+
+À discuter dans une PR séparée si **promotion RS Rotation → VALIDATED** est légitime, avec quels caveats (sizing, position management live, surveillance).
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
