@@ -1,0 +1,81 @@
+{
+  "setupId": "SECTOR_RELATIVE_STRENGTH",
+  "version": "v1",
+  "classification": "VALIDATED_RESEARCH_CORE",
+  "originatingPR": 211,
+  "originatingLab": "tools/backtests/new-setup-discovery-lab-v1.mjs",
+  "frozenAt": "2026-05-18",
+  "parameters": {
+    "horizon": 60,
+    "topSectors": 1,
+    "topAssetsPerSector": 5,
+    "rebalance": 10,
+    "lookback": 90,
+    "minMomentum": 0,
+    "regime": "NO_RISK_OFF",
+    "execution": "NEXT_OPEN",
+    "exit": "FIXED_HOLD"
+  },
+  "sectorGroups": {
+    "BIG_TECH": "from universe-v2.mjs",
+    "SEMIS": "from universe-v2.mjs",
+    "CYBER_CLOUD": "from universe-v2.mjs",
+    "SOFTWARE": "from universe-v2.mjs",
+    "AI_MOMENTUM": "from universe-v2.mjs",
+    "CONSUMER_GROWTH": "from universe-v2.mjs",
+    "QUALITY_DEFENSIVE": "from universe-v2.mjs",
+    "INDUSTRIALS": "from universe-v2.mjs",
+    "FINANCIALS": "from universe-v2.mjs",
+    "EUROPE": "from universe-v2.mjs"
+  },
+  "frictionModel": {
+    "spreadOneWayPct": 0.05,
+    "slippageOneWayPct": 0.05,
+    "commissionOneWayPct": 0.05,
+    "roundTripPct": 0.30,
+    "overnightGapPenaltyPctPerDay": 0.02,
+    "conversionToR": "5% = 1R",
+    "formula": "frictionR = (0.30 + 0.02 * holdDays) / 5"
+  },
+  "regimeFilter": {
+    "mode": "NO_RISK_OFF",
+    "basis": "SPY + QQQ + SMH vs EMA200",
+    "description": "Trading désactivé si SPY < EMA200 ET QQQ < EMA200 ET SMH < EMA200 simultanément"
+  },
+  "validationCriteria": {
+    "profitFactorPostFrictionMin": 1.3,
+    "yearsPositiveMin": 4,
+    "yearsPositiveOf": 5,
+    "executionInflationMax": 1.05,
+    "edgeDecayMax": 1.5,
+    "executionRequirement": "NEXT_OPEN",
+    "frictionRequirement": "obligatoire dès le premier test"
+  },
+  "referenceMetrics": {
+    "trades": 445,
+    "wins": 243,
+    "losses": 202,
+    "winratePct": 54.61,
+    "expectancyR": 2.30,
+    "profitFactor": 2.157,
+    "maxDrawdownR": 192.98,
+    "totalR": 1023.63,
+    "sharpeApprox": 1.64,
+    "turnoverPerYear": 89,
+    "yearlyProfitFactor": {
+      "2021": 1.87,
+      "2022": 1.08,
+      "2023": 1.86,
+      "2024": 2.90,
+      "2025": 2.09
+    },
+    "yearsPositive": "5/5",
+    "edgeDecayEarlyToLate": 0.68
+  },
+  "interdictions": [
+    "NE PAS optimiser davantage les paramètres dans cette config gelée",
+    "NE PAS ajouter de paramètres exotiques sans audit séparé",
+    "NE PAS toucher au runtime (Worker, frontend, providers, broker, paper trading)",
+    "NE PAS activer en live tant que stress-tests + walk-forward conditionnel + audit anti-look-ahead spécifique ne sont pas faits"
+  ]
+}

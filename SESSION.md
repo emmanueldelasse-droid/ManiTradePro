@@ -2861,3 +2861,70 @@ Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajout�
 - Pas de VIX, pas de breadth filter dans cette PR.
 - Pas de short-side, pas de position sizing dynamique.
 - Pas de comparaison vs buy-and-hold SPY.
+
+---
+
+# Sector Relative Strength — Formalization v1
+
+PR de **formalisation pure** (documentation + config gelée + outputs référence). Suite à la découverte PR #211, SECTOR_RELATIVE_STRENGTH est officiellement gelé en config v1 avec statut **VALIDATED_RESEARCH_CORE**.
+
+Fichiers créés :
+
+```text
+docs/setups/SECTOR_RELATIVE_STRENGTH.md
+tools/backtests/configs/sector-relative-strength-v1.json
+tools/backtests/output/sector-relative-strength-reference-v1.json
+tools/backtests/output/sector-relative-strength-reference-v1.md
+```
+
+## Paramètres officiels v1 (gelés)
+
+```text
+horizon              = 60 days
+topSectors           = 1
+topAssetsPerSector   = 5
+rebalance            = 10 days
+lookback             = 90 days
+regime               = NO_RISK_OFF
+execution            = NEXT_OPEN
+exit                 = FIXED_HOLD
+```
+
+Friction appliquée : `frictionR = (0.30 + 0.02 × holdDays) / 5` (5 % = 1R).
+
+## Métriques de référence
+
+- 445 trades, winrate 54.61 %, expectancy 2.30R
+- **PF post-friction 2.157**
+- Max DD 192.98 R, Sharpe ~1.64
+- PF annuel : 2021=1.87, 2022=1.08, 2023=1.86, 2024=2.90, 2025=2.09 (5/5 années positives)
+- Edge decay ×0.68 (edge meilleur récent)
+
+## Statut officiel : VALIDATED_RESEARCH_CORE
+
+Pas `LIVE_READY`, pas `PRODUCTION_READY`. Raisons documentées dans `docs/setups/SECTOR_RELATIVE_STRENGTH.md` :
+- pas de live shadow / paper trading parallèle
+- pas de sizing dynamique
+- pas de stress test exécuté (framework documenté mais pas passé)
+- pas d'audit anti-look-ahead spécifique
+- pas de gestion portefeuille multi-setup
+
+## Prochaines étapes documentées (PR séparées)
+
+1. Audit anti-look-ahead spécifique SECTOR_RS (symétrique PR #207/#208).
+2. Walk-forward conditionnel par régime (3 splits).
+3. Stress tests friction ×2/×3, bear market 2022, sector collapse, gap stress.
+4. Comparaison corrélation/complémentarité vs RS Rotation simple.
+5. Mise à jour SETUPS_REGISTRY.md avec le statut officiel.
+6. Sourcer données earnings pour POST_EARNINGS_DRIFT.
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 4 fichiers ajoutés (3 docs + 1 config). Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés). Pas d'activation live.
+
+## Interdictions associées
+
+- NE PAS optimiser davantage les paramètres dans cette config gelée.
+- NE PAS ajouter de paramètres exotiques sans audit séparé.
+- NE PAS toucher au runtime.
+- NE PAS activer en live tant que les 5 prochaines étapes ci-dessus ne sont pas exécutées.

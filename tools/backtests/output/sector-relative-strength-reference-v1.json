@@ -1,0 +1,138 @@
+{
+  "setupId": "SECTOR_RELATIVE_STRENGTH",
+  "version": "v1",
+  "classification": "VALIDATED_RESEARCH_CORE",
+  "originatingPR": 211,
+  "originatingLab": "tools/backtests/new-setup-discovery-lab-v1.mjs",
+  "frozenAt": "2026-05-18",
+  "configRef": "tools/backtests/configs/sector-relative-strength-v1.json",
+  "parameters": {
+    "horizon": 60,
+    "topSectors": 1,
+    "topAssetsPerSector": 5,
+    "rebalance": 10,
+    "lookback": 90,
+    "regime": "NO_RISK_OFF",
+    "execution": "NEXT_OPEN",
+    "exit": "FIXED_HOLD"
+  },
+  "frictionApplied": {
+    "roundTripPct": 0.30,
+    "overnightGapPenaltyPctPerDay": 0.02,
+    "formula": "frictionR = (0.30 + 0.02 * holdDays) / 5",
+    "frictionRForHorizon60": 0.30
+  },
+  "metrics": {
+    "trades": 445,
+    "wins": 243,
+    "losses": 202,
+    "winratePct": 54.61,
+    "expectancyR": 2.30,
+    "profitFactor": 2.157,
+    "maxDrawdownR": 192.98,
+    "totalR": 1023.63,
+    "sharpeApprox": 1.64,
+    "turnoverPerYear": 89
+  },
+  "yearlyProfitFactor": {
+    "2021": 1.87,
+    "2022": 1.08,
+    "2023": 1.86,
+    "2024": 2.90,
+    "2025": 2.09
+  },
+  "yearsPositive": "5/5",
+  "edgeDecay": {
+    "earlyPf": 1.75,
+    "latePf": 2.56,
+    "decayRatio": 0.68
+  },
+  "validationCriteriaCheck": {
+    "profitFactorPostFrictionMin1.3": {
+      "value": 2.157,
+      "passed": true
+    },
+    "yearsPositiveMin4of5": {
+      "value": "5/5",
+      "passed": true
+    },
+    "edgeDecayMax1.5": {
+      "value": 0.68,
+      "passed": true
+    },
+    "executionRequirementNEXT_OPEN": {
+      "value": "NEXT_OPEN",
+      "passed": true
+    },
+    "frictionRequirementApplied": {
+      "value": true,
+      "passed": true
+    },
+    "allCriteriaPassed": true
+  },
+  "topAlternativeRobustConfigs": [
+    {
+      "rank": 2,
+      "params": { "horizon": 120, "topSectors": 1, "topAssetsPerSector": 5 },
+      "profitFactor": 2.077,
+      "yearsPositive": "4/5",
+      "edgeDecay": 0.18
+    },
+    {
+      "rank": 3,
+      "params": { "horizon": 120, "topSectors": 1, "topAssetsPerSector": 10 },
+      "profitFactor": 1.998,
+      "yearsPositive": "4/5",
+      "edgeDecay": 0.12
+    },
+    {
+      "rank": 4,
+      "params": { "horizon": 40, "topSectors": 1, "topAssetsPerSector": 5 },
+      "profitFactor": 1.95,
+      "yearsPositive": "4/5",
+      "edgeDecay": 0.63
+    }
+  ],
+  "totalRobustConfigsInLab": 15,
+  "labRanking": "Top 9 of ROBUST_EDGE ranking are all SECTOR_RELATIVE_STRENGTH variants",
+  "comparisonVsRsRotation": {
+    "rsRotationBest": {
+      "params": "horizon=120, topN=10, NO_RISK_OFF, mixed, fixed_hold",
+      "profitFactor": 1.91,
+      "yearsPositive": "4/5",
+      "edgeDecay": 0.72
+    },
+    "sectorRsBest": {
+      "profitFactor": 2.157,
+      "yearsPositive": "5/5",
+      "edgeDecay": 0.68
+    },
+    "verdict": "SECTOR_RS outperforms RS Rotation simple on all 3 metrics"
+  },
+  "knownRisks": [
+    "regime_dependency_high",
+    "sector_concentration_high",
+    "turnover_moderate",
+    "momentum_crash_inherent",
+    "no_dynamic_sizing",
+    "no_live_shadow",
+    "look_ahead_audit_not_specific",
+    "survivorship_bias_universe",
+    "friction_uniform_per_asset",
+    "long_only"
+  ],
+  "nextStepsRequired": [
+    "Audit anti-look-ahead spécifique sur SECTOR_RS (symétrique des PR #207, #208)",
+    "Walk-forward conditionnel par régime (3 splits)",
+    "Stress tests : friction ×2, ×3, bear market 2022 isolé, sector collapse",
+    "Comparaison fine corrélation/complémentarité vs RS Rotation",
+    "Mise à jour SETUPS_REGISTRY.md (statut VALIDATED_RESEARCH_CORE)",
+    "Pas de passage live tant que ces étapes ne sont pas faites"
+  ],
+  "interdictions": [
+    "Ne pas optimiser les paramètres dans cette config gelée",
+    "Ne pas ajouter de paramètres exotiques sans audit séparé",
+    "Ne pas toucher au runtime",
+    "Ne pas activer en live"
+  ]
+}
