@@ -2394,47 +2394,45 @@ Pour tout le reste : interdit.
 - Caps fins : us_growth_etf 30 %, mega_cap_tech 25 %, software_saas 25 %, ai_hypergrowth 20 %, semis_pure 25 %, crypto_layer1 10 %, crypto_correlated_equity 8 %, precious_metals 20 %, banks_financials 15 %.
 - Support des deux noms `WATCH` et `REDUCE` (alias) sans casser.
 
-## Résultats du premier run (10 878 cellules univers v2)
+## Contrôle post-normalisation des caps hard (correction itération 2)
+
+Suite au refus de merge de la version initiale (caps Pullback 59.2 % et Breakout 25.2 % dépassés après normalisation), ajout d'un contrôle strict post-normalisation :
+
+1. Construction greedy initiale (TARGET_BUDGET = 8.0 unités).
+2. Détection des caps violés sur les **poids finaux normalisés** (setup, broad, fines).
+3. Retrait itératif de la position la moins prioritaire qui contribue à la pire violation (priorityGroup DESC → tier DESC → confidence DESC → alpha ASC).
+4. Après chaque retrait, tentative de **swap-in** : ajout d'un candidat du pool dédupliqué qui ne crée AUCUNE violation lorsqu'il est testé sur le nouveau total.
+5. Renormalisation et bouclage jusqu'à plus de violation ou portefeuille vide.
+6. `status = "failed"` si une violation demeure ou si portefeuille vide ; `warning` si < 3 positions ; `ok` sinon.
+
+## Résultats du run (10 878 cellules univers v2)
 
 - 346 cellules non-BLOCK
 - 334 éligibles priorité 1-4
 - 73 cellules après dédoublonnage par symbole
-- **10 positions** sélectionnées, status `ok`
+- **Greedy initial : 10 positions** sélectionnées avec Pullback 59.26 % et Breakout 25.19 % (caps dépassés).
+- **Contrôle post-normalisation : 10 retraits, 0 swap-in en 11 itérations → portefeuille vide.**
+- **Status : `failed`.**
 
-### Plan v3
+### Diagnostic mathématique
 
-| # | Symbole | Decision | Rolling | Tier | Setup | Régime | Poids |
-|---:|---|---|---|---|---|---|---:|
-| 1 | VRNS | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
-| 2 | CLOU | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
-| 3 | PSI | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
-| 4 | GOOGL | ALLOW | ROBUST | A | Pullback | RISK_ON | 14.81 % |
-| 5 | GLD | ALLOW | ROBUST | A | Breakout | RISK_ON | 14.81 % |
-| 6 | APP | REDUCE | FRAGILE | A | RS Rotation | RISK_ON | 5.19 % |
-| 7 | APLD | REDUCE | FRAGILE | A | RS Rotation | RISK_ON | 5.19 % |
-| 8 | SOL | REDUCE | FRAGILE | A | Breakout | RISK_ON | 5.19 % |
-| 9 | MSTR | REDUCE | FRAGILE | B | RS Rotation | RISK_ON | 5.19 % |
-| 10 | SMCI | REDUCE | FRAGILE | B | Breakout | RISK_ON | 5.19 % |
+Recherche aléatoire (200 000 essais de portefeuilles de 3 à 10 positions parmi 73 candidats) : **0 portefeuille viable trouvé**. Les caps demandés sont incompatibles avec le pool v2 actuel.
 
-→ 5 ALLOW ROBUST + 5 REDUCE FRAGILE (marquées `reduced_due_to_fragility`). 0 EXPERIMENTAL. 0 leveraged.
+Cause :
+- Somme caps setups = 110 % (≥ 100 % donc théoriquement faisable avec 3 setups).
+- Mais le pool v2 ne contient qu'**1 seul Breakout ROBUST (GLD)** et **4 RS Rotation FRAGILE** dont 2 (MSTR, COIN) déclenchent `crypto_correlated_equity ≤ 8 %`.
+- Toute combinaison testée viole soit Pullback 50 %, soit Breakout 25 %, soit crypto_correlated_equity 8 %, soit ai_hypergrowth 20 %.
 
-### Évolution vs v1/v2
+### Pistes proposées (décision ChatGPT)
 
-| Catégorie | v1 | v2 | v3 |
-|---|---:|---:|---:|
-| Positions | 10 | 10 | 10 |
-| tech_ai (large) | 54.3 % | 54.3 % | _réparti sur sous-thèmes_ |
-| crypto | 18.5 % | 18.5 % | 10.4 % |
-| leveraged | 4.6 % | 4.6 % | 0.0 % |
-| Positions FRAGILE explicites | 0 | 0 | 5 |
+- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permet d'inclure MSTR à 8.6 %).
+- Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne marge pour GLD + 1 Breakout FRAGILE).
+- Étendre `tradable-universe-v2` (attendre que d'autres setups remontent en ROBUST/STABLE).
+- Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0).
 
-**Symboles retirés vs v1** : VUG, SPYG, IYW, JPM, ROM, CRWD (tous FRAGILE ou INSUFFICIENT en rolling).
-**Symboles ajoutés vs v1** : VRNS, CLOU, PSI, GOOGL, APLD, SMCI (ROBUST/FRAGILE tier A/B).
-**Symbole survivant aux trois plans** : GLD × Breakout × RISK_ON (seule position ALLOW v2 du plan v1).
+### Cap respect garanti
 
-## Limite assumée
-
-Cap setup PULLBACK_MOMENTUM ≤ 50 % apparaît à 59.2 % dans le plan final, et BREAKOUT_EXPANSION ≤ 25 % à 25.2 %. C'est l'effet greedy : la construction applique les caps en parts du `TARGET_BUDGET` = 8.0 unités, mais le portefeuille ne se remplit qu'à 6.75 unités (mix ROBUST/FRAGILE), donc les pourcentages normalisés sont mécaniquement plus élevés que les seuils budgétaires. Documenté section 10 du rapport markdown.
+Le moteur garantit désormais que **`allocation-plan-v3.json` ne contient JAMAIS de cap hard dépassé** : soit un plan respectant tous les caps, soit `status=failed` avec liste explicite des positions retirées et des violations initiales.
 
 ## Non-régression confirmée
 

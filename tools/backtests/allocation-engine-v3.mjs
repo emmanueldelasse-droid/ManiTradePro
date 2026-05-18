@@ -265,6 +265,288 @@ function tryAdd(portfolio, cell) {
   return { ok: true, baseUnit, group, broad, fineThemes: fine.themes, fineConfidence: fine.confidence };
 }
 
+// === Contrôle post-normalisation des caps hard =============================
+//
+// Garantit que les caps annoncés (setup, broad, fine) sont respectés en
+// pourcentage du portefeuille FINAL (normalisé à 100 %), pas seulement vs
+// un TARGET_BUDGET théorique. Sinon le greedy peut sous-remplir certains
+// setups et faire mécaniquement dépasser les autres après normalisation.
+//
+// Algorithme :
+//   1. Recalculer les poids normalisés.
+//   2. Lister les caps violés (kind = setup | broad | fine).
+//   3. Trier par excès décroissant. Prendre la pire violation.
+//   4. Identifier les positions qui contribuent à cette violation.
+//   5. Retirer la position la moins prioritaire (priorityGroup max, tier
+//      pire, confidence pire, symbole alphabétique pour déterminisme).
+//   6. Renormaliser et boucler jusqu'à plus de violation ou portefeuille
+//      vide.
+
+function detectCapViolations(plan, policy) {
+  const total = plan.positions.reduce((s, p) => s + p.baseUnit, 0);
+  if (total === 0) return [];
+  const violations = [];
+
+  const bySetup = {};
+  const byBroad = {};
+  const byFine = {};
+  for (const p of plan.positions) {
+    bySetup[p.setup] = (bySetup[p.setup] || 0) + p.baseUnit;
+    byBroad[p.broadCategory] = (byBroad[p.broadCategory] || 0) + p.baseUnit;
+    for (const t of p.fineThemes) byFine[t] = (byFine[t] || 0) + p.baseUnit;
+  }
+
+  for (const [setup, units] of Object.entries(bySetup)) {
+    const cap = policy.setupCaps[setup];
+    if (cap === undefined) continue;
+    const pct = units / total;
+    if (pct > cap + 1e-9) violations.push({ kind: "setup", key: setup, cap, actualPct: pct, exceedance: pct - cap });
+  }
+  for (const [broad, units] of Object.entries(byBroad)) {
+    const cap = policy.broadCaps[broad];
+    if (cap === undefined) continue;
+    const pct = units / total;
+    if (pct > cap + 1e-9) violations.push({ kind: "broad", key: broad, cap, actualPct: pct, exceedance: pct - cap });
+  }
+  for (const [theme, units] of Object.entries(byFine)) {
+    const cap = policy.fineThemeCaps[theme];
+    if (cap === undefined) continue;
+    const pct = units / total;
+    if (pct > cap + 1e-9) violations.push({ kind: "fine", key: theme, cap, actualPct: pct, exceedance: pct - cap });
+  }
+  violations.sort((a, b) => b.exceedance - a.exceedance);
+  return violations;
+}
+
+function positionContributesToViolation(violation, position) {
+  if (violation.kind === "setup") return position.setup === violation.key;
+  if (violation.kind === "broad") return position.broadCategory === violation.key;
+  if (violation.kind === "fine") return position.fineThemes.includes(violation.key);
+  return false;
+}
+
+function pickPositionToRemove(violation, positions) {
+  const contributors = positions.filter((p) => positionContributesToViolation(violation, p));
+  if (!contributors.length) return null;
+  contributors.sort((a, b) => {
+    // priorityGroup plus grand = moins prioritaire = retiré en premier
+    if (b.priorityGroup !== a.priorityGroup) return b.priorityGroup - a.priorityGroup;
+    // tier pire en premier (D > C > B > A)
+    const ta = TIER_RANK[a.compositeTier] ?? 99;
+    const tb = TIER_RANK[b.compositeTier] ?? 99;
+    if (tb !== ta) return tb - ta;
+    // confidence pire en premier (LOW > MEDIUM > HIGH)
+    const ca = CONFIDENCE_RANK[a.confidence] ?? 99;
+    const cb = CONFIDENCE_RANK[b.confidence] ?? 99;
+    if (cb !== ca) return cb - ca;
+    // déterminisme final : alphabétique
+    return a.symbol.localeCompare(b.symbol);
+  });
+  return contributors[0];
+}
+
+// Tente d'ajouter un candidat de la pool triée qui ne crée AUCUNE violation
+// post-normalisation. Retourne true si une position a été ajoutée.
+function trySwapIn(plan, policy, candidatePool) {
+  const existingSymbols = new Set(plan.positions.map((p) => p.symbol));
+  for (const cell of candidatePool) {
+    if (existingSymbols.has(cell.symbol)) continue;
+    if (plan.positions.length >= POLICY.maxPositions) break;
+    if (FORBIDDEN_SETUPS.has(cell.setup)) continue;
+    if (LEVERAGED.has(cell.symbol)) continue;
+    const group = getPriorityGroup(cell);
+    if (group == null) continue;
+    const baseUnit = getBaseUnit(cell);
+    if (baseUnit <= 0) continue;
+    const broad = classifyBroadCategory(cell.symbol);
+    if (group === 4 && (broad === "crypto" || broad === "leveraged")) continue;
+    const fine = classifyFineThemes(cell.symbol);
+
+    const provisional = buildPositionFromCell(
+      cell,
+      plan.positions.length + 1,
+      group,
+      baseUnit,
+      broad,
+      fine.themes,
+      fine.confidence
+    );
+    const trialPositions = [...plan.positions, provisional];
+    const trialPlan = { positions: trialPositions };
+    const trialTotal = trialPositions.reduce((s, p) => s + p.baseUnit, 0);
+    for (const p of trialPositions) {
+      p.weightPct = trialTotal > 0 ? (p.baseUnit / trialTotal) * 100 : 0;
+    }
+    const trialViolations = detectCapViolations(trialPlan, policy);
+    if (trialViolations.length === 0) {
+      plan.positions.push(provisional);
+      plan.positions.forEach((p, i) => { p.rank = i + 1; });
+      return { added: true, position: provisional };
+    }
+  }
+  return { added: false };
+}
+
+function enforceCapsPostNormalization(plan, policy, candidatePool) {
+  const removalsLog = [];
+  const additionsLog = [];
+  const initialViolations = [];
+  let iterations = 0;
+  const maxIterations = 100;
+  let firstPass = true;
+
+  while (iterations < maxIterations) {
+    iterations++;
+
+    // Renormalisation
+    const total = plan.positions.reduce((s, p) => s + p.baseUnit, 0);
+    if (total > 0) {
+      for (const p of plan.positions) {
+        p.weightPct = Number(((p.baseUnit / total) * 100).toFixed(2));
+      }
+    }
+
+    const violations = detectCapViolations(plan, policy);
+    if (firstPass) {
+      for (const v of violations) {
+        initialViolations.push({
+          kind: v.kind,
+          key: v.key,
+          capPct: Number((v.cap * 100).toFixed(2)),
+          actualPct: Number((v.actualPct * 100).toFixed(2)),
+          exceedancePct: Number((v.exceedance * 100).toFixed(2)),
+        });
+      }
+      firstPass = false;
+    }
+
+    if (violations.length === 0) {
+      // Pas de violation. Tenter de combler les slots restants si le
+      // portefeuille est sous maxPositions.
+      if (plan.positions.length < POLICY.maxPositions) {
+        const result = trySwapIn(plan, policy, candidatePool);
+        if (result.added) {
+          additionsLog.push({
+            symbol: result.position.symbol,
+            setup: result.position.setup,
+            variant: result.position.variant,
+            regime: result.position.regime,
+            decisionV2: result.position.decisionV2,
+            rollingVerdict: result.position.rollingVerdict,
+            compositeTier: result.position.compositeTier,
+            baseUnit: result.position.baseUnit,
+            via: "fill-slot",
+          });
+          continue;
+        }
+      }
+      break;
+    }
+
+    if (plan.positions.length === 0) break;
+
+    const worst = violations[0];
+    const toRemove = pickPositionToRemove(worst, plan.positions);
+    if (!toRemove) break;
+
+    plan.positions = plan.positions.filter((p) => p !== toRemove);
+    removalsLog.push({
+      symbol: toRemove.symbol,
+      setup: toRemove.setup,
+      variant: toRemove.variant,
+      regime: toRemove.regime,
+      decisionV2: toRemove.decisionV2,
+      rollingVerdict: toRemove.rollingVerdict,
+      compositeTier: toRemove.compositeTier,
+      baseUnit: toRemove.baseUnit,
+      priorityGroup: toRemove.priorityGroup,
+      removedDueTo: {
+        kind: worst.kind,
+        key: worst.key,
+        capPct: Number((worst.cap * 100).toFixed(2)),
+        actualPctBeforeRemoval: Number((worst.actualPct * 100).toFixed(2)),
+      },
+    });
+    plan.positions.forEach((p, i) => { p.rank = i + 1; });
+
+    // Après retrait, tenter immédiatement un swap-in (peut-être qu'une
+    // position plus diversifiée comble le slot libéré sans recréer la
+    // violation).
+    const swap = trySwapIn(plan, policy, candidatePool);
+    if (swap.added) {
+      additionsLog.push({
+        symbol: swap.position.symbol,
+        setup: swap.position.setup,
+        variant: swap.position.variant,
+        regime: swap.position.regime,
+        decisionV2: swap.position.decisionV2,
+        rollingVerdict: swap.position.rollingVerdict,
+        compositeTier: swap.position.compositeTier,
+        baseUnit: swap.position.baseUnit,
+        via: "post-removal swap",
+      });
+    }
+  }
+
+  // Renormalisation finale
+  const finalTotal = plan.positions.reduce((s, p) => s + p.baseUnit, 0);
+  if (finalTotal > 0) {
+    for (const p of plan.positions) {
+      p.weightPct = Number(((p.baseUnit / finalTotal) * 100).toFixed(2));
+    }
+  }
+  const finalViolations = detectCapViolations(plan, policy).map((v) => ({
+    kind: v.kind,
+    key: v.key,
+    capPct: Number((v.cap * 100).toFixed(2)),
+    actualPct: Number((v.actualPct * 100).toFixed(2)),
+    exceedancePct: Number((v.exceedance * 100).toFixed(2)),
+  }));
+
+  return { removalsLog, additionsLog, iterations, initialViolations, finalViolations };
+}
+
+function buildPositionFromCell(cell, rank, group, baseUnit, broad, fineThemes, fineConfidence) {
+  const risks = [];
+  const tags = [];
+  const decNorm = normalizeDecision(cell.decisionV2);
+  if (decNorm === "REDUCE" && cell.rollingVerdict === "FRAGILE") {
+    tags.push("reduced_due_to_fragility");
+    risks.push("FRAGILE en walk-forward roulant — allocation réduite");
+  }
+  if (group === 4) {
+    tags.push("experimental_exception");
+    risks.push("EXPERIMENTAL — exception encadrée (INSUFFICIENT_DATA + WF unique PASS)");
+  }
+  if (fineConfidence === "UNKNOWN") {
+    risks.push("symbole non classé thématiquement");
+  }
+  if (broad === "crypto") {
+    risks.push("crypto — exposition réduite (cap 20% v3)");
+  }
+  return {
+    rank,
+    symbol: cell.symbol,
+    setup: cell.setup,
+    variant: cell.variant,
+    regime: cell.regime,
+    decisionV2: cell.decisionV2,
+    rollingVerdict: cell.rollingVerdict,
+    compositeTier: cell.compositeTier,
+    confidence: cell.confidence,
+    walkForwardTier: cell.filters?.walkForward?.tier ?? null,
+    priorityGroup: group,
+    baseUnit,
+    weightPct: 0,
+    broadCategory: broad,
+    fineThemes,
+    fineConfidence,
+    tags,
+    reason: cell.reasons?.[0] ?? "",
+    risks,
+  };
+}
+
 function buildPortfolio(rankedCells) {
   const portfolio = {
     positions: [],
@@ -282,45 +564,16 @@ function buildPortfolio(rankedCells) {
   for (const cell of rankedCells) {
     const result = tryAdd(portfolio, cell);
     if (result.ok) {
-      const risks = [];
-      const tags = [];
       const decNorm = normalizeDecision(cell.decisionV2);
-      if (decNorm === "REDUCE" && cell.rollingVerdict === "FRAGILE") {
-        tags.push("reduced_due_to_fragility");
-        risks.push("FRAGILE en walk-forward roulant — allocation réduite");
-      }
-      if (result.group === 4) {
-        tags.push("experimental_exception");
-        risks.push("EXPERIMENTAL — exception encadrée (INSUFFICIENT_DATA + WF unique PASS)");
-      }
-      if (result.fineConfidence === "UNKNOWN") {
-        risks.push("symbole non classé thématiquement");
-      }
-      if (result.broad === "crypto") {
-        risks.push("crypto — exposition réduite (cap 20% v3)");
-      }
-
-      const position = {
-        rank: portfolio.positions.length + 1,
-        symbol: cell.symbol,
-        setup: cell.setup,
-        variant: cell.variant,
-        regime: cell.regime,
-        decisionV2: cell.decisionV2,
-        rollingVerdict: cell.rollingVerdict,
-        compositeTier: cell.compositeTier,
-        confidence: cell.confidence,
-        walkForwardTier: cell.filters?.walkForward?.tier ?? null,
-        priorityGroup: result.group,
-        baseUnit: result.baseUnit,
-        weightPct: 0,
-        broadCategory: result.broad,
-        fineThemes: result.fineThemes,
-        fineConfidence: result.fineConfidence,
-        tags,
-        reason: cell.reasons?.[0] ?? "",
-        risks,
-      };
+      const position = buildPositionFromCell(
+        cell,
+        portfolio.positions.length + 1,
+        result.group,
+        result.baseUnit,
+        result.broad,
+        result.fineThemes,
+        result.fineConfidence
+      );
       portfolio.positions.push(position);
       portfolio.symbols.add(cell.symbol);
       portfolio.totalUnits += result.baseUnit;
@@ -360,9 +613,13 @@ function buildPortfolio(rankedCells) {
 
 function computeWarnings(portfolio) {
   const warnings = [];
-  if (portfolio.positions.length < POLICY.minPositions) {
+  if (portfolio.positions.length === 0) {
+    warnings.push("Portefeuille vide après contrôle post-normalisation — aucun sous-ensemble du pool v2 ne respecte simultanément tous les caps hard. Voir section 10 pour le diagnostic.");
+  } else if (portfolio.positions.length < POLICY.minPositions) {
     warnings.push(`Moins de ${POLICY.minPositions} positions sélectionnées (${portfolio.positions.length}) — portefeuille incomplet, status=warning.`);
   }
+  if (portfolio.positions.length === 0) return warnings;
+
   const regimesUsed = new Set(portfolio.positions.map((p) => p.regime));
   if (regimesUsed.size === 1) {
     const only = [...regimesUsed][0];
@@ -375,11 +632,14 @@ function computeWarnings(portfolio) {
   if (unknown.length) {
     warnings.push(`${unknown.length} symbole(s) non classé(s) dans le plan : ${unknown.map((p) => p.symbol).join(", ")}. Ajouter à lib/theme-table.mjs.`);
   }
-  if (portfolio.fragileCount > 0) {
-    warnings.push(`${portfolio.fragileCount} position(s) FRAGILE retenue(s) — allocation réduite explicite (reduced_due_to_fragility).`);
+  // Recompte fragile/experimental sur le portfolio final (post-enforce)
+  const fragileLive = portfolio.positions.filter((p) => p.tags.includes("reduced_due_to_fragility")).length;
+  const expLive = portfolio.positions.filter((p) => p.tags.includes("experimental_exception")).length;
+  if (fragileLive > 0) {
+    warnings.push(`${fragileLive} position(s) FRAGILE retenue(s) — allocation réduite explicite (reduced_due_to_fragility).`);
   }
-  if (portfolio.experimentalCount > 0) {
-    warnings.push(`${portfolio.experimentalCount} position(s) EXPERIMENTAL retenue(s) — micro allocation (10% unitaire), à surveiller en paper trading.`);
+  if (expLive > 0) {
+    warnings.push(`${expLive} position(s) EXPERIMENTAL retenue(s) — micro allocation (10 % unitaire), à surveiller en paper trading.`);
   }
   // Concentrations restantes > 30 %
   const totalWeight = portfolio.positions.reduce((s, p) => s + p.weightPct, 0);
@@ -646,7 +906,78 @@ function buildMarkdown(report) {
   }
   lines.push("");
 
-  lines.push("## 10. Risques et limites");
+  lines.push("## 10. Contrôle post-normalisation des caps hard");
+  lines.push("");
+  const pn = report.summary.postNormalization;
+  lines.push(`- Itérations : **${pn.iterations}**`);
+  lines.push(`- Positions retirées : **${pn.removalsCount}**`);
+  lines.push(`- Positions ajoutées par swap-in : **${(report.postNormalizationAdditions || []).length}**`);
+  if (report.positions.length === 0) {
+    lines.push("- Caps hard tous respectés sur les poids finaux : **n/a (portefeuille vide)**");
+  } else {
+    lines.push(`- Caps hard tous respectés sur les poids finaux : **${pn.capsAllRespectedFinal ? "✓ oui" : "✗ NON"}**`);
+  }
+  lines.push("");
+  if (report.positions.length === 0 && pn.initialViolations.length > 0) {
+    lines.push("⚠ **Aucun sous-ensemble du pool v2 ne respecte simultanément tous les caps hard demandés.** Le contrôle post-normalisation a retiré itérativement les positions violant les caps. À chaque retrait, un swap-in a été tenté depuis le reste du pool, mais aucun candidat n'a pu être ajouté sans recréer une violation. Conséquence : portefeuille vide, status `failed`.");
+    lines.push("");
+    lines.push("**Cause mathématique probable :** la somme des caps setups (Pullback 50 % + Breakout 25 % + RS Rotation 35 % = 110 %) autorise en théorie un portefeuille à 3 setups, mais le pool v2 actuel n'offre qu'un seul Breakout ROBUST (GLD) et 4 RS Rotation FRAGILE, dont 2 (MSTR, COIN) déclenchent le cap fin `crypto_correlated_equity ≤ 8 %`. Toute combinaison testée viole soit Pullback 50 %, soit Breakout 25 %, soit crypto_correlated_equity 8 %, soit ai_hypergrowth 20 %.");
+    lines.push("");
+    lines.push("**Pistes pour rendre la sélection viable** (à valider par ChatGPT) :");
+    lines.push("- Relâcher `crypto_correlated_equity` de 8 % à 12 % (permettrait d'inclure MSTR à 8.6 %).");
+    lines.push("- Relâcher `BREAKOUT_EXPANSION` de 25 % à 30 % (donne de la marge pour 1 GLD ROBUST + 1 Breakout FRAGILE).");
+    lines.push("- Étendre `tradable-universe-v2` en attendant qu'un walk-forward roulant futur fasse remonter d'autres Breakout/RS Rotation en ROBUST/STABLE.");
+    lines.push("- Ajuster les baseUnits (ex. ROBUST 0.7 au lieu de 1.0) pour réduire la concentration unitaire des P ROBUST.");
+    lines.push("");
+  }
+  if (pn.initialViolations.length) {
+    lines.push("Caps violés en sortie de greedy (avant correction) :");
+    lines.push("");
+    lines.push("| Kind | Clé | Cap | Réel | Excès |");
+    lines.push("|---|---|---:|---:|---:|");
+    for (const v of pn.initialViolations) {
+      lines.push(`| ${v.kind} | ${v.key} | ${fmt(v.capPct)} % | ${fmt(v.actualPct)} % | +${fmt(v.exceedancePct)} % |`);
+    }
+    lines.push("");
+  } else {
+    lines.push("_aucun cap violé en sortie de greedy_");
+    lines.push("");
+  }
+  if (report.postNormalizationRemovals.length) {
+    lines.push("Positions retirées par le contrôle post-normalisation :");
+    lines.push("");
+    lines.push("| Symbole | Setup | Régime | Tier | Decision | Rolling | Cap déclencheur | Réel avant |");
+    lines.push("|---|---|---|---|---|---|---|---:|");
+    for (const r of report.postNormalizationRemovals) {
+      lines.push(`| ${r.symbol} | ${r.setup} | ${r.regime} | ${r.compositeTier} | ${r.decisionV2} | ${r.rollingVerdict} | ${r.removedDueTo.kind} ${r.removedDueTo.key} (cap ${fmt(r.removedDueTo.capPct)} %) | ${fmt(r.removedDueTo.actualPctBeforeRemoval)} % |`);
+    }
+    lines.push("");
+  }
+  if (report.postNormalizationAdditions.length) {
+    lines.push("Positions ajoutées par swap-in (en remplacement des retraits) :");
+    lines.push("");
+    lines.push("| Symbole | Setup | Régime | Tier | Decision | Rolling | Via |");
+    lines.push("|---|---|---|---|---|---|---|");
+    for (const a of report.postNormalizationAdditions) {
+      lines.push(`| ${a.symbol} | ${a.setup} | ${a.regime} | ${a.compositeTier} | ${a.decisionV2} | ${a.rollingVerdict} | ${a.via} |`);
+    }
+    lines.push("");
+  }
+  if (pn.finalViolations.length) {
+    lines.push("**✗ Caps hard NON respectés après contrôle (status `failed`) :**");
+    lines.push("");
+    lines.push("| Kind | Clé | Cap | Réel | Excès |");
+    lines.push("|---|---|---:|---:|---:|");
+    for (const v of pn.finalViolations) {
+      lines.push(`| ${v.kind} | ${v.key} | ${fmt(v.capPct)} % | ${fmt(v.actualPct)} % | +${fmt(v.exceedancePct)} % |`);
+    }
+    lines.push("");
+  } else {
+    lines.push("**✓ Tous les caps hard sont respectés sur le portefeuille final normalisé.**");
+    lines.push("");
+  }
+
+  lines.push("## 11. Risques et limites");
   lines.push("");
   if (report.warnings.length) {
     for (const w of report.warnings) lines.push(`- ⚠ ${w}`);
@@ -654,14 +985,14 @@ function buildMarkdown(report) {
     lines.push("- _aucun warning structurel_");
   }
   lines.push("");
-  lines.push("- **Caps en valeur absolue** : la construction greedy applique les caps en parts du `TARGET_BUDGET` (8.0 unités). Si le portefeuille final ne se remplit pas à ce budget, les pourcentages effectifs peuvent être supérieurs aux caps annoncés.");
+  lines.push("- **Caps hard respectés sur les poids normalisés** (cf. section 10). Si le greedy initial dépasse un cap, le contrôle post-normalisation retire la position la moins prioritaire qui contribue, renormalise et boucle. Conséquence : le portefeuille peut compter moins de 10 positions si nécessaire pour respecter les caps.");
   lines.push("- **Pas de coût de transaction** modélisé. Voir `friction-model-v1` pour la couche friction.");
-  lines.push("- **Pas de corrélation inter-position** prise en compte — un portefeuille concentré sur 3 setups Pullback techs peut sembler diversifié par sous-thème mais rester très corrélé en bêta.");
+  lines.push("- **Pas de corrélation inter-position** prise en compte — un portefeuille concentré sur quelques setups Pullback techs peut sembler diversifié par sous-thème mais rester très corrélé en bêta.");
   lines.push("- **Symboles UNKNOWN** : non couverts par les caps fins, peuvent passer sous le radar. Ajouter à `lib/theme-table.mjs`.");
   lines.push("- **Plan théorique uniquement.** Aucun ordre, aucun broker, aucun endpoint live.");
   lines.push("");
 
-  lines.push("## 11. Prochaine étape recommandée");
+  lines.push("## 12. Prochaine étape recommandée");
   lines.push("");
   lines.push("- **Stress-test** ce plan v3 contre `friction-adjusted-report.json` pour mesurer l'érosion edge après coûts.");
   lines.push("- **Backfill ETF holdings** : propager les sous-jacents des ETFs détenus (BOTZ, CLOU, WCLD, IGV…) pour vérifier qu'aucun cap fin n'est dépassé une fois la transparence appliquée.");
@@ -711,7 +1042,31 @@ async function main() {
   deduped.sort(compareCells);
 
   const { portfolio, rejected, constraintsApplied } = buildPortfolio(deduped);
-  console.log(`[allocation-engine-v3] ${portfolio.positions.length} positions sélectionnées sur ${deduped.length} candidates dédupliquées`);
+  console.log(`[allocation-engine-v3] ${portfolio.positions.length} positions sélectionnées sur ${deduped.length} candidates dédupliquées (greedy pré-norm)`);
+
+  // Contrôle post-normalisation : retire les positions qui violent les caps
+  // sur le portefeuille final normalisé à 100 %.
+  const policySnapshot = {
+    setupCaps: POLICY.setupCaps,
+    broadCaps: POLICY.broadCaps,
+    fineThemeCaps: POLICY.fineThemeCaps,
+  };
+  const enforce = enforceCapsPostNormalization(portfolio, policySnapshot, deduped);
+  console.log(`[allocation-engine-v3] contrôle post-norm : ${enforce.removalsLog.length} retrait(s), ${enforce.additionsLog.length} swap-in en ${enforce.iterations} itération(s)`);
+  if (enforce.initialViolations.length) {
+    for (const v of enforce.initialViolations) {
+      console.log(`  ⚠ initial : ${v.kind} ${v.key} ${v.actualPct.toFixed(2)}% > cap ${v.capPct.toFixed(2)}%`);
+    }
+  }
+  if (enforce.finalViolations.length) {
+    for (const v of enforce.finalViolations) {
+      console.log(`  ✗ FINAL : ${v.kind} ${v.key} ${v.actualPct.toFixed(2)}% > cap ${v.capPct.toFixed(2)}%`);
+    }
+  }
+  if (enforce.removalsLog.length) {
+    constraintsApplied.push("post-normalization cap enforcement");
+  }
+  console.log(`[allocation-engine-v3] portefeuille final : ${portfolio.positions.length} positions`);
 
   // Stats par tier / setup / broad / fine
   const byTier = { A: { positions: 0, weightPct: 0 }, B: { positions: 0, weightPct: 0 }, C: { positions: 0, weightPct: 0 }, D: { positions: 0, weightPct: 0 } };
@@ -746,13 +1101,32 @@ async function main() {
 
   const totalWeight = portfolio.positions.reduce((s, p) => s + p.weightPct, 0);
   const warnings = computeWarnings(portfolio);
+  if (enforce.removalsLog.length) {
+    warnings.push(`Contrôle post-normalisation : ${enforce.removalsLog.length} position(s) retirée(s) pour respect des caps hard (${enforce.iterations} itération(s)). Voir section "Contrôle post-normalisation".`);
+  }
+  if (enforce.finalViolations.length) {
+    for (const v of enforce.finalViolations) {
+      warnings.push(`Cap hard NON respecté après contrôle post-normalisation : ${v.kind} ${v.key} ${v.actualPct} % > cap ${v.capPct} %.`);
+    }
+  }
   const comparison = await compareWithPrevious(portfolio);
 
   const allowCount = portfolio.positions.filter((p) => normalizeDecision(p.decisionV2) === "ALLOW").length;
   const watchCount = portfolio.positions.filter((p) => normalizeDecision(p.decisionV2) === "REDUCE").length;
   const expCount = portfolio.positions.filter((p) => p.decisionV2 === "EXPERIMENTAL").length;
 
-  const status = portfolio.positions.length >= POLICY.minPositions ? "ok" : (portfolio.positions.length > 0 ? "warning" : "failed");
+  // Statut : "failed" si un cap hard est encore dépassé après contrôle, sinon
+  // "warning" si < minPositions, "ok" sinon.
+  let status;
+  if (enforce.finalViolations.length > 0) {
+    status = "failed";
+  } else if (portfolio.positions.length === 0) {
+    status = "failed";
+  } else if (portfolio.positions.length < POLICY.minPositions) {
+    status = "warning";
+  } else {
+    status = "ok";
+  }
 
   const report = {
     generatedAt: new Date().toISOString(),
@@ -790,9 +1164,18 @@ async function main() {
       byBroad,
       byFineTheme,
       constraintsApplied,
+      postNormalization: {
+        initialViolations: enforce.initialViolations,
+        finalViolations: enforce.finalViolations,
+        removalsCount: enforce.removalsLog.length,
+        iterations: enforce.iterations,
+        capsAllRespectedFinal: enforce.finalViolations.length === 0,
+      },
     },
     positions: portfolio.positions,
     rejectedCandidates: rejected,
+    postNormalizationRemovals: enforce.removalsLog,
+    postNormalizationAdditions: enforce.additionsLog,
     comparison,
     warnings,
   };

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-05-18T11:38:03.667Z",
-  "status": "ok",
+  "generatedAt": "2026-05-18T12:25:12.672Z",
+  "status": "failed",
   "sources": {
     "tradableUniverseV2": "tools/backtests/output/tradable-universe-v2.json",
     "themeTable": "tools/backtests/lib/theme-table.mjs"
@@ -57,19 +57,19 @@
     "candidateCells": 346,
     "eligibleCells": 334,
     "dedupedCandidates": 73,
-    "selectedPositions": 10,
-    "allowPositions": 5,
-    "watchPositions": 5,
+    "selectedPositions": 0,
+    "allowPositions": 0,
+    "watchPositions": 0,
     "experimentalPositions": 0,
-    "totalWeight": 100,
+    "totalWeight": 0,
     "byTier": {
       "A": {
-        "positions": 8,
-        "weightPct": 89.62
+        "positions": 0,
+        "weightPct": 0
       },
       "B": {
-        "positions": 2,
-        "weightPct": 10.38
+        "positions": 0,
+        "weightPct": 0
       },
       "C": {
         "positions": 0,
@@ -80,348 +80,40 @@
         "weightPct": 0
       }
     },
-    "byDecision": {
-      "ALLOW": 5,
-      "REDUCE": 5
-    },
-    "byRollingVerdict": {
-      "ROBUST": 5,
-      "FRAGILE": 5
-    },
-    "bySetup": {
-      "PULLBACK_MOMENTUM": {
-        "positions": 4,
-        "weightPct": 59.24
-      },
-      "BREAKOUT_EXPANSION": {
-        "positions": 3,
-        "weightPct": 25.19
-      },
-      "RELATIVE_STRENGTH_ROTATION": {
-        "positions": 3,
-        "weightPct": 15.57
-      }
-    },
-    "byBroad": {
-      "other": {
-        "positions": 8,
-        "weightPct": 89.62
-      },
-      "crypto": {
-        "positions": 2,
-        "weightPct": 10.38
-      }
-    },
-    "byFineTheme": {
-      "cybersecurity": {
-        "positions": 1,
-        "weightPct": 14.81
-      },
-      "cloud_platform": {
-        "positions": 2,
-        "weightPct": 20
-      },
-      "semis_pure": {
-        "positions": 1,
-        "weightPct": 14.81
-      },
-      "mega_cap_tech": {
-        "positions": 1,
-        "weightPct": 14.81
-      },
-      "software_saas": {
-        "positions": 2,
-        "weightPct": 20
-      },
-      "precious_metals": {
-        "positions": 1,
-        "weightPct": 14.81
-      },
-      "macro_defensive": {
-        "positions": 1,
-        "weightPct": 14.81
-      },
-      "ai_hypergrowth": {
-        "positions": 3,
-        "weightPct": 15.57
-      },
-      "crypto_layer1": {
-        "positions": 1,
-        "weightPct": 5.19
-      },
-      "crypto_correlated_equity": {
-        "positions": 1,
-        "weightPct": 5.19
-      },
-      "industrials": {
-        "positions": 1,
-        "weightPct": 5.19
-      }
-    },
+    "byDecision": {},
+    "byRollingVerdict": {},
+    "bySetup": {},
+    "byBroad": {},
+    "byFineTheme": {},
     "constraintsApplied": [
       "cap setup PULLBACK_MOMENTUM",
-      "max positions"
-    ]
-  },
-  "positions": [
-    {
-      "rank": 1,
-      "symbol": "VRNS",
-      "setup": "PULLBACK_MOMENTUM",
-      "variant": "rsi45_55_chg20_0_stop0.1",
-      "regime": "RISK_ON",
-      "decisionV2": "ALLOW",
-      "rollingVerdict": "ROBUST",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 1,
-      "baseUnit": 1,
-      "weightPct": 14.81,
-      "broadCategory": "other",
-      "fineThemes": [
-        "cybersecurity"
+      "max positions",
+      "post-normalization cap enforcement"
+    ],
+    "postNormalization": {
+      "initialViolations": [
+        {
+          "kind": "setup",
+          "key": "PULLBACK_MOMENTUM",
+          "capPct": 50,
+          "actualPct": 59.26,
+          "exceedancePct": 9.26
+        },
+        {
+          "kind": "setup",
+          "key": "BREAKOUT_EXPANSION",
+          "capPct": 25,
+          "actualPct": 25.19,
+          "exceedancePct": 0.19
+        }
       ],
-      "fineConfidence": "HIGH",
-      "tags": [],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": []
-    },
-    {
-      "rank": 2,
-      "symbol": "CLOU",
-      "setup": "PULLBACK_MOMENTUM",
-      "variant": "base_rsi42_58_chg20_0_stop0.1",
-      "regime": "RISK_ON",
-      "decisionV2": "ALLOW",
-      "rollingVerdict": "ROBUST",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 1,
-      "baseUnit": 1,
-      "weightPct": 14.81,
-      "broadCategory": "other",
-      "fineThemes": [
-        "cloud_platform"
-      ],
-      "fineConfidence": "HIGH",
-      "tags": [],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": []
-    },
-    {
-      "rank": 3,
-      "symbol": "PSI",
-      "setup": "PULLBACK_MOMENTUM",
-      "variant": "base_rsi42_58_chg20_0_stop0.1",
-      "regime": "RISK_ON",
-      "decisionV2": "ALLOW",
-      "rollingVerdict": "ROBUST",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 1,
-      "baseUnit": 1,
-      "weightPct": 14.81,
-      "broadCategory": "other",
-      "fineThemes": [
-        "semis_pure"
-      ],
-      "fineConfidence": "HIGH",
-      "tags": [],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": []
-    },
-    {
-      "rank": 4,
-      "symbol": "GOOGL",
-      "setup": "PULLBACK_MOMENTUM",
-      "variant": "rsi42_58_chg20_0_stop0.5",
-      "regime": "RISK_ON",
-      "decisionV2": "ALLOW",
-      "rollingVerdict": "ROBUST",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 1,
-      "baseUnit": 1,
-      "weightPct": 14.81,
-      "broadCategory": "other",
-      "fineThemes": [
-        "mega_cap_tech",
-        "software_saas"
-      ],
-      "fineConfidence": "HIGH",
-      "tags": [],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": []
-    },
-    {
-      "rank": 5,
-      "symbol": "GLD",
-      "setup": "BREAKOUT_EXPANSION",
-      "variant": "breakout_h50_vol1.2_stop1.5_rr2.5",
-      "regime": "RISK_ON",
-      "decisionV2": "ALLOW",
-      "rollingVerdict": "ROBUST",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 1,
-      "baseUnit": 1,
-      "weightPct": 14.81,
-      "broadCategory": "other",
-      "fineThemes": [
-        "precious_metals",
-        "macro_defensive"
-      ],
-      "fineConfidence": "HIGH",
-      "tags": [],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": []
-    },
-    {
-      "rank": 6,
-      "symbol": "APP",
-      "setup": "RELATIVE_STRENGTH_ROTATION",
-      "variant": "rs_90d_top10_hold20",
-      "regime": "RISK_ON",
-      "decisionV2": "REDUCE",
-      "rollingVerdict": "FRAGILE",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 3,
-      "baseUnit": 0.35,
-      "weightPct": 5.19,
-      "broadCategory": "other",
-      "fineThemes": [
-        "ai_hypergrowth",
-        "software_saas"
-      ],
-      "fineConfidence": "MEDIUM",
-      "tags": [
-        "reduced_due_to_fragility"
-      ],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": [
-        "FRAGILE en walk-forward roulant — allocation réduite"
-      ]
-    },
-    {
-      "rank": 7,
-      "symbol": "APLD",
-      "setup": "RELATIVE_STRENGTH_ROTATION",
-      "variant": "rs_90d_top10_hold20",
-      "regime": "RISK_ON",
-      "decisionV2": "REDUCE",
-      "rollingVerdict": "FRAGILE",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 3,
-      "baseUnit": 0.35,
-      "weightPct": 5.19,
-      "broadCategory": "other",
-      "fineThemes": [
-        "ai_hypergrowth",
-        "cloud_platform"
-      ],
-      "fineConfidence": "MEDIUM",
-      "tags": [
-        "reduced_due_to_fragility"
-      ],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": [
-        "FRAGILE en walk-forward roulant — allocation réduite"
-      ]
-    },
-    {
-      "rank": 8,
-      "symbol": "SOL",
-      "setup": "BREAKOUT_EXPANSION",
-      "variant": "breakout_h20_vol1.2_stop1_rr2",
-      "regime": "RISK_ON",
-      "decisionV2": "REDUCE",
-      "rollingVerdict": "FRAGILE",
-      "compositeTier": "A",
-      "confidence": "HIGH",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 3,
-      "baseUnit": 0.35,
-      "weightPct": 5.19,
-      "broadCategory": "crypto",
-      "fineThemes": [
-        "crypto_layer1"
-      ],
-      "fineConfidence": "HIGH",
-      "tags": [
-        "reduced_due_to_fragility"
-      ],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": [
-        "FRAGILE en walk-forward roulant — allocation réduite",
-        "crypto — exposition réduite (cap 20% v3)"
-      ]
-    },
-    {
-      "rank": 9,
-      "symbol": "MSTR",
-      "setup": "RELATIVE_STRENGTH_ROTATION",
-      "variant": "rs_90d_top10_hold20",
-      "regime": "RISK_ON",
-      "decisionV2": "REDUCE",
-      "rollingVerdict": "FRAGILE",
-      "compositeTier": "B",
-      "confidence": "MEDIUM",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 3,
-      "baseUnit": 0.35,
-      "weightPct": 5.19,
-      "broadCategory": "crypto",
-      "fineThemes": [
-        "crypto_correlated_equity"
-      ],
-      "fineConfidence": "HIGH",
-      "tags": [
-        "reduced_due_to_fragility"
-      ],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": [
-        "FRAGILE en walk-forward roulant — allocation réduite",
-        "crypto — exposition réduite (cap 20% v3)"
-      ]
-    },
-    {
-      "rank": 10,
-      "symbol": "SMCI",
-      "setup": "BREAKOUT_EXPANSION",
-      "variant": "breakout_h20_vol1.2_stop1_rr2",
-      "regime": "RISK_ON",
-      "decisionV2": "REDUCE",
-      "rollingVerdict": "FRAGILE",
-      "compositeTier": "B",
-      "confidence": "MEDIUM",
-      "walkForwardTier": "PASS",
-      "priorityGroup": 3,
-      "baseUnit": 0.35,
-      "weightPct": 5.19,
-      "broadCategory": "other",
-      "fineThemes": [
-        "ai_hypergrowth",
-        "industrials"
-      ],
-      "fineConfidence": "HIGH",
-      "tags": [
-        "reduced_due_to_fragility"
-      ],
-      "reason": "WF PASS — test 2024-2025 confirme train 2021-2023",
-      "risks": [
-        "FRAGILE en walk-forward roulant — allocation réduite"
-      ]
+      "finalViolations": [],
+      "removalsCount": 10,
+      "iterations": 11,
+      "capsAllRespectedFinal": true
     }
-  ],
+  },
+  "positions": [],
   "rejectedCandidates": [
     {
       "symbol": "PH",
@@ -1054,25 +746,195 @@
       "reason": "max 10 positions atteintes"
     }
   ],
+  "postNormalizationRemovals": [
+    {
+      "symbol": "CLOU",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "priorityGroup": 1,
+      "removedDueTo": {
+        "kind": "setup",
+        "key": "PULLBACK_MOMENTUM",
+        "capPct": 50,
+        "actualPctBeforeRemoval": 59.26
+      }
+    },
+    {
+      "symbol": "SMCI",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "baseUnit": 0.35,
+      "priorityGroup": 3,
+      "removedDueTo": {
+        "kind": "setup",
+        "key": "BREAKOUT_EXPANSION",
+        "capPct": 25,
+        "actualPctBeforeRemoval": 29.57
+      }
+    },
+    {
+      "symbol": "GOOGL",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi42_58_chg20_0_stop0.5",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "priorityGroup": 1,
+      "removedDueTo": {
+        "kind": "setup",
+        "key": "PULLBACK_MOMENTUM",
+        "capPct": 50,
+        "actualPctBeforeRemoval": 55.56
+      }
+    },
+    {
+      "symbol": "SOL",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h20_vol1.2_stop1_rr2",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "baseUnit": 0.35,
+      "priorityGroup": 3,
+      "removedDueTo": {
+        "kind": "setup",
+        "key": "BREAKOUT_EXPANSION",
+        "capPct": 25,
+        "actualPctBeforeRemoval": 30.68
+      }
+    },
+    {
+      "symbol": "GLD",
+      "setup": "BREAKOUT_EXPANSION",
+      "variant": "breakout_h50_vol1.2_stop1.5_rr2.5",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "priorityGroup": 1,
+      "removedDueTo": {
+        "kind": "fine",
+        "key": "precious_metals",
+        "capPct": 20,
+        "actualPctBeforeRemoval": 24.69
+      }
+    },
+    {
+      "symbol": "PSI",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "base_rsi42_58_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "priorityGroup": 1,
+      "removedDueTo": {
+        "kind": "setup",
+        "key": "PULLBACK_MOMENTUM",
+        "capPct": 50,
+        "actualPctBeforeRemoval": 65.57
+      }
+    },
+    {
+      "symbol": "MSTR",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "B",
+      "baseUnit": 0.35,
+      "priorityGroup": 3,
+      "removedDueTo": {
+        "kind": "setup",
+        "key": "RELATIVE_STRENGTH_ROTATION",
+        "capPct": 35,
+        "actualPctBeforeRemoval": 51.22
+      }
+    },
+    {
+      "symbol": "APLD",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "baseUnit": 0.35,
+      "priorityGroup": 3,
+      "removedDueTo": {
+        "kind": "fine",
+        "key": "ai_hypergrowth",
+        "capPct": 20,
+        "actualPctBeforeRemoval": 41.18
+      }
+    },
+    {
+      "symbol": "VRNS",
+      "setup": "PULLBACK_MOMENTUM",
+      "variant": "rsi45_55_chg20_0_stop0.1",
+      "regime": "RISK_ON",
+      "decisionV2": "ALLOW",
+      "rollingVerdict": "ROBUST",
+      "compositeTier": "A",
+      "baseUnit": 1,
+      "priorityGroup": 1,
+      "removedDueTo": {
+        "kind": "setup",
+        "key": "PULLBACK_MOMENTUM",
+        "capPct": 50,
+        "actualPctBeforeRemoval": 74.07
+      }
+    },
+    {
+      "symbol": "APP",
+      "setup": "RELATIVE_STRENGTH_ROTATION",
+      "variant": "rs_90d_top10_hold20",
+      "regime": "RISK_ON",
+      "decisionV2": "REDUCE",
+      "rollingVerdict": "FRAGILE",
+      "compositeTier": "A",
+      "baseUnit": 0.35,
+      "priorityGroup": 3,
+      "removedDueTo": {
+        "kind": "fine",
+        "key": "ai_hypergrowth",
+        "capPct": 20,
+        "actualPctBeforeRemoval": 100
+      }
+    }
+  ],
+  "postNormalizationAdditions": [],
   "comparison": {
     "v1": {
       "available": true,
       "removedFromPrev": [
         "VUG",
         "SPYG",
+        "APP",
         "IYW",
+        "GLD",
+        "SOL",
+        "MSTR",
         "JPM",
         "ROM",
         "CRWD"
       ],
-      "addedVsPrev": [
-        "VRNS",
-        "CLOU",
-        "PSI",
-        "GOOGL",
-        "APLD",
-        "SMCI"
-      ],
+      "addedVsPrev": [],
       "broadDelta": {
         "tech_ai": {
           "prev": 54.32,
@@ -1086,18 +948,13 @@
         },
         "crypto": {
           "prev": 18.54,
-          "v3": 10.38,
-          "delta": -8.16
+          "v3": 0,
+          "delta": -18.54
         },
         "leveraged": {
           "prev": 4.64,
           "v3": 0,
           "delta": -4.64
-        },
-        "other": {
-          "prev": 0,
-          "v3": 89.62,
-          "delta": 89.62
         }
       }
     },
@@ -1106,19 +963,16 @@
       "removedFromPrev": [
         "VUG",
         "SPYG",
+        "APP",
         "SOXQ",
+        "GLD",
+        "SOL",
+        "MSTR",
         "JPM",
         "ROM",
         "CRWD"
       ],
-      "addedVsPrev": [
-        "VRNS",
-        "CLOU",
-        "PSI",
-        "GOOGL",
-        "APLD",
-        "SMCI"
-      ],
+      "addedVsPrev": [],
       "broadDelta": {
         "tech_ai": {
           "prev": 54.32,
@@ -1132,25 +986,19 @@
         },
         "crypto": {
           "prev": 18.54,
-          "v3": 10.38,
-          "delta": -8.16
+          "v3": 0,
+          "delta": -18.54
         },
         "leveraged": {
           "prev": 4.64,
           "v3": 0,
           "delta": -4.64
-        },
-        "other": {
-          "prev": 0,
-          "v3": 89.62,
-          "delta": 89.62
         }
       }
     }
   },
   "warnings": [
-    "Toutes les positions sont en régime RISK_ON — concentration régime.",
-    "Aucune position RISK_OFF — pas de couverture explicite si bascule macro.",
-    "5 position(s) FRAGILE retenue(s) — allocation réduite explicite (reduced_due_to_fragility)."
+    "Portefeuille vide après contrôle post-normalisation — aucun sous-ensemble du pool v2 ne respecte simultanément tous les caps hard. Voir section 10 pour le diagnostic.",
+    "Contrôle post-normalisation : 10 position(s) retirée(s) pour respect des caps hard (11 itération(s)). Voir section \"Contrôle post-normalisation\"."
   ]
 }
