@@ -1,6 +1,6 @@
 # Tradable Universe — ManiTradePro
 
-> Généré le 2026-05-18T10:09:50.295Z par `tools/backtests/tradable-universe-v1.mjs`.
+> Généré le 2026-05-18T10:21:16.623Z par `tools/backtests/tradable-universe-v1.mjs`.
 
 Consolidation officielle des 5 moteurs quant en une décision finale par cellule (`symbol × setup × variant × regime`). Mode régime canonique : `ALL_REGIMES`.
 

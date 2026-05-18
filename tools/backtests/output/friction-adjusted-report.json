@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-18T10:09:50.872Z",
+  "generatedAt": "2026-05-18T10:21:17.150Z",
   "sources": {
     "tradableUniverse": "tools/backtests/output/tradable-universe.json",
     "allocationPlan": "tools/backtests/output/allocation-plan.json"

@@ -1,6 +1,6 @@
 # Theme Classification v2 — ManiTradePro
 
-> Généré le 2026-05-18T10:09:51.155Z par `tools/backtests/theme-classification-v2.mjs`.
+> Généré le 2026-05-18T10:21:17.385Z par `tools/backtests/theme-classification-v2.mjs`.
 
 **⚠ Classification heuristique v2** maintenue à la main, basée sur la connaissance du produit. Pas de ML, pas de scraping, pas de matrice de covariance réelle. Vise à améliorer les caps et la lisibilité, pas à fournir une vérité financière.
 
