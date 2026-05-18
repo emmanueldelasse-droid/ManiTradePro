@@ -1,6 +1,6 @@
 # Theme Classification v2 — ManiTradePro
 
-> Généré le 2026-05-18T10:21:17.385Z par `tools/backtests/theme-classification-v2.mjs`.
+> Généré le 2026-05-18T10:33:54.339Z par `tools/backtests/theme-classification-v2.mjs`.
 
 **⚠ Classification heuristique v2** maintenue à la main, basée sur la connaissance du produit. Pas de ML, pas de scraping, pas de matrice de covariance réelle. Vise à améliorer les caps et la lisibilité, pas à fournir une vérité financière.
 
@@ -10,7 +10,7 @@ Les positions peuvent avoir **plusieurs tags** (ex. NVDA = semis_pure + ai_hyper
 
 - Symboles dans le portefeuille : **10** (10 classifiés, 0 inconnus)
 - Sous-thèmes détectés dans le plan original : **13**
-- Entrées dans la table de classification : 179
+- Entrées dans la table de classification : 181
 
 ## 2. Table de classification (positions du plan)
 

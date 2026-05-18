@@ -1,6 +1,6 @@
 # Allocation Plan — Friction-Adjusted v2 — ManiTradePro
 
-> Généré le 2026-05-18T10:21:17.247Z par `tools/backtests/friction-adjusted-allocation-v2.mjs`.
+> Généré le 2026-05-18T10:33:54.191Z par `tools/backtests/friction-adjusted-allocation-v2.mjs`.
 
 **⚠ Plan théorique ajusté par friction.** Aucun ordre n'est passé. Le plan original `allocation-plan.json` et le rapport `friction-adjusted-report.json` sont inchangés sur disque. Ce rapport est une couche aval prudente, basée sur des hypothèses heuristiques v1.
 

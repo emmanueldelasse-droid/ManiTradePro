@@ -28,6 +28,12 @@ import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
 
+import {
+  THEME_CLASSIFICATION as CLASSIFICATION,
+  VALID_THEMES,
+  classifySymbolThemes,
+} from "./lib/theme-table.mjs";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
 const OUTPUT_DIR = join(REPO_ROOT, "tools", "backtests", "output");
@@ -37,253 +43,6 @@ const INPUT_TU = join(OUTPUT_DIR, "tradable-universe.json");
 const OUTPUT_JSON = join(OUTPUT_DIR, "theme-classification-v2.json");
 const OUTPUT_MD = join(OUTPUT_DIR, "theme-classification-v2.md");
 
-// === Vocabulaire thématique v2 ===
-//
-// Une position peut avoir plusieurs tags (ex. NVDA = semis_pure + ai_hypergrowth
-// + mega_cap_tech). Confidence reflète la certitude de l'attribution :
-//   HIGH   : attribution évidente, peu de discussion possible
-//   MEDIUM : attribution raisonnable mais discutable
-//   LOW    : attribution incertaine
-const VALID_THEMES = new Set([
-  "us_growth_etf",
-  "semis_pure",
-  "semis_equipment",
-  "ai_hypergrowth",
-  "software_saas",
-  "cybersecurity",
-  "cloud_platform",
-  "fintech",
-  "crypto_layer1",
-  "crypto_exchange",
-  "crypto_correlated_equity",
-  "leveraged_tech",
-  "leveraged_macro",
-  "precious_metals",
-  "banks_financials",
-  "macro_defensive",
-  "industrials",
-  "europe_equity",
-  "broad_market",
-  "quality_growth",
-  "mega_cap_tech",
-  "macro_fx",
-]);
-
-// === Classification par symbole ===
-//
-// Maintenu à la main. Toute évolution doit être documentée en commit.
-// Si un actif n'est pas dans cette table, il est marqué `unknown` et listé
-// dans le rapport pour qu'un humain l'attribue.
-const CLASSIFICATION = {
-  // Mega cap tech
-  NVDA:  { themes: ["semis_pure", "ai_hypergrowth", "mega_cap_tech"], confidence: "HIGH" },
-  AAPL:  { themes: ["mega_cap_tech"], confidence: "HIGH" },
-  MSFT:  { themes: ["mega_cap_tech", "software_saas", "cloud_platform"], confidence: "HIGH" },
-  GOOGL: { themes: ["mega_cap_tech", "software_saas"], confidence: "HIGH" },
-  AMZN:  { themes: ["mega_cap_tech", "cloud_platform"], confidence: "HIGH" },
-  META:  { themes: ["mega_cap_tech", "software_saas"], confidence: "HIGH" },
-  TSLA:  { themes: ["mega_cap_tech"], confidence: "MEDIUM" },
-  AVGO:  { themes: ["semis_pure", "mega_cap_tech"], confidence: "HIGH" },
-  AMD:   { themes: ["semis_pure"], confidence: "HIGH" },
-  ORCL:  { themes: ["software_saas", "cloud_platform"], confidence: "HIGH" },
-  CRM:   { themes: ["software_saas"], confidence: "HIGH" },
-  ADBE:  { themes: ["software_saas"], confidence: "HIGH" },
-  NFLX:  { themes: ["mega_cap_tech"], confidence: "MEDIUM" },
-
-  // Semis pure (produits / design)
-  TSM:   { themes: ["semis_pure"], confidence: "HIGH" },
-  MU:    { themes: ["semis_pure"], confidence: "HIGH" },
-  ADI:   { themes: ["semis_pure"], confidence: "HIGH" },
-  MCHP:  { themes: ["semis_pure"], confidence: "HIGH" },
-  ON:    { themes: ["semis_pure"], confidence: "HIGH" },
-  TXN:   { themes: ["semis_pure"], confidence: "HIGH" },
-  NXPI:  { themes: ["semis_pure"], confidence: "HIGH" },
-  MPWR:  { themes: ["semis_pure"], confidence: "HIGH" },
-  SWKS:  { themes: ["semis_pure"], confidence: "HIGH" },
-  QCOM:  { themes: ["semis_pure"], confidence: "HIGH" },
-  MRVL:  { themes: ["semis_pure"], confidence: "HIGH" },
-  INTC:  { themes: ["semis_pure"], confidence: "HIGH" },
-  ASX:   { themes: ["semis_pure"], confidence: "MEDIUM" },
-  RMBS:  { themes: ["semis_pure"], confidence: "HIGH" },
-  SLAB:  { themes: ["semis_pure"], confidence: "HIGH" },
-  SYNA:  { themes: ["semis_pure"], confidence: "HIGH" },
-  WOLF:  { themes: ["semis_pure"], confidence: "HIGH" },
-  QRVO:  { themes: ["semis_pure"], confidence: "HIGH" },
-  LSCC:  { themes: ["semis_pure"], confidence: "HIGH" },
-  ALGM:  { themes: ["semis_pure"], confidence: "HIGH" },
-  STM:   { themes: ["semis_pure"], confidence: "HIGH" },
-  ARM:   { themes: ["semis_pure"], confidence: "HIGH" },
-
-  // Semis equipment (machines / outils de production)
-  KLAC:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  LRCX:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  AMAT:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  ENTG:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  TER:   { themes: ["semis_equipment"], confidence: "HIGH" },
-  NVMI:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  ACLS:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  CAMT:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  ONTO:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  AEHR:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  AMKR:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  FORM:  { themes: ["semis_equipment"], confidence: "HIGH" },
-  IPGP:  { themes: ["semis_equipment", "industrials"], confidence: "MEDIUM" },
-  ASML:  { themes: ["semis_equipment", "europe_equity"], confidence: "HIGH" },
-
-  // AI hypergrowth
-  PLTR:  { themes: ["ai_hypergrowth", "software_saas"], confidence: "HIGH" },
-  SMCI:  { themes: ["ai_hypergrowth", "industrials"], confidence: "HIGH" },
-  NBIS:  { themes: ["ai_hypergrowth", "cloud_platform"], confidence: "HIGH" },
-  APLD:  { themes: ["ai_hypergrowth", "cloud_platform"], confidence: "MEDIUM" },
-  AI:    { themes: ["ai_hypergrowth", "software_saas"], confidence: "HIGH" },
-  BBAI:  { themes: ["ai_hypergrowth"], confidence: "MEDIUM" },
-  SOUN:  { themes: ["ai_hypergrowth"], confidence: "MEDIUM" },
-  APP:   { themes: ["ai_hypergrowth", "software_saas"], confidence: "MEDIUM" },
-
-  // Cybersecurity
-  CRWD:  { themes: ["cybersecurity", "software_saas"], confidence: "HIGH" },
-  PANW:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  FTNT:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  ZS:    { themes: ["cybersecurity"], confidence: "HIGH" },
-  OKTA:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  CYBR:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  S:     { themes: ["cybersecurity"], confidence: "HIGH" },
-  RBRK:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  SENT:  { themes: ["cybersecurity"], confidence: "MEDIUM" },
-  TENB:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  VRNS:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  CHKP:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  GEN:   { themes: ["cybersecurity"], confidence: "MEDIUM" },
-  NET:   { themes: ["cybersecurity", "cloud_platform"], confidence: "HIGH" },
-
-  // Software / SaaS / cloud
-  ADSK:  { themes: ["software_saas"], confidence: "HIGH" },
-  TYL:   { themes: ["software_saas"], confidence: "HIGH" },
-  INTU:  { themes: ["software_saas"], confidence: "HIGH" },
-  NOW:   { themes: ["software_saas"], confidence: "HIGH" },
-  SHOP:  { themes: ["software_saas"], confidence: "HIGH" },
-  HUBS:  { themes: ["software_saas"], confidence: "HIGH" },
-  TEAM:  { themes: ["software_saas"], confidence: "HIGH" },
-  WDAY:  { themes: ["software_saas"], confidence: "HIGH" },
-  ESTC:  { themes: ["software_saas"], confidence: "HIGH" },
-  HCP:   { themes: ["software_saas"], confidence: "HIGH" },
-  DT:    { themes: ["software_saas"], confidence: "HIGH" },
-  PAYC:  { themes: ["software_saas"], confidence: "HIGH" },
-  DUOL:  { themes: ["software_saas"], confidence: "HIGH" },
-  ROKU:  { themes: ["software_saas"], confidence: "MEDIUM" },
-  DDOG:  { themes: ["software_saas"], confidence: "HIGH" },
-  MDB:   { themes: ["software_saas"], confidence: "HIGH" },
-  SNOW:  { themes: ["software_saas", "cloud_platform"], confidence: "HIGH" },
-  FICO:  { themes: ["software_saas"], confidence: "HIGH" },
-  SPLK:  { themes: ["software_saas"], confidence: "HIGH" },
-  ZEN:   { themes: ["software_saas"], confidence: "HIGH" },
-  AKAM:  { themes: ["cloud_platform"], confidence: "HIGH" },
-  DOCN:  { themes: ["cloud_platform"], confidence: "HIGH" },
-  CFLT:  { themes: ["software_saas"], confidence: "HIGH" },
-  PATH:  { themes: ["software_saas"], confidence: "HIGH" },
-  ANET:  { themes: ["cloud_platform", "industrials"], confidence: "MEDIUM" },
-  DELL:  { themes: ["industrials"], confidence: "MEDIUM" },
-  GTLB:  { themes: ["software_saas"], confidence: "HIGH" },
-  PD:    { themes: ["software_saas"], confidence: "HIGH" },
-
-  // Fintech / banks
-  V:     { themes: ["fintech"], confidence: "HIGH" },
-  MA:    { themes: ["fintech"], confidence: "HIGH" },
-  AXP:   { themes: ["fintech", "banks_financials"], confidence: "HIGH" },
-  JPM:   { themes: ["banks_financials"], confidence: "HIGH" },
-  UPST:  { themes: ["fintech", "ai_hypergrowth"], confidence: "MEDIUM" },
-  SPGI:  { themes: ["fintech"], confidence: "HIGH" },
-  MSCI:  { themes: ["fintech"], confidence: "HIGH" },
-
-  // Crypto
-  BTC:   { themes: ["crypto_layer1"], confidence: "HIGH" },
-  ETH:   { themes: ["crypto_layer1"], confidence: "HIGH" },
-  SOL:   { themes: ["crypto_layer1"], confidence: "HIGH" },
-  AVAX:  { themes: ["crypto_layer1"], confidence: "HIGH" },
-  BNB:   { themes: ["crypto_layer1", "crypto_exchange"], confidence: "HIGH" },
-  LINK:  { themes: ["crypto_layer1"], confidence: "MEDIUM" },
-  MSTR:  { themes: ["crypto_correlated_equity"], confidence: "HIGH" },
-  COIN:  { themes: ["crypto_exchange", "crypto_correlated_equity"], confidence: "HIGH" },
-  IBIT:  { themes: ["crypto_correlated_equity"], confidence: "HIGH" },
-  CRWV:  { themes: ["ai_hypergrowth"], confidence: "LOW" },
-
-  // Leveraged ETFs
-  SOXL:  { themes: ["leveraged_tech", "semis_pure"], confidence: "HIGH" },
-  USD:   { themes: ["leveraged_tech", "semis_pure"], confidence: "HIGH" },
-  ROM:   { themes: ["leveraged_tech", "mega_cap_tech"], confidence: "HIGH" },
-
-  // ETFs broad / growth
-  SPY:   { themes: ["broad_market"], confidence: "HIGH" },
-  QQQ:   { themes: ["broad_market", "mega_cap_tech"], confidence: "HIGH" },
-  IWM:   { themes: ["broad_market"], confidence: "HIGH" },
-  MDY:   { themes: ["broad_market"], confidence: "HIGH" },
-  SPYG:  { themes: ["us_growth_etf", "broad_market"], confidence: "HIGH" },
-  VUG:   { themes: ["us_growth_etf", "quality_growth"], confidence: "HIGH" },
-  IYW:   { themes: ["us_growth_etf", "mega_cap_tech"], confidence: "HIGH" },
-  VGT:   { themes: ["us_growth_etf", "mega_cap_tech"], confidence: "HIGH" },
-  XLK:   { themes: ["us_growth_etf", "mega_cap_tech"], confidence: "HIGH" },
-  FTEC:  { themes: ["us_growth_etf", "mega_cap_tech"], confidence: "HIGH" },
-  IGV:   { themes: ["software_saas"], confidence: "HIGH" },
-  IGM:   { themes: ["us_growth_etf"], confidence: "HIGH" },
-  XSW:   { themes: ["software_saas"], confidence: "HIGH" },
-  BOTZ:  { themes: ["ai_hypergrowth"], confidence: "HIGH" },
-  CIBR:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  HACK:  { themes: ["cybersecurity"], confidence: "HIGH" },
-  BUG:   { themes: ["cybersecurity"], confidence: "HIGH" },
-  FDN:   { themes: ["cloud_platform", "us_growth_etf"], confidence: "MEDIUM" },
-  SKYY:  { themes: ["cloud_platform"], confidence: "HIGH" },
-  CLOU:  { themes: ["cloud_platform"], confidence: "HIGH" },
-  WCLD:  { themes: ["cloud_platform"], confidence: "HIGH" },
-  PSI:   { themes: ["semis_pure"], confidence: "HIGH" },
-  XSD:   { themes: ["semis_pure"], confidence: "HIGH" },
-  SMH:   { themes: ["semis_pure"], confidence: "HIGH" },
-  SOXX:  { themes: ["semis_pure"], confidence: "HIGH" },
-  SOXQ:  { themes: ["semis_pure"], confidence: "HIGH" },
-
-  // Macro defensive
-  GLD:   { themes: ["precious_metals", "macro_defensive"], confidence: "HIGH" },
-  TLT:   { themes: ["macro_defensive"], confidence: "HIGH" },
-
-  // Industrials / other
-  ETN:   { themes: ["industrials"], confidence: "HIGH" },
-  PH:    { themes: ["industrials"], confidence: "HIGH" },
-  ROP:   { themes: ["industrials"], confidence: "HIGH" },
-  HUBB:  { themes: ["industrials"], confidence: "HIGH" },
-  WM:    { themes: ["industrials"], confidence: "HIGH" },
-  TT:    { themes: ["industrials"], confidence: "HIGH" },
-  LIN:   { themes: ["industrials"], confidence: "HIGH" },
-
-  // Health / consumer / other US large cap (less covered by sub-themes)
-  COST:  { themes: ["broad_market"], confidence: "LOW" },
-  LLY:   { themes: ["broad_market"], confidence: "LOW" },
-  VRTX:  { themes: ["broad_market"], confidence: "LOW" },
-  ELV:   { themes: ["broad_market"], confidence: "LOW" },
-  PDD:   { themes: ["broad_market"], confidence: "LOW" },
-  ABNB:  { themes: ["broad_market"], confidence: "LOW" },
-  UBER:  { themes: ["broad_market"], confidence: "LOW" },
-  BKNG:  { themes: ["broad_market"], confidence: "LOW" },
-  MELI:  { themes: ["broad_market"], confidence: "LOW" },
-  SE:    { themes: ["broad_market"], confidence: "LOW" },
-  EA:    { themes: ["broad_market"], confidence: "LOW" },
-  TTWO:  { themes: ["broad_market"], confidence: "LOW" },
-  TTD:   { themes: ["software_saas"], confidence: "MEDIUM" },
-  PAYX:  { themes: ["software_saas"], confidence: "MEDIUM" },
-
-  // Europe equity
-  SAP:   { themes: ["software_saas", "europe_equity"], confidence: "HIGH" },
-  AIR:   { themes: ["industrials", "europe_equity"], confidence: "MEDIUM" },
-  LVMH:  { themes: ["europe_equity"], confidence: "HIGH" },
-  TTE:   { themes: ["europe_equity"], confidence: "HIGH" },
-  NESN:  { themes: ["europe_equity"], confidence: "HIGH" },
-  RMS:   { themes: ["europe_equity"], confidence: "HIGH" },
-  SIE:   { themes: ["industrials", "europe_equity"], confidence: "HIGH" },
-  DSY:   { themes: ["software_saas", "europe_equity"], confidence: "HIGH" },
-
-  // FX
-  EURUSD: { themes: ["macro_fx"], confidence: "HIGH" },
-  GBPUSD: { themes: ["macro_fx"], confidence: "HIGH" },
-  USDJPY: { themes: ["macro_fx"], confidence: "HIGH" },
-};
 
 // === Chargement ===
 
@@ -296,10 +55,10 @@ async function tryRead(path) {
   }
 }
 
+// Wrapper local — délègue à la fonction partagée du module lib/theme-table.
+// Conservé pour limiter la perturbation du reste du fichier.
 function classifySymbol(symbol) {
-  const entry = CLASSIFICATION[symbol];
-  if (!entry) return { themes: [], confidence: "UNKNOWN" };
-  return entry;
+  return classifySymbolThemes(symbol);
 }
 
 // Calcule l'exposition par sous-thème pour une liste de positions.
