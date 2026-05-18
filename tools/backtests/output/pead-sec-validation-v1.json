@@ -1,0 +1,11 @@
+{
+  "generatedAt": "2026-05-18T18:40:09.443Z",
+  "scope": "Validation SEC EDGAR du dataset EODHD",
+  "dryRun": true,
+  "reason": "data/earnings/pead-eodhd-v1.json absent — exécuter pead-eodhd-ingestion-v1.mjs d'abord",
+  "verdict": "VALIDATION_NOT_RUN",
+  "sources": [
+    "data.sec.gov/submissions",
+    "data/earnings/pead-eodhd-v1.json (manquant)"
+  ]
+}
