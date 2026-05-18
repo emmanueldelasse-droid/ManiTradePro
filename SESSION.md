@@ -1434,3 +1434,142 @@ Une cellule qui passe les 4 premiers mais FAIL au 5e doit être **exclue**. C'es
 - **Pas de validation régime cross-period** : si le régime macro 2024-2025 ne ressemble pas à celui de 2021-2023, les verdicts peuvent être trompeurs. Idéalement, faire le walk-forward CONDITIONNELLEMENT au régime (mais les samples deviennent triviaux).
 - **Effet de levier (SOXL) toujours invisible** : SOXL × RS × RISK_ON sort PASS sur les chiffres bruts mais reste un instrument à risque non-linéaire.
 - **Verdict ≠ autorisation live** : un PASS dit "le passé récent confirme le passé long". Cela ne garantit pas le futur. Toujours combiner avec gestion du risque et observation live.
+
+---
+
+# Tradable Universe v1 — consolidateur officiel des 5 moteurs
+
+Fichier créé :
+
+```text
+tools/backtests/tradable-universe-v1.mjs
+```
+
+Combine les 5 moteurs précédents en une décision finale par cellule `(symbol × setup × variant × regime)`. Mode régime canonique : `ALL_REGIMES`.
+
+Sorties écrites :
+
+- `tools/backtests/output/tradable-universe.json`
+- `tools/backtests/output/tradable-universe.md`
+
+Comment le relancer :
+
+```text
+node tools/backtests/tradable-universe-v1.mjs
+```
+
+## Logique de décision
+
+Une cellule traverse séquentiellement les 5 filtres. Le premier échec déclenche BLOCK.
+
+1. **asset-quality** : BLACKLIST → BLOCK.
+2. **asset-setup-matrix** : AVOID ou WEAK → BLOCK.
+3. **setup-variant-matrix** : AVOID ou WEAK → BLOCK.
+4. **variant-regime-matrix** : AVOID ou WEAK → BLOCK.
+5. **walk-forward** : FAIL → BLOCK.
+
+Décision finale parmi celles ayant passé les 5 filtres :
+- **WF PASS** → ALLOW.
+- **WF WATCH** → REDUCE.
+- **WF INSUFFICIENT_DATA** → EXPERIMENTAL si variant-regime STRONG ET asset-quality ELITE/CORE ET confiance ≥ MEDIUM. Sinon BLOCK.
+
+Caps de politique :
+- **Setup non-prioritaire** (MEAN_REVERSION, VOLATILITY_COMPRESSION) → jamais ALLOW. Au mieux EXPERIMENTAL.
+- **ETF leveragé** (SOXL, USD ProShares 2× semis, ROM) → jamais ALLOW. Au mieux REDUCE.
+
+Composite tier :
+- **A** : ALLOW + HIGH confidence + setup prioritaire + non leveragé.
+- **B** : ALLOW autre.
+- **C** : REDUCE.
+- **D** : EXPERIMENTAL.
+- **BLOCKED** : BLOCK.
+
+Allocation profile : A/B → `normal`, C → `reduced`, D → `micro`, BLOCKED → `none`.
+
+## Résultat du premier run
+
+- **10 878 cellules** évaluées (symbol × setup × variant × regime).
+- **346 ALLOW** (3.2 %) — 183 tier A + 163 tier B.
+- **10 REDUCE** (0.1 %).
+- **182 EXPERIMENTAL** (1.7 %).
+- **10 340 BLOCK** (95.0 %).
+
+Rejets par filtre :
+
+| Filtre | Cellules rejetées |
+|---|---:|
+| asset-quality BLACKLIST | 3 006 |
+| asset-setup AVOID/WEAK | 3 582 |
+| setup-variant AVOID/WEAK | 1 908 |
+| variant-regime AVOID/WEAK | 1 396 |
+| walk-forward FAIL ou INSUFF sans base très forte | 448 |
+| Total BLOCK | **10 340** |
+
+## STRONG-base bloqués par walk-forward (5 cellules)
+
+C'est exactement le verrou anti-surajustement attendu — ces cellules étaient STRONG dans la matrice variant-regime mais BLOCK ici via WF FAIL :
+
+- BTC × PULLBACK_MOMENTUM × RANGE × 3 variantes (`base_rsi42_58_chg20_0_stop0.1`, `pullback_base_rsi42_58_chg20_0_stop0.1`, `rsi42_58_chg20_3_stop0.1`).
+- APP × RELATIVE_STRENGTH_ROTATION × RANGE × 2 variantes (`rs_90d_top10_hold20`, `rs_120d_top10_hold20`).
+
+→ APP × RS × **RISK_ON** reste ALLOW (tier A même), c'est le couple RANGE qui est éjecté.
+
+## Top 5 cellules tier A (ALLOW + HIGH + priority + non-leveraged)
+
+| Symbole | Setup | Variante | Régime | Score VR | WF test trades | WF test exp |
+|---|---|---|---|---:|---:|---:|
+| VUG | PULLBACK_MOMENTUM | base_rsi42_58_chg20_0_stop0.1 | RISK_ON | 95 | 26 | 1.79 |
+| SPYG | PULLBACK_MOMENTUM | rsi42_58_chg20_0_stop0.5 | RISK_ON | 95 | 23 | 1.37 |
+| APP | RELATIVE_STRENGTH_ROTATION | rs_90d_top10_hold20 | RISK_ON | 95 | 25 | 2.65 |
+| IYW | PULLBACK_MOMENTUM | base_rsi42_58_chg20_0_stop0.1 | RISK_ON | 95 | 28 | 1.71 |
+| SOXQ | PULLBACK_MOMENTUM | base_rsi42_58_chg20_0_stop0.1 | RISK_ON | 95 | 30 | 1.87 |
+
+Toutes en RISK_ON, tous avec test 2024-2025 robuste (≥ 23 trades, exp > 1.3, PF élevé). C'est exactement le profil de cellule à privilégier dans l'allocation.
+
+## Cas focus
+
+| Actif | Total | ALLOW | REDUCE | EXP | BLOCK | Note |
+|---|---:|---:|---:|---:|---:|---|
+| NVDA | 69 | 1 | 0 | 5 | 63 | ALLOW B sur Breakout h50 RISK_ON. EXP sur Pullback RANGE. |
+| PLTR | 60 | 5 | 0 | 11 | 44 | 5 ALLOW B sur Pullback RISK_ON. Actif riche. |
+| APP | 66 | 1 | 0 | 1 | 64 | ALLOW **A** sur RS rs_90d RISK_ON. APP × RANGE bloqué par WF FAIL. |
+| SMCI | 83 | 2 | 0 | 5 | 76 | 2 ALLOW B sur Breakout h20/h50 RISK_ON. |
+| AVGO | 73 | 0 | 0 | 0 | 73 | **Aucune cellule tradable**. Filtres setup-variant ou variant-regime éliminent toutes les combinaisons. |
+| SOXL | 65 | 0 | 0 | 0 | 65 | **Aucune cellule tradable**. Cap leveraged + filtres en amont. |
+| BTC | 72 | 0 | 0 | 1 | 71 | 1 EXP D seulement. BTC × Pullback × RANGE éjecté par WF FAIL. |
+| SOL | 66 | 2 | 0 | 5 | 59 | 2 ALLOW dont 1 tier A (Breakout h20 RISK_ON), 1 tier B (RS RISK_ON). |
+| COIN | 54 | 1 | 0 | 0 | 53 | 1 ALLOW B sur RS RISK_ON. |
+| MSTR | 66 | 4 | 0 | 0 | 62 | 4 ALLOW B (RS + Breakout RISK_ON). |
+
+## Non-régression confirmée
+
+Les 5 moteurs sources (asset-quality, asset-setup-matrix, setup-variant-matrix, variant-regime-matrix, walk-forward-regime-validator) ont été ré-exécutés et leurs JSON outputs comparés byte-par-byte (modulo `generatedAt`) : **strictement identiques**. Le consolidateur ne modifie aucun moteur amont, il lit seulement.
+
+## Conséquence opérationnelle
+
+Le moteur dispose désormais d'un **point d'entrée unique** pour la décision tradable :
+
+```text
+tools/backtests/output/tradable-universe.json
+```
+
+L'allocation-engine futur n'a plus à lire les 5 fichiers — il consomme `cells[]` filtré par `decision !== "BLOCK"` et trie par `compositeTier`. Les politiques (non-prioritaire, leveraged) sont déjà appliquées en amont.
+
+## Limites résiduelles
+
+- **Dépend de la fraîcheur des 5 sources** : si l'une est obsolète, des cellules entières peuvent être incorrectes. Toujours rerun les 5 moteurs avant ce consolidateur. À automatiser via un orchestrator script (non fait dans cette PR).
+- **Mode régime canonique unique** : seul `ALL_REGIMES` est évalué. Les modes `NO_RISK_OFF` et `RISK_ON_ONLY` du backtest RS regime donnent par construction les mêmes cellules par régime individuel, donc non évalués séparément.
+- **Cap leveraged sur 3 symboles seulement** : SOXL, USD, ROM. Liste à étendre si TQQQ, SQQQ, UPRO etc. arrivent dans l'univers.
+- **Aucun coût de transaction** : ALLOW ≠ rentable avec slippage/spread/frais réels. Priorité #3 du TODO quant.
+- **Walk-forward unique** : un seul split. INSUFFICIENT_DATA promu EXPERIMENTAL doit être manipulé prudemment.
+- **Verdict ALLOW ≠ autorisation live** : ce JSON alimente un futur allocation-engine. Le passage à l'argent réel reste conditionné à : paper trading live validé, gestion du risque opérationnelle, kill-switch testé, connecteur broker.
+
+## Prochaine étape recommandée
+
+**Allocation engine v1** (priorité #4 du TODO quant). Maintenant que les 5 niveaux et leur consolidation produisent un tradable universe rigoureux, le moteur d'allocation peut prendre :
+
+```text
+tools/backtests/output/tradable-universe.json
+```
+
+et émettre des positions pondérées par tier (A/B/C/D) en respectant des contraintes globales (max N positions simultanées, max exposition par secteur/crypto, max exposition leveraged, etc.). C'est l'étape qui transforme la recherche quant en décisions de sizing concrètes.
