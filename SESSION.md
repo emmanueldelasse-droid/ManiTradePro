@@ -2771,3 +2771,93 @@ Le statut **RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED** de RS Rotation peut poten
 ## Non-régression
 
 Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+---
+
+# New Setup Discovery Lab v1
+
+Fichier créé :
+
+```text
+tools/backtests/new-setup-discovery-lab-v1.mjs
+```
+
+Laboratoire offline de découverte de nouveaux setups après nettoyage des anciens. Validation réaliste obligatoire (NEXT_OPEN + friction round-trip 0.30 % + 0.02 %/jour).
+
+Sorties :
+
+- `tools/backtests/output/new-setup-discovery-lab-v1.json`
+- `tools/backtests/output/new-setup-discovery-lab-v1.md` (10 sections)
+
+## Verdict global : **NEW_ROBUST_SETUP_FOUND**
+
+| Catégorie | Configs |
+|---|---:|
+| ROBUST_EDGE | **17** |
+| CONDITIONAL_EDGE | 20 |
+| FRAGILE | 11 |
+| DEAD | 10 |
+| DATA_MISSING (POST_EARNINGS_DRIFT) | 1 famille |
+
+## Best ROBUST config — bat RS Rotation 120j
+
+```text
+Famille : SECTOR_RELATIVE_STRENGTH
+horizon : 60 days
+topSectors : 1
+topAssetsPerSector : 5
+rebalance : 10 days
+lookback : 90 days
+régime : NO_RISK_OFF
+```
+
+- 445 trades sur 5 ans
+- **PF 2.16 après friction** (vs RS Rotation 120j PF 1.91 → **BETTER**)
+- **5/5 années positives** (vs 4/5 pour RS Rotation)
+- Edge decay ×0.68 (edge meilleur récent)
+
+## Pattern dominant : 2-level rotation
+
+Sur les 17 configs ROBUST_EDGE :
+- **Le top 9 est entièrement SECTOR_RELATIVE_STRENGTH** (rotation 2-niveaux).
+- Concentration sur 1 secteur top + 3-10 actifs du secteur = formule gagnante.
+- Horizons 40-120j surperforment les horizons courts.
+- Pattern « concentrer sur le secteur le plus fort » > « diversifier sur l'univers entier ».
+
+## Familles testées
+
+| Famille | Status | Findings |
+|---|---|---|
+| POST_EARNINGS_DRIFT | DATA_MISSING | Pas de données earnings dans `data/`. Section dédiée liste les sources possibles (Alpha Vantage, Polygon, FMP, EOD, SEC EDGAR) et le design proposé. |
+| ETF_MOMENTUM_ROTATION | testé | 45 configs sur 6 sous-univers ETF. Mostly FRAGILE/DEAD. Confirme PR #210 : ETFs purs sans actions ne suffisent pas. |
+| SECTOR_RELATIVE_STRENGTH | **gagnant** | 27 configs. Top 1-2 secteurs + top assets = **17 ROBUST_EDGE**. Best PF 2.16. |
+| REGIME_SPECIFIC_SETUPS | testé | 4 configs (RISK_ON / RANGE / RISK_OFF / CASH). Confirme : NO_RISK_OFF est la combinaison optimale. RISK_ON_ONLY paradoxalement fragile. CASH = 0R par construction. |
+
+## Réponses aux 7 questions du brief
+
+1. **Y a-t-il un nouveau setup viable ?** OUI, 17 configs ROBUST_EDGE.
+2. **Bat RS Rotation robuste ?** OUI, SECTOR_RELATIVE_STRENGTH PF 2.16 > 1.91.
+3. **Quel survit aux frictions ?** 37 configs sur 58 (ROBUST + CONDITIONAL).
+4. **Survit sur plusieurs années ?** 17 configs ≥ 4/5 années positives.
+5. **Meurt dès NEXT_OPEN ?** Top 1 hyper-concentré (PR #210 le montrait déjà). Ici, ETF-only sur subsets restreints.
+6. **Mérite une PR dédiée ?** SECTOR_RELATIVE_STRENGTH horizon 60j top 1 sec top 5 act, à formaliser.
+7. **Données manquantes pour Post-Earnings Drift ?** Earnings dates, EPS surprise, gap d'ouverture, volume relatif. 4 sources listées.
+
+## Conséquences pour SETUPS_REGISTRY.md
+
+Un nouveau candidat sérieux : **SECTOR_RELATIVE_STRENGTH** (rotation 2-niveaux). Méritera une PR dédiée pour formaliser :
+- statut probable : RESEARCH_CANDIDATE ou même VALIDATED après vérifs supplémentaires (walk-forward conditionnel, friction stress-test).
+- Mécanisme : différent de RS Rotation simple → complémentarité possible dans une allocation multi-setup future.
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+## Limites assumées
+
+- POST_EARNINGS_DRIFT : non testable sans données externes (documenté).
+- Sweeps multivariés partiels (subset × horizon × topN), pas grid complet.
+- Sector RS utilise les groupes UNIVERSE existants, pas des ETFs sectoriels SPDR réels en proxy.
+- Pas de VIX, pas de breadth filter dans cette PR.
+- Pas de short-side, pas de position sizing dynamique.
+- Pas de comparaison vs buy-and-hold SPY.

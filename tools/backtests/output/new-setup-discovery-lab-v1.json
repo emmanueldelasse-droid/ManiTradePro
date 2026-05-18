@@ -1,0 +1,4890 @@
+{
+  "generatedAt": "2026-05-18T15:51:09.215Z",
+  "scope": "Laboratoire offline de découverte de nouveaux setups après nettoyage des anciens faux edges. Validation réaliste obligatoire (NEXT_OPEN + friction).",
+  "sources": [
+    "tools/backtests/universe-v2.mjs",
+    "data/*.json (OHLC 2021-2025)",
+    "tools/backtests/output/rs-rotation-robustness-lab-v1.json (référence)",
+    "tools/backtests/output/setup-execution-bias-audit-v1.json (référence)",
+    "SETUPS_REGISTRY.md (référence)"
+  ],
+  "executionModel": {
+    "entry": "open[i+1] (NEXT_OPEN)",
+    "exit": "open[exitIdx]",
+    "friction": {
+      "roundTripPct": 0.3,
+      "overnightGapPenaltyPctPerDay": 0.02,
+      "conversionToR": "5% = 1R",
+      "formula": "frictionR = (0.30 + 0.02 × holdDays) / 5"
+    }
+  },
+  "families": {
+    "POST_EARNINGS_DRIFT": {
+      "status": "DATA_MISSING",
+      "reason": "Aucune source de dates d'earnings dans le repo. Les fichiers `data/*.json` ne contiennent que des OHLC quotidiens.",
+      "dataNeeded": [
+        "Calendrier des dates d'earnings par symbole (date de publication, type pre-market/post-market)",
+        "Surprise EPS et CA (réel vs consensus analystes) — pour filtrer 'beat' vs 'miss'",
+        "Idéalement : direction du gap d'ouverture le jour après earnings (pour la pré-condition 'gap positif fort')",
+        "Volume relatif d'avant et après publication (pour la pré-condition 'volume anormal')"
+      ],
+      "proposedSources": [
+        "API Alpha Vantage / Polygon / FMP — earnings_calendar endpoint (souvent gratuit en historique limité)",
+        "EOD Historical Data : `eodhd.com` propose des fichiers earnings batch",
+        "Yahoo Finance (scraping fragile, conditions d'usage à vérifier)",
+        "SEC EDGAR — filings 10-Q/10-K, dates exactes (mais sans estimates analystes)"
+      ],
+      "proposedDesign": [
+        "Filtre 1 : earnings positifs (surprise EPS > 0, ou simplement gap d'ouverture > +3 %)",
+        "Filtre 2 : volume relatif jour d'earnings > 2× moyenne 20j",
+        "Filtre 3 : régime de marché NO_RISK_OFF (déjà disponible dans le repo)",
+        "Entry : open[T+1] où T = jour publication earnings",
+        "Exits testés : 5j / 10j / 20j / 40j fixed hold + ATR trailing",
+        "Friction : identique à `frictionRPerTrade(holdDays)` = round-trip 0.30 % + 0.02 %/jour",
+        "Classification : mêmes critères ROBUST/CONDITIONAL/FRAGILE/DEAD"
+      ]
+    },
+    "ETF_MOMENTUM_ROTATION": [
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 87,
+          "wins": 50,
+          "losses": 37,
+          "winrate": 57.47,
+          "expectancyR": 0.031,
+          "profitFactor": 1.093,
+          "maxDrawdownR": 8.66,
+          "totalR": 2.72,
+          "sharpeApprox": 0.25,
+          "turnoverPerYear": 17.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.78,
+            "2022": 0.07,
+            "2023": 1.93,
+            "2024": 1.06,
+            "2025": 1.08
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.59,
+          "latePf": 1.07,
+          "decayRatio": 0.55
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 234,
+          "wins": 136,
+          "losses": 98,
+          "winrate": 58.12,
+          "expectancyR": 0.025,
+          "profitFactor": 1.078,
+          "maxDrawdownR": 19.54,
+          "totalR": 5.87,
+          "sharpeApprox": 0.21,
+          "turnoverPerYear": 46.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.8,
+            "2022": 0.05,
+            "2023": 0.97,
+            "2024": 1.43,
+            "2025": 1.43
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.67,
+          "latePf": 1.43,
+          "decayRatio": 0.47
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 20,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_index insuffisant (4 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 83,
+          "wins": 44,
+          "losses": 39,
+          "winrate": 53.01,
+          "expectancyR": 0.154,
+          "profitFactor": 1.258,
+          "maxDrawdownR": 24.22,
+          "totalR": 12.76,
+          "sharpeApprox": 0.68,
+          "turnoverPerYear": 16.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.36,
+            "2022": 0,
+            "2023": 4.07,
+            "2024": 0.92,
+            "2025": 1.43
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.27,
+          "latePf": 1.13,
+          "decayRatio": 0.24
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 222,
+          "wins": 126,
+          "losses": 96,
+          "winrate": 56.76,
+          "expectancyR": 0.128,
+          "profitFactor": 1.232,
+          "maxDrawdownR": 45.87,
+          "totalR": 28.37,
+          "sharpeApprox": 0.62,
+          "turnoverPerYear": 44.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.47,
+            "2022": 0,
+            "2023": 2.26,
+            "2024": 1.53,
+            "2025": 1.18
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.4,
+          "latePf": 1.37,
+          "decayRatio": 0.29
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 60,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_index insuffisant (4 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 77,
+          "wins": 48,
+          "losses": 29,
+          "winrate": 62.34,
+          "expectancyR": 0.403,
+          "profitFactor": 1.476,
+          "maxDrawdownR": 46.61,
+          "totalR": 31.06,
+          "sharpeApprox": 1.16,
+          "turnoverPerYear": 15.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.12,
+            "2022": 0,
+            "2023": 54.43,
+            "2024": 1.39,
+            "2025": 999
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.1,
+          "latePf": 2.22,
+          "decayRatio": 0.04
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 204,
+          "wins": 124,
+          "losses": 80,
+          "winrate": 60.78,
+          "expectancyR": 0.272,
+          "profitFactor": 1.354,
+          "maxDrawdownR": 92.07,
+          "totalR": 55.47,
+          "sharpeApprox": 0.89,
+          "turnoverPerYear": 40.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.19,
+            "2022": 0,
+            "2023": 17.44,
+            "2024": 1.3,
+            "2025": 12.87
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.16,
+          "latePf": 1.7,
+          "decayRatio": 0.1
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 120,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_index insuffisant (4 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 91,
+          "wins": 58,
+          "losses": 33,
+          "winrate": 63.74,
+          "expectancyR": 0.29,
+          "profitFactor": 1.585,
+          "maxDrawdownR": 13.17,
+          "totalR": 26.41,
+          "sharpeApprox": 1.32,
+          "turnoverPerYear": 18.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.14,
+            "2022": 0,
+            "2023": 3.04,
+            "2024": 2.2,
+            "2025": 1.53
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.65,
+          "latePf": 1.86,
+          "decayRatio": 0.35
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 267,
+          "wins": 173,
+          "losses": 93,
+          "winrate": 64.79,
+          "expectancyR": 0.159,
+          "profitFactor": 1.271,
+          "maxDrawdownR": 36.03,
+          "totalR": 42.51,
+          "sharpeApprox": 0.58,
+          "turnoverPerYear": 53.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.23,
+            "2022": 0,
+            "2023": 1.89,
+            "2024": 1.12,
+            "2025": 1.72
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.76,
+          "latePf": 1.32,
+          "decayRatio": 0.57
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 20,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 438,
+          "wins": 282,
+          "losses": 155,
+          "winrate": 64.38,
+          "expectancyR": 0.167,
+          "profitFactor": 1.318,
+          "maxDrawdownR": 51.41,
+          "totalR": 72.99,
+          "sharpeApprox": 0.69,
+          "turnoverPerYear": 87.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.22,
+            "2022": 0,
+            "2023": 1.87,
+            "2024": 1.13,
+            "2025": 1.96
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.78,
+          "latePf": 1.42,
+          "decayRatio": 0.55
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 87,
+          "wins": 52,
+          "losses": 35,
+          "winrate": 59.77,
+          "expectancyR": 0.033,
+          "profitFactor": 1.029,
+          "maxDrawdownR": 62.51,
+          "totalR": 2.9,
+          "sharpeApprox": 0.08,
+          "turnoverPerYear": 17.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.33,
+            "2022": 0.01,
+            "2023": 1.22,
+            "2024": 2.19,
+            "2025": 1.51
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 1.85,
+          "decayRatio": 0.14
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 255,
+          "wins": 151,
+          "losses": 104,
+          "winrate": 59.22,
+          "expectancyR": 0.081,
+          "profitFactor": 1.07,
+          "maxDrawdownR": 126.16,
+          "totalR": 20.66,
+          "sharpeApprox": 0.19,
+          "turnoverPerYear": 51
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.49,
+            "2022": 0,
+            "2023": 1.69,
+            "2024": 1,
+            "2025": 1.89
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.38,
+          "latePf": 1.29,
+          "decayRatio": 0.29
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 60,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 418,
+          "wins": 243,
+          "losses": 175,
+          "winrate": 58.13,
+          "expectancyR": 0.077,
+          "profitFactor": 1.069,
+          "maxDrawdownR": 171.74,
+          "totalR": 32.34,
+          "sharpeApprox": 0.18,
+          "turnoverPerYear": 83.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.52,
+            "2022": 0,
+            "2023": 1.67,
+            "2024": 0.86,
+            "2025": 2.14
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.4,
+          "latePf": 1.27,
+          "decayRatio": 0.31
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 81,
+          "wins": 41,
+          "losses": 40,
+          "winrate": 50.62,
+          "expectancyR": -0.246,
+          "profitFactor": 0.856,
+          "maxDrawdownR": 91.62,
+          "totalR": -19.89,
+          "sharpeApprox": -0.45,
+          "turnoverPerYear": 16.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.26,
+            "2022": 0.14,
+            "2023": 1.9,
+            "2024": 1.18,
+            "2025": 2.05
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.24,
+          "latePf": 1.42,
+          "decayRatio": 0.17
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 237,
+          "wins": 117,
+          "losses": 120,
+          "winrate": 49.37,
+          "expectancyR": -0.608,
+          "profitFactor": 0.685,
+          "maxDrawdownR": 226,
+          "totalR": -144.16,
+          "sharpeApprox": -0.99,
+          "turnoverPerYear": 47.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.29,
+            "2022": 0.06,
+            "2023": 1.29,
+            "2024": 0.51,
+            "2025": 1.86
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 0.75,
+          "decayRatio": 0.34
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 120,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 388,
+          "wins": 201,
+          "losses": 187,
+          "winrate": 51.8,
+          "expectancyR": -0.581,
+          "profitFactor": 0.697,
+          "maxDrawdownR": 355.09,
+          "totalR": -225.45,
+          "sharpeApprox": -0.93,
+          "turnoverPerYear": 77.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.3,
+            "2022": 0.04,
+            "2023": 1.16,
+            "2024": 0.57,
+            "2025": 1.94
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 0.83,
+          "decayRatio": 0.31
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 20,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 60,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_sectors",
+          "horizon": 120,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_us_sectors insuffisant (0 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 81,
+          "wins": 48,
+          "losses": 33,
+          "winrate": 59.26,
+          "expectancyR": 0.234,
+          "profitFactor": 2.11,
+          "maxDrawdownR": 4.69,
+          "totalR": 18.98,
+          "sharpeApprox": 2.11,
+          "turnoverPerYear": 16.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.18,
+            "2022": 13.85,
+            "2023": 0.8,
+            "2024": 3.15,
+            "2025": 9.54
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.65,
+          "latePf": 5.12,
+          "decayRatio": 0.13
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_commodities insuffisant (1 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 20,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_commodities insuffisant (1 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 77,
+          "wins": 52,
+          "losses": 25,
+          "winrate": 67.53,
+          "expectancyR": 0.898,
+          "profitFactor": 5.242,
+          "maxDrawdownR": 8.05,
+          "totalR": 69.18,
+          "sharpeApprox": 4.47,
+          "turnoverPerYear": 15.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.43,
+            "2022": 1.86,
+            "2023": 0.87,
+            "2024": 31.89,
+            "2025": 88.83
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.76,
+          "latePf": 49.14,
+          "decayRatio": 0.02
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_commodities insuffisant (1 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 60,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_commodities insuffisant (1 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 71,
+          "wins": 51,
+          "losses": 20,
+          "winrate": 71.83,
+          "expectancyR": 1.567,
+          "profitFactor": 6.652,
+          "maxDrawdownR": 15.96,
+          "totalR": 111.26,
+          "sharpeApprox": 5.45,
+          "turnoverPerYear": 14.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.4,
+            "2022": 0.15,
+            "2023": 2.19,
+            "2024": 999,
+            "2025": 999
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.25,
+          "latePf": 999,
+          "decayRatio": 0
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_commodities insuffisant (1 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 120,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "skipped": true,
+        "reason": "univers etfs_commodities insuffisant (1 ETFs)"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 93,
+          "wins": 56,
+          "losses": 37,
+          "winrate": 60.22,
+          "expectancyR": 0.147,
+          "profitFactor": 1.298,
+          "maxDrawdownR": 12.68,
+          "totalR": 13.64,
+          "sharpeApprox": 0.72,
+          "turnoverPerYear": 18.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.72,
+            "2022": 0.26,
+            "2023": 2.71,
+            "2024": 1.34,
+            "2025": 1.49
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.56,
+          "latePf": 1.41,
+          "decayRatio": 0.4
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 273,
+          "wins": 170,
+          "losses": 103,
+          "winrate": 62.27,
+          "expectancyR": 0.074,
+          "profitFactor": 1.126,
+          "maxDrawdownR": 33.38,
+          "totalR": 20.26,
+          "sharpeApprox": 0.28,
+          "turnoverPerYear": 54.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.85,
+            "2022": 0.19,
+            "2023": 1.84,
+            "2024": 0.88,
+            "2025": 1.73
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.62,
+          "latePf": 1.14,
+          "decayRatio": 0.54
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 20,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 449,
+          "wins": 281,
+          "losses": 167,
+          "winrate": 62.58,
+          "expectancyR": 0.119,
+          "profitFactor": 1.23,
+          "maxDrawdownR": 51.54,
+          "totalR": 53.33,
+          "sharpeApprox": 0.5,
+          "turnoverPerYear": 89.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.96,
+            "2022": 0.12,
+            "2023": 1.72,
+            "2024": 1.02,
+            "2025": 1.96
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.68,
+          "latePf": 1.35,
+          "decayRatio": 0.5
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 89,
+          "wins": 48,
+          "losses": 41,
+          "winrate": 53.93,
+          "expectancyR": -0.193,
+          "profitFactor": 0.833,
+          "maxDrawdownR": 59.87,
+          "totalR": -17.2,
+          "sharpeApprox": -0.49,
+          "turnoverPerYear": 17.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.09,
+            "2022": 0.11,
+            "2023": 1.05,
+            "2024": 1.55,
+            "2025": 1.5
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.09,
+          "latePf": 1.53,
+          "decayRatio": 0.06
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 261,
+          "wins": 145,
+          "losses": 116,
+          "winrate": 55.56,
+          "expectancyR": -0.077,
+          "profitFactor": 0.934,
+          "maxDrawdownR": 124.91,
+          "totalR": -19.99,
+          "sharpeApprox": -0.18,
+          "turnoverPerYear": 52.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.25,
+            "2022": 0.07,
+            "2023": 1.67,
+            "2024": 0.76,
+            "2025": 1.99
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.21,
+          "latePf": 1.14,
+          "decayRatio": 0.18
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 60,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 429,
+          "wins": 244,
+          "losses": 185,
+          "winrate": 56.88,
+          "expectancyR": 0.007,
+          "profitFactor": 1.006,
+          "maxDrawdownR": 170.97,
+          "totalR": 2.88,
+          "sharpeApprox": 0.02,
+          "turnoverPerYear": 85.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.37,
+            "2022": 0.04,
+            "2023": 1.64,
+            "2024": 0.8,
+            "2025": 2.19
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.29,
+          "latePf": 1.24,
+          "decayRatio": 0.23
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 83,
+          "wins": 44,
+          "losses": 39,
+          "winrate": 53.01,
+          "expectancyR": -0.288,
+          "profitFactor": 0.83,
+          "maxDrawdownR": 92.23,
+          "totalR": -23.87,
+          "sharpeApprox": -0.55,
+          "turnoverPerYear": 16.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.08,
+            "2022": 0.2,
+            "2023": 1.85,
+            "2024": 1.27,
+            "2025": 3.31
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.1,
+          "latePf": 1.81,
+          "decayRatio": 0.05
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 243,
+          "wins": 120,
+          "losses": 123,
+          "winrate": 49.38,
+          "expectancyR": -0.688,
+          "profitFactor": 0.642,
+          "maxDrawdownR": 238.38,
+          "totalR": -167.18,
+          "sharpeApprox": -1.15,
+          "turnoverPerYear": 48.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.13,
+            "2022": 0.08,
+            "2023": 1.29,
+            "2024": 0.47,
+            "2025": 3.15
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.12,
+          "latePf": 0.86,
+          "decayRatio": 0.14
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 120,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 399,
+          "wins": 205,
+          "losses": 194,
+          "winrate": 51.38,
+          "expectancyR": -0.59,
+          "profitFactor": 0.686,
+          "maxDrawdownR": 371.9,
+          "totalR": -235.22,
+          "sharpeApprox": -0.96,
+          "turnoverPerYear": 79.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.2,
+            "2022": 0.05,
+            "2023": 1.11,
+            "2024": 0.6,
+            "2025": 3.54
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.17,
+          "latePf": 1.02,
+          "decayRatio": 0.17
+        },
+        "classification": "DEAD"
+      }
+    ],
+    "SECTOR_RELATIVE_STRENGTH": [
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 1,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 273,
+          "wins": 138,
+          "losses": 135,
+          "winrate": 50.55,
+          "expectancyR": 1.193,
+          "profitFactor": 1.604,
+          "maxDrawdownR": 146.24,
+          "totalR": 325.65,
+          "sharpeApprox": 1.09,
+          "turnoverPerYear": 54.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.98,
+            "2022": 0.87,
+            "2023": 1.27,
+            "2024": 1.91,
+            "2025": 1.44
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.8,
+          "latePf": 1.67,
+          "decayRatio": 1.08
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 1,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 455,
+          "wins": 243,
+          "losses": 212,
+          "winrate": 53.41,
+          "expectancyR": 1.678,
+          "profitFactor": 1.949,
+          "maxDrawdownR": 178.97,
+          "totalR": 763.47,
+          "sharpeApprox": 1.5,
+          "turnoverPerYear": 91
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.52,
+            "2022": 0.66,
+            "2023": 2.45,
+            "2024": 2.86,
+            "2025": 1.36
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.32,
+          "latePf": 2.09,
+          "decayRatio": 0.63
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 1,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 761,
+          "wins": 376,
+          "losses": 385,
+          "winrate": 49.41,
+          "expectancyR": 1.117,
+          "profitFactor": 1.572,
+          "maxDrawdownR": 344.98,
+          "totalR": 850.01,
+          "sharpeApprox": 1.06,
+          "turnoverPerYear": 152.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.91,
+            "2022": 0.38,
+            "2023": 2.36,
+            "2024": 2.31,
+            "2025": 1.12
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.78,
+          "latePf": 1.69,
+          "decayRatio": 0.46
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 2,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 546,
+          "wins": 270,
+          "losses": 276,
+          "winrate": 49.45,
+          "expectancyR": 0.472,
+          "profitFactor": 1.257,
+          "maxDrawdownR": 315.04,
+          "totalR": 257.5,
+          "sharpeApprox": 0.51,
+          "turnoverPerYear": 109.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.65,
+            "2022": 0.63,
+            "2023": 1.43,
+            "2024": 1.05,
+            "2025": 1.17
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.48,
+          "latePf": 1.1,
+          "decayRatio": 1.35
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 2,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 910,
+          "wins": 472,
+          "losses": 438,
+          "winrate": 51.87,
+          "expectancyR": 0.853,
+          "profitFactor": 1.542,
+          "maxDrawdownR": 263.61,
+          "totalR": 775.85,
+          "sharpeApprox": 0.94,
+          "turnoverPerYear": 182
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.47,
+            "2022": 0.57,
+            "2023": 2.3,
+            "2024": 1.55,
+            "2025": 1.24
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.28,
+          "latePf": 1.42,
+          "decayRatio": 0.9
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 2,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1567,
+          "wins": 794,
+          "losses": 773,
+          "winrate": 50.67,
+          "expectancyR": 0.627,
+          "profitFactor": 1.392,
+          "maxDrawdownR": 515.18,
+          "totalR": 982.9,
+          "sharpeApprox": 0.75,
+          "turnoverPerYear": 313.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.97,
+            "2022": 0.41,
+            "2023": 2.32,
+            "2024": 1.46,
+            "2025": 1.21
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.86,
+          "latePf": 1.35,
+          "decayRatio": 0.64
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 3,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 819,
+          "wins": 416,
+          "losses": 403,
+          "winrate": 50.79,
+          "expectancyR": 0.395,
+          "profitFactor": 1.235,
+          "maxDrawdownR": 346.53,
+          "totalR": 323.49,
+          "sharpeApprox": 0.48,
+          "turnoverPerYear": 163.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.29,
+            "2022": 0.33,
+            "2023": 1.92,
+            "2024": 0.98,
+            "2025": 1.23
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 1.08,
+          "latePf": 1.08,
+          "decayRatio": 1
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 3,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1365,
+          "wins": 720,
+          "losses": 645,
+          "winrate": 52.75,
+          "expectancyR": 0.627,
+          "profitFactor": 1.422,
+          "maxDrawdownR": 461.27,
+          "totalR": 856.36,
+          "sharpeApprox": 0.78,
+          "turnoverPerYear": 273
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.16,
+            "2022": 0.32,
+            "2023": 2.57,
+            "2024": 1.39,
+            "2025": 1.24
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.95,
+          "latePf": 1.32,
+          "decayRatio": 0.71
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 3,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 2368,
+          "wins": 1216,
+          "losses": 1152,
+          "winrate": 51.35,
+          "expectancyR": 0.459,
+          "profitFactor": 1.298,
+          "maxDrawdownR": 861.55,
+          "totalR": 1086.35,
+          "sharpeApprox": 0.59,
+          "turnoverPerYear": 473.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.82,
+            "2022": 0.21,
+            "2023": 2.68,
+            "2024": 1.32,
+            "2025": 1.13
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.66,
+          "latePf": 1.23,
+          "decayRatio": 0.54
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 1,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 267,
+          "wins": 142,
+          "losses": 125,
+          "winrate": 53.18,
+          "expectancyR": 1.817,
+          "profitFactor": 1.794,
+          "maxDrawdownR": 236.94,
+          "totalR": 485.23,
+          "sharpeApprox": 1.31,
+          "turnoverPerYear": 53.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 2.7,
+            "2022": 1.69,
+            "2023": 0.85,
+            "2024": 1.89,
+            "2025": 2.22
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 2.59,
+          "latePf": 2.02,
+          "decayRatio": 1.28
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 1,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 445,
+          "wins": 243,
+          "losses": 202,
+          "winrate": 54.61,
+          "expectancyR": 2.3,
+          "profitFactor": 2.157,
+          "maxDrawdownR": 192.98,
+          "totalR": 1023.63,
+          "sharpeApprox": 1.64,
+          "turnoverPerYear": 89
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.87,
+            "2022": 1.08,
+            "2023": 1.86,
+            "2024": 2.9,
+            "2025": 2.09
+          },
+          "validYears": 5,
+          "positiveYears": 5
+        },
+        "decay": {
+          "earlyPf": 1.75,
+          "latePf": 2.56,
+          "decayRatio": 0.68
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 1,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 743,
+          "wins": 378,
+          "losses": 365,
+          "winrate": 50.87,
+          "expectancyR": 1.812,
+          "profitFactor": 1.843,
+          "maxDrawdownR": 340.58,
+          "totalR": 1346.49,
+          "sharpeApprox": 1.31,
+          "turnoverPerYear": 148.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.09,
+            "2022": 0.72,
+            "2023": 2.33,
+            "2024": 2.66,
+            "2025": 1.45
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.02,
+          "latePf": 2.11,
+          "decayRatio": 0.49
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 2,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 534,
+          "wins": 276,
+          "losses": 258,
+          "winrate": 51.69,
+          "expectancyR": 0.792,
+          "profitFactor": 1.369,
+          "maxDrawdownR": 384.49,
+          "totalR": 422.81,
+          "sharpeApprox": 0.7,
+          "turnoverPerYear": 106.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.75,
+            "2022": 1.14,
+            "2023": 1.32,
+            "2024": 1.1,
+            "2025": 1.53
+          },
+          "validYears": 5,
+          "positiveYears": 5
+        },
+        "decay": {
+          "earlyPf": 1.67,
+          "latePf": 1.24,
+          "decayRatio": 1.34
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 2,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 890,
+          "wins": 467,
+          "losses": 423,
+          "winrate": 52.47,
+          "expectancyR": 1.265,
+          "profitFactor": 1.681,
+          "maxDrawdownR": 336.46,
+          "totalR": 1125.86,
+          "sharpeApprox": 1.09,
+          "turnoverPerYear": 178
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.4,
+            "2022": 0.94,
+            "2023": 2.28,
+            "2024": 1.63,
+            "2025": 1.68
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.33,
+          "latePf": 1.65,
+          "decayRatio": 0.8
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 2,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1529,
+          "wins": 768,
+          "losses": 761,
+          "winrate": 50.23,
+          "expectancyR": 0.951,
+          "profitFactor": 1.494,
+          "maxDrawdownR": 670.68,
+          "totalR": 1454.34,
+          "sharpeApprox": 0.86,
+          "turnoverPerYear": 305.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.88,
+            "2022": 0.67,
+            "2023": 2.73,
+            "2024": 1.52,
+            "2025": 1.34
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.85,
+          "latePf": 1.45,
+          "decayRatio": 0.59
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 3,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 801,
+          "wins": 416,
+          "losses": 385,
+          "winrate": 51.94,
+          "expectancyR": 0.668,
+          "profitFactor": 1.339,
+          "maxDrawdownR": 382.47,
+          "totalR": 535.16,
+          "sharpeApprox": 0.67,
+          "turnoverPerYear": 160.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.29,
+            "2022": 0.61,
+            "2023": 1.86,
+            "2024": 1.05,
+            "2025": 1.58
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.18,
+          "latePf": 1.23,
+          "decayRatio": 0.96
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 3,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1335,
+          "wins": 708,
+          "losses": 627,
+          "winrate": 53.03,
+          "expectancyR": 0.956,
+          "profitFactor": 1.542,
+          "maxDrawdownR": 609.46,
+          "totalR": 1276.45,
+          "sharpeApprox": 0.93,
+          "turnoverPerYear": 267
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.04,
+            "2022": 0.49,
+            "2023": 2.64,
+            "2024": 1.54,
+            "2025": 1.62
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.94,
+          "latePf": 1.57,
+          "decayRatio": 0.6
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 3,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 2310,
+          "wins": 1182,
+          "losses": 1128,
+          "winrate": 51.17,
+          "expectancyR": 0.778,
+          "profitFactor": 1.43,
+          "maxDrawdownR": 1109.62,
+          "totalR": 1797.65,
+          "sharpeApprox": 0.77,
+          "turnoverPerYear": 462
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.73,
+            "2022": 0.36,
+            "2023": 3.2,
+            "2024": 1.43,
+            "2025": 1.36
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.66,
+          "latePf": 1.4,
+          "decayRatio": 0.47
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 1,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 249,
+          "wins": 125,
+          "losses": 124,
+          "winrate": 50.2,
+          "expectancyR": 2.265,
+          "profitFactor": 1.642,
+          "maxDrawdownR": 265.97,
+          "totalR": 564.1,
+          "sharpeApprox": 1.17,
+          "turnoverPerYear": 49.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.7,
+            "2022": 2.52,
+            "2023": 1.97,
+            "2024": 2.05,
+            "2025": 2.17
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.83,
+          "latePf": 2.07,
+          "decayRatio": 0.4
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 1,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 415,
+          "wins": 229,
+          "losses": 186,
+          "winrate": 55.18,
+          "expectancyR": 3.073,
+          "profitFactor": 2.077,
+          "maxDrawdownR": 416.81,
+          "totalR": 1275.11,
+          "sharpeApprox": 1.7,
+          "turnoverPerYear": 83
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.47,
+            "2022": 1.88,
+            "2023": 2.91,
+            "2024": 2.94,
+            "2025": 4.36
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.59,
+          "latePf": 3.2,
+          "decayRatio": 0.18
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 1,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 689,
+          "wins": 361,
+          "losses": 328,
+          "winrate": 52.39,
+          "expectancyR": 2.856,
+          "profitFactor": 1.998,
+          "maxDrawdownR": 748.14,
+          "totalR": 1967.52,
+          "sharpeApprox": 1.63,
+          "turnoverPerYear": 137.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.29,
+            "2022": 1.08,
+            "2023": 3.62,
+            "2024": 2.95,
+            "2025": 3.62
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.37,
+          "latePf": 3.11,
+          "decayRatio": 0.12
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 2,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 498,
+          "wins": 251,
+          "losses": 247,
+          "winrate": 50.4,
+          "expectancyR": 1.075,
+          "profitFactor": 1.343,
+          "maxDrawdownR": 494.45,
+          "totalR": 535.5,
+          "sharpeApprox": 0.68,
+          "turnoverPerYear": 99.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.43,
+            "2022": 1.45,
+            "2023": 2.76,
+            "2024": 1.52,
+            "2025": 1.16
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.52,
+          "latePf": 1.44,
+          "decayRatio": 0.36
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 2,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 830,
+          "wins": 444,
+          "losses": 386,
+          "winrate": 53.49,
+          "expectancyR": 1.733,
+          "profitFactor": 1.663,
+          "maxDrawdownR": 753.95,
+          "totalR": 1438.56,
+          "sharpeApprox": 1.15,
+          "turnoverPerYear": 166
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.31,
+            "2022": 1.27,
+            "2023": 3.61,
+            "2024": 2.14,
+            "2025": 2.19
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.4,
+          "latePf": 2.15,
+          "decayRatio": 0.19
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 2,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1415,
+          "wins": 740,
+          "losses": 675,
+          "winrate": 52.3,
+          "expectancyR": 1.646,
+          "profitFactor": 1.646,
+          "maxDrawdownR": 1402.57,
+          "totalR": 2328.46,
+          "sharpeApprox": 1.1,
+          "turnoverPerYear": 283
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.22,
+            "2022": 0.89,
+            "2023": 4.39,
+            "2024": 2.15,
+            "2025": 2.41
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.29,
+          "latePf": 2.21,
+          "decayRatio": 0.13
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 3,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 747,
+          "wins": 386,
+          "losses": 361,
+          "winrate": 51.67,
+          "expectancyR": 0.632,
+          "profitFactor": 1.213,
+          "maxDrawdownR": 776.1,
+          "totalR": 472.12,
+          "sharpeApprox": 0.45,
+          "turnoverPerYear": 149.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.36,
+            "2022": 0.89,
+            "2023": 3.35,
+            "2024": 1.24,
+            "2025": 0.99
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.42,
+          "latePf": 1.18,
+          "decayRatio": 0.35
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 3,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1245,
+          "wins": 676,
+          "losses": 569,
+          "winrate": 54.3,
+          "expectancyR": 1.093,
+          "profitFactor": 1.429,
+          "maxDrawdownR": 1188.8,
+          "totalR": 1361.08,
+          "sharpeApprox": 0.82,
+          "turnoverPerYear": 249
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.29,
+            "2022": 0.64,
+            "2023": 3.89,
+            "2024": 1.72,
+            "2025": 1.73
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.34,
+          "latePf": 1.72,
+          "decayRatio": 0.2
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 3,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 2136,
+          "wins": 1129,
+          "losses": 1007,
+          "winrate": 52.86,
+          "expectancyR": 1.083,
+          "profitFactor": 1.433,
+          "maxDrawdownR": 2180.47,
+          "totalR": 2312.23,
+          "sharpeApprox": 0.82,
+          "turnoverPerYear": 427.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.22,
+            "2022": 0.46,
+            "2023": 4.66,
+            "2024": 1.71,
+            "2025": 2.02
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 1.78,
+          "decayRatio": 0.15
+        },
+        "classification": "CONDITIONAL_EDGE"
+      }
+    ],
+    "REGIME_SPECIFIC_SETUPS": [
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "RISK_ON",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 530,
+          "wins": 253,
+          "losses": 276,
+          "winrate": 47.74,
+          "expectancyR": 0.459,
+          "profitFactor": 1.276,
+          "maxDrawdownR": 224.87,
+          "totalR": 243.38,
+          "sharpeApprox": 0.58,
+          "turnoverPerYear": 106
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.59,
+            "2022": 0.04,
+            "2023": 0.9,
+            "2024": 1.62,
+            "2025": 1.76
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.45,
+          "latePf": 1.67,
+          "decayRatio": 0.27
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "RANGE",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 290,
+          "wins": 172,
+          "losses": 118,
+          "winrate": 59.31,
+          "expectancyR": 0.775,
+          "profitFactor": 1.701,
+          "maxDrawdownR": 81.91,
+          "totalR": 224.72,
+          "sharpeApprox": 1.25,
+          "turnoverPerYear": 72.5
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": null,
+            "2022": 0.26,
+            "2023": 2.55,
+            "2024": 999,
+            "2025": 0.42
+          },
+          "validYears": 4,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 0.69,
+          "decayRatio": 0.37
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "RISK_OFF",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 199,
+          "wins": 89,
+          "losses": 110,
+          "winrate": 44.72,
+          "expectancyR": -0.169,
+          "profitFactor": 0.873,
+          "maxDrawdownR": 111.07,
+          "totalR": -33.68,
+          "sharpeApprox": -0.36,
+          "turnoverPerYear": 99.5
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": null,
+            "2022": 0.81,
+            "2023": null,
+            "2024": null,
+            "2025": 1.24
+          },
+          "validYears": 2,
+          "positiveYears": 1
+        },
+        "decay": {
+          "earlyPf": 0.81,
+          "latePf": 1.24,
+          "decayRatio": 0.66
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "CASH",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 0
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": null,
+            "2022": null,
+            "2023": null,
+            "2024": null,
+            "2025": null
+          },
+          "validYears": 0,
+          "positiveYears": 0
+        },
+        "decay": {
+          "earlyPf": null,
+          "latePf": null,
+          "decayRatio": null
+        },
+        "classification": "DEAD",
+        "note": "Stratégie CASH : 0 trade, 0R par construction. Implicite : preserve capital."
+      }
+    ]
+  },
+  "rankings": {
+    "ROBUST_EDGE": [
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 1,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 445,
+          "wins": 243,
+          "losses": 202,
+          "winrate": 54.61,
+          "expectancyR": 2.3,
+          "profitFactor": 2.157,
+          "maxDrawdownR": 192.98,
+          "totalR": 1023.63,
+          "sharpeApprox": 1.64,
+          "turnoverPerYear": 89
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.87,
+            "2022": 1.08,
+            "2023": 1.86,
+            "2024": 2.9,
+            "2025": 2.09
+          },
+          "validYears": 5,
+          "positiveYears": 5
+        },
+        "decay": {
+          "earlyPf": 1.75,
+          "latePf": 2.56,
+          "decayRatio": 0.68
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 1,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 415,
+          "wins": 229,
+          "losses": 186,
+          "winrate": 55.18,
+          "expectancyR": 3.073,
+          "profitFactor": 2.077,
+          "maxDrawdownR": 416.81,
+          "totalR": 1275.11,
+          "sharpeApprox": 1.7,
+          "turnoverPerYear": 83
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.47,
+            "2022": 1.88,
+            "2023": 2.91,
+            "2024": 2.94,
+            "2025": 4.36
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.59,
+          "latePf": 3.2,
+          "decayRatio": 0.18
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 1,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 689,
+          "wins": 361,
+          "losses": 328,
+          "winrate": 52.39,
+          "expectancyR": 2.856,
+          "profitFactor": 1.998,
+          "maxDrawdownR": 748.14,
+          "totalR": 1967.52,
+          "sharpeApprox": 1.63,
+          "turnoverPerYear": 137.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.29,
+            "2022": 1.08,
+            "2023": 3.62,
+            "2024": 2.95,
+            "2025": 3.62
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.37,
+          "latePf": 3.11,
+          "decayRatio": 0.12
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 1,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 455,
+          "wins": 243,
+          "losses": 212,
+          "winrate": 53.41,
+          "expectancyR": 1.678,
+          "profitFactor": 1.949,
+          "maxDrawdownR": 178.97,
+          "totalR": 763.47,
+          "sharpeApprox": 1.5,
+          "turnoverPerYear": 91
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.52,
+            "2022": 0.66,
+            "2023": 2.45,
+            "2024": 2.86,
+            "2025": 1.36
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.32,
+          "latePf": 2.09,
+          "decayRatio": 0.63
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 1,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 743,
+          "wins": 378,
+          "losses": 365,
+          "winrate": 50.87,
+          "expectancyR": 1.812,
+          "profitFactor": 1.843,
+          "maxDrawdownR": 340.58,
+          "totalR": 1346.49,
+          "sharpeApprox": 1.31,
+          "turnoverPerYear": 148.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.09,
+            "2022": 0.72,
+            "2023": 2.33,
+            "2024": 2.66,
+            "2025": 1.45
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.02,
+          "latePf": 2.11,
+          "decayRatio": 0.49
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 1,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 267,
+          "wins": 142,
+          "losses": 125,
+          "winrate": 53.18,
+          "expectancyR": 1.817,
+          "profitFactor": 1.794,
+          "maxDrawdownR": 236.94,
+          "totalR": 485.23,
+          "sharpeApprox": 1.31,
+          "turnoverPerYear": 53.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 2.7,
+            "2022": 1.69,
+            "2023": 0.85,
+            "2024": 1.89,
+            "2025": 2.22
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 2.59,
+          "latePf": 2.02,
+          "decayRatio": 1.28
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 2,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 890,
+          "wins": 467,
+          "losses": 423,
+          "winrate": 52.47,
+          "expectancyR": 1.265,
+          "profitFactor": 1.681,
+          "maxDrawdownR": 336.46,
+          "totalR": 1125.86,
+          "sharpeApprox": 1.09,
+          "turnoverPerYear": 178
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.4,
+            "2022": 0.94,
+            "2023": 2.28,
+            "2024": 1.63,
+            "2025": 1.68
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.33,
+          "latePf": 1.65,
+          "decayRatio": 0.8
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 2,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 830,
+          "wins": 444,
+          "losses": 386,
+          "winrate": 53.49,
+          "expectancyR": 1.733,
+          "profitFactor": 1.663,
+          "maxDrawdownR": 753.95,
+          "totalR": 1438.56,
+          "sharpeApprox": 1.15,
+          "turnoverPerYear": 166
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.31,
+            "2022": 1.27,
+            "2023": 3.61,
+            "2024": 2.14,
+            "2025": 2.19
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.4,
+          "latePf": 2.15,
+          "decayRatio": 0.19
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 1,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 249,
+          "wins": 125,
+          "losses": 124,
+          "winrate": 50.2,
+          "expectancyR": 2.265,
+          "profitFactor": 1.642,
+          "maxDrawdownR": 265.97,
+          "totalR": 564.1,
+          "sharpeApprox": 1.17,
+          "turnoverPerYear": 49.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.7,
+            "2022": 2.52,
+            "2023": 1.97,
+            "2024": 2.05,
+            "2025": 2.17
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.83,
+          "latePf": 2.07,
+          "decayRatio": 0.4
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 1,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 273,
+          "wins": 138,
+          "losses": 135,
+          "winrate": 50.55,
+          "expectancyR": 1.193,
+          "profitFactor": 1.604,
+          "maxDrawdownR": 146.24,
+          "totalR": 325.65,
+          "sharpeApprox": 1.09,
+          "turnoverPerYear": 54.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.98,
+            "2022": 0.87,
+            "2023": 1.27,
+            "2024": 1.91,
+            "2025": 1.44
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.8,
+          "latePf": 1.67,
+          "decayRatio": 1.08
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 91,
+          "wins": 58,
+          "losses": 33,
+          "winrate": 63.74,
+          "expectancyR": 0.29,
+          "profitFactor": 1.585,
+          "maxDrawdownR": 13.17,
+          "totalR": 26.41,
+          "sharpeApprox": 1.32,
+          "turnoverPerYear": 18.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.14,
+            "2022": 0,
+            "2023": 3.04,
+            "2024": 2.2,
+            "2025": 1.53
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.65,
+          "latePf": 1.86,
+          "decayRatio": 0.35
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 2,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 910,
+          "wins": 472,
+          "losses": 438,
+          "winrate": 51.87,
+          "expectancyR": 0.853,
+          "profitFactor": 1.542,
+          "maxDrawdownR": 263.61,
+          "totalR": 775.85,
+          "sharpeApprox": 0.94,
+          "turnoverPerYear": 182
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.47,
+            "2022": 0.57,
+            "2023": 2.3,
+            "2024": 1.55,
+            "2025": 1.24
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.28,
+          "latePf": 1.42,
+          "decayRatio": 0.9
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 3,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1335,
+          "wins": 708,
+          "losses": 627,
+          "winrate": 53.03,
+          "expectancyR": 0.956,
+          "profitFactor": 1.542,
+          "maxDrawdownR": 609.46,
+          "totalR": 1276.45,
+          "sharpeApprox": 0.93,
+          "turnoverPerYear": 267
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.04,
+            "2022": 0.49,
+            "2023": 2.64,
+            "2024": 1.54,
+            "2025": 1.62
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.94,
+          "latePf": 1.57,
+          "decayRatio": 0.6
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 3,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1365,
+          "wins": 720,
+          "losses": 645,
+          "winrate": 52.75,
+          "expectancyR": 0.627,
+          "profitFactor": 1.422,
+          "maxDrawdownR": 461.27,
+          "totalR": 856.36,
+          "sharpeApprox": 0.78,
+          "turnoverPerYear": 273
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.16,
+            "2022": 0.32,
+            "2023": 2.57,
+            "2024": 1.39,
+            "2025": 1.24
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.95,
+          "latePf": 1.32,
+          "decayRatio": 0.71
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 2,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 498,
+          "wins": 251,
+          "losses": 247,
+          "winrate": 50.4,
+          "expectancyR": 1.075,
+          "profitFactor": 1.343,
+          "maxDrawdownR": 494.45,
+          "totalR": 535.5,
+          "sharpeApprox": 0.68,
+          "turnoverPerYear": 99.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.43,
+            "2022": 1.45,
+            "2023": 2.76,
+            "2024": 1.52,
+            "2025": 1.16
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.52,
+          "latePf": 1.44,
+          "decayRatio": 0.36
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 3,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 801,
+          "wins": 416,
+          "losses": 385,
+          "winrate": 51.94,
+          "expectancyR": 0.668,
+          "profitFactor": 1.339,
+          "maxDrawdownR": 382.47,
+          "totalR": 535.16,
+          "sharpeApprox": 0.67,
+          "turnoverPerYear": 160.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.29,
+            "2022": 0.61,
+            "2023": 1.86,
+            "2024": 1.05,
+            "2025": 1.58
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.18,
+          "latePf": 1.23,
+          "decayRatio": 0.96
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 20,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 438,
+          "wins": 282,
+          "losses": 155,
+          "winrate": 64.38,
+          "expectancyR": 0.167,
+          "profitFactor": 1.318,
+          "maxDrawdownR": 51.41,
+          "totalR": 72.99,
+          "sharpeApprox": 0.69,
+          "turnoverPerYear": 87.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.22,
+            "2022": 0,
+            "2023": 1.87,
+            "2024": 1.13,
+            "2025": 1.96
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.78,
+          "latePf": 1.42,
+          "decayRatio": 0.55
+        },
+        "classification": "ROBUST_EDGE"
+      }
+    ],
+    "CONDITIONAL_EDGE": [
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 71,
+          "wins": 51,
+          "losses": 20,
+          "winrate": 71.83,
+          "expectancyR": 1.567,
+          "profitFactor": 6.652,
+          "maxDrawdownR": 15.96,
+          "totalR": 111.26,
+          "sharpeApprox": 5.45,
+          "turnoverPerYear": 14.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.4,
+            "2022": 0.15,
+            "2023": 2.19,
+            "2024": 999,
+            "2025": 999
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.25,
+          "latePf": 999,
+          "decayRatio": 0
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 77,
+          "wins": 52,
+          "losses": 25,
+          "winrate": 67.53,
+          "expectancyR": 0.898,
+          "profitFactor": 5.242,
+          "maxDrawdownR": 8.05,
+          "totalR": 69.18,
+          "sharpeApprox": 4.47,
+          "turnoverPerYear": 15.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.43,
+            "2022": 1.86,
+            "2023": 0.87,
+            "2024": 31.89,
+            "2025": 88.83
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.76,
+          "latePf": 49.14,
+          "decayRatio": 0.02
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_commodities",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 81,
+          "wins": 48,
+          "losses": 33,
+          "winrate": 59.26,
+          "expectancyR": 0.234,
+          "profitFactor": 2.11,
+          "maxDrawdownR": 4.69,
+          "totalR": 18.98,
+          "sharpeApprox": 2.11,
+          "turnoverPerYear": 16.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.18,
+            "2022": 13.85,
+            "2023": 0.8,
+            "2024": 3.15,
+            "2025": 9.54
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.65,
+          "latePf": 5.12,
+          "decayRatio": 0.13
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 2,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1415,
+          "wins": 740,
+          "losses": 675,
+          "winrate": 52.3,
+          "expectancyR": 1.646,
+          "profitFactor": 1.646,
+          "maxDrawdownR": 1402.57,
+          "totalR": 2328.46,
+          "sharpeApprox": 1.1,
+          "turnoverPerYear": 283
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.22,
+            "2022": 0.89,
+            "2023": 4.39,
+            "2024": 2.15,
+            "2025": 2.41
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.29,
+          "latePf": 2.21,
+          "decayRatio": 0.13
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 1,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 761,
+          "wins": 376,
+          "losses": 385,
+          "winrate": 49.41,
+          "expectancyR": 1.117,
+          "profitFactor": 1.572,
+          "maxDrawdownR": 344.98,
+          "totalR": 850.01,
+          "sharpeApprox": 1.06,
+          "turnoverPerYear": 152.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.91,
+            "2022": 0.38,
+            "2023": 2.36,
+            "2024": 2.31,
+            "2025": 1.12
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.78,
+          "latePf": 1.69,
+          "decayRatio": 0.46
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 2,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1529,
+          "wins": 768,
+          "losses": 761,
+          "winrate": 50.23,
+          "expectancyR": 0.951,
+          "profitFactor": 1.494,
+          "maxDrawdownR": 670.68,
+          "totalR": 1454.34,
+          "sharpeApprox": 0.86,
+          "turnoverPerYear": 305.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.88,
+            "2022": 0.67,
+            "2023": 2.73,
+            "2024": 1.52,
+            "2025": 1.34
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.85,
+          "latePf": 1.45,
+          "decayRatio": 0.59
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 77,
+          "wins": 48,
+          "losses": 29,
+          "winrate": 62.34,
+          "expectancyR": 0.403,
+          "profitFactor": 1.476,
+          "maxDrawdownR": 46.61,
+          "totalR": 31.06,
+          "sharpeApprox": 1.16,
+          "turnoverPerYear": 15.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.12,
+            "2022": 0,
+            "2023": 54.43,
+            "2024": 1.39,
+            "2025": 999
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.1,
+          "latePf": 2.22,
+          "decayRatio": 0.04
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 3,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 2136,
+          "wins": 1129,
+          "losses": 1007,
+          "winrate": 52.86,
+          "expectancyR": 1.083,
+          "profitFactor": 1.433,
+          "maxDrawdownR": 2180.47,
+          "totalR": 2312.23,
+          "sharpeApprox": 0.82,
+          "turnoverPerYear": 427.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.22,
+            "2022": 0.46,
+            "2023": 4.66,
+            "2024": 1.71,
+            "2025": 2.02
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 1.78,
+          "decayRatio": 0.15
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 3,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 2310,
+          "wins": 1182,
+          "losses": 1128,
+          "winrate": 51.17,
+          "expectancyR": 0.778,
+          "profitFactor": 1.43,
+          "maxDrawdownR": 1109.62,
+          "totalR": 1797.65,
+          "sharpeApprox": 0.77,
+          "turnoverPerYear": 462
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.73,
+            "2022": 0.36,
+            "2023": 3.2,
+            "2024": 1.43,
+            "2025": 1.36
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.66,
+          "latePf": 1.4,
+          "decayRatio": 0.47
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 3,
+          "topAssetsPerSector": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1245,
+          "wins": 676,
+          "losses": 569,
+          "winrate": 54.3,
+          "expectancyR": 1.093,
+          "profitFactor": 1.429,
+          "maxDrawdownR": 1188.8,
+          "totalR": 1361.08,
+          "sharpeApprox": 0.82,
+          "turnoverPerYear": 249
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.29,
+            "2022": 0.64,
+            "2023": 3.89,
+            "2024": 1.72,
+            "2025": 1.73
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.34,
+          "latePf": 1.72,
+          "decayRatio": 0.2
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 2,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 1567,
+          "wins": 794,
+          "losses": 773,
+          "winrate": 50.67,
+          "expectancyR": 0.627,
+          "profitFactor": 1.392,
+          "maxDrawdownR": 515.18,
+          "totalR": 982.9,
+          "sharpeApprox": 0.75,
+          "turnoverPerYear": 313.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.97,
+            "2022": 0.41,
+            "2023": 2.32,
+            "2024": 1.46,
+            "2025": 1.21
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.86,
+          "latePf": 1.35,
+          "decayRatio": 0.64
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 60,
+          "topSectors": 2,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 534,
+          "wins": 276,
+          "losses": 258,
+          "winrate": 51.69,
+          "expectancyR": 0.792,
+          "profitFactor": 1.369,
+          "maxDrawdownR": 384.49,
+          "totalR": 422.81,
+          "sharpeApprox": 0.7,
+          "turnoverPerYear": 106.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.75,
+            "2022": 1.14,
+            "2023": 1.32,
+            "2024": 1.1,
+            "2025": 1.53
+          },
+          "validYears": 5,
+          "positiveYears": 5
+        },
+        "decay": {
+          "earlyPf": 1.67,
+          "latePf": 1.24,
+          "decayRatio": 1.34
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 204,
+          "wins": 124,
+          "losses": 80,
+          "winrate": 60.78,
+          "expectancyR": 0.272,
+          "profitFactor": 1.354,
+          "maxDrawdownR": 92.07,
+          "totalR": 55.47,
+          "sharpeApprox": 0.89,
+          "turnoverPerYear": 40.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.19,
+            "2022": 0,
+            "2023": 17.44,
+            "2024": 1.3,
+            "2025": 12.87
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.16,
+          "latePf": 1.7,
+          "decayRatio": 0.1
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 93,
+          "wins": 56,
+          "losses": 37,
+          "winrate": 60.22,
+          "expectancyR": 0.147,
+          "profitFactor": 1.298,
+          "maxDrawdownR": 12.68,
+          "totalR": 13.64,
+          "sharpeApprox": 0.72,
+          "turnoverPerYear": 18.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.72,
+            "2022": 0.26,
+            "2023": 2.71,
+            "2024": 1.34,
+            "2025": 1.49
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.56,
+          "latePf": 1.41,
+          "decayRatio": 0.4
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 3,
+          "topAssetsPerSector": 10,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 2368,
+          "wins": 1216,
+          "losses": 1152,
+          "winrate": 51.35,
+          "expectancyR": 0.459,
+          "profitFactor": 1.298,
+          "maxDrawdownR": 861.55,
+          "totalR": 1086.35,
+          "sharpeApprox": 0.59,
+          "turnoverPerYear": 473.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.82,
+            "2022": 0.21,
+            "2023": 2.68,
+            "2024": 1.32,
+            "2025": 1.13
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.66,
+          "latePf": 1.23,
+          "decayRatio": 0.54
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 267,
+          "wins": 173,
+          "losses": 93,
+          "winrate": 64.79,
+          "expectancyR": 0.159,
+          "profitFactor": 1.271,
+          "maxDrawdownR": 36.03,
+          "totalR": 42.51,
+          "sharpeApprox": 0.58,
+          "turnoverPerYear": 53.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.23,
+            "2022": 0,
+            "2023": 1.89,
+            "2024": 1.12,
+            "2025": 1.72
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 0.76,
+          "latePf": 1.32,
+          "decayRatio": 0.57
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 2,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 546,
+          "wins": 270,
+          "losses": 276,
+          "winrate": 49.45,
+          "expectancyR": 0.472,
+          "profitFactor": 1.257,
+          "maxDrawdownR": 315.04,
+          "totalR": 257.5,
+          "sharpeApprox": 0.51,
+          "turnoverPerYear": 109.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.65,
+            "2022": 0.63,
+            "2023": 1.43,
+            "2024": 1.05,
+            "2025": 1.17
+          },
+          "validYears": 5,
+          "positiveYears": 4
+        },
+        "decay": {
+          "earlyPf": 1.48,
+          "latePf": 1.1,
+          "decayRatio": 1.35
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 40,
+          "topSectors": 3,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 819,
+          "wins": 416,
+          "losses": 403,
+          "winrate": 50.79,
+          "expectancyR": 0.395,
+          "profitFactor": 1.235,
+          "maxDrawdownR": 346.53,
+          "totalR": 323.49,
+          "sharpeApprox": 0.48,
+          "turnoverPerYear": 163.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.29,
+            "2022": 0.33,
+            "2023": 1.92,
+            "2024": 0.98,
+            "2025": 1.23
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 1.08,
+          "latePf": 1.08,
+          "decayRatio": 1
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 222,
+          "wins": 126,
+          "losses": 96,
+          "winrate": 56.76,
+          "expectancyR": 0.128,
+          "profitFactor": 1.232,
+          "maxDrawdownR": 45.87,
+          "totalR": 28.37,
+          "sharpeApprox": 0.62,
+          "turnoverPerYear": 44.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.47,
+            "2022": 0,
+            "2023": 2.26,
+            "2024": 1.53,
+            "2025": 1.18
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.4,
+          "latePf": 1.37,
+          "decayRatio": 0.29
+        },
+        "classification": "CONDITIONAL_EDGE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 20,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 449,
+          "wins": 281,
+          "losses": 167,
+          "winrate": 62.58,
+          "expectancyR": 0.119,
+          "profitFactor": 1.23,
+          "maxDrawdownR": 51.54,
+          "totalR": 53.33,
+          "sharpeApprox": 0.5,
+          "turnoverPerYear": 89.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.96,
+            "2022": 0.12,
+            "2023": 1.72,
+            "2024": 1.02,
+            "2025": 1.96
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.68,
+          "latePf": 1.35,
+          "decayRatio": 0.5
+        },
+        "classification": "CONDITIONAL_EDGE"
+      }
+    ],
+    "FRAGILE": [
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "RANGE",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 290,
+          "wins": 172,
+          "losses": 118,
+          "winrate": 59.31,
+          "expectancyR": 0.775,
+          "profitFactor": 1.701,
+          "maxDrawdownR": 81.91,
+          "totalR": 224.72,
+          "sharpeApprox": 1.25,
+          "turnoverPerYear": 72.5
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": null,
+            "2022": 0.26,
+            "2023": 2.55,
+            "2024": 999,
+            "2025": 0.42
+          },
+          "validYears": 4,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 0.69,
+          "decayRatio": 0.37
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "RISK_ON",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 530,
+          "wins": 253,
+          "losses": 276,
+          "winrate": 47.74,
+          "expectancyR": 0.459,
+          "profitFactor": 1.276,
+          "maxDrawdownR": 224.87,
+          "totalR": 243.38,
+          "sharpeApprox": 0.58,
+          "turnoverPerYear": 106
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.59,
+            "2022": 0.04,
+            "2023": 0.9,
+            "2024": 1.62,
+            "2025": 1.76
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.45,
+          "latePf": 1.67,
+          "decayRatio": 0.27
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 83,
+          "wins": 44,
+          "losses": 39,
+          "winrate": 53.01,
+          "expectancyR": 0.154,
+          "profitFactor": 1.258,
+          "maxDrawdownR": 24.22,
+          "totalR": 12.76,
+          "sharpeApprox": 0.68,
+          "turnoverPerYear": 16.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.36,
+            "2022": 0,
+            "2023": 4.07,
+            "2024": 0.92,
+            "2025": 1.43
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.27,
+          "latePf": 1.13,
+          "decayRatio": 0.24
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "SECTOR_RELATIVE_STRENGTH",
+        "opts": {
+          "horizon": 120,
+          "topSectors": 3,
+          "topAssetsPerSector": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 747,
+          "wins": 386,
+          "losses": 361,
+          "winrate": 51.67,
+          "expectancyR": 0.632,
+          "profitFactor": 1.213,
+          "maxDrawdownR": 776.1,
+          "totalR": 472.12,
+          "sharpeApprox": 0.45,
+          "turnoverPerYear": 149.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.36,
+            "2022": 0.89,
+            "2023": 3.35,
+            "2024": 1.24,
+            "2025": 0.99
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.42,
+          "latePf": 1.18,
+          "decayRatio": 0.35
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 273,
+          "wins": 170,
+          "losses": 103,
+          "winrate": 62.27,
+          "expectancyR": 0.074,
+          "profitFactor": 1.126,
+          "maxDrawdownR": 33.38,
+          "totalR": 20.26,
+          "sharpeApprox": 0.28,
+          "turnoverPerYear": 54.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.85,
+            "2022": 0.19,
+            "2023": 1.84,
+            "2024": 0.88,
+            "2025": 1.73
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.62,
+          "latePf": 1.14,
+          "decayRatio": 0.54
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 20,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 87,
+          "wins": 50,
+          "losses": 37,
+          "winrate": 57.47,
+          "expectancyR": 0.031,
+          "profitFactor": 1.093,
+          "maxDrawdownR": 8.66,
+          "totalR": 2.72,
+          "sharpeApprox": 0.25,
+          "turnoverPerYear": 17.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.78,
+            "2022": 0.07,
+            "2023": 1.93,
+            "2024": 1.06,
+            "2025": 1.08
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.59,
+          "latePf": 1.07,
+          "decayRatio": 0.55
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_index",
+          "horizon": 20,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 234,
+          "wins": 136,
+          "losses": 98,
+          "winrate": 58.12,
+          "expectancyR": 0.025,
+          "profitFactor": 1.078,
+          "maxDrawdownR": 19.54,
+          "totalR": 5.87,
+          "sharpeApprox": 0.21,
+          "turnoverPerYear": 46.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.8,
+            "2022": 0.05,
+            "2023": 0.97,
+            "2024": 1.43,
+            "2025": 1.43
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.67,
+          "latePf": 1.43,
+          "decayRatio": 0.47
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 255,
+          "wins": 151,
+          "losses": 104,
+          "winrate": 59.22,
+          "expectancyR": 0.081,
+          "profitFactor": 1.07,
+          "maxDrawdownR": 126.16,
+          "totalR": 20.66,
+          "sharpeApprox": 0.19,
+          "turnoverPerYear": 51
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.49,
+            "2022": 0,
+            "2023": 1.69,
+            "2024": 1,
+            "2025": 1.89
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.38,
+          "latePf": 1.29,
+          "decayRatio": 0.29
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 60,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 418,
+          "wins": 243,
+          "losses": 175,
+          "winrate": 58.13,
+          "expectancyR": 0.077,
+          "profitFactor": 1.069,
+          "maxDrawdownR": 171.74,
+          "totalR": 32.34,
+          "sharpeApprox": 0.18,
+          "turnoverPerYear": 83.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.52,
+            "2022": 0,
+            "2023": 1.67,
+            "2024": 0.86,
+            "2025": 2.14
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.4,
+          "latePf": 1.27,
+          "decayRatio": 0.31
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 87,
+          "wins": 52,
+          "losses": 35,
+          "winrate": 59.77,
+          "expectancyR": 0.033,
+          "profitFactor": 1.029,
+          "maxDrawdownR": 62.51,
+          "totalR": 2.9,
+          "sharpeApprox": 0.08,
+          "turnoverPerYear": 17.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.33,
+            "2022": 0.01,
+            "2023": 1.22,
+            "2024": 2.19,
+            "2025": 1.51
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 1.85,
+          "decayRatio": 0.14
+        },
+        "classification": "FRAGILE"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 60,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 429,
+          "wins": 244,
+          "losses": 185,
+          "winrate": 56.88,
+          "expectancyR": 0.007,
+          "profitFactor": 1.006,
+          "maxDrawdownR": 170.97,
+          "totalR": 2.88,
+          "sharpeApprox": 0.02,
+          "turnoverPerYear": 85.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.37,
+            "2022": 0.04,
+            "2023": 1.64,
+            "2024": 0.8,
+            "2025": 2.19
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.29,
+          "latePf": 1.24,
+          "decayRatio": 0.23
+        },
+        "classification": "FRAGILE"
+      }
+    ],
+    "DEAD": [
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 60,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 261,
+          "wins": 145,
+          "losses": 116,
+          "winrate": 55.56,
+          "expectancyR": -0.077,
+          "profitFactor": 0.934,
+          "maxDrawdownR": 124.91,
+          "totalR": -19.99,
+          "sharpeApprox": -0.18,
+          "turnoverPerYear": 52.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.25,
+            "2022": 0.07,
+            "2023": 1.67,
+            "2024": 0.76,
+            "2025": 1.99
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.21,
+          "latePf": 1.14,
+          "decayRatio": 0.18
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "RISK_OFF",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 199,
+          "wins": 89,
+          "losses": 110,
+          "winrate": 44.72,
+          "expectancyR": -0.169,
+          "profitFactor": 0.873,
+          "maxDrawdownR": 111.07,
+          "totalR": -33.68,
+          "sharpeApprox": -0.36,
+          "turnoverPerYear": 99.5
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": null,
+            "2022": 0.81,
+            "2023": null,
+            "2024": null,
+            "2025": 1.24
+          },
+          "validYears": 2,
+          "positiveYears": 1
+        },
+        "decay": {
+          "earlyPf": 0.81,
+          "latePf": 1.24,
+          "decayRatio": 0.66
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 81,
+          "wins": 41,
+          "losses": 40,
+          "winrate": 50.62,
+          "expectancyR": -0.246,
+          "profitFactor": 0.856,
+          "maxDrawdownR": 91.62,
+          "totalR": -19.89,
+          "sharpeApprox": -0.45,
+          "turnoverPerYear": 16.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.26,
+            "2022": 0.14,
+            "2023": 1.9,
+            "2024": 1.18,
+            "2025": 2.05
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.24,
+          "latePf": 1.42,
+          "decayRatio": 0.17
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 60,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 89,
+          "wins": 48,
+          "losses": 41,
+          "winrate": 53.93,
+          "expectancyR": -0.193,
+          "profitFactor": 0.833,
+          "maxDrawdownR": 59.87,
+          "totalR": -17.2,
+          "sharpeApprox": -0.49,
+          "turnoverPerYear": 17.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.09,
+            "2022": 0.11,
+            "2023": 1.05,
+            "2024": 1.55,
+            "2025": 1.5
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.09,
+          "latePf": 1.53,
+          "decayRatio": 0.06
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 120,
+          "topN": 1,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 83,
+          "wins": 44,
+          "losses": 39,
+          "winrate": 53.01,
+          "expectancyR": -0.288,
+          "profitFactor": 0.83,
+          "maxDrawdownR": 92.23,
+          "totalR": -23.87,
+          "sharpeApprox": -0.55,
+          "turnoverPerYear": 16.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.08,
+            "2022": 0.2,
+            "2023": 1.85,
+            "2024": 1.27,
+            "2025": 3.31
+          },
+          "validYears": 5,
+          "positiveYears": 3
+        },
+        "decay": {
+          "earlyPf": 0.1,
+          "latePf": 1.81,
+          "decayRatio": 0.05
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 120,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 388,
+          "wins": 201,
+          "losses": 187,
+          "winrate": 51.8,
+          "expectancyR": -0.581,
+          "profitFactor": 0.697,
+          "maxDrawdownR": 355.09,
+          "totalR": -225.45,
+          "sharpeApprox": -0.93,
+          "turnoverPerYear": 77.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.3,
+            "2022": 0.04,
+            "2023": 1.16,
+            "2024": 0.57,
+            "2025": 1.94
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 0.83,
+          "decayRatio": 0.31
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 120,
+          "topN": 5,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 399,
+          "wins": 205,
+          "losses": 194,
+          "winrate": 51.38,
+          "expectancyR": -0.59,
+          "profitFactor": 0.686,
+          "maxDrawdownR": 371.9,
+          "totalR": -235.22,
+          "sharpeApprox": -0.96,
+          "turnoverPerYear": 79.8
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.2,
+            "2022": 0.05,
+            "2023": 1.11,
+            "2024": 0.6,
+            "2025": 3.54
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.17,
+          "latePf": 1.02,
+          "decayRatio": 0.17
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_us_tech",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 237,
+          "wins": 117,
+          "losses": 120,
+          "winrate": 49.37,
+          "expectancyR": -0.608,
+          "profitFactor": 0.685,
+          "maxDrawdownR": 226,
+          "totalR": -144.16,
+          "sharpeApprox": -0.99,
+          "turnoverPerYear": 47.4
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.29,
+            "2022": 0.06,
+            "2023": 1.29,
+            "2024": 0.51,
+            "2025": 1.86
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.26,
+          "latePf": 0.75,
+          "decayRatio": 0.34
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "ETF_MOMENTUM_ROTATION",
+        "opts": {
+          "subset": "etfs_all",
+          "horizon": 120,
+          "topN": 3,
+          "rebalance": 10,
+          "lookback": 90
+        },
+        "summary": {
+          "trades": 243,
+          "wins": 120,
+          "losses": 123,
+          "winrate": 49.38,
+          "expectancyR": -0.688,
+          "profitFactor": 0.642,
+          "maxDrawdownR": 238.38,
+          "totalR": -167.18,
+          "sharpeApprox": -1.15,
+          "turnoverPerYear": 48.6
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 0.13,
+            "2022": 0.08,
+            "2023": 1.29,
+            "2024": 0.47,
+            "2025": 3.15
+          },
+          "validYears": 5,
+          "positiveYears": 2
+        },
+        "decay": {
+          "earlyPf": 0.12,
+          "latePf": 0.86,
+          "decayRatio": 0.14
+        },
+        "classification": "DEAD"
+      },
+      {
+        "family": "REGIME_SPECIFIC_SETUPS",
+        "opts": {
+          "regimeOnly": "CASH",
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "lookback": 90,
+          "minMomentum": 5
+        },
+        "summary": {
+          "trades": 0
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": null,
+            "2022": null,
+            "2023": null,
+            "2024": null,
+            "2025": null
+          },
+          "validYears": 0,
+          "positiveYears": 0
+        },
+        "decay": {
+          "earlyPf": null,
+          "latePf": null,
+          "decayRatio": null
+        },
+        "classification": "DEAD",
+        "note": "Stratégie CASH : 0 trade, 0R par construction. Implicite : preserve capital."
+      }
+    ]
+  },
+  "verdict": {
+    "status": "NEW_ROBUST_SETUP_FOUND",
+    "configsTested": 59,
+    "robustCount": 17,
+    "conditionalCount": 20,
+    "fragileCount": 11,
+    "deadCount": 10,
+    "dataMissingFamilies": 1,
+    "bestRobust": {
+      "family": "SECTOR_RELATIVE_STRENGTH",
+      "opts": {
+        "horizon": 60,
+        "topSectors": 1,
+        "topAssetsPerSector": 5,
+        "rebalance": 10,
+        "lookback": 90
+      },
+      "summary": {
+        "trades": 445,
+        "wins": 243,
+        "losses": 202,
+        "winrate": 54.61,
+        "expectancyR": 2.3,
+        "profitFactor": 2.157,
+        "maxDrawdownR": 192.98,
+        "totalR": 1023.63,
+        "sharpeApprox": 1.64,
+        "turnoverPerYear": 89
+      },
+      "stability": {
+        "yearlyPf": {
+          "2021": 1.87,
+          "2022": 1.08,
+          "2023": 1.86,
+          "2024": 2.9,
+          "2025": 2.09
+        },
+        "validYears": 5,
+        "positiveYears": 5
+      },
+      "decay": {
+        "earlyPf": 1.75,
+        "latePf": 2.56,
+        "decayRatio": 0.68
+      },
+      "classification": "ROBUST_EDGE"
+    },
+    "bestConditional": {
+      "family": "ETF_MOMENTUM_ROTATION",
+      "opts": {
+        "subset": "etfs_commodities",
+        "horizon": 120,
+        "topN": 1,
+        "rebalance": 10,
+        "lookback": 90
+      },
+      "summary": {
+        "trades": 71,
+        "wins": 51,
+        "losses": 20,
+        "winrate": 71.83,
+        "expectancyR": 1.567,
+        "profitFactor": 6.652,
+        "maxDrawdownR": 15.96,
+        "totalR": 111.26,
+        "sharpeApprox": 5.45,
+        "turnoverPerYear": 14.2
+      },
+      "stability": {
+        "yearlyPf": {
+          "2021": 0.4,
+          "2022": 0.15,
+          "2023": 2.19,
+          "2024": 999,
+          "2025": 999
+        },
+        "validYears": 5,
+        "positiveYears": 3
+      },
+      "decay": {
+        "earlyPf": 0.25,
+        "latePf": 999,
+        "decayRatio": 0
+      },
+      "classification": "CONDITIONAL_EDGE"
+    }
+  },
+  "comparisonRef": {
+    "name": "RS Rotation 120j (PR #210 best ROBUST_EDGE)",
+    "profitFactor": 1.91,
+    "expectancyR": 2.78,
+    "yearsPositive": "4/5",
+    "edgeDecay": 0.72
+  }
+}
