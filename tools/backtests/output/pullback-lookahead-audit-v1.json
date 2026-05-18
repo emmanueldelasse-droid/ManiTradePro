@@ -1,0 +1,653 @@
+{
+  "generatedAt": "2026-05-18T13:54:17.471Z",
+  "sources": [
+    "tools/backtests/backtest-multi-setup-grid.mjs",
+    "tools/backtests/backtest-pullback-yearly-walkforward.mjs",
+    "tools/backtests/universe-v2.mjs",
+    "data/*.json (OHLC quotidiens 2021-2025)",
+    "tools/backtests/output/setup-performance-summary-v1.json (référence)",
+    "tools/backtests/output/rolling-walkforward-validator.json (référence)",
+    "tools/backtests/output/setup-variant-matrix.json (référence)"
+  ],
+  "scope": "Audit look-ahead / temporal leakage / execution bias / survivorship du setup PULLBACK_MOMENTUM",
+  "entryModels": [
+    "CURRENT",
+    "CURRENT_NO_LEAK",
+    "SIGNAL_CLOSE",
+    "NEXT_OPEN",
+    "RETOUCH_EMA20",
+    "MID_NEXT_BAR"
+  ],
+  "variants": [
+    "pullback_rsi42_58_chg20_5_stop0.1",
+    "pullback_rsi42_58_chg20_3_stop0.1",
+    "pullback_base_rsi42_58_chg20_0_stop0.1",
+    "pullback_rsi42_58_chg20_5_stop0.5",
+    "pullback_rsi42_58_chg20_3_stop0.5"
+  ],
+  "staticAudit": {
+    "fileAudited": "tools/backtests/backtest-multi-setup-grid.mjs (et backtest-pullback-yearly-walkforward.mjs)",
+    "findings": [
+      {
+        "id": "F1",
+        "category": "future_candle_leakage",
+        "component": "swingHigh20 (TP)",
+        "codeRef": "detectPullback : candles.slice(-20).map(c => c.high)",
+        "description": "swingHigh20 inclut la bougie signal elle-même (candles[i]). Si le high de la bougie i = swingHigh20, le TP est égal au high réalisé pendant la bougie i — un niveau qui peut avoir été touché AVANT que le trader puisse réagir.",
+        "severity": "MEDIUM",
+        "verdict": "RISKY",
+        "evidence": "Ligne `swingHigh20 = Math.max(...recent20.map(c => c.high))` avec recent20 = candles.slice(-20)."
+      },
+      {
+        "id": "F2",
+        "category": "future_candle_leakage",
+        "component": "swingLow10 (stop)",
+        "codeRef": "detectPullback : candles.slice(-10).map(c => c.low)",
+        "description": "swingLow10 inclut la bougie signal. Si le low de la bougie i fait un nouveau bas dans la fenêtre, le stop calculé est sous ce low — stop potentiellement déjà touché pendant la bougie i.",
+        "severity": "MEDIUM",
+        "verdict": "RISKY",
+        "evidence": "Ligne `swingLow10 = Math.min(...recent10.map(c => c.low))` avec recent10 = candles.slice(-10)."
+      },
+      {
+        "id": "F3",
+        "category": "execution_bias",
+        "component": "entry = ema20",
+        "codeRef": "detectPullback : const entry = ema20",
+        "description": "L'entrée est l'EMA20 calculée EN INCLUANT la close de la bougie signal. Or à la fin de la bougie i, le close peut être différent de l'EMA20. Le moteur suppose qu'on a réussi à acheter à EMA20 pendant la bougie i, sans vérifier que le low de la bougie i a touché EMA20.",
+        "severity": "HIGH",
+        "verdict": "RISKY",
+        "evidence": "Lignes `const ema20 = ema20Series.at(-1)` puis `const entry = ema20`. Aucun check `low[i] <= ema20`."
+      },
+      {
+        "id": "F4",
+        "category": "indicator_recomputation",
+        "component": "EMA20, EMA50, RSI14",
+        "codeRef": "detectPullback : ema(closes, 20) etc.",
+        "description": "Les indicateurs sont recalculés sur la fenêtre incluant la bougie i. C'est nécessaire pour générer le signal en fin de jour, mais utiliser EMA20[i] comme PRIX d'entrée pose problème car cette EMA20 ne pouvait être connue qu'à 16h.",
+        "severity": "LOW",
+        "verdict": "RISKY",
+        "evidence": "Le calcul EMA est correct (causal). Le problème n'est pas le calcul, mais l'usage comme prix d'entrée."
+      },
+      {
+        "id": "F5",
+        "category": "intraday_impossibility",
+        "component": "TP / stop sur même bougie",
+        "codeRef": "simulateTrade : `if (stopHit && tpHit) return LOSS`",
+        "description": "Si stop et TP sont touchés dans la même bougie, on assume LOSS (worst case). C'est CONSERVATEUR — bon point. Mais si l'entrée à EMA20 a eu lieu pendant la bougie i, et que stop/tp ont aussi pu être touchés pendant cette même bougie i, l'analyse n'en tient pas compte (simulation commence à i+1).",
+        "severity": "LOW",
+        "verdict": "SAFE (conservateur côté simulation, mais incohérent avec entry intraday)",
+        "evidence": "Simulation `simulateTrade(candles.slice(i + 1, i + 11), setup)` commence à i+1."
+      },
+      {
+        "id": "F6",
+        "category": "timestamp_alignment",
+        "component": "timing du signal",
+        "codeRef": "boucle for(i=220; i<candles.length-11; i++) puis slice(0, i+1)",
+        "description": "Le signal est généré en utilisant TOUTES les données jusqu'à i inclus (close de la bougie i compris). Donc le signal n'est utilisable qu'EN FIN de bougie i. L'entrée à EMA20[i] (potentiellement < close[i]) suppose qu'on a pu se positionner à un prix vu plus tôt dans la journée — c'est de l'INTRADAY déguisé en daily.",
+        "severity": "HIGH",
+        "verdict": "RISKY",
+        "evidence": "Pas de séparation explicite entre `signal time` et `entry time` dans le code. Le rapport recommande de distinguer."
+      },
+      {
+        "id": "F7",
+        "category": "survivorship_bias",
+        "component": "univers fixé via universe-v2.mjs",
+        "codeRef": "import { UNIVERSE } from './universe-v2.mjs'",
+        "description": "L'univers testé est celui actuellement défini dans universe-v2. Les actifs delistés ou ETFs retirés entre 2021 et 2025 ne sont pas dans le set. Risque de survivorship bias, à quantifier par audit séparé des sources data/*.json.",
+        "severity": "MEDIUM",
+        "verdict": "UNKNOWN (à mesurer)",
+        "evidence": "Le moteur ne charge que les symboles existant en `data/SYMBOL_2025.json`. Pas de liste de delistés."
+      },
+      {
+        "id": "F8",
+        "category": "execution_bias",
+        "component": "rr (risk/reward)",
+        "codeRef": "const rr = (tp - entry) / (entry - stop)",
+        "description": "Le rr est calculé avec entry = ema20 (potentiellement < close). Si l'entry réelle est au close (modèle SIGNAL_CLOSE), le rr s'effondre car (tp - close) est plus petit et (close - stop) est plus grand. L'edge mesuré est donc tributaire de cette hypothèse d'entrée optimiste.",
+        "severity": "HIGH",
+        "verdict": "RISKY",
+        "evidence": "Aucune mesure de sensibilité du rr selon le modèle d'entrée dans le code source."
+      },
+      {
+        "id": "F9",
+        "category": "data_completeness",
+        "component": "data/*.json",
+        "codeRef": "loadCandles : fs.readFileSync(`./data/${symbol}_2025.json`)",
+        "description": "Les fichiers data/ semblent complets (1255 candles par symbole sur 2021-2025). À vérifier en croisant avec la liste UNIVERSE — chaque symbole de UNIVERSE doit avoir son fichier OHLC. Symboles manquants signalent un possible biais (univers déclaré ≠ univers testé).",
+        "severity": "LOW",
+        "verdict": "UNKNOWN (à mesurer)",
+        "evidence": "Vérification dynamique faite par le moteur d'audit, voir section 8."
+      }
+    ]
+  },
+  "survivorship": {
+    "declaredUniverseSize": 191,
+    "dataFilesAvailable": 182,
+    "missingDataSymbols": [
+      "DIA",
+      "XLE",
+      "XLF",
+      "XLV",
+      "XLI",
+      "XLP",
+      "XLY",
+      "XLB",
+      "XLU",
+      "XLRE",
+      "XLC",
+      "EWJ",
+      "EWZ",
+      "FXI",
+      "EEM",
+      "VGK",
+      "FEZ",
+      "INDA",
+      "EWT",
+      "EWY",
+      "SLV",
+      "USO",
+      "UNG",
+      "DBA",
+      "IEF",
+      "HYG",
+      "LQD",
+      "TQQQ",
+      "KO",
+      "PG",
+      "JNJ"
+    ],
+    "dataFilesNotInUniverse": [
+      "ANET",
+      "CDNS",
+      "CFLT",
+      "DELL",
+      "EURUSD",
+      "GBPUSD",
+      "GEN",
+      "HCP",
+      "IGM",
+      "INTC",
+      "PATH",
+      "PAYX",
+      "RBRK",
+      "SENT",
+      "SIE",
+      "SNPS",
+      "SPLK",
+      "SPYG",
+      "USDJPY",
+      "VUG",
+      "XSW",
+      "ZEN"
+    ]
+  },
+  "variantResults": [
+    {
+      "variant": "pullback_rsi42_58_chg20_5_stop0.1",
+      "byModel": {
+        "CURRENT": {
+          "trades": 3173,
+          "wins": 856,
+          "losses": 1860,
+          "timeouts": 457,
+          "winrate": 26.98,
+          "expectancy": 0.621,
+          "profitFactor": 2.059,
+          "maxDrawdown": 89.57,
+          "totalPnl": 1969.56
+        },
+        "CURRENT_NO_LEAK": {
+          "trades": 2876,
+          "wins": 775,
+          "losses": 1657,
+          "timeouts": 444,
+          "winrate": 26.95,
+          "expectancy": 0.972,
+          "profitFactor": 2.687,
+          "maxDrawdown": 89.59,
+          "totalPnl": 2794.63
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 2201,
+          "wins": 491,
+          "losses": 1384,
+          "timeouts": 326,
+          "winrate": 22.31,
+          "expectancy": 0.152,
+          "profitFactor": 1.241,
+          "maxDrawdown": 99.35,
+          "totalPnl": 333.61
+        },
+        "NEXT_OPEN": {
+          "trades": 1929,
+          "wins": 391,
+          "losses": 1254,
+          "timeouts": 284,
+          "winrate": 20.27,
+          "expectancy": -0.021,
+          "profitFactor": 0.968,
+          "maxDrawdown": 163.22,
+          "totalPnl": -40.63
+        },
+        "RETOUCH_EMA20": {
+          "trades": 2205,
+          "wins": 367,
+          "losses": 1558,
+          "timeouts": 280,
+          "winrate": 16.64,
+          "expectancy": -0.189,
+          "profitFactor": 0.733,
+          "maxDrawdown": 478.36,
+          "totalPnl": -415.72
+        },
+        "MID_NEXT_BAR": {
+          "trades": 1838,
+          "wins": 365,
+          "losses": 1230,
+          "timeouts": 243,
+          "winrate": 19.86,
+          "expectancy": 0.107,
+          "profitFactor": 1.16,
+          "maxDrawdown": 148.53,
+          "totalPnl": 197.27
+        }
+      }
+    },
+    {
+      "variant": "pullback_rsi42_58_chg20_3_stop0.1",
+      "byModel": {
+        "CURRENT": {
+          "trades": 4688,
+          "wins": 1305,
+          "losses": 2791,
+          "timeouts": 592,
+          "winrate": 27.84,
+          "expectancy": 0.526,
+          "profitFactor": 1.884,
+          "maxDrawdown": 93.31,
+          "totalPnl": 2468.04
+        },
+        "CURRENT_NO_LEAK": {
+          "trades": 4239,
+          "wins": 1173,
+          "losses": 2492,
+          "timeouts": 574,
+          "winrate": 27.67,
+          "expectancy": 0.791,
+          "profitFactor": 2.345,
+          "maxDrawdown": 91.8,
+          "totalPnl": 3352.53
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 3222,
+          "wins": 757,
+          "losses": 2052,
+          "timeouts": 413,
+          "winrate": 23.49,
+          "expectancy": 0.143,
+          "profitFactor": 1.225,
+          "maxDrawdown": 91.22,
+          "totalPnl": 462.1
+        },
+        "NEXT_OPEN": {
+          "trades": 2838,
+          "wins": 597,
+          "losses": 1882,
+          "timeouts": 359,
+          "winrate": 21.04,
+          "expectancy": 0.005,
+          "profitFactor": 1.008,
+          "maxDrawdown": 116.17,
+          "totalPnl": 14.19
+        },
+        "RETOUCH_EMA20": {
+          "trades": 3301,
+          "wins": 588,
+          "losses": 2341,
+          "timeouts": 372,
+          "winrate": 17.81,
+          "expectancy": -0.177,
+          "profitFactor": 0.751,
+          "maxDrawdown": 637.13,
+          "totalPnl": -582.77
+        },
+        "MID_NEXT_BAR": {
+          "trades": 2724,
+          "wins": 551,
+          "losses": 1860,
+          "timeouts": 313,
+          "winrate": 20.23,
+          "expectancy": 0.159,
+          "profitFactor": 1.233,
+          "maxDrawdown": 148.01,
+          "totalPnl": 434.04
+        }
+      }
+    },
+    {
+      "variant": "pullback_base_rsi42_58_chg20_0_stop0.1",
+      "byModel": {
+        "CURRENT": {
+          "trades": 6847,
+          "wins": 1878,
+          "losses": 4170,
+          "timeouts": 799,
+          "winrate": 27.43,
+          "expectancy": 0.385,
+          "profitFactor": 1.633,
+          "maxDrawdown": 74.77,
+          "totalPnl": 2638.89
+        },
+        "CURRENT_NO_LEAK": {
+          "trades": 6207,
+          "wins": 1671,
+          "losses": 3762,
+          "timeouts": 774,
+          "winrate": 26.92,
+          "expectancy": 0.561,
+          "profitFactor": 1.926,
+          "maxDrawdown": 74.15,
+          "totalPnl": 3484.09
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 5027,
+          "wins": 1173,
+          "losses": 3253,
+          "timeouts": 601,
+          "winrate": 23.33,
+          "expectancy": 0.136,
+          "profitFactor": 1.21,
+          "maxDrawdown": 121.16,
+          "totalPnl": 683.47
+        },
+        "NEXT_OPEN": {
+          "trades": 4523,
+          "wins": 957,
+          "losses": 3010,
+          "timeouts": 556,
+          "winrate": 21.16,
+          "expectancy": 0.012,
+          "profitFactor": 1.018,
+          "maxDrawdown": 148.95,
+          "totalPnl": 55.25
+        },
+        "RETOUCH_EMA20": {
+          "trades": 5003,
+          "wins": 898,
+          "losses": 3570,
+          "timeouts": 535,
+          "winrate": 17.95,
+          "expectancy": -0.205,
+          "profitFactor": 0.712,
+          "maxDrawdown": 1027.42,
+          "totalPnl": -1027.42
+        },
+        "MID_NEXT_BAR": {
+          "trades": 4331,
+          "wins": 885,
+          "losses": 2983,
+          "timeouts": 463,
+          "winrate": 20.43,
+          "expectancy": 0.225,
+          "profitFactor": 1.326,
+          "maxDrawdown": 122.26,
+          "totalPnl": 973.47
+        }
+      }
+    },
+    {
+      "variant": "pullback_rsi42_58_chg20_5_stop0.5",
+      "byModel": {
+        "CURRENT": {
+          "trades": 2505,
+          "wins": 722,
+          "losses": 1246,
+          "timeouts": 537,
+          "winrate": 28.82,
+          "expectancy": 0.282,
+          "profitFactor": 1.568,
+          "maxDrawdown": 72.29,
+          "totalPnl": 707.64
+        },
+        "CURRENT_NO_LEAK": {
+          "trades": 2230,
+          "wins": 630,
+          "losses": 1124,
+          "timeouts": 476,
+          "winrate": 28.25,
+          "expectancy": 0.262,
+          "profitFactor": 1.52,
+          "maxDrawdown": 71.78,
+          "totalPnl": 584.27
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 1632,
+          "wins": 381,
+          "losses": 905,
+          "timeouts": 346,
+          "winrate": 23.35,
+          "expectancy": 0.015,
+          "profitFactor": 1.027,
+          "maxDrawdown": 97.89,
+          "totalPnl": 24.83
+        },
+        "NEXT_OPEN": {
+          "trades": 1519,
+          "wins": 305,
+          "losses": 882,
+          "timeouts": 332,
+          "winrate": 20.08,
+          "expectancy": -0.048,
+          "profitFactor": 0.917,
+          "maxDrawdown": 88.91,
+          "totalPnl": -73.16
+        },
+        "RETOUCH_EMA20": {
+          "trades": 1720,
+          "wins": 324,
+          "losses": 1061,
+          "timeouts": 335,
+          "winrate": 18.84,
+          "expectancy": -0.147,
+          "profitFactor": 0.762,
+          "maxDrawdown": 257.17,
+          "totalPnl": -253.01
+        },
+        "MID_NEXT_BAR": {
+          "trades": 1500,
+          "wins": 273,
+          "losses": 954,
+          "timeouts": 273,
+          "winrate": 18.2,
+          "expectancy": -0.147,
+          "profitFactor": 0.769,
+          "maxDrawdown": 223.29,
+          "totalPnl": -220.37
+        }
+      }
+    },
+    {
+      "variant": "pullback_rsi42_58_chg20_3_stop0.5",
+      "byModel": {
+        "CURRENT": {
+          "trades": 3470,
+          "wins": 1024,
+          "losses": 1773,
+          "timeouts": 673,
+          "winrate": 29.51,
+          "expectancy": 0.254,
+          "profitFactor": 1.498,
+          "maxDrawdown": 74.94,
+          "totalPnl": 882.84
+        },
+        "CURRENT_NO_LEAK": {
+          "trades": 3101,
+          "wins": 884,
+          "losses": 1621,
+          "timeouts": 596,
+          "winrate": 28.51,
+          "expectancy": 0.218,
+          "profitFactor": 1.417,
+          "maxDrawdown": 75.32,
+          "totalPnl": 676.52
+        },
+        "SIGNAL_CLOSE": {
+          "trades": 2312,
+          "wins": 552,
+          "losses": 1321,
+          "timeouts": 439,
+          "winrate": 23.88,
+          "expectancy": 0.034,
+          "profitFactor": 1.06,
+          "maxDrawdown": 74.41,
+          "totalPnl": 78.84
+        },
+        "NEXT_OPEN": {
+          "trades": 2189,
+          "wins": 451,
+          "losses": 1303,
+          "timeouts": 435,
+          "winrate": 20.6,
+          "expectancy": -0.05,
+          "profitFactor": 0.915,
+          "maxDrawdown": 131.73,
+          "totalPnl": -110.19
+        },
+        "RETOUCH_EMA20": {
+          "trades": 2423,
+          "wins": 472,
+          "losses": 1525,
+          "timeouts": 426,
+          "winrate": 19.48,
+          "expectancy": -0.157,
+          "profitFactor": 0.75,
+          "maxDrawdown": 381.1,
+          "totalPnl": -381.1
+        },
+        "MID_NEXT_BAR": {
+          "trades": 2169,
+          "wins": 406,
+          "losses": 1397,
+          "timeouts": 366,
+          "winrate": 18.72,
+          "expectancy": -0.154,
+          "profitFactor": 0.761,
+          "maxDrawdown": 334.54,
+          "totalPnl": -334.39
+        }
+      }
+    }
+  ],
+  "global": {
+    "byModel": {
+      "CURRENT": {
+        "trades": 20683,
+        "wins": 5785,
+        "losses": 11840,
+        "timeouts": 3058,
+        "winrate": 27.97,
+        "expectancy": 0.419,
+        "profitFactor": 1.732,
+        "maxDrawdown": 93.31,
+        "totalPnl": 8666.97
+      },
+      "CURRENT_NO_LEAK": {
+        "trades": 18653,
+        "wins": 5133,
+        "losses": 10656,
+        "timeouts": 2864,
+        "winrate": 27.52,
+        "expectancy": 0.584,
+        "profitFactor": 2.022,
+        "maxDrawdown": 91.8,
+        "totalPnl": 10892.04
+      },
+      "SIGNAL_CLOSE": {
+        "trades": 14394,
+        "wins": 3354,
+        "losses": 8915,
+        "timeouts": 2125,
+        "winrate": 23.3,
+        "expectancy": 0.11,
+        "profitFactor": 1.178,
+        "maxDrawdown": 132.98,
+        "totalPnl": 1582.85
+      },
+      "NEXT_OPEN": {
+        "trades": 12998,
+        "wins": 2701,
+        "losses": 8331,
+        "timeouts": 1966,
+        "winrate": 20.78,
+        "expectancy": -0.012,
+        "profitFactor": 0.981,
+        "maxDrawdown": 334.69,
+        "totalPnl": -154.55
+      },
+      "RETOUCH_EMA20": {
+        "trades": 14652,
+        "wins": 2649,
+        "losses": 10055,
+        "timeouts": 1948,
+        "winrate": 18.08,
+        "expectancy": -0.182,
+        "profitFactor": 0.735,
+        "maxDrawdown": 2722.66,
+        "totalPnl": -2660.02
+      },
+      "MID_NEXT_BAR": {
+        "trades": 12562,
+        "wins": 2480,
+        "losses": 8424,
+        "timeouts": 1658,
+        "winrate": 19.74,
+        "expectancy": 0.084,
+        "profitFactor": 1.125,
+        "maxDrawdown": 677.02,
+        "totalPnl": 1050.02
+      }
+    }
+  },
+  "severity": {
+    "global": "INVALID_BACKTEST",
+    "breakdown": [
+      {
+        "kind": "Entry execution bias (entry=ema20)",
+        "level": "INVALID_BACKTEST",
+        "justification": "PF CURRENT 1.73 / PF NEXT_OPEN 0.98 = inflation ×1.77"
+      },
+      {
+        "kind": "Stop/TP look-ahead (fenêtres incluant bougie signal)",
+        "level": "LOW_RISK",
+        "justification": "PF CURRENT 1.73 / PF CURRENT_NO_LEAK 2.02 = inflation ×0.86"
+      },
+      {
+        "kind": "Survivorship bias",
+        "level": "HIGH_RISK",
+        "justification": "31 symboles UNIVERSE sans OHLC, 22 fichiers OHLC hors univers. Pas de liste de delistés pour audit complet."
+      },
+      {
+        "kind": "Indicator recomputation / future leakage",
+        "level": "LOW_RISK",
+        "justification": "Tous les indicateurs (EMA, RSI, ATR, chg) sont causaux. Aucun usage de candle N+1 détecté. Le risque vient de l'USAGE (entry=EMA20[i]) pas du calcul."
+      }
+    ]
+  },
+  "verdictSummary": [
+    "Le modèle CURRENT (code en place) affiche un profit factor agrégé de **1.73** sur 20 683 trades.",
+    "Avec un modèle d'entrée réaliste (NEXT_OPEN, exécution à l'open de la bougie suivante), le PF tombe à **0.98** — inflation ×1.77.",
+    "Avec SIGNAL_CLOSE (entrée au close de la bougie signal), le PF tombe à **1.18** — inflation ×1.47.",
+    "Avec RETOUCH_EMA20 (entrée à EMA20 seulement si le low des 3 jours suivants y revient), 29 % des trades CURRENT sont éliminés. Le PF restant est 0.73 sur 14 652 trades.",
+    "Le code utilise EMA20[i], swingHigh20 et swingLow10 calculés sur une fenêtre INCLUANT la bougie signal — donc en partie postérieure au moment où le signal est censé être généré.",
+    "Severity globale : **INVALID_BACKTEST**. 4 sources de risque identifiées, dont 2 en HIGH_RISK ou pire."
+  ],
+  "recommendations": [
+    "**Corriger l'entrée** : utiliser `entry = open[i+1]` (NEXT_OPEN) ou conditionner `entry = ema20[i]` à un retouch explicite (`low[i+1..i+3] ≤ ema20[i]`).",
+    "**Corriger stop/TP** : calculer swingHigh20 sur `candles[i-20..i-1]` et swingLow10 sur `candles[i-10..i-1]` — exclure la bougie signal de la fenêtre.",
+    "**Recalculer toute la pipeline aval** : `tradable-universe-v1`, `rolling-walkforward-validator`, `tradable-universe-v2`, `allocation-engine-v3`, `setup-performance-summary` consomment toutes le PF gonflé. Les grades B actuels peuvent passer à C ou D après correction.",
+    "**Audit symétrique sur Breakout, RS Rotation, Mean Reversion** : la même logique d'entrée intraday-déguisée-en-daily peut affecter d'autres setups (à vérifier par PR séparée).",
+    "**Friction** : appliquer `friction-model-v1` sur le modèle réaliste pour mesurer l'edge effectif après coûts. Si PF post-friction < 1.1, le setup n'a plus d'edge.",
+    "**Ne pas trader Pullback Momentum en réel** tant que la correction du code source et la re-validation rolling walk-forward n'ont pas été faites.",
+    "**Audit survivorship** complémentaire : liste des tickers delistés 2021-2025 à recouper avec UNIVERSE pour quantifier le biais de survie."
+  ]
+}

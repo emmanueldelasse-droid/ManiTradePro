@@ -2526,3 +2526,76 @@ Aucun fichier amont modifié. 3 fichiers ajoutés : le script `.mjs` et ses 2 so
 - Audit anti-look-ahead sur les indicateurs Pullback Momentum (priorité vu le volume).
 - Restreindre une éventuelle tradable-universe-v3 aux setups A/B uniquement.
 - Calibration friction sur les top variantes (GLD × breakout, ACLS × pullback, etc.).
+
+---
+
+# Pullback Look-Ahead Audit v1
+
+Fichier créé :
+
+```text
+tools/backtests/pullback-lookahead-audit-v1.mjs
+```
+
+Audit offline complet du setup PULLBACK_MOMENTUM, combinant :
+
+1. **Analyse statique** du code source (`backtest-multi-setup-grid.mjs` + `backtest-pullback-yearly-walkforward.mjs`).
+2. **Re-simulation** sur les mêmes données OHLC 2021-2025 (182 fichiers, 160 chargés) avec 6 modèles d'entrée alternatifs.
+
+Sorties :
+
+- `tools/backtests/output/pullback-lookahead-audit-v1.json`
+- `tools/backtests/output/pullback-lookahead-audit-v1.md` (12 sections)
+
+## Verdict : **INVALID_BACKTEST**
+
+Le code Pullback actuel souffre de plusieurs biais structurels :
+
+| Biais | Severity | Preuve |
+|---|---|---|
+| `entry = ema20` calculé AVEC le close de la bougie signal | HIGH_RISK | Aucun check `low[i] ≤ ema20[i]` |
+| `swingHigh20`/`swingLow10` incluent la bougie signal | MEDIUM_RISK | Inflation ×0.86 (légèrement bénéfique post-correction) |
+| Pas de séparation signal-time / entry-time | HIGH_RISK | Boucle `slice(0, i+1)` puis `entry = ema20Series.at(-1)` |
+| 31 symboles UNIVERSE sans OHLC dans `data/` | HIGH_RISK | Survivorship potentiel |
+
+## Re-simulation : effondrement du PF
+
+| Modèle | Trades | Winrate | Expectancy | PF | Inflation vs CURRENT |
+|---|---:|---:|---:|---:|---:|
+| **CURRENT** (code actuel) | 20 683 | 27.97 % | 0.419 | **1.73** | — |
+| CURRENT_NO_LEAK (stop/tp sans bougie i) | 18 653 | 27.52 % | 0.584 | 2.02 | ×0.86 |
+| SIGNAL_CLOSE (entry = close[i]) | 14 394 | 23.30 % | 0.110 | **1.18** | ×1.47 |
+| NEXT_OPEN (entry = open[i+1]) | 12 998 | 20.78 % | -0.012 | **0.98** | ×1.77 |
+| RETOUCH_EMA20 (EMA20 si touché dans 3 j) | 14 652 | 18.08 % | -0.182 | **0.73** | ×2.36 |
+| MID_NEXT_BAR (entry = mid bougie i+1) | 12 562 | 19.74 % | 0.084 | 1.13 | ×1.54 |
+
+→ Avec un modèle d'exécution réaliste (NEXT_OPEN), le **PF tombe sous 1**, expectancy **négative**. Le setup n'a plus d'edge.
+
+## Conséquences en cascade
+
+Toute la pipeline aval consomme ce PF gonflé :
+
+- `tradable-universe-v1` → 328 ALLOW Pullback (probablement sur-évaluées).
+- `rolling-walkforward-validator` → 31 cellules ROBUST/STABLE Pullback (probablement gonflées).
+- `tradable-universe-v2` → 24 ALLOW v2 Pullback survivants (idem).
+- `allocation-engine-v3` → était déjà en `status=failed`, mais la cause est différente : avec PF réel ~1, le setup Pullback n'aurait probablement pas d'ALLOW v2 du tout.
+- `setup-performance-summary-v1` → Pullback grade **B (63/100)** affiché, réel probablement **D ou FAILED**.
+
+## Recommandations
+
+- **Ne pas trader Pullback Momentum en réel** tant que la correction n'est pas faite.
+- **PR séparée** : corriger `detectPullback` (entry, stop, tp) en utilisant les fenêtres `[i-N..i-1]` au lieu de `[-N..-1]` incluant la bougie i, et choisir un modèle d'entrée réaliste (`NEXT_OPEN` recommandé).
+- **Recalcul complet** de toute la pipeline aval après correction.
+- **Audit symétrique** sur Breakout, RS Rotation, Mean Reversion (même schéma potentiel d'entrée intraday-déguisée).
+- **Friction** : appliquer `friction-model-v1` au modèle corrigé pour mesurer l'edge survivant.
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+## Limites assumées
+
+- Simulation limitée aux 5 variantes Pullback de `multi-setup-grid` (les 10 de `yearly-walkforward` partagent la même logique).
+- Pas d'audit anti-look-ahead pour les autres setups dans cette PR.
+- Pas de friction modélisée dans la simulation.
+- Survivorship audit limité aux symboles UNIVERSE sans OHLC ; les delistés hors univers ne sont pas mesurables sans liste externe.
