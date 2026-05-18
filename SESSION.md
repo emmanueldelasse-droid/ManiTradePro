@@ -3099,3 +3099,73 @@ Implications :
 ## Non-régression
 
 Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+---
+
+# Trend Pullback Dynamic Support v1
+
+Fichier créé :
+
+```text
+tools/backtests/trend-pullback-dynamic-support-v1.mjs
+```
+
+Test honnête du nouveau setup TREND_PULLBACK_DYNAMIC_SUPPORT, hypothèse : "acheter des leaders sur respiration contrôlée, avec confirmation".
+
+Sorties :
+
+- `tools/backtests/output/trend-pullback-dynamic-support-v1.json`
+- `tools/backtests/output/trend-pullback-dynamic-support-v1.md` (16 sections)
+
+## Verdict : **FRAGILE**
+
+Améliore l'ancien Pullback (PF 0.98 NEXT_OPEN → 1.045 baseline) mais reste fragile. **0 variante sur 18 ne passe les critères minimum**.
+
+## Comparaison directe vs ancien Pullback (NEXT_OPEN)
+
+| Critère | Ancien Pullback | Trend Pullback baseline |
+|---|---:|---:|
+| Trades | 12 998 | 7 334 |
+| Winrate | 20.78 % | 41 % approx. |
+| PF | 0.98 | **1.045** |
+| Expectancy R | -0.012 | + (positif) |
+| Verdict | INVALID_BACKTEST | FRAGILE |
+
+→ Amélioration mesurable mais marginale.
+
+## Variantes les plus prometteuses (toutes < critères minimum)
+
+| Variante | Trades | PF | Years+ | Note |
+|---|---:|---:|---:|---|
+| support=EMA50 | 4 818 | 1.15 | 3/5 | meilleure structure |
+| horizon=40 | 7 196 | 1.15 | 3/5 | hold plus long aide |
+| universe=ai_software | 1 705 | 1.19 | 2/5 | concentration AI |
+| stop=ema50 | 7 324 | 1.09 | 3/5 | OK marginalement |
+| friction_x2 | 7 334 | 0.90 | 1/5 | tue l'edge à coûts élevés |
+| exit=trailing_atr | 7 334 | 0.84 | 0/5 | trailing tue le setup |
+
+## Lectures clés
+
+1. **Le concept Pullback n'est pas mort, mais il est marginal.** Même avec exécution propre (NEXT_OPEN), confirmation de reprise, filtres trend rigoureux, le PF reste ~1.0-1.2. Pas un edge robuste.
+
+2. **Le problème de l'ancien Pullback n'était pas QUE l'implémentation.** L'implémentation était cassée (look-ahead, entry théorique), oui — mais même en la corrigeant, le concept structurel donne un edge mince.
+
+3. **Trailings tuent le setup.** ATR trailing : PF 0.84. EMA20 trailing : PF 0.97. Le concept Pullback ne tolère pas les exits dynamiques — les bougies vertes initiales sont vite "trailing-out" avant que le mouvement ne se développe.
+
+4. **2021-2025 contexte particulier.** Bull AI a fait que les leaders SOIT continuaient sans pullback (manqués), SOIT corrigent violemment (refusés par le filtre -15 %). La fenêtre de "respiration contrôlée" est rare.
+
+5. **Walk-forward 3/3 splits positifs** sur baseline malgré tout. Edge décay × 0.2 (edge meilleur récent). Donc l'edge marginal existe et tient temporellement, juste pas suffisant.
+
+## Implications
+
+- **Pas de promotion** du setup à VALIDATED_RESEARCH_CORE ou même RESEARCH_CANDIDATE.
+- Statut suggéré : `EXPERIMENTAL_ONLY` ou `RESEARCH_INSIGHT_ONLY`.
+- Conclusion : le concept Pullback semble structurellement marginal sous exécution réaliste. SETUPS_REGISTRY.md devrait conserver l'ancien Pullback en DEAD et noter que la reformulation v1 n'apporte qu'une amélioration mineure.
+- Les ressources de recherche devraient se concentrer sur :
+  - POST_EARNINGS_DRIFT (si données sourcées)
+  - Setups non-momentum (mean reversion ciblée, pairs trading)
+  - Stratégies multi-temporelles diversifiées
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 3 fichiers ajoutés. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
