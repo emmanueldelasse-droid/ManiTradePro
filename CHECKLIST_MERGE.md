@@ -8,6 +8,30 @@ Ce fichier est la **checklist à parcourir avant chaque merge** d'une PR sur `ma
 
 ---
 
+## Matrice d'impact documentaire
+
+Avant merge :
+
+- [ ] `docs/project/DOC_IMPACT_MATRIX.md` **consulté** pour identifier les fichiers mémoire attendus selon le type de modification.
+- [ ] Les fichiers mémoire attendus pour le type de PR ont été **mis à jour**.
+- [ ] Les fichiers normalement concernés mais **non modifiés** sont **justifiés** dans la section `## Documentation impact` du body de PR.
+- [ ] `SESSION.md` reflète l'état réel après la PR (cf. § *Documentation* ci-dessous).
+- [ ] Aucune contradiction documentaire détectée entre les fichiers sources.
+- [ ] Optionnel mais recommandé : `npm run check:doc-impact` exécuté localement (aide anti-oubli, non bloquant).
+
+Le body de PR doit contenir une section `## Documentation impact` structurée :
+
+```
+## Documentation impact
+- Type de modification :
+- Fichiers mémoire attendus :
+- Fichiers mis à jour :
+- Fichiers vérifiés mais non modifiés :
+- Justification des non-modifications :
+```
+
+---
+
 ## Documentation
 
 - [ ] **`SESSION.md` mis à jour** : reflète l'état réel **après** la PR. Doit contenir objectif livré, fichiers modifiés, impacts (runtime / quant / documentation), limites, prochaine étape. Une PR ne doit pas recevoir `GO MERGE` si `SESSION.md` est absent, obsolète ou contradictoire avec les fichiers sources.

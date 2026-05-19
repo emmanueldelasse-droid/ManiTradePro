@@ -27,6 +27,16 @@ Le protocole officiel de reprise de session est défini dans `GOVERNANCE.md` § 
 
 `CLAUDE.md` ne duplique pas ce protocole. Il rappelle seulement que Claude Code doit l'appliquer avant toute analyse ou modification : lire le **socle obligatoire** (5 fichiers), puis les **fichiers spécialisés** correspondant au sujet, et refuser de partir uniquement de `SESSION.md` ou de la mémoire.
 
+## Matrice d'impact documentaire
+
+Avant toute PR, Claude Code doit consulter :
+
+`docs/project/DOC_IMPACT_MATRIX.md`
+
+Cette matrice indique quels fichiers mémoire doivent être mis à jour ou explicitement vérifiés selon le type de modification. `SESSION.md` reste obligatoire avant chaque demande de `GO MERGE`.
+
+Aide anti-oubli (non bloquante) : `npm run check:doc-impact`. Le script ne remplace ni la matrice, ni `CHECKLIST_MERGE.md`, ni la revue ChatGPT.
+
 ## Documentation permanente (IMPÉRATIVE — mai 2026)
 
 À chaque session, **lire AVANT toute modif**. L'ordre de priorité canonique est défini dans `GOVERNANCE.md` § *Ordre de priorité* ; la liste ci-dessous précise les fichiers opérationnels utiles dans ce repo :

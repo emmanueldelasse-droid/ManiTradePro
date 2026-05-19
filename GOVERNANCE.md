@@ -961,3 +961,35 @@ Claude **ne doit pas** répondre à ChatGPT avec :
 ### Objectif
 
 Maximiser la précision d'exécution de Claude et permettre à ChatGPT de relire, challenger et valider efficacement.
+
+---
+
+## MATRICE D'IMPACT DOCUMENTAIRE
+
+Avant chaque demande de `GO MERGE`, Claude doit consulter la matrice d'impact documentaire officielle :
+
+`docs/project/DOC_IMPACT_MATRIX.md`
+
+Cette matrice définit quels fichiers mémoire doivent être **mis à jour** ou **explicitement vérifiés** selon le type de modification.
+
+### Règles
+
+- `SESSION.md` doit toujours être mis à jour avant `GO MERGE` (cf. § *Règles synchronisation mémoire*).
+- Les fichiers attendus par la matrice pour le type de PR doivent être mis à jour **ou** justifiés explicitement dans une section `## Documentation impact` du body de PR.
+- En cas multi-domaines, **fusionner les listes** issues de chaque ligne concernée de la matrice.
+- Si la matrice est incomplète pour un cas réel, **l'enrichir dans la même PR** plutôt que de bypass.
+
+### Critères de refus
+
+ChatGPT **ne doit pas** donner `GO MERGE` si :
+
+- un fichier documentaire attendu par la matrice n'a pas été mis à jour ;
+- aucun motif n'explique pourquoi il n'a pas été modifié ;
+- `SESSION.md` n'a pas été mis à jour ;
+- les fichiers sources sont contradictoires entre eux.
+
+### Aide anti-oubli
+
+Un script dev-only est fourni pour aider à détecter les oublis : `scripts/check-doc-impact.mjs` (commande : `npm run check:doc-impact`).
+
+Le script est une **aide**, pas une garantie. Il ne remplace ni la matrice, ni la `CHECKLIST_MERGE.md`, ni la revue ChatGPT. Il ne doit pas être branché dans CI comme gate bloquant sans validation explicite de ChatGPT.
