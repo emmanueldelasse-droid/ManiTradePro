@@ -18,7 +18,7 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 
 ### Risques actuels
 
-- **Doublons potentiels** : après les migrations `docs/project/` (PR #227) et `docs/quant/` (PR en cours `claude/migrate-docs-quant-registries`), il reste 9 sources canoniques racine vivantes. 2 ont encore un pendant `/docs/*` au même nom (`PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md` — à migrer dans la PR `docs/monitoring/`), 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md` sont désormais canoniques sous `docs/*`, leurs anciens chemins racine sont des stubs temporaires de redirection. `TRADING_LOGIC.md` reste racine (contenu transversal, split reporté à une PR dédiée).
+- **Doublons potentiels** : après les migrations `docs/project/` (PR #227), `docs/quant/` (PR #228) et `docs/monitoring/` (PR en cours `claude/migrate-docs-monitoring`), il reste 7 sources canoniques racine vivantes. Aucune n'a encore de pendant `/docs/*` au même nom. 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md` sont désormais canoniques sous `docs/*`, leurs anciens chemins racine sont des stubs temporaires de redirection. `TRADING_LOGIC.md` reste racine (contenu transversal, split reporté à une PR dédiée).
 - **Confusion possible** : un contributeur peut écrire dans un squelette `/docs/*` au lieu de la source canonique racine.
 - **Lecture excessive** : la matrice d'impact documentaire pointe à la fois vers racine et `/docs/`, et le protocole de reprise de session liste explicitement les sources racine.
 - **Fichiers semi-actifs** : plusieurs squelettes `/docs/project/` et `/docs/quant/` contiennent des rôles + métadonnées sans contenu métier réel, ce qui peut donner une fausse impression de couverture documentaire.
@@ -41,8 +41,8 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `TRADING_LOGIC.md` | 501 | Logique du moteur (transversal) | Canonique racine | **Reste racine** : contenu transversal (scoring + pipeline + safety gate + sizing + fermeture + garde-fou devise). Split entre `docs/project/` et `docs/quant/` reporté à une PR dédiée. |
 | `SETUPS_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/SETUPS_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 | `ASSET_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/ASSET_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `PROVIDERS_MATRIX.md` | 125 | Routage providers | Canonique | À déplacer vers `docs/monitoring/PROVIDERS_MATRIX.md` (PR migration monitoring) |
-| `KNOWN_ISSUES.md` | 331 | Bugs / dette | Canonique | À déplacer vers `docs/monitoring/KNOWN_ISSUES.md` (PR migration monitoring) |
+| `PROVIDERS_MATRIX.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/monitoring/PROVIDERS_MATRIX.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
+| `KNOWN_ISSUES.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/monitoring/KNOWN_ISSUES.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 
 ### Stubs et squelettes `/docs/*`
 
@@ -65,8 +65,8 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `docs/quant/REGIME_RULES.md` | 59 | Squelette | Aucune source canonique racine | À enrichir plus tard |
 | `docs/quant/RISK_ENGINE_RULES.md` | 79 | Squelette | Aucune source canonique racine | À enrichir plus tard |
 | `docs/quant/WALK_FORWARD_RULES.md` | 65 | Squelette | (couvert par `docs/research/`) | À fusionner avec docs/research/ plus tard |
-| `docs/monitoring/KNOWN_ISSUES.md` | 13 | Stub pointer | `KNOWN_ISSUES.md` | À remplacer par la source canonique lors de la migration monitoring |
-| `docs/monitoring/PROVIDERS_MATRIX.md` | 15 | Stub pointer | `PROVIDERS_MATRIX.md` | À remplacer par la source canonique lors de la migration monitoring |
+| `docs/monitoring/KNOWN_ISSUES.md` | 331 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle des bugs / dette |
+| `docs/monitoring/PROVIDERS_MATRIX.md` | 125 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle des providers |
 | `docs/monitoring/DATA_QUALITY.md` | 53 | Squelette | Aucune source canonique racine | À enrichir plus tard |
 | `docs/decisions/README.md` | 81 | Placeholder | (pas de décision archivée) | À conserver, alimenter quand une décision sera archivée |
 
@@ -186,10 +186,10 @@ Racine du repo (5 fichiers) :
    - Crée des stubs racine pendant la transition. **Fait** pour `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md`.
    - Met à jour la matrice et tous les renvois. **Fait**.
 
-3. **PR migration `docs/monitoring/`**
-   - Déplace `PROVIDERS_MATRIX.md` → `docs/monitoring/PROVIDERS_MATRIX.md`.
-   - Déplace `KNOWN_ISSUES.md` → `docs/monitoring/KNOWN_ISSUES.md`.
-   - Stubs racine pendant la transition.
+3. **PR migration `docs/monitoring/`** *(partiellement réalisée — PR en cours `claude/migrate-docs-monitoring`)*
+   - Déplace `PROVIDERS_MATRIX.md` → `docs/monitoring/PROVIDERS_MATRIX.md`. **Fait** (déplacement bloc 125 lignes).
+   - Déplace `KNOWN_ISSUES.md` → `docs/monitoring/KNOWN_ISSUES.md`. **Fait** (déplacement bloc 331 lignes).
+   - Stubs racine pendant la transition. **Fait**.
 
 4. **PR décisions / historique**
    - Première décision archivée dans `docs/decisions/DECISION-001-*.md` (rétroactif : la fusion `GPT_ROLE.md` → `GOVERNANCE.md` est un bon candidat).

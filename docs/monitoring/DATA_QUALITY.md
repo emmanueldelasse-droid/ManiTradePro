@@ -47,7 +47,7 @@ _À remplir._
 
 ## Sources existantes à consolider
 
-- `/PROVIDERS_MATRIX.md`
-- `/KNOWN_ISSUES.md` — incidents data historiques
+- `docs/monitoring/PROVIDERS_MATRIX.md`
+- `docs/monitoring/KNOWN_ISSUES.md` — incidents data historiques
 - `/docs/research/DATASET_GOVERNANCE.md`
 - `/docs/research/PEAD_DATA_REQUIREMENTS.md`

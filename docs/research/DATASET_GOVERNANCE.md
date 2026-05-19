@@ -8,7 +8,7 @@
 
 ## 1. Périmètre
 
-Ce document gouverne tous les datasets utilisés pour la recherche offline (backtests, audits, labs). Il ne concerne PAS les données runtime (Worker, providers live), qui sont gouvernées par `PROVIDERS_MATRIX.md`.
+Ce document gouverne tous les datasets utilisés pour la recherche offline (backtests, audits, labs). Il ne concerne PAS les données runtime (Worker, providers live), qui sont gouvernées par `docs/monitoring/PROVIDERS_MATRIX.md`.
 
 ---
 

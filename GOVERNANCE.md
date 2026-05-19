@@ -391,11 +391,12 @@ canonique actuelle et quel chemin de transition existe encore.
 
 ### Exemple
 
-- `/PROVIDERS_MATRIX.md` = source canonique (pas encore migrée).
-- `docs/monitoring/PROVIDERS_MATRIX.md` = stub lecture seule pointant
-  vers la racine.
+- `/TRADING_LOGIC.md` = source canonique (split entre `docs/project/` et
+  `docs/quant/` reporté à une PR dédiée).
 - `docs/project/ARCHITECTURE.md` = source canonique (migrée).
 - `/ARCHITECTURE.md` = stub de redirection vers `docs/project/`.
+- `docs/monitoring/PROVIDERS_MATRIX.md` = source canonique (migrée).
+- `/PROVIDERS_MATRIX.md` = stub de redirection vers `docs/monitoring/`.
 - Toute modification doit être faite uniquement sur la source canonique
   en vigueur.
 
@@ -407,8 +408,8 @@ canonique actuelle et quel chemin de transition existe encore.
 | `docs/project/DATA_PIPELINE.md` | `/DATA_PIPELINE.md` = stub de redirection | **Migré** |
 | `docs/quant/SETUPS_REGISTRY.md` | `/SETUPS_REGISTRY.md` = stub de redirection | **Migré** |
 | `docs/quant/ASSET_REGISTRY.md` | `/ASSET_REGISTRY.md` = stub de redirection | **Migré** |
-| `/PROVIDERS_MATRIX.md` | `docs/monitoring/PROVIDERS_MATRIX.md` = stub pointer | À migrer (PR `docs/monitoring/`) |
-| `/KNOWN_ISSUES.md` | `docs/monitoring/KNOWN_ISSUES.md` = stub pointer | À migrer (PR `docs/monitoring/`) |
+| `docs/monitoring/PROVIDERS_MATRIX.md` | `/PROVIDERS_MATRIX.md` = stub de redirection | **Migré** |
+| `docs/monitoring/KNOWN_ISSUES.md` | `/KNOWN_ISSUES.md` = stub de redirection | **Migré** |
 | `/BOT_OBJECTIVE.md` | _(squelette `docs/project/PROJECT_VISION.md`)_ | À arbitrer plus tard |
 | `/SESSION.md` | _(reste à la racine, cf. § `RÔLE DES FICHIERS`)_ | Non migré (intentionnel) |
 | `/CHECKLIST_MERGE.md` | _(squelette `docs/project/MERGE_PROTOCOL.md`)_ | À arbitrer plus tard |
@@ -858,7 +859,7 @@ Lire obligatoirement, dans cet ordre :
 2. `BOT_OBJECTIVE.md`
 3. `PROJECT_RULES.md`
 4. `SESSION.md`
-5. `KNOWN_ISSUES.md`
+5. `docs/monitoring/KNOWN_ISSUES.md`
 
 Rôle de chaque fichier :
 
@@ -866,7 +867,7 @@ Rôle de chaque fichier :
 - `BOT_OBJECTIVE.md` — objectif réel du projet, ce que ManiTradePro doit devenir, conditions avant argent réel.
 - `PROJECT_RULES.md` — règles techniques structurelles non négociables.
 - `SESSION.md` — état actuel résumé, dernière situation connue, prochaines priorités.
-- `KNOWN_ISSUES.md` — dette, bugs connus, limites et pièges à ne pas oublier.
+- `docs/monitoring/KNOWN_ISSUES.md` — dette, bugs connus, limites et pièges à ne pas oublier (la racine `KNOWN_ISSUES.md` est un stub temporaire de redirection).
 
 ### Fichiers spécialisés selon le sujet
 
@@ -878,7 +879,7 @@ Lire aussi :
 
 - `docs/project/ARCHITECTURE.md`
 - `docs/project/DATA_PIPELINE.md`
-- `PROVIDERS_MATRIX.md`
+- `docs/monitoring/PROVIDERS_MATRIX.md`
 
 #### Trading / bot / paper trading / setups / scores / décisions / régimes / actifs
 

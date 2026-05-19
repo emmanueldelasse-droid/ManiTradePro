@@ -38,8 +38,8 @@ Le body de PR doit contenir une section `## Documentation impact` structurée :
 - [ ] **`docs/project/ARCHITECTURE.md` mis à jour** si la structure du code change (nouvelle route, nouveau cluster de fonctions, nouvelle table Supabase, modification de cache).
 - [ ] **`docs/project/DATA_PIPELINE.md` mis à jour** si le flux d'une donnée change (provider, cache, TTL, devise, freshness).
 - [ ] **`TRADING_LOGIC.md` mis à jour** si le scoring, les setups, les règles d'ouverture/fermeture, ou l'apprentissage évoluent.
-- [ ] **`PROVIDERS_MATRIX.md` mis à jour** si une source de données change ou un nouveau provider est ajouté.
-- [ ] **`KNOWN_ISSUES.md` mis à jour** : ajouter un nouveau bug découvert, marquer un bug résolu comme tel, documenter une nouvelle dette identifiée.
+- [ ] **`docs/monitoring/PROVIDERS_MATRIX.md` mis à jour** si une source de données change ou un nouveau provider est ajouté.
+- [ ] **`docs/monitoring/KNOWN_ISSUES.md` mis à jour** : ajouter un nouveau bug découvert, marquer un bug résolu comme tel, documenter une nouvelle dette identifiée.
 - [ ] **`CLAUDE.md` mis à jour** si une règle de processus change (workflow git, déploiement, conventions).
 - [ ] **`GOVERNANCE.md` et `SESSION.md` mis à jour** si la PR modifie les règles de reprise de session ou de communication ChatGPT ↔ Claude (cf. `GOVERNANCE.md` § *Session start protocol* et § *Format obligatoire ChatGPT ↔ Claude*).
 - [ ] **`docs/quant/SETUPS_REGISTRY.md` mis à jour** si un setup change, si une nouvelle variante est validée, dépréciée ou abandonnée.
