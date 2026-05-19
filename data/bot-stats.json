@@ -192,39 +192,39 @@
     ]
   },
   "stats30d": {
-    "totalCount": 33,
+    "totalCount": 32,
     "winCount": 2,
-    "lossCount": 31,
-    "winRate": 0.06060606060606061,
-    "totalPnl": -791.4337758544158,
+    "lossCount": 30,
+    "winRate": 0.0625,
+    "totalPnl": -773.6587512076854,
     "avgWin": 34.09007459492636,
-    "avgLoss": 27.72948145304091,
-    "expectancy": -23.982841692558047,
-    "rrActual": 1.229380168996558,
+    "avgLoss": 28.06129667991793,
+    "expectancy": -24.176835975240163,
+    "rrActual": 1.2148431693579906,
     "openCount": 0,
     "bySetup": [
-      {
-        "setup": "autre",
-        "count": 17,
-        "wins": 1,
-        "pnl": -292.529692277564,
-        "winRate": 0.058823529411764705
-      },
       {
         "setup": "continuation",
         "count": 16,
         "wins": 1,
         "pnl": -498.9040835768518,
         "winRate": 0.0625
+      },
+      {
+        "setup": "autre",
+        "count": 16,
+        "wins": 1,
+        "pnl": -274.7546676308337,
+        "winRate": 0.0625
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 29,
+        "count": 28,
         "wins": 2,
-        "pnl": -674.8891549657468,
-        "winRate": 0.06896551724137931
+        "pnl": -657.1141303190165,
+        "winRate": 0.07142857142857142
       },
       {
         "class": "crypto",
@@ -274,15 +274,15 @@
         "wins": 0
       },
       {
-        "symbol": "BTC",
-        "count": 5,
-        "pnl": -169.022805075014,
-        "wins": 0
-      },
-      {
         "symbol": "MSFT",
         "count": 4,
         "pnl": -151.8855927352821,
+        "wins": 0
+      },
+      {
+        "symbol": "BTC",
+        "count": 4,
+        "pnl": -151.2477804282837,
         "wins": 0
       },
       {
