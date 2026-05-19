@@ -241,6 +241,31 @@ Avant B.10, ce trou existait pour Yahoo (le provider posait `quotedAt = nowIso()
 
 ---
 
+### #14 🟡 SESSION.md oversized
+
+**Status**
+OPEN
+
+**Problem**
+`SESSION.md` currently exceeds governance size expectations (3393 lignes au 2026-05-19) and mixes:
+- historical logs,
+- quantitative research,
+- architecture notes,
+- temporary investigations.
+
+`GOVERNANCE.md` § `RÔLE DES FICHIERS` exige que `SESSION.md` reste court et § `STRUCTURE MÉMOIRE OFFICIELLE` interdit la documentation monolithique.
+
+**Risk**
+- navigation difficulty,
+- memory divergence,
+- governance non-compliance,
+- session onboarding degradation.
+
+**Planned resolution**
+Dedicated decomposition PR with archive strategy (extraction des blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/` ; archivage des logs historiques ; nouveau `SESSION.md` court conforme au rôle officiel). Pas adressé dans la PR setup-governance-docs (règle `Une PR = un objectif`).
+
+---
+
 ## Issues résolues récemment
 
 | Description | Résolu par | Note |

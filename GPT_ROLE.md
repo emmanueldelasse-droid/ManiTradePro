@@ -5,6 +5,32 @@
 
 ---
 
+## Priorité documentaire (cohérence avec `CLAUDE.md`)
+
+> **Lecture obligatoire de `GOVERNANCE.md` AVANT toute autre action.**
+>
+> `GOVERNANCE.md` est le fichier de gouvernance officiel du projet et la
+> source unique de vérité sur :
+> - l'ordre de priorité documentaire ;
+> - les rôles Créateur / ChatGPT / Claude ;
+> - le mode de communication obligatoire ;
+> - les règles merge / mémoire / validation ;
+> - la structure de dossiers `/docs/` ;
+> - les interdictions absolues.
+>
+> Toute règle de ce fichier (`GPT_ROLE.md`) est **subordonnée** à
+> `GOVERNANCE.md`. En cas de conflit, `GOVERNANCE.md` fait autorité.
+>
+> Obligation de lecture :
+> - au début de chaque session (Claude **et** ChatGPT) ;
+> - avant toute analyse, implémentation, review, validation, PR ou merge.
+>
+> Cette section a été ajoutée le 2026-05-19 dans la PR `setup-governance-docs`
+> pour éviter toute divergence Claude ↔ ChatGPT sur la lecture de la
+> gouvernance.
+
+---
+
 # Gouvernance Claude ↔ ChatGPT
 
 ## Rôle de Claude

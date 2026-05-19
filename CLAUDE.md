@@ -1,12 +1,14 @@
 # CLAUDE.md — ManiTradePro
 
 > Règles permanentes pour toute session Claude Code sur ce repo.
-> **Lire aussi `SESSION.md`** en premier — c'est le fichier de continuité vivant.
+> **Priorité absolue : `GOVERNANCE.md`** — fichier officiel de gouvernance projet, prioritaire sur tout autre document, à lire AVANT toute analyse, implémentation, review ou merge.
+> Lire ensuite `SESSION.md` — le fichier de continuité vivant.
 
 ## Documentation permanente (IMPÉRATIVE — mai 2026)
 
-À chaque session, **lire AVANT toute modif** :
-- `BOT_OBJECTIVE.md` — **constitution officielle du projet** : objectif réel, règles absolues, ce que le bot est et n'est pas. À lire en premier.
+À chaque session, **lire AVANT toute modif** (ordre de priorité officiel défini dans `GOVERNANCE.md`) :
+- `GOVERNANCE.md` — **fichier de gouvernance projet officiel** (priorité #1). Définit rôles, règles merge/mémoire/validation, structure dossiers `/docs/`, interdictions absolues.
+- `BOT_OBJECTIVE.md` — **constitution officielle du projet** : objectif réel, règles absolues, ce que le bot est et n'est pas. Source actuelle de `docs/project/PROJECT_VISION.md`.
 - `PROJECT_RULES.md` — règles techniques structurelles (séparation analytique/live, snapshotId, additivité du payload)
 - `SESSION.md` — état du projet
 - `ARCHITECTURE.md` — structure code après merge
