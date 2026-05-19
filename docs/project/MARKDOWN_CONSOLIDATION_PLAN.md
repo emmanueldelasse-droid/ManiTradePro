@@ -18,7 +18,7 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 
 ### Risques actuels
 
-- **Doublons potentiels** : 13 fichiers racine ont un pendant `/docs/*` (stub ou squelette).
+- **Doublons potentiels** : sur les 13 sources canoniques racine vivantes, 5 ont un pendant `/docs/*` au même nom (`ARCHITECTURE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`), 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`), 6 n'ont pas de pendant `/docs/*` à ce jour (`GOVERNANCE.md`, `PROJECT_RULES.md`, `SESSION.md`, `CLAUDE.md`, `DATA_PIPELINE.md`, `TRADING_LOGIC.md`).
 - **Confusion possible** : un contributeur peut écrire dans un squelette `/docs/*` au lieu de la source canonique racine.
 - **Lecture excessive** : la matrice d'impact documentaire pointe à la fois vers racine et `/docs/`, et le protocole de reprise de session liste explicitement les sources racine.
 - **Fichiers semi-actifs** : plusieurs squelettes `/docs/project/` et `/docs/quant/` contiennent des rôles + métadonnées sans contenu métier réel, ce qui peut donner une fausse impression de couverture documentaire.
