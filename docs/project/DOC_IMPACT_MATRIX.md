@@ -25,12 +25,12 @@
 | Front / UI / PWA | `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md` si flux modifié, `SESSION.md`, `docs/monitoring/KNOWN_ISSUES.md` si bug / dette | Éviter divergence front / back |
 | Provider / prix / quote / TTL / fallback | `docs/monitoring/PROVIDERS_MATRIX.md`, `docs/project/DATA_PIPELINE.md`, `PROJECT_RULES.md` si règle changée, `SESSION.md`, `docs/monitoring/KNOWN_ISSUES.md` si limite | Éviter faux live / faux prix |
 | Supabase / DB / migration | `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, fichier migration SQL si nécessaire | Éviter schéma invisible |
-| Trading logic / scoring / décision | `TRADING_LOGIC.md`, `docs/quant/SETUPS_REGISTRY.md` si setup impacté, `docs/quant/ASSET_REGISTRY.md` si actifs impactés, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter régression quant |
-| Setup nouveau / modifié / abandonné | `docs/quant/SETUPS_REGISTRY.md`, `TRADING_LOGIC.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `SESSION.md` | Garder statut setup exact |
+| Trading logic / scoring / décision | `docs/quant/TRADING_LOGIC.md` (scoring) ou `docs/project/TRADING_ENGINE.md` (exécution), `docs/quant/SETUPS_REGISTRY.md` si setup impacté, `docs/quant/ASSET_REGISTRY.md` si actifs impactés, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter régression quant |
+| Setup nouveau / modifié / abandonné | `docs/quant/SETUPS_REGISTRY.md`, `docs/quant/TRADING_LOGIC.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `SESSION.md` | Garder statut setup exact |
 | Actif / univers / classification | `docs/quant/ASSET_REGISTRY.md`, `docs/quant/SETUPS_REGISTRY.md` si compatibilité setup impactée, `SESSION.md` | Éviter actifs mal classés |
 | Recherche quant / backtest / walk-forward | `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `docs/research/ANTI_LOOKAHEAD_RULES.md`, `docs/research/DATASET_GOVERNANCE.md`, `docs/quant/SETUPS_REGISTRY.md`, `SESSION.md` | Éviter overfit / lookahead |
-| Risk / allocation / sizing / kill switch | fichiers risk / allocation si existants, `TRADING_LOGIC.md`, `PROJECT_RULES.md`, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter risque non documenté |
-| Broker réel / exécution argent réel | `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `docs/project/ARCHITECTURE.md`, `TRADING_LOGIC.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, `docs/monitoring/KNOWN_ISSUES.md` | Escalade obligatoire |
+| Risk / allocation / sizing / kill switch | fichiers risk / allocation si existants, `docs/project/TRADING_ENGINE.md`, `docs/quant/TRADING_LOGIC.md` si scoring impacté, `PROJECT_RULES.md`, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter risque non documenté |
+| Broker réel / exécution argent réel | `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `docs/project/ARCHITECTURE.md`, `docs/project/TRADING_ENGINE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, `docs/monitoring/KNOWN_ISSUES.md` | Escalade obligatoire |
 | Bug corrigé / dette ajoutée | `docs/monitoring/KNOWN_ISSUES.md`, `SESSION.md`, fichier domaine concerné | Garder dette à jour |
 | Documentation pure | `SESSION.md`, fichier documentaire concerné, `CHECKLIST_MERGE.md` si règle merge / process impactée | Garder trace claire |
 | Consolidation Markdown future | `GOVERNANCE.md`, `SESSION.md`, `CLAUDE.md`, `CHECKLIST_MERGE.md`, `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`, fichiers déplacés / stubs | Éviter sources canoniques cassées, suivre le plan officiel |
@@ -41,7 +41,7 @@ Si un fichier source attendu pour le type de PR **n'est pas mis à jour**, la PR
 
 Exemples acceptables :
 
-- `TRADING_LOGIC.md vérifié : aucun changement requis car la PR ne modifie pas le scoring.`
+- `docs/quant/TRADING_LOGIC.md vérifié : aucun changement requis car la PR ne modifie pas le scoring.`
 - `docs/monitoring/PROVIDERS_MATRIX.md non modifié : aucun provider / TTL / fallback touché.`
 - `docs/quant/SETUPS_REGISTRY.md non modifié : la PR ne touche aucun setup, juste la documentation de gouvernance.`
 

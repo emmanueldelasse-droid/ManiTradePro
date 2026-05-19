@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/migrate-docs-monitoring` (en cours — migration `docs/monitoring/` : `PROVIDERS_MATRIX.md` + `KNOWN_ISSUES.md` racine → `docs/monitoring/`).
-- **Dernier merge connu** : PR #228 `docs(quant): migrate registries` (commit `476ef04` sur `main`).
+- **Branche / PR active** : `claude/split-trading-logic` (en cours — split documentaire de `TRADING_LOGIC.md` racine entre `docs/quant/TRADING_LOGIC.md` et `docs/project/TRADING_ENGINE.md`).
+- **Dernier merge connu** : PR #229 `docs(monitoring): migrate provider and issue docs` (commit `225b3b5` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -35,25 +35,25 @@
 ## Dernière session / dernière PR mergée (bis)
 
 - **Date** : 2026-05-19.
-- **PR** : #228 — `docs(quant): migrate registries`.
-- **Objectif** : deuxième migration physique — `SETUPS_REGISTRY.md` + `ASSET_REGISTRY.md` racine → `docs/quant/`, décision documentaire sur `TRADING_LOGIC.md`.
-- **Résultat** : merge squash sur `main` (commit `476ef04`). Stubs racine en place, liens canoniques mis à jour, références actives `SESSION.md` corrigées après review ChatGPT (NOGO initial). `TRADING_LOGIC.md` reste racine, split reporté.
-- **Fichiers ajoutés / migrés** : `docs/quant/SETUPS_REGISTRY.md` (529), `docs/quant/ASSET_REGISTRY.md` (202).
-- **Fichiers transformés en stubs** : `SETUPS_REGISTRY.md` (racine), `ASSET_REGISTRY.md` (racine).
+- **PR** : #229 — `docs(monitoring): migrate provider and issue docs`.
+- **Objectif** : troisième migration physique — `PROVIDERS_MATRIX.md` + `KNOWN_ISSUES.md` racine → `docs/monitoring/`.
+- **Résultat** : merge squash sur `main` (commit `225b3b5`). Stubs racine en place, socle obligatoire du protocole de reprise pointe désormais vers `docs/monitoring/KNOWN_ISSUES.md`.
+- **Fichiers ajoutés / migrés** : `docs/monitoring/PROVIDERS_MATRIX.md` (125), `docs/monitoring/KNOWN_ISSUES.md` (331).
+- **Fichiers transformés en stubs** : `PROVIDERS_MATRIX.md` (racine), `KNOWN_ISSUES.md` (racine).
 - **Impact runtime / quant** : aucun.
-- **Statut merge** : `GO MERGE` explicite reçu avec résumé simple, merge effectué en squash.
+- **Statut merge** : `GO MERGE` reçu (créateur) après PR validée.
 
 ## PR en cours
 
-- **PR** : migration `docs/monitoring/` (étape 3 du plan) — branche `claude/migrate-docs-monitoring`.
-- **Objectif** : déplacer les sources canoniques `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md` de la racine vers `docs/monitoring/`, en remplaçant les chemins racine par des stubs temporaires de redirection.
-- **Fichiers ajoutés / migrés (déplacement bloc)** : `docs/monitoring/PROVIDERS_MATRIX.md` (125 lignes, contenu intégral de l'ancien `PROVIDERS_MATRIX.md` racine ; l'ancien stub de 15 lignes a été remplacé), `docs/monitoring/KNOWN_ISSUES.md` (331 lignes, contenu intégral de l'ancien `KNOWN_ISSUES.md` racine ; l'ancien stub de 13 lignes a été remplacé).
-- **Fichiers transformés en stubs** : `PROVIDERS_MATRIX.md` (racine, 12 lignes), `KNOWN_ISSUES.md` (racine, 12 lignes).
-- **Fichiers modifiés (liens canoniques)** : `GOVERNANCE.md` (table hybride + exemple + socle obligatoire du protocole de reprise + section spécialisée architecture), `CLAUDE.md` (Documentation permanente + Mémo merge), `CHECKLIST_MERGE.md` (Documentation), `docs/project/DOC_IMPACT_MATRIX.md` (5 lignes : Objectif produit, Front, Provider, Broker, Bug + exemple de justification), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire + ordre des PR + doublons recomputés), `docs/research/DATASET_GOVERNANCE.md` (ref active), `docs/project/PROD_SAFETY_RULES.md`, `docs/monitoring/DATA_QUALITY.md`, `docs/quant/FRICTION_MODEL.md`, `SESSION.md`.
+- **PR** : split documentaire de `TRADING_LOGIC.md` — branche `claude/split-trading-logic`.
+- **Objectif** : séparer le contenu transversal de `TRADING_LOGIC.md` racine en deux sources canoniques spécialisées (quant vs engine), sans aucune modification de fond métier.
+- **Fichiers créés** : `docs/quant/TRADING_LOGIC.md` (logique quant : scoring `safetyScore` / `decisionScore` / `strategicAnalysis` / `exploitabilityScore` / `dossierScore` / `officialScore`, setups détectés, recherche quant externe, modulateurs régime / news / AI, apprentissage adaptatif, non encore fait quant, limites de fiabilité quant) ; `docs/project/TRADING_ENGINE.md` (logique engine : `liveContext`, `snapshotId` + timestamps analytiques, `quoteQuality`, règles d'ouverture cron + filtres + filtre 17 safety gate + sizing, règles de fermeture + filtre 0 + ordre de priorité + tracker intra + fallback + time exit + invalidation + manuel, garde-fou devise, configurations bot, non encore fait engine, limites engine, vague B.10 durcissement safety gate).
+- **Fichiers transformés en stubs** : `TRADING_LOGIC.md` (racine, 16 lignes, pointe vers les deux fichiers spécialisés).
+- **Fichiers modifiés (liens canoniques)** : `GOVERNANCE.md` (table hybride + exemple + § *Trading* du protocole de reprise + § *Gouvernance ChatGPT ↔ Claude*), `CLAUDE.md` (Documentation permanente + mémo merge), `CHECKLIST_MERGE.md` (Documentation, scinde la ligne TRADING_LOGIC en 2 lignes quant + engine), `docs/project/DOC_IMPACT_MATRIX.md` (4 lignes : Trading logic, Setup, Risk, Broker + exemple), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire actualisé, ligne split marquée *Migré (split)*, doublons recomputés), `docs/quant/ALLOCATION_RULES.md`, `docs/quant/RISK_ENGINE_RULES.md`, `docs/quant/REGIME_RULES.md` (sources à consolider), `SESSION.md`.
 - **Impact runtime** : aucun.
-- **Impact quant** : aucun changement de fond.
-- **Impact documentation** : `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md` désormais canoniques sous `docs/monitoring/` ; stubs racine conservés. Le socle obligatoire du protocole de reprise de session pointe désormais vers `docs/monitoring/KNOWN_ISSUES.md`.
-- **Non inclus** : split de `TRADING_LOGIC.md` (PR dédiée), migration de `BOT_OBJECTIVE.md` / `PROJECT_RULES.md` / `CHECKLIST_MERGE.md`, suppression des stubs racine.
+- **Impact quant sur le fond** : aucun. Le contenu est conservé verbatim, seul le classement change.
+- **Impact documentation** : `TRADING_LOGIC.md` racine devient stub ; le contenu est désormais réparti entre `docs/quant/TRADING_LOGIC.md` et `docs/project/TRADING_ENGINE.md`.
+- **Non inclus** : migration de `BOT_OBJECTIVE.md` / `PROJECT_RULES.md` / `CHECKLIST_MERGE.md`, suppression des stubs racine, modification du fond métier.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
@@ -77,12 +77,11 @@
 
 ## Prochaines priorités
 
-1. **PR split `TRADING_LOGIC.md`** (gouvernance) : éclatement entre `docs/project/` (partie pipeline / safety / sizing / exécution) et `docs/quant/` (partie scoring / setups / régimes). Nécessite une refonte de fond, à valider séparément par ChatGPT.
-2. **PR décisions / historique** (gouvernance) : première `DECISION-001-*.md` (candidat : fusion GPT_ROLE → GOVERNANCE).
-3. **PR nettoyage final** (gouvernance) : suppression définitive des stubs racine devenus inutiles (6 stubs : ARCHITECTURE, DATA_PIPELINE, SETUPS_REGISTRY, ASSET_REGISTRY, PROVIDERS_MATRIX, KNOWN_ISSUES), décision finale sur `BOT_OBJECTIVE.md` et `GPT_ROLE.md`.
-4. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
-5. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
-6. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+1. **PR décisions / historique** (gouvernance) : première `DECISION-001-*.md` (candidat : fusion GPT_ROLE → GOVERNANCE).
+2. **PR nettoyage final** (gouvernance) : suppression définitive des 7 stubs racine devenus inutiles (`ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`, `TRADING_LOGIC.md`), décision finale sur `BOT_OBJECTIVE.md` et `GPT_ROLE.md`.
+3. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
+4. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
+5. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
 
 ## Fichiers sources à consulter
 
@@ -92,7 +91,8 @@
 - **Règles techniques structurelles** : `PROJECT_RULES.md`.
 - **Architecture code** : `docs/project/ARCHITECTURE.md` (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
 - **Pipeline de données** : `docs/project/DATA_PIPELINE.md` (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
-- **Logique trading / moteur** : `TRADING_LOGIC.md`.
+- **Logique quant / scoring / setups** : `docs/quant/TRADING_LOGIC.md` (la racine `TRADING_LOGIC.md` est un stub de redirection vers les deux fichiers spécialisés).
+- **Moteur trading / exécution / safety / sizing** : `docs/project/TRADING_ENGINE.md`.
 - **Setups quantitatifs** : `docs/quant/SETUPS_REGISTRY.md` (la racine `SETUPS_REGISTRY.md` est un stub temporaire de redirection).
 - **Classification actifs** : `docs/quant/ASSET_REGISTRY.md` (la racine `ASSET_REGISTRY.md` est un stub temporaire de redirection).
 - **Providers** : `docs/monitoring/PROVIDERS_MATRIX.md` (la racine `PROVIDERS_MATRIX.md` est un stub temporaire de redirection).
