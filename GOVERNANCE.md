@@ -5,7 +5,7 @@
 >
 > Ce fichier est **prioritaire** sur tout autre document du repo.
 
-> **Note (2026-05-19) :** depuis la fusion documentaire, `GOVERNANCE.md` remplace `GPT_ROLE.md` comme source canonique pour la gouvernance IA, les rôles ChatGPT / Claude, les validations, les agents, les skills et les règles de merge. `GPT_ROLE.md` est désormais un stub de redirection.
+> **Note (2026-05-19) :** depuis la fusion documentaire, `GOVERNANCE.md` est la source canonique unique pour la gouvernance IA, les rôles ChatGPT / Claude, les validations, les agents, les skills et les règles de merge. L'historique de cette fusion est archivé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md` ; le stub racine `GPT_ROLE.md` a été supprimé lors de la PR de nettoyage final.
 
 ---
 
@@ -38,8 +38,8 @@ Cette lecture est obligatoire :
 Ordre de priorité obligatoire :
 
 1. ce fichier gouvernance ;
-2. `PROJECT_VISION.md` ;
-3. `ARCHITECTURE.md` ;
+2. `BOT_OBJECTIVE.md` (constitution produit, racine) ;
+3. `docs/project/ARCHITECTURE.md` ;
 4. règles sécurité / calibration / risk ;
 5. `SESSION.md` ;
 6. demandes utilisateur session courante.
@@ -193,7 +193,12 @@ Interdictions :
     DECISION-XXX-*.md
 
 Racine :
+    GOVERNANCE.md
     SESSION.md
+    CLAUDE.md
+    BOT_OBJECTIVE.md
+    PROJECT_RULES.md
+    CHECKLIST_MERGE.md
 ```
 
 ---
@@ -366,77 +371,90 @@ Racine :
 
 ## DOCUMENT CANONICAL SOURCES
 
-> Objectif : formaliser explicitement le mode hybride temporaire **racine ↔ `/docs/`**
-> introduit par la PR de setup gouvernance (2026-05-19), pendant l'exécution
-> progressive de la migration physique (plan officiel :
-> `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`).
+> Objectif : lister les **sources canoniques actuelles** de la documentation projet, après l'exécution complète du plan de consolidation Markdown (PR #226 → #232).
+>
+> Historique de la migration : `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md` et `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`.
 
-### Mode hybride en vigueur
+### État final (post-nettoyage)
 
-Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` ont déjà
-été migrés vers `/docs/*`, d'autres sont encore à la racine en attendant
-leur PR de migration dédiée. À tout instant, pour chaque sujet :
+La consolidation Markdown est **terminée**. Tous les stubs racine de redirection créés pendant la transition ont été supprimés. Pour chaque sujet, il existe désormais une **seule source canonique** et un seul chemin.
 
-- une **seule source canonique** fait foi (racine **ou** `/docs/*` selon
-  où en est la migration) ;
-- l'autre chemin, s'il existe, est un **stub lecture seule** (stub
-  pointer côté `/docs/*` avant migration, stub de redirection côté
-  racine après migration) ;
-- toute modification de fond doit être faite **uniquement** sur la
-  source canonique en vigueur ;
-- les stubs ne doivent **jamais** devenir des sources métier.
+Règles permanentes :
 
-La table ci-dessous indique pour chaque fichier où se trouve la source
-canonique actuelle et quel chemin de transition existe encore.
+- Une seule source canonique par sujet.
+- Toute modification de fond doit être faite sur la source canonique listée ci-dessous.
+- Les anciens chemins racine (`/ARCHITECTURE.md`, `/DATA_PIPELINE.md`, `/SETUPS_REGISTRY.md`, `/ASSET_REGISTRY.md`, `/PROVIDERS_MATRIX.md`, `/KNOWN_ISSUES.md`, `/TRADING_LOGIC.md`, `/GPT_ROLE.md`) **n'existent plus**. Toute nouvelle référence doit pointer directement vers le chemin canonique.
+- Toute évolution future de structure documentaire doit suivre la règle « une PR = un objectif » et être documentée dans `docs/decisions/`.
 
-### Exemple
+### Sources canoniques actuelles
 
-- `docs/project/ARCHITECTURE.md` = source canonique (migrée).
-- `/ARCHITECTURE.md` = stub de redirection vers `docs/project/`.
-- `docs/monitoring/PROVIDERS_MATRIX.md` = source canonique (migrée).
-- `/PROVIDERS_MATRIX.md` = stub de redirection vers `docs/monitoring/`.
-- `docs/quant/TRADING_LOGIC.md` et `docs/project/TRADING_ENGINE.md` =
-  sources canoniques (split de l'ancien `/TRADING_LOGIC.md`).
-- `/TRADING_LOGIC.md` = stub de redirection vers les deux fichiers
-  spécialisés.
-- Toute modification doit être faite uniquement sur la source canonique
-  en vigueur.
+**Racine (fichiers transversaux ou opérationnels)** :
 
-### Sources canoniques actuelles et chemins de transition (au 2026-05-19)
+| Fichier | Rôle |
+|---|---|
+| `GOVERNANCE.md` | Gouvernance projet (priorité absolue). |
+| `BOT_OBJECTIVE.md` | Constitution produit, objectif réel, conditions avant argent réel. |
+| `PROJECT_RULES.md` | Règles techniques structurelles non négociables. |
+| `SESSION.md` | Carnet de bord court, état actuel. |
+| `CLAUDE.md` | Manuel opérationnel Claude Code (subordonné à `GOVERNANCE.md`). |
+| `CHECKLIST_MERGE.md` | Checklist obligatoire avant merge. |
 
-| Source canonique actuelle | Chemin de transition (stub) | Statut migration |
-|---|---|---|
-| `docs/project/ARCHITECTURE.md` | `/ARCHITECTURE.md` = stub de redirection | **Migré** |
-| `docs/project/DATA_PIPELINE.md` | `/DATA_PIPELINE.md` = stub de redirection | **Migré** |
-| `docs/quant/SETUPS_REGISTRY.md` | `/SETUPS_REGISTRY.md` = stub de redirection | **Migré** |
-| `docs/quant/ASSET_REGISTRY.md` | `/ASSET_REGISTRY.md` = stub de redirection | **Migré** |
-| `docs/monitoring/PROVIDERS_MATRIX.md` | `/PROVIDERS_MATRIX.md` = stub de redirection | **Migré** |
-| `docs/monitoring/KNOWN_ISSUES.md` | `/KNOWN_ISSUES.md` = stub de redirection | **Migré** |
-| `/BOT_OBJECTIVE.md` | _(squelette `docs/project/PROJECT_VISION.md`)_ | À arbitrer plus tard |
-| `/SESSION.md` | _(reste à la racine, cf. § `RÔLE DES FICHIERS`)_ | Non migré (intentionnel) |
-| `/CHECKLIST_MERGE.md` | _(squelette `docs/project/MERGE_PROTOCOL.md`)_ | À arbitrer plus tard |
-| `/GPT_ROLE.md` | _stub de redirection vers `GOVERNANCE.md` depuis 2026-05-19_ | Déprécié |
-| `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ | À arbitrer plus tard |
-| `docs/quant/TRADING_LOGIC.md` + `docs/project/TRADING_ENGINE.md` | `/TRADING_LOGIC.md` = stub de redirection vers les deux fichiers spécialisés | **Migré (split)** |
+**`docs/project/`** :
 
-### Règles obligatoires
+| Fichier | Rôle |
+|---|---|
+| `docs/project/ARCHITECTURE.md` | Architecture code après merge (worker, front, storage, pipeline). |
+| `docs/project/DATA_PIPELINE.md` | Flux de données par écran. |
+| `docs/project/TRADING_ENGINE.md` | Logique moteur / exécution / paper trading / safety / sizing. |
+| `docs/project/DOC_IMPACT_MATRIX.md` | Matrice d'impact documentaire. |
+| `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` | Plan officiel (historique de la consolidation). |
+| `docs/project/AI_WORKFLOW.md`, `MERGE_PROTOCOL.md`, `PROJECT_VISION.md`, `PROD_SAFETY_RULES.md`, `CALIBRATION_RULES.md`, `EXPERIMENTAL_FEATURES.md` | Squelettes à enrichir au besoin. |
 
-- Les stubs `/docs/*` ne doivent contenir :
-  - aucune logique métier ;
-  - aucune règle ;
-  - aucune source canonique ;
-  - aucun contenu vivant.
-- Les stubs servent uniquement :
-  - de pointeur vers la source canonique ;
-  - de compatibilité structurelle avec la `STRUCTURE DOSSIERS OBLIGATOIRE` ;
-  - de préparation à la future migration physique.
-- La migration physique sera faite dans une **PR dédiée**, jamais mélangée
-  à un travail de fond ou de feature (règle `Une PR = un objectif`).
-- La consolidation physique des fichiers Markdown doit suivre le plan
-  `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` et être réalisée par PR
-  dédiées, sans mélange avec des changements runtime ou quant.
-- Toute modification métier doit être faite sur la **source canonique
-  uniquement**.
+**`docs/quant/`** :
+
+| Fichier | Rôle |
+|---|---|
+| `docs/quant/TRADING_LOGIC.md` | Logique quant : scoring, setups, régimes, modulateurs, apprentissage. |
+| `docs/quant/SETUPS_REGISTRY.md` | Registre officiel des setups validés / testés / abandonnés. |
+| `docs/quant/ASSET_REGISTRY.md` | Classification provisoire des actifs. |
+| `docs/quant/ALLOCATION_RULES.md`, `BACKTEST_RULES.md`, `FRICTION_MODEL.md`, `REGIME_RULES.md`, `RISK_ENGINE_RULES.md`, `WALK_FORWARD_RULES.md` | Squelettes à enrichir au besoin. |
+
+**`docs/monitoring/`** :
+
+| Fichier | Rôle |
+|---|---|
+| `docs/monitoring/PROVIDERS_MATRIX.md` | Routage providers / TTL / fallback / quotas. |
+| `docs/monitoring/KNOWN_ISSUES.md` | Bugs connus, dette technique, limitations. |
+| `docs/monitoring/DATA_QUALITY.md` | Squelette à enrichir au besoin. |
+
+**`docs/research/`** :
+
+| Fichier | Rôle |
+|---|---|
+| `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md` | Gel méthodologique recherche quant. |
+| `docs/research/SETUP_VALIDATION_CHECKLIST.md` | Checklist obligatoire pour tout nouveau setup. |
+| `docs/research/ANTI_LOOKAHEAD_RULES.md` | Règles anti-lookahead. |
+| `docs/research/DATASET_GOVERNANCE.md` | Gouvernance des datasets offline. |
+| `docs/research/PEAD_DATA_REQUIREMENTS.md`, `POST_EARNINGS_DRIFT_FOUNDATION.md` | Notes spécifiques PEAD. |
+
+**`docs/setups/`** :
+
+| Fichier | Rôle |
+|---|---|
+| `docs/setups/SECTOR_RELATIVE_STRENGTH.md` | Fiche officielle du setup VALIDATED_RESEARCH_CORE. |
+
+**`docs/decisions/`** :
+
+| Fichier | Rôle |
+|---|---|
+| `docs/decisions/README.md` | Format obligatoire et règles d'usage. |
+| `docs/decisions/DECISION-NNN-*.md` | Décisions structurantes historiques (immutables). |
+
+### Arbitrages assumés
+
+- `BOT_OBJECTIVE.md` reste à la racine : `docs/project/PROJECT_VISION.md` est encore un squelette vide. Une migration future éventuelle sera faite dans une PR dédiée avec création de `DECISION-002` si besoin.
+- `PROJECT_RULES.md` et `CHECKLIST_MERGE.md` restent à la racine pour la même raison (squelettes / sources fonctionnelles équivalentes pas encore consolidées). Migration future éventuelle sous le même protocole.
+- `GPT_ROLE.md` a été **supprimé** : aucune référence active ne dépendait du stub, l'historique est conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`.
 
 ---
 
@@ -916,7 +934,7 @@ Lire uniquement la source canonique :
 
 - `GOVERNANCE.md`
 
-`GPT_ROLE.md` n'est plus une source active. Il reste un stub de redirection.
+L'historique de la fusion `GPT_ROLE.md` → `GOVERNANCE.md` est conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. Le stub racine a été supprimé après la consolidation.
 
 ### Cas multi-domaines
 

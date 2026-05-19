@@ -285,7 +285,7 @@ Le projet ne pourra envisager du trading réel (argent réel chez un broker) **q
 7. **Faux signaux maîtrisés** : le taux de trades `suspect` ou `invalid` doit rester sous un seuil acceptable (à définir, par exemple < 5 %).
 8. **Données validées en continu** : `quoteQualityEngine` en place, alerte si écart inter-providers > seuil.
 9. **Moteur stable** : pas de changement de scoring non maîtrisé. Toute évolution doit être validée par backtest et A/B.
-10. **Régressions sous contrôle** : `KNOWN_ISSUES.md` à jour, aucun bug critique non résolu, processus de doc respecté à chaque merge.
+10. **Régressions sous contrôle** : `docs/monitoring/KNOWN_ISSUES.md` à jour, aucun bug critique non résolu, processus de doc respecté à chaque merge.
 11. **Slippage modélisé** : pas de prix d'exécution parfait. Une estimation réaliste du slippage doit être intégrée avant l'argent réel.
 12. **Adapter broker prêt** : intégration testée avec un compte démo du broker choisi avant le moindre euro réel.
 
@@ -317,7 +317,7 @@ Les éléments suivants sont planifiés mais non livrés. Tant qu'ils manquent, 
 - **Slippage modélisé** — pas commencé.
 - **Adapter broker réel** — pas commencé.
 
-Détail complet dans `KNOWN_ISSUES.md` et `SESSION.md`.
+Détail complet dans `docs/monitoring/KNOWN_ISSUES.md` et `SESSION.md`.
 
 ---
 
@@ -325,8 +325,8 @@ Détail complet dans `KNOWN_ISSUES.md` et `SESSION.md`.
 
 Ce document est une constitution produit, pas une référence technique. Il décrit **ce que le projet doit être**, pas **comment il l'est aujourd'hui**. Pour l'état réel du code :
 
-- `ARCHITECTURE.md` pour le code.
-- `DATA_PIPELINE.md` pour les flux.
-- `TRADING_LOGIC.md` pour le moteur.
-- `PROVIDERS_MATRIX.md` pour les sources.
-- `KNOWN_ISSUES.md` pour les écarts entre l'idéal (ce document) et le réel.
+- `docs/project/ARCHITECTURE.md` pour le code.
+- `docs/project/DATA_PIPELINE.md` pour les flux.
+- `docs/quant/TRADING_LOGIC.md` pour la logique quant (scoring / setups / régimes) et `docs/project/TRADING_ENGINE.md` pour la logique moteur (exécution / sizing / safety).
+- `docs/monitoring/PROVIDERS_MATRIX.md` pour les sources.
+- `docs/monitoring/KNOWN_ISSUES.md` pour les écarts entre l'idéal (ce document) et le réel.

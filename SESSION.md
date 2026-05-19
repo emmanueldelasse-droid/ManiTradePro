@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/add-decision-records` (en cours — création du dossier `docs/decisions/` et première décision officielle `DECISION-001`).
-- **Dernier merge connu** : PR #230 `docs(trading): split trading logic documentation` (commit `3e674da` sur `main`).
+- **Branche / PR active** : `claude/final-doc-stub-cleanup` (en cours — nettoyage final : suppression des 7 stubs racine + `GPT_ROLE.md`, arbitrages `BOT_OBJECTIVE.md` reste racine).
+- **Dernier merge connu** : PR #231 `docs(decisions): add first project decision record` (commit `a4249d8` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -35,29 +35,29 @@
 ## Dernière session / dernière PR mergée (bis)
 
 - **Date** : 2026-05-19.
-- **PR** : #230 — `docs(trading): split trading logic documentation`.
-- **Objectif** : split documentaire de `TRADING_LOGIC.md` racine en deux sources canoniques spécialisées (quant vs engine).
-- **Résultat** : merge squash sur `main` (commit `3e674da`). `docs/quant/TRADING_LOGIC.md` (262) et `docs/project/TRADING_ENGINE.md` (307) créés, stub racine 16 lignes en place, comptage corrigé après review ChatGPT.
-- **Fichiers ajoutés** : `docs/quant/TRADING_LOGIC.md`, `docs/project/TRADING_ENGINE.md`.
-- **Fichiers transformés en stubs** : `TRADING_LOGIC.md` (racine).
-- **Impact runtime / quant** : aucun changement de fond.
-- **Statut merge** : `GO MERGE` reçu (créateur) après correction.
+- **PR** : #231 — `docs(decisions): add first project decision record`.
+- **Objectif** : système officiel d'historique des décisions structurantes + première décision archivée (`DECISION-001`).
+- **Résultat** : merge squash sur `main` (commit `a4249d8`). `docs/decisions/README.md` réécrit, `DECISION-001` archivée (statut ACTIVE), GOVERNANCE.md § Décisions historiques en place.
+- **Fichiers ajoutés** : `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`.
+- **Impact runtime / quant** : aucun.
+- **Statut merge** : `GO MERGE` reçu (créateur).
 
 ## PR en cours
 
-- **PR** : création du dossier `docs/decisions/` et première décision historique — branche `claude/add-decision-records`.
-- **Objectif** : historiser les décisions structurantes du projet dans un dossier dédié et archiver la première décision officielle (`DECISION-001`, fusion `GPT_ROLE.md` → `GOVERNANCE.md`).
-- **Fichiers créés / réécrits** : `docs/decisions/README.md` (réécrit en format court conforme au plan : objectif, format recommandé, statuts, règle de non-réécriture, index des décisions), `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md` (90 lignes : statut ACTIVE / date / contexte / décision / raisons / conséquences / fichiers concernés / PR liées #220 #221 #223 #225 / état actuel / suite éventuelle).
-- **Fichiers modifiés** : `GOVERNANCE.md` (nouvelle section *Décisions historiques* avec ordre de précédence et règles), `CLAUDE.md` (section *Décisions historiques* — pointeur vers `docs/decisions/`, rappel que ce ne sont pas des règles actives), `CHECKLIST_MERGE.md` (ligne ajoutée : `docs/decisions/` créé ou mis à jour si la PR acte une décision structurante), `docs/project/DOC_IMPACT_MATRIX.md` (nouvelle ligne *Décision structurante / historique*), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (étape 4 marquée partiellement réalisée, inventaire actualisé), `SESSION.md`.
+- **PR** : nettoyage final des stubs racine et arbitrages — branche `claude/final-doc-stub-cleanup`.
+- **Objectif** : terminer la consolidation Markdown en supprimant les 7 stubs racine de redirection, arbitrer le sort de `BOT_OBJECTIVE.md` et de `GPT_ROLE.md`.
+- **Fichiers supprimés** : `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`, `TRADING_LOGIC.md`, `GPT_ROLE.md`.
+- **Arbitrages** : `BOT_OBJECTIVE.md` reste à la racine (squelette `docs/project/PROJECT_VISION.md` vide, migration future sous PR dédiée si besoin) ; `GPT_ROLE.md` supprimé (aucune référence active dépendante ; historique préservé dans `DECISION-001` + note datée 2026-05-19).
+- **Fichiers modifiés** : `GOVERNANCE.md` (header note GPT_ROLE, ordre de priorité, structure dossiers racine enrichie, § *Document canonical sources* réécrit en "État final post-nettoyage" avec 5 tables par dossier, phrase finale workflow IA), `CLAUDE.md` (retrait des annotations "stub temporaire de redirection"), `PROJECT_RULES.md` (5 lignes : KNOWN_ISSUES, ARCHITECTURE/DATA_PIPELINE/TRADING_LOGIC/TRADING_ENGINE/PROVIDERS_MATRIX, SETUPS_REGISTRY ×2, ASSET_REGISTRY), `BOT_OBJECTIVE.md` (6 lignes : KNOWN_ISSUES ×3, ARCHITECTURE, DATA_PIPELINE, TRADING_LOGIC scindée, PROVIDERS_MATRIX), `docs/project/DOC_IMPACT_MATRIX.md` (ligne "Évolution future structure" reformulée), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire actualisé avec lignes ~~strikethrough~~ pour stubs supprimés, étape 5 marquée réalisée), `docs/decisions/DECISION-001-...` (note datée § État actuel + § Suite éventuelle), `SESSION.md`.
 - **Impact runtime** : aucun.
 - **Impact quant** : aucun.
-- **Impact documentation** : système d'historique des décisions formalisé ; règle « une décision historique ne se réécrit pas » officialisée ; ordre de précédence `GOVERNANCE > spécialisés > SESSION > decisions` documenté.
-- **Non inclus** : suppression des stubs racine, suppression de `GPT_ROLE.md`, migration de `BOT_OBJECTIVE.md` / `PROJECT_RULES.md` / `CHECKLIST_MERGE.md`.
+- **Impact documentation** : consolidation Markdown **terminée**. Racine réduite à 6 sources canoniques (`GOVERNANCE`, `BOT_OBJECTIVE`, `PROJECT_RULES`, `SESSION`, `CLAUDE`, `CHECKLIST_MERGE`). Tous les anciens chemins racine de transition supprimés. `GPT_ROLE.md` supprimé conformément à `DECISION-001` § *Suite éventuelle*.
+- **Non inclus** : migration de `BOT_OBJECTIVE.md` / `PROJECT_RULES.md` / `CHECKLIST_MERGE.md` (squelettes équivalents pas prêts), modification du fond métier, modification runtime, modification quant.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
 
-- **Gouvernance** : `GOVERNANCE.md` = source canonique unique (IA, projet, validation, merge, agents/skills, gouvernance quant). `GPT_ROLE.md` = stub de redirection. `CLAUDE.md` = manuel opérationnel Claude Code.
+- **Gouvernance** : `GOVERNANCE.md` = source canonique unique (IA, projet, validation, merge, agents/skills, gouvernance quant). `GPT_ROLE.md` a été supprimé après période de transition ; l'historique de sa fusion dans `GOVERNANCE.md` est conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. `CLAUDE.md` = manuel opérationnel Claude Code.
 - **Provider principal** : EODHD (daily / swing). Détails et fallbacks dans `docs/monitoring/PROVIDERS_MATRIX.md`.
 - **Capital réel** : interdit tant que les conditions de `BOT_OBJECTIVE.md` § *Conditions avant passage en bot réel* ne sont pas remplies (walk-forward, frictions, sizing, kill switch, paper trading prolongé, etc.).
 - **Research Framework Freeze v1** : actif. Toute PR de recherche doit s'y conformer ou marquer explicitement `⚠ DÉVIATION FRAMEWORK FREEZE v1` + justification.
@@ -76,10 +76,11 @@
 
 ## Prochaines priorités
 
-1. **PR nettoyage final** (gouvernance) : suppression définitive des 7 stubs racine devenus inutiles (`ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`, `TRADING_LOGIC.md`), arbitrage final sur `BOT_OBJECTIVE.md` et `GPT_ROLE.md`.
-2. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
-3. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
-4. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+1. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
+2. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
+3. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+4. **Optionnel** : modernisation du script `scripts/check-doc-impact.mjs` pour retirer les noms racine obsolètes de son matcher (faux positifs identifiés depuis PR #228).
+5. **Optionnel** : archivage des outputs `tools/backtests/output/*.md` (hors gouvernance documentaire).
 
 ## Fichiers sources à consulter
 
@@ -87,14 +88,14 @@
 - **Manuel opérationnel Claude Code** : `CLAUDE.md`.
 - **Objectif produit / constitution** : `BOT_OBJECTIVE.md`.
 - **Règles techniques structurelles** : `PROJECT_RULES.md`.
-- **Architecture code** : `docs/project/ARCHITECTURE.md` (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
-- **Pipeline de données** : `docs/project/DATA_PIPELINE.md` (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
-- **Logique quant / scoring / setups** : `docs/quant/TRADING_LOGIC.md` (la racine `TRADING_LOGIC.md` est un stub de redirection vers les deux fichiers spécialisés).
+- **Architecture code** : `docs/project/ARCHITECTURE.md`.
+- **Pipeline de données** : `docs/project/DATA_PIPELINE.md`.
+- **Logique quant / scoring / setups** : `docs/quant/TRADING_LOGIC.md`.
 - **Moteur trading / exécution / safety / sizing** : `docs/project/TRADING_ENGINE.md`.
-- **Setups quantitatifs** : `docs/quant/SETUPS_REGISTRY.md` (la racine `SETUPS_REGISTRY.md` est un stub temporaire de redirection).
-- **Classification actifs** : `docs/quant/ASSET_REGISTRY.md` (la racine `ASSET_REGISTRY.md` est un stub temporaire de redirection).
-- **Providers** : `docs/monitoring/PROVIDERS_MATRIX.md` (la racine `PROVIDERS_MATRIX.md` est un stub temporaire de redirection).
-- **Bugs / dette** : `docs/monitoring/KNOWN_ISSUES.md` (la racine `KNOWN_ISSUES.md` est un stub temporaire de redirection).
+- **Setups quantitatifs** : `docs/quant/SETUPS_REGISTRY.md`.
+- **Classification actifs** : `docs/quant/ASSET_REGISTRY.md`.
+- **Providers** : `docs/monitoring/PROVIDERS_MATRIX.md`.
+- **Bugs / dette** : `docs/monitoring/KNOWN_ISSUES.md`.
 - **Checklist merge** : `CHECKLIST_MERGE.md`.
 - **Matrice d'impact documentaire** : `docs/project/DOC_IMPACT_MATRIX.md` (aide anti-oubli : `npm run check:doc-impact`).
 - **Plan de consolidation Markdown** : `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`.
@@ -103,10 +104,10 @@
 
 ## Non encore fait
 
-- Migration physique des fichiers Markdown (racine → `/docs/`) : à exécuter en plusieurs PR successives selon `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`.
+- Migration physique des fichiers Markdown (racine → `/docs/`) : **terminée**. Consolidation Markdown finalisée par la PR de nettoyage final (`claude/final-doc-stub-cleanup`).
 - Sourcing dataset PEAD : décision politique en attente.
 - Walk-forward conditionnel régime sur RS Rotation simple : non lancé.
-- Migration physique racine → `/docs/` (mode hybride en vigueur, cf. `GOVERNANCE.md` § *Document canonical sources*).
+- Migration physique racine → `/docs/` : terminée pour les 7 fichiers concernés ; les arbitrages restants (`BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `CHECKLIST_MERGE.md`) restent intentionnellement à la racine (cf. `GOVERNANCE.md` § *Arbitrages assumés*).
 - Aucun setup activé en paper trading automatique sans supervision humaine.
 - Aucune connexion broker réel (pas de passage en argent réel).
 

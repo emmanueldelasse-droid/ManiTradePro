@@ -18,7 +18,7 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 
 ### Risques actuels
 
-- **Doublons potentiels** : après les migrations `docs/project/` (PR #227), `docs/quant/` (PR #228), `docs/monitoring/` (PR #229) et le split `TRADING_LOGIC.md` (PR en cours `claude/split-trading-logic`), il reste 6 sources canoniques racine vivantes. Aucune n'a de pendant `/docs/*` au même nom. 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). 7 stubs racine de redirection sont en place : `/ARCHITECTURE.md`, `/DATA_PIPELINE.md`, `/SETUPS_REGISTRY.md`, `/ASSET_REGISTRY.md`, `/PROVIDERS_MATRIX.md`, `/KNOWN_ISSUES.md`, `/TRADING_LOGIC.md`. Le contenu de `TRADING_LOGIC.md` a été réparti entre `docs/quant/TRADING_LOGIC.md` (scoring / setups / régimes / modulateurs / apprentissage) et `docs/project/TRADING_ENGINE.md` (pipeline / safety gate / sizing / règles ouverture / fermeture / garde-fou devise / paper trading).
+- **Doublons potentiels** : après les migrations `docs/project/` (PR #227), `docs/quant/` (PR #228), `docs/monitoring/` (PR #229), le split `TRADING_LOGIC.md` (PR #230), la création de `docs/decisions/` (PR #231) et le **nettoyage final** (PR en cours `claude/final-doc-stub-cleanup`), il reste 6 sources canoniques racine vivantes : `GOVERNANCE.md`, `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `SESSION.md`, `CLAUDE.md`, `CHECKLIST_MERGE.md`. Aucun stub de transition ne subsiste à la racine. `GPT_ROLE.md` a été supprimé (historique conservé dans `docs/decisions/DECISION-001`). Le contenu de l'ancien `TRADING_LOGIC.md` est canonique sous `docs/quant/TRADING_LOGIC.md` (scoring / setups / régimes / modulateurs / apprentissage) et `docs/project/TRADING_ENGINE.md` (pipeline / safety gate / sizing / règles ouverture / fermeture / garde-fou devise / paper trading).
 - **Confusion possible** : un contributeur peut écrire dans un squelette `/docs/*` au lieu de la source canonique racine.
 - **Lecture excessive** : la matrice d'impact documentaire pointe à la fois vers racine et `/docs/`, et le protocole de reprise de session liste explicitement les sources racine.
 - **Fichiers semi-actifs** : plusieurs squelettes `/docs/project/` et `/docs/quant/` contiennent des rôles + métadonnées sans contenu métier réel, ce qui peut donner une fausse impression de couverture documentaire.
@@ -36,15 +36,15 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `SESSION.md` | 127 | Carnet de bord | Canonique vivant | Garder à la racine (reste à la racine selon GOVERNANCE) |
 | `CLAUDE.md` | 183 | Manuel opérationnel Claude | Canonique | Garder à la racine (lecture quotidienne Claude Code) |
 | `CHECKLIST_MERGE.md` | 182 | Checklist merge | Canonique | À consolider plus tard vers `docs/project/MERGE_PROTOCOL.md` |
-| `ARCHITECTURE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/ARCHITECTURE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `DATA_PIPELINE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/DATA_PIPELINE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `TRADING_LOGIC.md` | 13 | Stub temporaire de redirection | Stub | **Splitté** entre `docs/quant/TRADING_LOGIC.md` (scoring / setups / régimes / modulateurs / apprentissage) et `docs/project/TRADING_ENGINE.md` (pipeline / safety / sizing / ouverture / fermeture / garde-fou devise). Stub racine à supprimer lors de la PR de nettoyage final. |
+| ~~`ARCHITECTURE.md`~~ | — | **Stub supprimé** (PR nettoyage final) | — | Source canonique vit dans `docs/project/ARCHITECTURE.md`. |
+| ~~`DATA_PIPELINE.md`~~ | — | **Stub supprimé** (PR nettoyage final) | — | Source canonique vit dans `docs/project/DATA_PIPELINE.md`. |
+| ~~`TRADING_LOGIC.md`~~ | — | **Stub supprimé** (PR nettoyage final) | — | Contenu splitté entre `docs/quant/TRADING_LOGIC.md` et `docs/project/TRADING_ENGINE.md`. |
 | `docs/quant/TRADING_LOGIC.md` | 262 | **Canonique** *(extrait du split)* | Canonique | Garder, source officielle de la logique quant |
 | `docs/project/TRADING_ENGINE.md` | 307 | **Canonique** *(extrait du split)* | Canonique | Garder, source officielle de la logique moteur / exécution |
-| `SETUPS_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/SETUPS_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `ASSET_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/ASSET_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `PROVIDERS_MATRIX.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/monitoring/PROVIDERS_MATRIX.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `KNOWN_ISSUES.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/monitoring/KNOWN_ISSUES.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
+| ~~`SETUPS_REGISTRY.md`~~ | — | **Stub supprimé** (PR nettoyage final) | — | Source canonique vit dans `docs/quant/SETUPS_REGISTRY.md`. |
+| ~~`ASSET_REGISTRY.md`~~ | — | **Stub supprimé** (PR nettoyage final) | — | Source canonique vit dans `docs/quant/ASSET_REGISTRY.md`. |
+| ~~`PROVIDERS_MATRIX.md`~~ | — | **Stub supprimé** (PR nettoyage final) | — | Source canonique vit dans `docs/monitoring/PROVIDERS_MATRIX.md`. |
+| ~~`KNOWN_ISSUES.md`~~ | — | **Stub supprimé** (PR nettoyage final) | — | Source canonique vit dans `docs/monitoring/KNOWN_ISSUES.md`. |
 
 ### Stubs et squelettes `/docs/*`
 
@@ -94,7 +94,7 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 
 | Fichier | Lignes | Statut | Action |
 |---|---|---|---|
-| `GPT_ROLE.md` | 12 | Stub de redirection (PR #220) | Garder tel quel pour compatibilité externe ; supprimer plus tard si plus aucun lien externe |
+| ~~`GPT_ROLE.md`~~ | — | **Stub supprimé** (PR nettoyage final, conformément à `DECISION-001` § *Suite éventuelle*) | — | Historique conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. |
 
 ### Outputs de backtest (historiques)
 
@@ -194,15 +194,16 @@ Racine du repo (5 fichiers) :
    - Déplace `KNOWN_ISSUES.md` → `docs/monitoring/KNOWN_ISSUES.md`. **Fait** (déplacement bloc 331 lignes).
    - Stubs racine pendant la transition. **Fait**.
 
-4. **PR décisions / historique** *(partiellement réalisée — PR en cours `claude/add-decision-records`)*
-   - `docs/decisions/README.md` réécrit en format court conforme au plan (statut / date / contexte / décision / raisons / conséquences / fichiers / PR / état / suite). **Fait**.
-   - Première décision archivée : `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md` (fusion `GPT_ROLE.md` → `GOVERNANCE.md`, statut `ACTIVE`). **Fait**.
-   - `GOVERNANCE.md` § *Décisions historiques* ajouté : ordre de précédence, règles, format obligatoire dans `docs/decisions/README.md`. **Fait**.
+4. **PR décisions / historique** *(réalisée — PR #231)*
+   - `docs/decisions/README.md` réécrit en format court conforme au plan. **Fait**.
+   - Première décision archivée : `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. **Fait**.
+   - `GOVERNANCE.md` § *Décisions historiques* ajouté. **Fait**.
 
-5. **PR nettoyage final**
-   - Suppression définitive des stubs racine devenus inutiles, après plusieurs sprints sans incident.
-   - Décision finale sur `BOT_OBJECTIVE.md` (rester à la racine ou devenir `docs/project/PROJECT_VISION.md`).
-   - Décision finale sur `GPT_ROLE.md` (suppression ou maintien comme garde-fou externe).
+5. **PR nettoyage final** *(réalisée — PR en cours `claude/final-doc-stub-cleanup`)*
+   - Suppression définitive des 7 stubs racine de redirection (`ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`, `TRADING_LOGIC.md`). **Fait**.
+   - Décision finale sur `BOT_OBJECTIVE.md` : **reste à la racine** (`docs/project/PROJECT_VISION.md` est un squelette vide ; migration future sous PR dédiée si nécessaire). **Fait**.
+   - Décision finale sur `GPT_ROLE.md` : **supprimé** (aucune référence active dépendante, historique conservé dans `DECISION-001`). **Fait**.
+   - Mise à jour des références actives résiduelles dans `PROJECT_RULES.md`, `BOT_OBJECTIVE.md`, `GOVERNANCE.md` (table canoniques, header note GPT_ROLE, ordre de priorité, structure dossiers racine, phrase finale workflow IA), `CLAUDE.md` (retrait des annotations "stub temporaire de redirection"), `docs/decisions/DECISION-001` (note datée de suppression du stub). **Fait**.
 
 6. **PR archivage backtests** (optionnelle, hors gouvernance documentaire stricte)
    - Range `tools/backtests/output/*.md` par dossier daté ou par run, sans toucher au contenu.
