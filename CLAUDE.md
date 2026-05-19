@@ -37,6 +37,12 @@ Cette matrice indique quels fichiers mémoire doivent être mis à jour ou expli
 
 Aide anti-oubli (non bloquante) : `npm run check:doc-impact`. Le script ne remplace ni la matrice, ni `CHECKLIST_MERGE.md`, ni la revue ChatGPT.
 
+## Décisions historiques
+
+Les décisions structurantes du projet sont archivées dans `docs/decisions/` (format défini dans `docs/decisions/README.md`).
+
+Claude Code **ne doit pas** traiter ces fichiers comme règles actives si `GOVERNANCE.md` ou un fichier spécialisé dit autre chose : ils servent à comprendre le contexte (« pourquoi cette décision a été prise »), pas à piloter le comportement courant. Toute PR qui acte une décision structurante doit créer ou mettre à jour une `DECISION-NNN-*.md`.
+
 ## Documentation permanente (IMPÉRATIVE — mai 2026)
 
 À chaque session, **lire AVANT toute modif**. L'ordre de priorité canonique est défini dans `GOVERNANCE.md` § *Ordre de priorité* ; la liste ci-dessous précise les fichiers opérationnels utiles dans ce repo :
