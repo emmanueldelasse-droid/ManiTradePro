@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/doc-impact-matrix` (en cours — matrice d'impact documentaire + contrôle anti-oubli dev-only).
-- **Dernier merge connu** : PR #223 `docs(governance): add official session start protocol` (commit `25a9582` sur `main`).
+- **Branche / PR active** : `claude/go-merge-summary-rule` (en cours — règle « résumé simple obligatoire avec chaque `GO MERGE` »).
+- **Dernier merge connu** : PR #224 `docs(governance): add documentation impact matrix` (commit `2decfdb` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -35,24 +35,24 @@
 ## Dernière session / dernière PR mergée (bis)
 
 - **Date** : 2026-05-19.
-- **PR** : #223 — `docs(governance): add official session start protocol`.
-- **Objectif** : ajouter le protocole officiel de reprise de session et la règle de format ChatGPT ↔ Claude dans `GOVERNANCE.md`.
-- **Résultat** : merge squash sur `main` (commit `25a9582`). Socle obligatoire à 5 fichiers, fichiers spécialisés par sujet, prompt unique / réponse en bloc unique.
-- **Fichiers modifiés** : `GOVERNANCE.md`, `CLAUDE.md`, `SESSION.md`, `CHECKLIST_MERGE.md`.
+- **PR** : #224 — `docs(governance): add documentation impact matrix`.
+- **Objectif** : matrice d'impact documentaire officielle + contrôle anti-oubli dev-only.
+- **Résultat** : merge squash sur `main` (commit `2decfdb`). 16 lignes de matrice, section `## Documentation impact` obligatoire dans le body de PR, script `npm run check:doc-impact` (exit 0, non bloquant, non CI).
+- **Fichiers ajoutés** : `docs/project/DOC_IMPACT_MATRIX.md`, `scripts/check-doc-impact.mjs`.
+- **Fichiers modifiés** : `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `CLAUDE.md`, `package.json`, `SESSION.md`.
 - **Impact runtime / quant** : aucun.
 - **Statut merge** : `GO MERGE` explicite reçu, merge effectué en squash.
 
 ## PR en cours
 
-- **PR** : matrice d'impact documentaire + contrôle anti-oubli — branche `claude/doc-impact-matrix`.
-- **Objectif** : éviter les oublis de mise à jour des fichiers mémoire en formalisant une matrice « si tu modifies X, mets aussi à jour Y », et fournir un script dev-only d'aide.
-- **Fichiers ajoutés** : `docs/project/DOC_IMPACT_MATRIX.md` (matrice officielle), `scripts/check-doc-impact.mjs` (aide dev-only).
-- **Fichiers modifiés** : `GOVERNANCE.md` (référence officielle + critères de refus), `CHECKLIST_MERGE.md` (section dédiée + section `Documentation impact` obligatoire dans le body), `CLAUDE.md` (renvoi court), `package.json` (commande `check:doc-impact`), `SESSION.md`.
-- **Impact runtime** : aucun (script dev-only, sans appel réseau, sans modification de fichier, exit code 0).
+- **PR** : règle « résumé simple obligatoire avec chaque `GO MERGE` » — branche `claude/go-merge-summary-rule`.
+- **Objectif** : exiger qu'à chaque `GO MERGE` donné par ChatGPT, un résumé simple soit fourni au créateur (ce qui a été fait / pourquoi validé / fichiers touchés / impact runtime / impact quant / risques restants / prochaine étape). Un `GO MERGE` nu sans résumé est invalide.
+- **Fichiers modifiés** : `GOVERNANCE.md` (nouvelle sous-section dans § *Workflow validation avant merge*), `CHECKLIST_MERGE.md` (ligne ajoutée dans § *Gouvernance IA*), `SESSION.md`.
+- **Impact runtime** : aucun.
 - **Impact quant** : aucun.
-- **Impact documentation** : matrice officielle et critères de refus `GO MERGE` ajoutés.
-- **Non inclus** : consolidation / déplacement / suppression des fichiers Markdown (PR ultérieure).
-- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
+- **Impact documentation** : règle anti-`GO MERGE`-nu officielle.
+- **Non inclus** : consolidation / déplacement / suppression de fichiers Markdown (PR ultérieure).
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT` (avec résumé simple, conformément à la règle ajoutée par cette PR).
 
 ## Décisions actives
 

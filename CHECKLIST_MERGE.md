@@ -146,7 +146,7 @@ Pour toute PR importante (touchant le moteur, les setups, la classification d'ac
 - [ ] Les risques potentiels ont été documentés.
 - [ ] Les diffs ont été fournis.
 - [ ] Validation ChatGPT obtenue.
-- [ ] `GO MERGE` explicite reçu.
+- [ ] `GO MERGE` explicite reçu **accompagné d'un résumé simple** : ce qui vient d'être fait, pourquoi c'est validé, fichiers touchés, impact runtime (oui/non), impact quant (oui/non), risques restants, prochaine étape. Un `GO MERGE` nu, sans résumé, est invalide (cf. `GOVERNANCE.md` § *Résumé simple obligatoire avec chaque GO MERGE*).
 
 Cf. `GOVERNANCE.md` § "Gouvernance ChatGPT ↔ Claude" et § "Workflow validation avant merge" pour le rôle de chaque IA et le workflow complet.
 
