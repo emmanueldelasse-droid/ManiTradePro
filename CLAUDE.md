@@ -45,8 +45,8 @@ Aide anti-oubli (non bloquante) : `npm run check:doc-impact`. Le script ne rempl
 - `BOT_OBJECTIVE.md` — constitution officielle du projet (objectif réel, règles absolues). Source actuelle de `docs/project/PROJECT_VISION.md`.
 - `PROJECT_RULES.md` — règles techniques structurelles (séparation analytique/live, snapshotId, additivité du payload).
 - `SESSION.md` — état du projet.
-- `ARCHITECTURE.md` — structure code après merge.
-- `DATA_PIPELINE.md` — flux de données par écran.
+- `docs/project/ARCHITECTURE.md` — structure code après merge (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
+- `docs/project/DATA_PIPELINE.md` — flux de données par écran (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
 - `TRADING_LOGIC.md` — logique du moteur.
 - `PROVIDERS_MATRIX.md` — routage providers.
 - `KNOWN_ISSUES.md` — bugs et dette.
@@ -57,8 +57,8 @@ Aide anti-oubli (non bloquante) : `npm run check:doc-impact`. Le script ne rempl
 Si une demande touche aux setups, aux backtests, au régime marché ou aux actifs compatibles, lire aussi `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md` avant toute réponse ou modification.
 
 À chaque merge, **parcourir `CHECKLIST_MERGE.md`** et mettre à jour les fichiers concernés AVANT le merge :
-- Modif architecture → `ARCHITECTURE.md`
-- Modif flux donnée → `DATA_PIPELINE.md`
+- Modif architecture → `docs/project/ARCHITECTURE.md`
+- Modif flux donnée → `docs/project/DATA_PIPELINE.md`
 - Modif logique trading → `TRADING_LOGIC.md`
 - Modif provider → `PROVIDERS_MATRIX.md`
 - Découverte bug → `KNOWN_ISSUES.md`

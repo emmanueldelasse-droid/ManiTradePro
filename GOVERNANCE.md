@@ -390,9 +390,10 @@ Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` existent déj�
 
 ### Liste exhaustive des sources canoniques racine (au 2026-05-19)
 
-| Source canonique racine | Stub `/docs/` correspondant |
+| Source canonique | Stub racine de transition (si applicable) |
 |---|---|
-| `/ARCHITECTURE.md` | `docs/project/ARCHITECTURE.md` |
+| `docs/project/ARCHITECTURE.md` *(migré depuis la racine)* | `/ARCHITECTURE.md` = stub temporaire de redirection |
+| `docs/project/DATA_PIPELINE.md` *(migré depuis la racine)* | `/DATA_PIPELINE.md` = stub temporaire de redirection |
 | `/SETUPS_REGISTRY.md` | `docs/quant/SETUPS_REGISTRY.md` |
 | `/ASSET_REGISTRY.md` | `docs/quant/ASSET_REGISTRY.md` |
 | `/PROVIDERS_MATRIX.md` | `docs/monitoring/PROVIDERS_MATRIX.md` |
@@ -402,7 +403,6 @@ Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` existent déj�
 | `/CHECKLIST_MERGE.md` | _(source de la future `docs/project/MERGE_PROTOCOL.md`)_ |
 | `/GPT_ROLE.md` | _stub de redirection vers `GOVERNANCE.md` depuis 2026-05-19 ; n'est plus une source canonique_ |
 | `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ |
-| `/DATA_PIPELINE.md` | _(à consolider dans `docs/project/ARCHITECTURE.md` à terme)_ |
 | `/TRADING_LOGIC.md` | _(à scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/`)_ |
 
 ### Règles obligatoires
@@ -865,8 +865,8 @@ Après le socle obligatoire, lire les fichiers spécialisés correspondant au su
 
 Lire aussi :
 
-- `ARCHITECTURE.md`
-- `DATA_PIPELINE.md`
+- `docs/project/ARCHITECTURE.md`
+- `docs/project/DATA_PIPELINE.md`
 - `PROVIDERS_MATRIX.md`
 
 #### Trading / bot / paper trading / setups / scores / décisions / régimes / actifs

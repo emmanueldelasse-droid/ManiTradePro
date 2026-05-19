@@ -18,7 +18,7 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 
 ### Risques actuels
 
-- **Doublons potentiels** : sur les 13 sources canoniques racine vivantes, 5 ont un pendant `/docs/*` au même nom (`ARCHITECTURE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`), 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`), 6 n'ont pas de pendant `/docs/*` à ce jour (`GOVERNANCE.md`, `PROJECT_RULES.md`, `SESSION.md`, `CLAUDE.md`, `DATA_PIPELINE.md`, `TRADING_LOGIC.md`).
+- **Doublons potentiels** : après la première migration `docs/project/` (PR `claude/migrate-docs-project-architecture`), il reste 11 sources canoniques racine vivantes. 3 ont encore un pendant `/docs/*` au même nom (`SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md` — soit 4 stubs ; à migrer dans les PR suivantes), 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). `ARCHITECTURE.md` et `DATA_PIPELINE.md` sont désormais canoniques sous `docs/project/`, leurs anciens chemins racine sont des stubs temporaires de redirection.
 - **Confusion possible** : un contributeur peut écrire dans un squelette `/docs/*` au lieu de la source canonique racine.
 - **Lecture excessive** : la matrice d'impact documentaire pointe à la fois vers racine et `/docs/`, et le protocole de reprise de session liste explicitement les sources racine.
 - **Fichiers semi-actifs** : plusieurs squelettes `/docs/project/` et `/docs/quant/` contiennent des rôles + métadonnées sans contenu métier réel, ce qui peut donner une fausse impression de couverture documentaire.
@@ -36,8 +36,8 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `SESSION.md` | 127 | Carnet de bord | Canonique vivant | Garder à la racine (reste à la racine selon GOVERNANCE) |
 | `CLAUDE.md` | 183 | Manuel opérationnel Claude | Canonique | Garder à la racine (lecture quotidienne Claude Code) |
 | `CHECKLIST_MERGE.md` | 182 | Checklist merge | Canonique | À consolider plus tard vers `docs/project/MERGE_PROTOCOL.md` |
-| `ARCHITECTURE.md` | 344 | Architecture code | Canonique | À déplacer vers `docs/project/ARCHITECTURE.md` (PR migration project) |
-| `DATA_PIPELINE.md` | 640 | Flux de données | Canonique | À scinder/consolider dans `docs/project/ARCHITECTURE.md` (PR migration project) |
+| `ARCHITECTURE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/ARCHITECTURE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
+| `DATA_PIPELINE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/DATA_PIPELINE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 | `TRADING_LOGIC.md` | 501 | Logique du moteur | Canonique | À scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/` (PR migration quant) |
 | `SETUPS_REGISTRY.md` | 529 | Registre setups | Canonique | À déplacer vers `docs/quant/SETUPS_REGISTRY.md` (PR migration quant) |
 | `ASSET_REGISTRY.md` | 202 | Classification actifs | Canonique | À déplacer vers `docs/quant/ASSET_REGISTRY.md` (PR migration quant) |
@@ -49,7 +49,8 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | Fichier | Lignes | Type | Source canonique | Action recommandée |
 |---|---|---|---|---|
 | `docs/project/PROJECT_VISION.md` | 42 | Squelette | `BOT_OBJECTIVE.md` | À transformer en stub pur ou à fusionner lors de la migration project |
-| `docs/project/ARCHITECTURE.md` | 18 | Stub pointer | `ARCHITECTURE.md` | À remplacer par la source canonique lors de la migration project |
+| `docs/project/ARCHITECTURE.md` | 344 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle de l'architecture |
+| `docs/project/DATA_PIPELINE.md` | 640 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle du pipeline de données |
 | `docs/project/AI_WORKFLOW.md` | 57 | Squelette | (intégré dans `GOVERNANCE.md`) | À transformer en stub ou à supprimer plus tard (cas couvert par GOVERNANCE) |
 | `docs/project/MERGE_PROTOCOL.md` | 83 | Squelette | `CHECKLIST_MERGE.md` | À fusionner lors de la migration project |
 | `docs/project/CALIBRATION_RULES.md` | 67 | Squelette | Aucune source canonique racine | À enrichir plus tard quand un sujet calibration émerge |
@@ -170,12 +171,13 @@ Racine du repo (5 fichiers) :
 
 ## Ordre recommandé des futures PR
 
-1. **PR migration `docs/project/`**
-   - Déplace `ARCHITECTURE.md` → `docs/project/ARCHITECTURE.md`.
-   - Déplace `DATA_PIPELINE.md` → `docs/project/DATA_PIPELINE.md` ou consolide dans `ARCHITECTURE.md`.
-   - Remplace les squelettes par les sources canoniques.
-   - Crée des stubs racine pendant la transition.
-   - Met à jour `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `CLAUDE.md`, `DOC_IMPACT_MATRIX.md`, `SESSION.md`.
+1. **PR migration `docs/project/`** *(partiellement réalisée — PR en cours `claude/migrate-docs-project-architecture`)*
+   - Déplace `ARCHITECTURE.md` → `docs/project/ARCHITECTURE.md`. **Fait.**
+   - Déplace `DATA_PIPELINE.md` → `docs/project/DATA_PIPELINE.md`. **Fait** (déplacement bloc, sans consolidation dans `ARCHITECTURE.md`).
+   - Remplace les squelettes par les sources canoniques. **Fait** pour `ARCHITECTURE.md` ; `DATA_PIPELINE.md` n'avait pas de squelette préexistant.
+   - Crée des stubs racine pendant la transition. **Fait** pour `ARCHITECTURE.md` et `DATA_PIPELINE.md`.
+   - Met à jour `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `CLAUDE.md`, `DOC_IMPACT_MATRIX.md`, `SESSION.md`. **Fait**.
+   - Reste pour cette ligne : aucune autre action prévue. La consolidation `AI_WORKFLOW.md` / `MERGE_PROTOCOL.md` / squelettes prod safety / calibration / experimental est traitée dans une PR séparée si elle devient nécessaire.
 
 2. **PR migration `docs/quant/`**
    - Déplace `SETUPS_REGISTRY.md` → `docs/quant/SETUPS_REGISTRY.md`.
