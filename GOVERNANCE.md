@@ -362,6 +362,99 @@ Racine :
 
 ---
 
+## DOCUMENT CANONICAL SOURCES
+
+> Objectif : formaliser explicitement le mode hybride temporaire **racine ↔ `/docs/`**
+> introduit par la PR de setup gouvernance (2026-05-19), tant que la migration
+> physique n'a pas été exécutée dans une PR dédiée.
+
+### Mode hybride en vigueur
+
+Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` existent déjà
+à la racine du repo. Tant que la migration physique n'a pas eu lieu :
+
+- la **source canonique** reste à la racine ;
+- le fichier dans `/docs/*` est un **stub lecture seule** qui ne fait que
+  pointer vers la source canonique ;
+- toute modification de fond doit être faite **uniquement** sur la source
+  canonique ;
+- les stubs ne doivent **jamais** devenir des sources métier.
+
+### Exemple
+
+- `/SETUPS_REGISTRY.md` = source canonique.
+- `docs/quant/SETUPS_REGISTRY.md` = stub lecture seule.
+- Toute modification doit être faite uniquement sur la source canonique.
+
+### Liste exhaustive des sources canoniques racine (au 2026-05-19)
+
+| Source canonique racine | Stub `/docs/` correspondant |
+|---|---|
+| `/ARCHITECTURE.md` | `docs/project/ARCHITECTURE.md` |
+| `/SETUPS_REGISTRY.md` | `docs/quant/SETUPS_REGISTRY.md` |
+| `/ASSET_REGISTRY.md` | `docs/quant/ASSET_REGISTRY.md` |
+| `/PROVIDERS_MATRIX.md` | `docs/monitoring/PROVIDERS_MATRIX.md` |
+| `/KNOWN_ISSUES.md` | `docs/monitoring/KNOWN_ISSUES.md` |
+| `/BOT_OBJECTIVE.md` | _(source actuelle de `docs/project/PROJECT_VISION.md` à venir)_ |
+| `/SESSION.md` | _(reste à la racine, cf. § `RÔLE DES FICHIERS`)_ |
+| `/CHECKLIST_MERGE.md` | _(source de la future `docs/project/MERGE_PROTOCOL.md`)_ |
+| `/GPT_ROLE.md` | _(source de la future `docs/project/AI_WORKFLOW.md`)_ |
+| `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ |
+| `/DATA_PIPELINE.md` | _(à consolider dans `docs/project/ARCHITECTURE.md` à terme)_ |
+| `/TRADING_LOGIC.md` | _(à scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/`)_ |
+
+### Règles obligatoires
+
+- Les stubs `/docs/*` ne doivent contenir :
+  - aucune logique métier ;
+  - aucune règle ;
+  - aucune source canonique ;
+  - aucun contenu vivant.
+- Les stubs servent uniquement :
+  - de pointeur vers la source canonique ;
+  - de compatibilité structurelle avec la `STRUCTURE DOSSIERS OBLIGATOIRE` ;
+  - de préparation à la future migration physique.
+- La migration physique sera faite dans une **PR dédiée**, jamais mélangée
+  à un travail de fond ou de feature (règle `Une PR = un objectif`).
+- Toute modification métier doit être faite sur la **source canonique
+  uniquement**.
+
+---
+
+## STUB FILE RULES
+
+> Règles obligatoires applicables à tout fichier marqué comme **stub**
+> dans `/docs/*`.
+
+### Un stub ne doit contenir
+
+- aucune logique métier ;
+- aucune règle projet ;
+- aucune calibration ;
+- aucune architecture ;
+- aucune source canonique ;
+- aucune donnée vivante ;
+- aucun état projet.
+
+### Un stub peut contenir uniquement
+
+- rôle du fichier (recopié depuis `RÔLE DES FICHIERS` de ce document) ;
+- avertissement explicite **lecture seule** ;
+- pointeur vers la source canonique correspondante ;
+- note `Migration future : PR dédiée`.
+
+### Règles d'évolution
+
+- Toute modification métier doit être faite **sur la source canonique
+  uniquement**.
+- Toute divergence stub ↔ source canonique doit être considérée comme
+  un **incident documentaire** et tracée dans
+  `docs/monitoring/KNOWN_ISSUES.md`.
+- ChatGPT ne donne pas `GO merge` si une PR ajoute du contenu métier
+  dans un stub.
+
+---
+
 ## RÈGLES SYNCHRONISATION MÉMOIRE
 
 Toute PR doit maintenir la cohérence mémoire.
