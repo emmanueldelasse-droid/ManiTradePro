@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/clean-session-md` (PR 3, en cours — nettoyage `SESSION.md` + règle mise à jour obligatoire).
-- **Dernier merge connu** : PR #221 `docs(claude): clean operational guide after governance merge` (commit `eddda56` sur `main`).
+- **Branche / PR active** : `claude/session-start-protocol` (en cours — ajout du protocole officiel de reprise de session + règle de format ChatGPT ↔ Claude dans `GOVERNANCE.md`).
+- **Dernier merge connu** : PR #222 `docs(session): clean session state and enforce update rule` (commit `c6d6d91` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -23,14 +23,29 @@
 ## Dernière session / dernière PR mergée
 
 - **Date** : 2026-05-19.
-- **PR** : #221 — `docs(claude): clean operational guide after governance merge`.
-- **Objectif** : transformer `CLAUDE.md` en manuel opérationnel Claude Code, subordonné à `GOVERNANCE.md`, sans doublons de gouvernance.
-- **Résultat** : merge squash sur `main` (commit `eddda56`). `CLAUDE.md` allégé, gouvernance IA centralisée dans `GOVERNANCE.md`.
-- **Fichiers modifiés** : `CLAUDE.md`, `SESSION.md`.
+- **PR** : #222 — `docs(session): clean session state and enforce update rule`.
+- **Objectif** : réduire `SESSION.md` à un carnet de bord court, formaliser l'obligation de mise à jour avant chaque `GO MERGE`.
+- **Résultat** : merge squash sur `main` (commit `c6d6d91`). `SESSION.md` réduit à ~100 lignes, règle synchro mémoire renforcée dans `GOVERNANCE.md` et `CHECKLIST_MERGE.md`.
+- **Fichiers modifiés** : `SESSION.md`, `CHECKLIST_MERGE.md`, `GOVERNANCE.md`, `CLAUDE.md`.
 - **Impact runtime** : aucun.
 - **Impact quant** : aucun.
-- **Impact documentation** : `GOVERNANCE.md` reste la source canonique unique, `CLAUDE.md` devient le manuel opérationnel.
+- **Impact documentation** : `SESSION.md` redevient un résumé d'état, pas un journal complet.
 - **Statut merge** : `GO MERGE` explicite reçu, merge effectué en squash.
+
+## PR en cours
+
+- **PR** : protocole officiel de reprise de session — branche `claude/session-start-protocol`.
+- **Objectif** : ajouter dans `GOVERNANCE.md` :
+  - le **socle obligatoire** à lire au début de chaque session (`GOVERNANCE.md`, `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `SESSION.md`, `KNOWN_ISSUES.md`) ;
+  - les **fichiers spécialisés** par sujet (architecture / trading / recherche quant / PR / workflow IA) ;
+  - la règle **prompt unique** ChatGPT → Claude ;
+  - la règle **réponse en bloc unique** Claude → ChatGPT.
+- **Fichiers modifiés** : `GOVERNANCE.md`, `CLAUDE.md` (renvoi court), `SESSION.md`, `CHECKLIST_MERGE.md` (ligne courte).
+- **Impact runtime** : aucun.
+- **Impact quant** : aucun.
+- **Impact documentation** : `GOVERNANCE.md` devient la source unique du protocole de reprise de session ; aucune obligation de lire tous les `.md` à chaque session.
+- **Non inclus** : matrice d'impact documentaire (PR suivante), contrôle anti-oubli (PR suivante), consolidation des fichiers Markdown (PR ultérieure).
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 
 ## Décisions actives
 
@@ -53,10 +68,11 @@
 
 ## Prochaines priorités
 
-1. **PR séparée — protocole officiel de reprise session** (gouvernance) : formaliser la procédure que Claude / ChatGPT doivent suivre au début de chaque session pour reprendre le projet correctement. Non inclus dans la PR 3.
-2. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
-3. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
-4. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+1. **PR séparée — matrice d'impact documentaire + contrôle anti-oubli** (gouvernance) : table « si tu modifies X, alors mets aussi à jour Y » + script ou checklist pour détecter les oublis. Non incluse dans la PR `claude/session-start-protocol`.
+2. **PR séparée — consolidation / rangement des fichiers Markdown** (gouvernance) : alignement racine ↔ `/docs/` selon `STRUCTURE DOSSIERS OBLIGATOIRE`. Après la matrice d'impact.
+3. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
+4. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
+5. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
 
 ## Fichiers sources à consulter
 
@@ -76,7 +92,8 @@
 
 ## Non encore fait
 
-- Protocole officiel de reprise de session (PR séparée à venir).
+- Matrice d'impact documentaire + contrôle anti-oubli (PR séparée à venir).
+- Consolidation / rangement des fichiers Markdown (PR ultérieure).
 - Sourcing dataset PEAD : décision politique en attente.
 - Walk-forward conditionnel régime sur RS Rotation simple : non lancé.
 - Migration physique racine → `/docs/` (mode hybride en vigueur, cf. `GOVERNANCE.md` § *Document canonical sources*).
@@ -88,7 +105,7 @@
 - **Ne jamais inventer l'état du projet.** Toujours partir de ce fichier + des fichiers sources, jamais de la mémoire.
 - **Toujours vérifier les fichiers sources** quand une décision dépend du domaine (setups, actifs, architecture, trading, providers). `SESSION.md` ne fait que résumer ; il n'est pas la source de vérité du domaine.
 - **Ne pas considérer `SESSION.md` comme source unique** : c'est le carnet de bord, pas la mémoire complète. Les règles détaillées vivent dans les fichiers spécialisés.
-- **Lecture obligatoire au début de chaque session** : `GOVERNANCE.md` (priorité 1), puis `BOT_OBJECTIVE.md`, puis ce fichier (`SESSION.md`), puis les fichiers du domaine concerné par la demande utilisateur. Ordre complet dans `GOVERNANCE.md` § *Ordre de priorité* et `CLAUDE.md` § *Documentation permanente*.
+- **Lecture obligatoire au début de chaque session** : appliquer le protocole `GOVERNANCE.md` § *Session start protocol — reprise officielle de session* — socle obligatoire (`GOVERNANCE.md`, `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `SESSION.md`, `KNOWN_ISSUES.md`) puis fichiers spécialisés selon le sujet. Ne jamais partir uniquement de `SESSION.md`.
 - **Mise à jour obligatoire avant chaque PR / merge** : voir section suivante.
 
 ## Règle : mise à jour de `SESSION.md` avant chaque PR / merge

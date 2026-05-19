@@ -782,3 +782,182 @@ Au début de chaque session projet, Claude et ChatGPT doivent implicitement cons
 - la gouvernance projet est obligatoire.
 
 Aucune session ManiTradePro ne doit commencer sans lecture préalable de ce fichier.
+
+---
+
+## SESSION START PROTOCOL — REPRISE OFFICIELLE DE SESSION
+
+> Objectif : reprendre chaque session ManiTradePro dans les meilleures conditions, sans relire inutilement tout le repo, mais sans oublier les fichiers qui changent la décision.
+
+### Principe général
+
+Au début d'une session ManiTradePro, ChatGPT et Claude **ne doivent jamais** partir uniquement de leur mémoire ou uniquement de `SESSION.md`.
+
+La reprise correcte est :
+
+```
+socle obligatoire
++
+fichiers spécialisés selon le sujet traité
+```
+
+La lecture de **tous** les fichiers Markdown du repo **n'est pas** obligatoire à chaque session.
+
+### Socle obligatoire à chaque début de session
+
+Lire obligatoirement, dans cet ordre :
+
+1. `GOVERNANCE.md`
+2. `BOT_OBJECTIVE.md`
+3. `PROJECT_RULES.md`
+4. `SESSION.md`
+5. `KNOWN_ISSUES.md`
+
+Rôle de chaque fichier :
+
+- `GOVERNANCE.md` — règles du jeu, autorité projet, validation, merge, rôles, interdictions.
+- `BOT_OBJECTIVE.md` — objectif réel du projet, ce que ManiTradePro doit devenir, conditions avant argent réel.
+- `PROJECT_RULES.md` — règles techniques structurelles non négociables.
+- `SESSION.md` — état actuel résumé, dernière situation connue, prochaines priorités.
+- `KNOWN_ISSUES.md` — dette, bugs connus, limites et pièges à ne pas oublier.
+
+### Fichiers spécialisés selon le sujet
+
+Après le socle obligatoire, lire les fichiers spécialisés correspondant au sujet.
+
+#### Architecture / worker / front / routes / Supabase / données
+
+Lire aussi :
+
+- `ARCHITECTURE.md`
+- `DATA_PIPELINE.md`
+- `PROVIDERS_MATRIX.md`
+
+#### Trading / bot / paper trading / setups / scores / décisions / régimes / actifs
+
+Lire aussi :
+
+- `TRADING_LOGIC.md`
+- `SETUPS_REGISTRY.md`
+- `ASSET_REGISTRY.md`
+
+#### Recherche quant / backtests / validation de setup / nouveau setup
+
+Lire aussi :
+
+- `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`
+- `docs/research/SETUP_VALIDATION_CHECKLIST.md`
+- `docs/research/ANTI_LOOKAHEAD_RULES.md`
+- `docs/research/DATASET_GOVERNANCE.md`
+- `SETUPS_REGISTRY.md`
+- `ASSET_REGISTRY.md`
+
+#### PR / merge / validation / livraison
+
+Lire aussi :
+
+- `CHECKLIST_MERGE.md`
+- `CLAUDE.md`
+
+#### Workflow ChatGPT ↔ Claude / agents / skills / règles IA
+
+Lire uniquement la source canonique :
+
+- `GOVERNANCE.md`
+
+`GPT_ROLE.md` n'est plus une source active. Il reste un stub de redirection.
+
+### Cas multi-domaines
+
+Si une demande touche plusieurs domaines, lire **tous** les groupes concernés.
+
+Exemples :
+
+- Paper trading automatique = socle obligatoire + trading + architecture + validation PR.
+- Nouveau setup = socle obligatoire + recherche quant + trading + registres.
+- Provider prix live = socle obligatoire + architecture + données + trading.
+- Nettoyage documentation = socle obligatoire + fichiers impactés + checklist merge.
+- Broker réel = socle obligatoire + objectif produit + architecture + trading + risk + checklist merge.
+
+### Règle anti-invention
+
+Si une information est absente, contradictoire ou obsolète :
+
+- ne pas inventer ;
+- signaler l'incertitude ;
+- indiquer quel fichier manque ou quelle contradiction existe ;
+- proposer une correction documentaire si nécessaire.
+
+### Sortie attendue au début d'une session
+
+Après lecture du socle et des fichiers spécialisés nécessaires, Claude ou ChatGPT doit pouvoir résumer en 3 lignes :
+
+```
+Projet :
+État réel :
+Prochaine étape :
+```
+
+Ce résumé doit venir des fichiers lus, pas de mémoire approximative.
+
+---
+
+## FORMAT OBLIGATOIRE CHATGPT ↔ CLAUDE
+
+> Règle de communication obligatoire pour toute interaction de travail entre ChatGPT et Claude sur le projet ManiTradePro. Complète et précise la section *Mode de communication obligatoire*.
+
+### Sens ChatGPT → Claude : prompt unique
+
+Pour toute demande de travail adressée à Claude, ChatGPT doit communiquer **uniquement** sous forme de **prompt complet, ultra précis, en un seul bloc prêt à copier-coller**.
+
+Le prompt ChatGPT → Claude doit contenir, quand pertinent :
+
+- contexte projet ;
+- objectif exact ;
+- fichiers à lire ;
+- contraintes absolues ;
+- étapes d'exécution ;
+- fichiers autorisés à modifier ;
+- fichiers interdits à modifier ;
+- livrable attendu ;
+- format de réponse attendu ;
+- règle de non-merge sans validation ChatGPT.
+
+ChatGPT **ne doit pas** envoyer à Claude :
+
+- des consignes fragmentées ;
+- des messages vagues ;
+- des intentions générales ;
+- des demi-prompts ;
+- des instructions implicites ;
+- des validations ambiguës.
+
+### Sens Claude → ChatGPT : réponse en bloc unique
+
+Claude doit répondre à ChatGPT **uniquement** en un **seul bloc structuré, prêt à copier-coller**, contenant :
+
+1. résumé court ;
+2. fichiers lus ;
+3. fichiers modifiés ;
+4. changements effectués ;
+5. impacts techniques ;
+6. impacts quantitatifs ;
+7. risques ;
+8. limites ;
+9. vérifications effectuées ;
+10. état de `SESSION.md` ;
+11. agents / skills utilisés ;
+12. demande explicite de validation si nécessaire.
+
+Claude **ne doit pas** répondre à ChatGPT avec :
+
+- plusieurs blocs dispersés ;
+- des réponses partielles ;
+- du storytelling ;
+- des justifications vagues ;
+- des conclusions non prouvées ;
+- une demande de merge implicite.
+
+### Objectif
+
+Maximiser la précision d'exécution de Claude et permettre à ChatGPT de relire, challenger et valider efficacement.

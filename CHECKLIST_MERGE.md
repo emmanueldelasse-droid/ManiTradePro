@@ -17,6 +17,7 @@ Ce fichier est la **checklist à parcourir avant chaque merge** d'une PR sur `ma
 - [ ] **`PROVIDERS_MATRIX.md` mis à jour** si une source de données change ou un nouveau provider est ajouté.
 - [ ] **`KNOWN_ISSUES.md` mis à jour** : ajouter un nouveau bug découvert, marquer un bug résolu comme tel, documenter une nouvelle dette identifiée.
 - [ ] **`CLAUDE.md` mis à jour** si une règle de processus change (workflow git, déploiement, conventions).
+- [ ] **`GOVERNANCE.md` et `SESSION.md` mis à jour** si la PR modifie les règles de reprise de session ou de communication ChatGPT ↔ Claude (cf. `GOVERNANCE.md` § *Session start protocol* et § *Format obligatoire ChatGPT ↔ Claude*).
 - [ ] **`SETUPS_REGISTRY.md` mis à jour** si un setup change, si une nouvelle variante est validée, dépréciée ou abandonnée.
 - [ ] **`ASSET_REGISTRY.md` mis à jour** si une nouvelle classification d'actifs est validée ou si un actif change de catégorie.
 
