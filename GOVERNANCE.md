@@ -479,6 +479,14 @@ avec :
 - raison ;
 - statut cohérence.
 
+### `SESSION.md` — mise à jour obligatoire avant chaque PR / merge
+
+`SESSION.md` doit être mis à jour **avant chaque demande de `GO MERGE`**. Il doit refléter l'état réel **après** la PR : objectif livré, fichiers modifiés, impacts (runtime / quant / documentation), limites, prochaine étape.
+
+Une PR ne doit pas recevoir `GO MERGE` si `SESSION.md` est absent, obsolète ou contradictoire avec les fichiers sources.
+
+`SESSION.md` reste un carnet de bord court ; les règles détaillées de chaque domaine restent dans leurs fichiers spécialisés (cf. § *Rôle des fichiers*).
+
 ---
 
 ## GOUVERNANCE CHATGPT ↔ CLAUDE

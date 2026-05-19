@@ -73,7 +73,7 @@ Erreur type à NE PAS répéter : pousser 4 commits sur la branche de feature, m
 2. Donner le lien de la PR à l'utilisateur **après** le merge avec le statut du déploiement (Pages / Worker).
 3. Ne **jamais** dire "tout est poussé" sans avoir vérifié l'état vs `main`. "Poussé sur la branche" ≠ "livré à l'utilisateur" tant que la PR n'est pas mergée.
 4. **Exceptions à l'auto-merge — demander avant de merger** si :
-   - Le PR touche un broker réel / passage en argent réel (cf. section "Architecture cible" de SESSION.md).
+   - Le PR touche un broker réel / passage en argent réel (cf. `BOT_OBJECTIVE.md` § *Conditions avant passage en bot réel*).
    - Le PR contient une migration SQL Supabase destructrice (DROP, TRUNCATE).
    - Le PR supprime un endpoint authentifié ou affaiblit l'auth admin (PIN, HMAC).
    - Le PR change la matrice `validateConfiguration` du moteur (worker.js).
