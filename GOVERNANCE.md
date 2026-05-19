@@ -5,6 +5,8 @@
 >
 > Ce fichier est **prioritaire** sur tout autre document du repo.
 
+> **Note (2026-05-19) :** depuis la fusion documentaire, `GOVERNANCE.md` remplace `GPT_ROLE.md` comme source canonique pour la gouvernance IA, les rôles ChatGPT / Claude, les validations, les agents, les skills et les règles de merge. `GPT_ROLE.md` est désormais un stub de redirection.
+
 ---
 
 ## FICHIER GOUVERNANCE — LECTURE OBLIGATOIRE
@@ -398,7 +400,7 @@ Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` existent déj�
 | `/BOT_OBJECTIVE.md` | _(source actuelle de `docs/project/PROJECT_VISION.md` à venir)_ |
 | `/SESSION.md` | _(reste à la racine, cf. § `RÔLE DES FICHIERS`)_ |
 | `/CHECKLIST_MERGE.md` | _(source de la future `docs/project/MERGE_PROTOCOL.md`)_ |
-| `/GPT_ROLE.md` | _(source de la future `docs/project/AI_WORKFLOW.md`)_ |
+| `/GPT_ROLE.md` | _stub de redirection vers `GOVERNANCE.md` depuis 2026-05-19 ; n'est plus une source canonique_ |
 | `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ |
 | `/DATA_PIPELINE.md` | _(à consolider dans `docs/project/ARCHITECTURE.md` à terme)_ |
 | `/TRADING_LOGIC.md` | _(à scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/`)_ |
@@ -479,9 +481,64 @@ avec :
 
 ---
 
-## RÈGLES VALIDATION CHATGPT
+## GOUVERNANCE CHATGPT ↔ CLAUDE
 
-ChatGPT ne doit **PAS** donner GO merge si :
+Principes structurels et non négociables :
+
+- Claude **implémente**.
+- ChatGPT **valide**.
+- Claude **ne s'auto-valide jamais**. Même quand les tests passent localement, le merge attend.
+- ChatGPT **challenge** systématiquement les conclusions, hypothèses, risques, résultats quantitatifs et régressions potentielles.
+- Aucun merge important ne peut être effectué sans `GO MERGE explicite de ChatGPT`.
+- Sans `GO MERGE` explicite : pas de merge, pas de push sur `main`, pas de fusion de PR.
+
+### Responsabilités Claude
+
+- produire le code ;
+- mettre à jour tous les fichiers `.md` impactés ;
+- préparer la PR (fichiers modifiés, diffs, impacts techniques, impacts quant) ;
+- remplir `CHECKLIST_MERGE.md` ;
+- détecter et signaler les incohérences.
+
+### Interdictions Claude
+
+- auto-valider son propre travail ;
+- considérer qu'un code qui compile est valide ;
+- merger sans validation externe ;
+- ignorer les incohérences quant, la dette technique ou les régressions silencieuses ;
+- pousser du code « réel » prématurément.
+
+### Responsabilités ChatGPT
+
+- valider stratégie, architecture, logique et quant ;
+- relire PR + diffs ;
+- challenger hypothèses, conclusions et risques ;
+- vérifier impacts (architecture, quant, sécurité), régressions potentielles, risques d'overfit ;
+- vérifier la cohérence globale entre `SESSION.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `TRADING_LOGIC.md`, `PROJECT_RULES.md`, `CHECKLIST_MERGE.md` et la présente gouvernance ;
+- répondre formellement par `GO MERGE` ou `NOGO merge` + raisons.
+
+---
+
+## WORKFLOW VALIDATION AVANT MERGE
+
+### Étape 1 — Claude
+
+1. produire les modifications ;
+2. mettre à jour tous les `.md` nécessaires ;
+3. remplir `CHECKLIST_MERGE.md` ;
+4. fournir les fichiers modifiés et les diffs ;
+5. fournir les impacts techniques et quantitatifs ;
+6. attendre validation.
+
+### Étape 2 — ChatGPT
+
+1. relire les changements ;
+2. vérifier impacts, risques, robustesse, régressions, cohérence globale, overfit ;
+3. répondre explicitement `GO MERGE` ou `NOGO merge` + raisons précises.
+
+### Critères de refus
+
+ChatGPT ne doit **PAS** donner `GO MERGE` si :
 
 - docs désynchronisées ;
 - nouvelle règle non documentée ;
@@ -494,6 +551,31 @@ ChatGPT ne doit **PAS** donner GO merge si :
 - rollback absent ;
 - impacts non explicités ;
 - limites non mentionnées.
+
+---
+
+## RÈGLE ANTI-HALLUCINATION
+
+Un résultat « qui semble bon » n'est **pas** valide automatiquement.
+
+ChatGPT doit systématiquement challenger :
+
+- les PF anormalement élevés ;
+- les drawdowns suspects ;
+- les résultats avec peu de trades ;
+- les stratégies trop optimisées ;
+- les conclusions sans walk-forward ;
+- les conclusions sans validation régime ;
+- les conclusions sans validation multi-années.
+
+Priorité du projet :
+
+```text
+robustesse > vitesse
+cohérence > hype
+structure > accumulation de features
+vérité > confort
+```
 
 ---
 
@@ -559,6 +641,77 @@ Priorité :
 - signaler les règles manquantes ;
 - signaler les docs obsolètes ;
 - signaler les décisions non documentées.
+
+---
+
+## GOUVERNANCE QUANTITATIVE
+
+Pour le moteur quant ManiTradePro, des règles supplémentaires s'appliquent :
+
+- Les moteurs quant **doivent être implémentés directement par Claude**, pas via un agent isolé. Le contexte isolé d'un agent rend la non-régression et l'audit cross-fichiers difficiles à garantir.
+- ChatGPT challenge systématiquement :
+  - les risques d'overfit ;
+  - les biais (sélection, données, échantillon) ;
+  - les risques techniques (régression silencieuse, ordre d'exécution, dépendance cachée) ;
+  - la cohérence cross-fichiers ;
+  - la non-régression byte-par-byte sur les outputs JSON existants ;
+  - la logique régime / setup / variant.
+- **Aucun merge important sans `GO MERGE` explicite de ChatGPT.**
+- **Claude ne s'auto-valide jamais.**
+- **Les agents ne remplacent pas la revue quant.** Même un agent général qui produirait un moteur entier ne court-circuite ni la relecture humaine ni la validation ChatGPT.
+
+---
+
+## AGENTS ET SKILLS CLAUDE CODE
+
+Cette section liste les agents et skills Claude Code disponibles sur le projet et leurs limites de gouvernance. ChatGPT doit savoir précisément ce que Claude peut déléguer.
+
+### Principes généraux
+
+- Les agents tournent en **contexte isolé** : Claude ne voit que leur réponse finale.
+- Les agents **ne valident jamais** les décisions quant et **ne peuvent pas auto-merger**.
+- Claude reste **responsable de tout code commité**, même produit via un agent.
+- Toute utilisation d'un agent ou d'un skill non trivial **doit être déclarée explicitement** dans le body de la PR. **Le body de PR doit également déclarer explicitement l'absence** d'agent/skill (aucune déclaration implicite n'est admise) :
+
+```text
+## Agents / skills utilisés
+- Agent : <nom>
+- Tâche déléguée : <description courte>
+- Résultat : <ce qui a été produit / modifié>
+- Limites : <ce qui a été vérifié à la main par Claude après l'agent>
+```
+
+Si aucun agent ni skill n'a été utilisé, écrire explicitement dans la PR :
+
+```text
+## Agents / skills utilisés
+Aucun.
+```
+
+### Agents disponibles
+
+| Agent | Rôle | Limites / Interdictions |
+|---|---|---|
+| `bug-hunter` | Bugs UI/CSS récurrents (thème, layout, modal, touch). | Pas de logique quant, pas de worker. |
+| `claude` (catch-all) | Générique, tous outils. | Éviter si un agent spécifique convient ; pas de revue quant, pas de merge. |
+| `claude-code-guide` | Questions Claude Code / SDK / API. | Ne touche pas au code applicatif. |
+| `Explore` | Recherche read-only (fichiers, symboles). | Lit des extraits ; pas pour code review / audit cross-fichiers. |
+| `general-purpose` | Recherche complexe multi-étapes. | Contexte isolé ; pas de validation quant finale, pas de merge. |
+| `Plan` | Plans d'implémentation. | Read-only ; ne fait pas l'implémentation. |
+| `statusline-setup` | Configuration status line CLI. | Cosmétique CLI uniquement. |
+
+### Skills disponibles
+
+Procédures scriptées invoquées par mot-clé ou `/<nom>`, s'exécutant **dans le contexte principal** (pas isolé) : `session-start-hook`, `ui-ux-pro-max`, `update-config`, `keybindings-help`, `simplify`, `fewer-permission-prompts`, `loop`, `claude-api`, `init`, `review`, `security-review`.
+
+Leur usage doit être mentionné si il a influencé une PR importante.
+
+### Interdictions communes
+
+- Aucun agent ne valide une décision quant.
+- Aucun agent ne décide un merge.
+- Aucun agent ne remplace la revue ChatGPT.
+- Les moteurs quant ne sont pas délégués à un agent isolé.
 
 ---
 

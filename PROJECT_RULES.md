@@ -185,7 +185,7 @@ Le but de cette gouvernance est :
 - protéger l'architecture long terme,
 - protéger la robustesse du moteur.
 
-Cf. `GPT_ROLE.md` pour le détail du workflow Claude ↔ ChatGPT et les règles anti-hallucination.
+Cf. `GOVERNANCE.md` § "Gouvernance ChatGPT ↔ Claude" et § "Règle anti-hallucination" pour le détail du workflow Claude ↔ ChatGPT et les règles anti-hallucination.
 
 ---
 

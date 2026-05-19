@@ -7,13 +7,14 @@
 > - format validation.
 
 > **Statut :** squelette créé le 2026-05-19 (PR setup-governance-docs).
-> Sources à consolider : `GPT_ROLE.md` (racine), section "Mode de communication" de `GOVERNANCE.md`, section "Validation obligatoire avant merge" de `CLAUDE.md`.
+> Source canonique unique de la gouvernance IA : `GOVERNANCE.md` (centralisée depuis la fusion de `GPT_ROLE.md` le 2026-05-19).
+> `CLAUDE.md` est le manuel opérationnel Claude Code ; il n'est **pas** une source canonique de gouvernance IA.
 
 ---
 
 ## 1. Acteurs et rôles
 
-Voir `GOVERNANCE.md` § "Gouvernance projet".
+Voir `GOVERNANCE.md` § "Gouvernance projet" et § "Gouvernance ChatGPT ↔ Claude".
 
 | Acteur | Responsabilité principale |
 |---|---|
@@ -23,7 +24,7 @@ Voir `GOVERNANCE.md` § "Gouvernance projet".
 
 ## 2. Format des réponses Claude → ChatGPT
 
-_À remplir — extraire de `GOVERNANCE.md` § "Format obligatoire des réponses" et `GPT_ROLE.md`._
+_À remplir — extraire de `GOVERNANCE.md` § "Format obligatoire des réponses"._
 
 ## 3. Format des reviews ChatGPT → Claude
 
@@ -31,7 +32,7 @@ _À remplir._
 
 ## 4. Format de validation `GO merge` / `NOGO merge`
 
-_À remplir — extraire de `CLAUDE.md` § "Validation obligatoire avant merge"._
+_À remplir — extraire de `GOVERNANCE.md` § "Workflow validation avant merge"._
 
 ## 5. Cas d'escalade vers créateur ("Avis créateur requis")
 
@@ -39,7 +40,7 @@ _À remplir — lister exhaustivement les cas où Claude doit demander au créat
 
 ## 6. Délégation aux agents Claude Code
 
-Voir `GPT_ROLE.md` § "Claude Code Agents & Skills Governance".
+Voir `GOVERNANCE.md` § "Agents et skills Claude Code".
 
 _À synchroniser ici._
 
@@ -47,6 +48,10 @@ _À synchroniser ici._
 
 ## Sources existantes à consolider
 
-- `/GPT_ROLE.md`
-- `/CLAUDE.md` § "Validation obligatoire avant merge", § "Agents et skills Claude Code"
-- `/GOVERNANCE.md` § "Mode de communication obligatoire", § "Format obligatoire des réponses"
+Source canonique unique de gouvernance IA :
+
+- `/GOVERNANCE.md` § "Gouvernance ChatGPT ↔ Claude", § "Workflow validation avant merge", § "Règle anti-hallucination", § "Gouvernance quantitative", § "Agents et skills Claude Code", § "Mode de communication obligatoire", § "Format obligatoire des réponses".
+
+Référence opérationnelle (non canonique pour la gouvernance IA) :
+
+- `/CLAUDE.md` — manuel opérationnel Claude Code (conventions de session, déploiement, style code). Ne fait pas autorité sur la gouvernance IA ; en cas de conflit, `GOVERNANCE.md` prime.
