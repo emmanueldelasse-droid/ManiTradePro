@@ -57,7 +57,7 @@
 
 ## Décisions actives
 
-- **Gouvernance** : `GOVERNANCE.md` = source canonique unique (IA, projet, validation, merge, agents/skills, gouvernance quant). `GPT_ROLE.md` = stub de redirection. `CLAUDE.md` = manuel opérationnel Claude Code.
+- **Gouvernance** : `GOVERNANCE.md` = source canonique unique (IA, projet, validation, merge, agents/skills, gouvernance quant). `GPT_ROLE.md` a été supprimé après période de transition ; l'historique de sa fusion dans `GOVERNANCE.md` est conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. `CLAUDE.md` = manuel opérationnel Claude Code.
 - **Provider principal** : EODHD (daily / swing). Détails et fallbacks dans `docs/monitoring/PROVIDERS_MATRIX.md`.
 - **Capital réel** : interdit tant que les conditions de `BOT_OBJECTIVE.md` § *Conditions avant passage en bot réel* ne sont pas remplies (walk-forward, frictions, sizing, kill switch, paper trading prolongé, etc.).
 - **Research Framework Freeze v1** : actif. Toute PR de recherche doit s'y conformer ou marquer explicitement `⚠ DÉVIATION FRAMEWORK FREEZE v1` + justification.
@@ -88,14 +88,14 @@
 - **Manuel opérationnel Claude Code** : `CLAUDE.md`.
 - **Objectif produit / constitution** : `BOT_OBJECTIVE.md`.
 - **Règles techniques structurelles** : `PROJECT_RULES.md`.
-- **Architecture code** : `docs/project/ARCHITECTURE.md` (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
-- **Pipeline de données** : `docs/project/DATA_PIPELINE.md` (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
-- **Logique quant / scoring / setups** : `docs/quant/TRADING_LOGIC.md` (la racine `TRADING_LOGIC.md` est un stub de redirection vers les deux fichiers spécialisés).
+- **Architecture code** : `docs/project/ARCHITECTURE.md`.
+- **Pipeline de données** : `docs/project/DATA_PIPELINE.md`.
+- **Logique quant / scoring / setups** : `docs/quant/TRADING_LOGIC.md`.
 - **Moteur trading / exécution / safety / sizing** : `docs/project/TRADING_ENGINE.md`.
-- **Setups quantitatifs** : `docs/quant/SETUPS_REGISTRY.md` (la racine `SETUPS_REGISTRY.md` est un stub temporaire de redirection).
-- **Classification actifs** : `docs/quant/ASSET_REGISTRY.md` (la racine `ASSET_REGISTRY.md` est un stub temporaire de redirection).
-- **Providers** : `docs/monitoring/PROVIDERS_MATRIX.md` (la racine `PROVIDERS_MATRIX.md` est un stub temporaire de redirection).
-- **Bugs / dette** : `docs/monitoring/KNOWN_ISSUES.md` (la racine `KNOWN_ISSUES.md` est un stub temporaire de redirection).
+- **Setups quantitatifs** : `docs/quant/SETUPS_REGISTRY.md`.
+- **Classification actifs** : `docs/quant/ASSET_REGISTRY.md`.
+- **Providers** : `docs/monitoring/PROVIDERS_MATRIX.md`.
+- **Bugs / dette** : `docs/monitoring/KNOWN_ISSUES.md`.
 - **Checklist merge** : `CHECKLIST_MERGE.md`.
 - **Matrice d'impact documentaire** : `docs/project/DOC_IMPACT_MATRIX.md` (aide anti-oubli : `npm run check:doc-impact`).
 - **Plan de consolidation Markdown** : `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`.
@@ -107,7 +107,7 @@
 - Migration physique des fichiers Markdown (racine → `/docs/`) : **terminée**. Consolidation Markdown finalisée par la PR de nettoyage final (`claude/final-doc-stub-cleanup`).
 - Sourcing dataset PEAD : décision politique en attente.
 - Walk-forward conditionnel régime sur RS Rotation simple : non lancé.
-- Migration physique racine → `/docs/` (mode hybride en vigueur, cf. `GOVERNANCE.md` § *Document canonical sources*).
+- Migration physique racine → `/docs/` : terminée pour les 7 fichiers concernés ; les arbitrages restants (`BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `CHECKLIST_MERGE.md`) restent intentionnellement à la racine (cf. `GOVERNANCE.md` § *Arbitrages assumés*).
 - Aucun setup activé en paper trading automatique sans supervision humaine.
 - Aucune connexion broker réel (pas de passage en argent réel).
 
