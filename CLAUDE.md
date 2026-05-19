@@ -13,11 +13,19 @@ Toute règle de gouvernance, validation, merge, rôle ChatGPT / Claude, agents, 
 `CLAUDE.md` ne doit pas dupliquer ces règles. Il explique uniquement comment Claude Code les applique concrètement dans ce repo.
 
 Pointeurs utiles dans `GOVERNANCE.md` :
+- § *Session start protocol — reprise officielle de session*
+- § *Format obligatoire ChatGPT ↔ Claude*
 - § *Gouvernance ChatGPT ↔ Claude*
 - § *Workflow validation avant merge*
 - § *Règle anti-hallucination*
 - § *Gouvernance quantitative*
 - § *Agents et skills Claude Code*
+
+## Reprise de session
+
+Le protocole officiel de reprise de session est défini dans `GOVERNANCE.md` § *Session start protocol — reprise officielle de session*.
+
+`CLAUDE.md` ne duplique pas ce protocole. Il rappelle seulement que Claude Code doit l'appliquer avant toute analyse ou modification : lire le **socle obligatoire** (5 fichiers), puis les **fichiers spécialisés** correspondant au sujet, et refuser de partir uniquement de `SESSION.md` ou de la mémoire.
 
 ## Documentation permanente (IMPÉRATIVE — mai 2026)
 
