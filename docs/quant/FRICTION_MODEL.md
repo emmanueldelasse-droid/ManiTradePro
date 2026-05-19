@@ -79,4 +79,4 @@ Items attendus :
 
 - `/SESSION.md` — discussions friction
 - `docs/quant/ASSET_REGISTRY.md`
-- `/PROVIDERS_MATRIX.md`
+- `docs/monitoring/PROVIDERS_MATRIX.md`

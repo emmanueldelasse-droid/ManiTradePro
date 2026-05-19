@@ -48,8 +48,8 @@ Aide anti-oubli (non bloquante) : `npm run check:doc-impact`. Le script ne rempl
 - `docs/project/ARCHITECTURE.md` — structure code après merge (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
 - `docs/project/DATA_PIPELINE.md` — flux de données par écran (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
 - `TRADING_LOGIC.md` — logique du moteur.
-- `PROVIDERS_MATRIX.md` — routage providers.
-- `KNOWN_ISSUES.md` — bugs et dette.
+- `docs/monitoring/PROVIDERS_MATRIX.md` — routage providers (la racine `PROVIDERS_MATRIX.md` est un stub temporaire de redirection).
+- `docs/monitoring/KNOWN_ISSUES.md` — bugs et dette (la racine `KNOWN_ISSUES.md` est un stub temporaire de redirection).
 - `CHECKLIST_MERGE.md` — checklist obligatoire avant tout merge.
 - `docs/quant/SETUPS_REGISTRY.md` — registre officiel des setups quantitatifs validés/testés/abandonnés (la racine `SETUPS_REGISTRY.md` est un stub temporaire de redirection).
 - `docs/quant/ASSET_REGISTRY.md` — classification provisoire des actifs compatibles avec les setups (la racine `ASSET_REGISTRY.md` est un stub temporaire de redirection).
@@ -60,8 +60,8 @@ Si une demande touche aux setups, aux backtests, au régime marché ou aux actif
 - Modif architecture → `docs/project/ARCHITECTURE.md`
 - Modif flux donnée → `docs/project/DATA_PIPELINE.md`
 - Modif logique trading → `TRADING_LOGIC.md`
-- Modif provider → `PROVIDERS_MATRIX.md`
-- Découverte bug → `KNOWN_ISSUES.md`
+- Modif provider → `docs/monitoring/PROVIDERS_MATRIX.md`
+- Découverte bug → `docs/monitoring/KNOWN_ISSUES.md`
 - Toute évolution → `SESSION.md`
 
 Un merge n'est PAS considéré comme terminé tant que la doc n'est pas à jour. La doc doit représenter l'ÉTAT RÉEL APRÈS MERGE, jamais une intention ou un futur.

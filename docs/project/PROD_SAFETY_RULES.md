@@ -70,5 +70,5 @@ Tant que le bot reste en paper, lister les conditions minimum AVANT toute connex
 ## Sources existantes à consolider
 
 - `/CLAUDE.md` § "Contraintes de déploiement", § "Secrets"
-- `/KNOWN_ISSUES.md` — incidents prod historiques
+- `docs/monitoring/KNOWN_ISSUES.md` — incidents prod historiques
 - `/SESSION.md` — sections "Architecture cible" et incidents
