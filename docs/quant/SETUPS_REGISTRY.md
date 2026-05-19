@@ -254,6 +254,21 @@ breakout_h10_vol12
 **RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED** (post-audit, cf. section "Post execution-bias audit status" en tête de fichier).
 _Ancien statut : VALIDATED — rétrogradé. L'exécution est propre (audit PR #208 CLEAN, ×1.01 d'inflation), MAIS la robustesse temporelle est insuffisante (0 cellule ROBUST/STABLE en rolling walk-forward 3 splits). Les métriques détaillées ci-dessous restent valides comme référence historique mais ne garantissent pas la performance future tant que la robustesse n'est pas confirmée._
 
+### Mise à jour 2026-05-19 — PR-R1 robustness hardening (proposition, en attente validation ChatGPT)
+
+Le script `tools/backtests/rs-rotation-robustness-v1.mjs` (PR-R1) durcit l'évaluation avec walk-forward STRICT train/test 3 splits, friction systématique, analyse concentration top 5 explicite, drawdown deep-dive. Résultats sur la baseline gelée `rs_90d_top10_hold20` :
+
+- Baseline NO_RISK_OFF frictionné : **929 trades, PF 1.53, totalR 689.94 R, max DD 226.21 R, longest loss streak 19**.
+- Walk-forward 3 splits stricts paramètres gelés : **3/3 splits PASS live (PF test ≥ 1.0)** et **3/3 splits PASS robust (PF test ≥ 1.3)** — S1 test PF 2.05, S2 test PF 1.69, S3 test PF 1.39.
+- Concentration : top 5 = **48.66 %** du PnL positif (< 60 % seuil Freeze § 4 critère G). PF sans top 5 = **1.22** (> 1.05 minimum) — edge diversifiable.
+- Caveat majeur : pire année = **2022 PF 0.14** (59 trades, totalR -92.97 R) — RS Rotation reste catastrophique dans les périodes où le filtre NO_RISK_OFF échoue à protéger.
+
+**Statut proposé par le script : `CONDITIONAL_EDGE`** (vocabulaire Freeze v1 § 8). Justification : walk-forward 3/3 robust + concentration acceptable + PF baseline ≥ 1.3 + concentration diversifiable, MAIS pire année 2022 PF < 0.9 → caveat résiduel rédhibitoire.
+
+**Statut effectif inchangé** tant que `GO MERGE` ChatGPT explicite n'est pas reçu (cf. `GOVERNANCE.md` § *Workflow validation avant merge*). Aucune promotion `VALIDATED_RESEARCH_CORE` n'est proposée (Freeze § 4 critères supplémentaires non vérifiés ici : audit anti-look-ahead spécifique, friction ×2/×3, edge decay early/late, single-symbol max share).
+
+Rapport complet : `tools/backtests/output/rs-rotation-robustness-v1.md`.
+
 ## Objectif
 Sélectionner les leaders structurels du marché.
 
