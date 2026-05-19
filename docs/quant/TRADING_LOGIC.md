@@ -138,6 +138,19 @@ Champ legacy qui valait `safetyScore + regimeBonus + newsBonus` (composite). Dep
 
 ## Setups détectés
 
+> **Note importante (truth-sync 2026-05-19) — Détecteur runtime ≠ setup validé.**
+>
+> Le tableau ci-dessous liste les détecteurs présents dans `detectConfiguration` côté worker. **La détection runtime n'implique pas la validation quant.** Le statut officiel de chaque setup vit dans `docs/quant/SETUPS_REGISTRY.md` (source unique).
+>
+> Au 2026-05-19, **aucun** des setups détectés par `detectConfiguration` n'est `VALIDATED_RESEARCH_CORE` au sens `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 4. État exact :
+>
+> - `pullback`, `pullback_short` → `DEAD / DO_NOT_TRADE` (PULLBACK_MOMENTUM, PR #207 INVALID_BACKTEST).
+> - `breakout`, `breakdown` → `DEAD_AGGREGATED` (PR #208). Seule exception : `GLD × breakout_h20_vol1.5_stop1_rr2` → `CONDITIONAL_RESEARCH_CANDIDATE` (n=47).
+> - `continuation`, `continuation_short` → non audités spécifiquement post-Freeze, à traiter comme non validés.
+> - `mean_reversion` → `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`.
+>
+> **Aucun trade automatique** ne doit être ouvert sur ces détecteurs sans (a) statut `VALIDATED_RESEARCH_CORE` confirmé dans `SETUPS_REGISTRY.md` et (b) `GO MERGE` explicite ChatGPT sur une PR d'activation dédiée. Le mode manuel utilisateur reste souverain (cf. `PROJECT_RULES.md` R3-ter).
+
 Détection dans `detectConfiguration` (côté worker), à partir des bougies daily.
 
 | Setup | Direction | Description | Conditions principales |

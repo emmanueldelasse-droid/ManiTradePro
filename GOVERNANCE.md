@@ -441,7 +441,7 @@ Règles permanentes :
 
 | Fichier | Rôle |
 |---|---|
-| `docs/setups/SECTOR_RELATIVE_STRENGTH.md` | Fiche officielle du setup VALIDATED_RESEARCH_CORE. |
+| `docs/setups/SECTOR_RELATIVE_STRENGTH.md` | Fiche technique détaillée du setup Sector Relative Strength v1 (statut courant : `FRAGILE / CONCENTRATION_EXCESSIVE`, cf. `docs/quant/SETUPS_REGISTRY.md`). |
 
 **`docs/decisions/`** :
 
