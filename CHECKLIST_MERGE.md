@@ -123,7 +123,7 @@ Pour toute PR importante (touchant le moteur, les setups, la classification d'ac
 - [ ] Validation ChatGPT obtenue.
 - [ ] `GO MERGE` explicite reçu.
 
-Cf. `GPT_ROLE.md` pour le rôle de chaque IA et le workflow complet.
+Cf. `GOVERNANCE.md` § "Gouvernance ChatGPT ↔ Claude" et § "Workflow validation avant merge" pour le rôle de chaque IA et le workflow complet.
 
 ---
 
@@ -136,7 +136,7 @@ Pour toute PR, indiquer explicitement si un agent ou skill Claude Code a été u
 - [ ] Vérification humaine Claude effectuée après l'agent (relecture, tests).
 - [ ] Pour une PR quant ou importante : validation ChatGPT obtenue malgré (ou en plus de) l'usage d'un agent.
 
-Cf. `GPT_ROLE.md` section *Claude Code Agents & Skills Governance* pour la liste complète des agents disponibles, leurs limites, et les cas d'usage interdits.
+Cf. `GOVERNANCE.md` section *Agents et skills Claude Code* pour la liste complète des agents disponibles, leurs limites, et les cas d'usage interdits.
 
 ---
 

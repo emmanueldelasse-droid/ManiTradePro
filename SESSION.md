@@ -3391,3 +3391,14 @@ Ce gel met fin à la phase d'exploration tous azimuts. La prochaine PR doit êtr
 - soit une décision politique sur le sourcing PEAD,
 - soit une PR strictement conforme au framework,
 - soit une mise à jour du framework lui-même via PR v2 explicite.
+
+---
+
+# Session 2026-05-19 — Fusion `GPT_ROLE.md` → `GOVERNANCE.md`
+
+- Fusion documentaire pure : `GPT_ROLE.md` fusionné dans `GOVERNANCE.md`.
+- `GPT_ROLE.md` devient un stub de redirection (plus de règles actives).
+- Doublons de gouvernance IA supprimés (rôles, validations, merge, agents, skills).
+- Références mises à jour dans `CLAUDE.md`, `CHECKLIST_MERGE.md`, `PROJECT_RULES.md`, `docs/project/AI_WORKFLOW.md`, table des sources canoniques de `GOVERNANCE.md`.
+- Aucune modification runtime. Aucun impact trading. Aucun impact worker/front/provider/SQL.
+- Prochaine étape (PR séparée) : ajouter le protocole officiel de reprise session.
