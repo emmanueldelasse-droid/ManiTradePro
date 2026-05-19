@@ -34,6 +34,7 @@
 | Bug corrigé / dette ajoutée | `docs/monitoring/KNOWN_ISSUES.md`, `SESSION.md`, fichier domaine concerné | Garder dette à jour |
 | Documentation pure | `SESSION.md`, fichier documentaire concerné, `CHECKLIST_MERGE.md` si règle merge / process impactée | Garder trace claire |
 | Consolidation Markdown future | `GOVERNANCE.md`, `SESSION.md`, `CLAUDE.md`, `CHECKLIST_MERGE.md`, `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`, fichiers déplacés / stubs | Éviter sources canoniques cassées, suivre le plan officiel |
+| Décision structurante / historique | `docs/decisions/` (nouvelle `DECISION-NNN-*.md` ou mise à jour de statut), `GOVERNANCE.md` si règle active impactée, `SESSION.md`, fichier domaine concerné | Garder la trace du pourquoi sans polluer `SESSION.md` |
 
 ## Règle de justification
 

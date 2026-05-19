@@ -70,7 +70,8 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `docs/monitoring/KNOWN_ISSUES.md` | 331 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle des bugs / dette |
 | `docs/monitoring/PROVIDERS_MATRIX.md` | 125 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle des providers |
 | `docs/monitoring/DATA_QUALITY.md` | 53 | Squelette | Aucune source canonique racine | À enrichir plus tard |
-| `docs/decisions/README.md` | 81 | Placeholder | (pas de décision archivée) | À conserver, alimenter quand une décision sera archivée |
+| `docs/decisions/README.md` | 39 | **Canonique** *(réécrit PR `claude/add-decision-records`)* | Canonique | Garder, format officiel des décisions structurantes |
+| `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md` | 90 | **Décision historique** *(ACTIVE)* | Canonique | Garder, ne pas réécrire ; archiver via `SUPERSEDED` si la règle change |
 
 ### Recherche quant (canoniques `/docs/research/`)
 
@@ -193,9 +194,10 @@ Racine du repo (5 fichiers) :
    - Déplace `KNOWN_ISSUES.md` → `docs/monitoring/KNOWN_ISSUES.md`. **Fait** (déplacement bloc 331 lignes).
    - Stubs racine pendant la transition. **Fait**.
 
-4. **PR décisions / historique**
-   - Première décision archivée dans `docs/decisions/DECISION-001-*.md` (rétroactif : la fusion `GPT_ROLE.md` → `GOVERNANCE.md` est un bon candidat).
-   - Le README du dossier reste tel quel.
+4. **PR décisions / historique** *(partiellement réalisée — PR en cours `claude/add-decision-records`)*
+   - `docs/decisions/README.md` réécrit en format court conforme au plan (statut / date / contexte / décision / raisons / conséquences / fichiers / PR / état / suite). **Fait**.
+   - Première décision archivée : `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md` (fusion `GPT_ROLE.md` → `GOVERNANCE.md`, statut `ACTIVE`). **Fait**.
+   - `GOVERNANCE.md` § *Décisions historiques* ajouté : ordre de précédence, règles, format obligatoire dans `docs/decisions/README.md`. **Fait**.
 
 5. **PR nettoyage final**
    - Suppression définitive des stubs racine devenus inutiles, après plusieurs sprints sans incident.

@@ -1,81 +1,39 @@
-# docs/decisions/
+# Décisions structurantes — ManiTradePro
 
-> **Rôle (selon `GOVERNANCE.md`, fichier `DECISION-XXX-*.md`) :**
-> - grosses décisions ;
-> - contexte ;
-> - alternatives rejetées ;
-> - impacts ;
-> - justification.
+Objectif : conserver l'historique court et exploitable des décisions importantes du projet.
 
-Chaque décision importante du projet ManiTradePro doit produire un fichier `DECISION-NNN-slug.md`.
+Ce dossier ne remplace pas :
+- `GOVERNANCE.md` pour les règles actives ;
+- `SESSION.md` pour l'état courant ;
+- les fichiers spécialisés pour les détails métier ou techniques.
 
----
+Il sert à répondre à une question simple :
 
-## Convention de nommage
+> Pourquoi cette décision a-t-elle été prise ?
 
-```
-DECISION-001-supabase-vs-cloudflare-d1.md
-DECISION-002-eodhd-primary-provider.md
-DECISION-003-recalibration-q3-2026.md
-...
-```
+## Format recommandé pour chaque décision
 
-- `NNN` = numéro séquentiel à 3 chiffres.
-- `slug` = court, kebab-case, en anglais.
+Chaque décision est un fichier `DECISION-NNN-slug.md` (numéro séquentiel à 3 chiffres + slug court en kebab-case anglais) avec les sections suivantes :
 
----
+- statut ;
+- date ;
+- contexte ;
+- décision ;
+- raisons ;
+- conséquences ;
+- fichiers concernés ;
+- PR liées ;
+- état actuel ;
+- suite éventuelle.
 
-## Template obligatoire
+Statuts possibles : `ACTIVE` (adoptée et toujours en vigueur), `SUPERSEDED par DECISION-MMM` (remplacée par une décision postérieure), `REVERTED` (annulée).
 
-```markdown
-# DECISION-NNN — Titre court
+## Règle
 
-- **Date :** YYYY-MM-DD
-- **Statut :** ACTIVE | SUPERSEDED par DECISION-MMM | REVERTED
-- **Auteur :** créateur / ChatGPT / Claude
-- **PR liée :** #xxx
-- **Commit lié :** SHA
+Une décision historique **ne doit pas être modifiée pour réécrire le passé**.
 
-## Contexte
-
-_Pourquoi cette décision est nécessaire ? Quel problème elle résout ?_
-
-## Alternatives considérées
-
-1. **Option A :** _description, avantages, inconvénients._
-2. **Option B :** _description, avantages, inconvénients._
-3. **Option C (retenue) :** _description, raisons._
-
-## Décision
-
-_Ce qu'on fait concrètement._
-
-## Impacts
-
-- _Impact code._
-- _Impact docs._
-- _Impact prod._
-- _Impact data._
-
-## Risques
-
-_Liste exhaustive des risques + plan de mitigation._
-
-## Critères de revisite
-
-_Conditions qui pourraient invalider cette décision et nécessiter une DECISION-MMM superseding._
-
-## Sources
-
-- _PR_
-- _commits_
-- _autres décisions liées_
-```
-
----
+Si une décision change, créer une **nouvelle décision** (`DECISION-MMM-...`) qui remplace ou annule l'ancienne, et marquer l'ancienne comme `SUPERSEDED par DECISION-MMM` ou `REVERTED`.
 
 ## Décisions actuelles
 
-_Aucune entrée pour l'instant._
-
-**TODO créateur + ChatGPT :** identifier les décisions importantes passées qui méritent d'être documentées rétroactivement (choix EODHD, séparation analytique/live, snapshotId, etc.) et les écrire ici.
+- `DECISION-001-gpt-role-merged-into-governance.md` — fusion de `GPT_ROLE.md` dans `GOVERNANCE.md` (2026-05-19, ACTIVE).

@@ -43,6 +43,7 @@ Le body de PR doit contenir une section `## Documentation impact` structurée :
 - [ ] **`docs/monitoring/KNOWN_ISSUES.md` mis à jour** : ajouter un nouveau bug découvert, marquer un bug résolu comme tel, documenter une nouvelle dette identifiée.
 - [ ] **`CLAUDE.md` mis à jour** si une règle de processus change (workflow git, déploiement, conventions).
 - [ ] **`GOVERNANCE.md` et `SESSION.md` mis à jour** si la PR modifie les règles de reprise de session ou de communication ChatGPT ↔ Claude (cf. `GOVERNANCE.md` § *Session start protocol* et § *Format obligatoire ChatGPT ↔ Claude*).
+- [ ] **`docs/decisions/` créé ou mis à jour** si la PR acte une décision structurante (changement d'autorité, fusion / scission de fichier canonique, abandon d'une règle, choix architectural majeur). Format obligatoire défini dans `docs/decisions/README.md`.
 - [ ] **`docs/quant/SETUPS_REGISTRY.md` mis à jour** si un setup change, si une nouvelle variante est validée, dépréciée ou abandonnée.
 - [ ] **`docs/quant/ASSET_REGISTRY.md` mis à jour** si une nouvelle classification d'actifs est validée ou si un actif change de catégorie.
 

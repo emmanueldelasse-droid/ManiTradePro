@@ -1044,3 +1044,29 @@ ChatGPT **ne doit pas** donner `GO MERGE` si :
 Un script dev-only est fourni pour aider à détecter les oublis : `scripts/check-doc-impact.mjs` (commande : `npm run check:doc-impact`).
 
 Le script est une **aide**, pas une garantie. Il ne remplace ni la matrice, ni la `CHECKLIST_MERGE.md`, ni la revue ChatGPT. Il ne doit pas être branché dans CI comme gate bloquant sans validation explicite de ChatGPT.
+
+---
+
+## DÉCISIONS HISTORIQUES
+
+Les décisions structurantes du projet sont documentées dans :
+
+`docs/decisions/`
+
+Ces fichiers expliquent **pourquoi** une décision a été prise. Ils ne remplacent pas les règles actives.
+
+### Ordre de précédence
+
+En cas de divergence :
+
+1. `GOVERNANCE.md` prime pour les règles de gouvernance ;
+2. les fichiers spécialisés priment pour leur domaine (architecture, trading engine, registres, etc.) ;
+3. `SESSION.md` résume l'état courant ;
+4. `docs/decisions/` explique l'historique (pas la règle active).
+
+### Règles
+
+- Une décision historique **ne doit pas être réécrite** pour modifier le passé.
+- Si une règle change, créer une **nouvelle décision** (`DECISION-MMM-...`) et marquer l'ancienne `SUPERSEDED par DECISION-MMM` ou `REVERTED`.
+- Toute nouvelle PR qui acte une décision structurante (changement d'autorité, fusion / scission de fichiers canoniques, abandon d'une règle, choix architectural majeur) doit créer ou mettre à jour `docs/decisions/`.
+- Le format obligatoire de chaque décision est défini dans `docs/decisions/README.md`.
