@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/go-merge-summary-rule` (en cours — règle « résumé simple obligatoire avec chaque `GO MERGE` »).
-- **Dernier merge connu** : PR #224 `docs(governance): add documentation impact matrix` (commit `2decfdb` sur `main`).
+- **Branche / PR active** : `claude/markdown-consolidation-plan` (en cours — audit Markdown + plan de consolidation, sans déplacement ni suppression).
+- **Dernier merge connu** : PR #225 `docs(governance): require summary with GO MERGE` (commit `b33d1cf` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -35,24 +35,24 @@
 ## Dernière session / dernière PR mergée (bis)
 
 - **Date** : 2026-05-19.
-- **PR** : #224 — `docs(governance): add documentation impact matrix`.
-- **Objectif** : matrice d'impact documentaire officielle + contrôle anti-oubli dev-only.
-- **Résultat** : merge squash sur `main` (commit `2decfdb`). 16 lignes de matrice, section `## Documentation impact` obligatoire dans le body de PR, script `npm run check:doc-impact` (exit 0, non bloquant, non CI).
-- **Fichiers ajoutés** : `docs/project/DOC_IMPACT_MATRIX.md`, `scripts/check-doc-impact.mjs`.
-- **Fichiers modifiés** : `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `CLAUDE.md`, `package.json`, `SESSION.md`.
+- **PR** : #225 — `docs(governance): require summary with GO MERGE`.
+- **Objectif** : rendre obligatoire un résumé simple avec chaque `GO MERGE` donné par ChatGPT (un `GO MERGE` nu est invalide).
+- **Résultat** : merge squash sur `main` (commit `b33d1cf`). Sous-section ajoutée dans `GOVERNANCE.md` § *Workflow validation avant merge*, coche `CHECKLIST_MERGE.md` complétée.
+- **Fichiers modifiés** : `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`.
 - **Impact runtime / quant** : aucun.
-- **Statut merge** : `GO MERGE` explicite reçu, merge effectué en squash.
+- **Statut merge** : `GO MERGE` explicite reçu avec résumé simple, merge effectué en squash.
 
 ## PR en cours
 
-- **PR** : règle « résumé simple obligatoire avec chaque `GO MERGE` » — branche `claude/go-merge-summary-rule`.
-- **Objectif** : exiger qu'à chaque `GO MERGE` donné par ChatGPT, un résumé simple soit fourni au créateur (ce qui a été fait / pourquoi validé / fichiers touchés / impact runtime / impact quant / risques restants / prochaine étape). Un `GO MERGE` nu sans résumé est invalide.
-- **Fichiers modifiés** : `GOVERNANCE.md` (nouvelle sous-section dans § *Workflow validation avant merge*), `CHECKLIST_MERGE.md` (ligne ajoutée dans § *Gouvernance IA*), `SESSION.md`.
+- **PR** : audit Markdown + plan de consolidation — branche `claude/markdown-consolidation-plan`.
+- **Objectif** : auditer tous les fichiers `.md` du repo et produire un plan officiel de consolidation, **sans déplacement ni suppression dans cette PR**.
+- **Fichier ajouté** : `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire complet, structure cible, ordre des futures PR, règles de migration, ce qui ne doit pas être fait maintenant).
+- **Fichiers modifiés** : `GOVERNANCE.md` (1 phrase pointant le plan dans § *Document canonical sources*), `docs/project/DOC_IMPACT_MATRIX.md` (ligne *Consolidation Markdown future* enrichie avec le pointeur vers le plan), `SESSION.md`.
 - **Impact runtime** : aucun.
 - **Impact quant** : aucun.
-- **Impact documentation** : règle anti-`GO MERGE`-nu officielle.
-- **Non inclus** : consolidation / déplacement / suppression de fichiers Markdown (PR ultérieure).
-- **Statut merge** : attente `GO MERGE explicite de ChatGPT` (avec résumé simple, conformément à la règle ajoutée par cette PR).
+- **Impact documentation** : plan officiel de consolidation Markdown ajouté ; ordre prudent en 6 PR successives proposé (project → quant → monitoring → décisions → nettoyage final → archivage backtests optionnel).
+- **Non inclus** : déplacement, suppression, fusion réelle de fichiers Markdown.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
 
@@ -75,10 +75,12 @@
 
 ## Prochaines priorités
 
-1. **PR séparée — consolidation / rangement des fichiers Markdown** (gouvernance) : alignement racine ↔ `/docs/` selon `STRUCTURE DOSSIERS OBLIGATOIRE`. Après la matrice d'impact.
-2. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
-3. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
-4. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+1. **PR migration `docs/project/`** (gouvernance) : première PR d'exécution du plan `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`. Déplacer `ARCHITECTURE.md` et `DATA_PIPELINE.md` vers `docs/project/`, remplacer les squelettes, créer des stubs racine pendant la transition, mettre à jour tous les renvois.
+2. **PR migration `docs/quant/`** (gouvernance) : déplacer `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, décider du sort de `TRADING_LOGIC.md`.
+3. **PR migration `docs/monitoring/`** (gouvernance) : déplacer `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md`.
+4. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
+5. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
+6. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
 
 ## Fichiers sources à consulter
 
@@ -95,11 +97,12 @@
 - **Bugs / dette** : `KNOWN_ISSUES.md`.
 - **Checklist merge** : `CHECKLIST_MERGE.md`.
 - **Matrice d'impact documentaire** : `docs/project/DOC_IMPACT_MATRIX.md` (aide anti-oubli : `npm run check:doc-impact`).
+- **Plan de consolidation Markdown** : `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`.
 - **Framework recherche (gel actif)** : `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `docs/research/ANTI_LOOKAHEAD_RULES.md`, `docs/research/DATASET_GOVERNANCE.md`.
 
 ## Non encore fait
 
-- Consolidation / rangement des fichiers Markdown (PR ultérieure).
+- Migration physique des fichiers Markdown (racine → `/docs/`) : à exécuter en plusieurs PR successives selon `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`.
 - Sourcing dataset PEAD : décision politique en attente.
 - Walk-forward conditionnel régime sur RS Rotation simple : non lancé.
 - Migration physique racine → `/docs/` (mode hybride en vigueur, cf. `GOVERNANCE.md` § *Document canonical sources*).

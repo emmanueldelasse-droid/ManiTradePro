@@ -418,6 +418,9 @@ Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` existent déj�
   - de préparation à la future migration physique.
 - La migration physique sera faite dans une **PR dédiée**, jamais mélangée
   à un travail de fond ou de feature (règle `Une PR = un objectif`).
+- La consolidation physique des fichiers Markdown doit suivre le plan
+  `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` et être réalisée par PR
+  dédiées, sans mélange avec des changements runtime ou quant.
 - Toute modification métier doit être faite sur la **source canonique
   uniquement**.
 
