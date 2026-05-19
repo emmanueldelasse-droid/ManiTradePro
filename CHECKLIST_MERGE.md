@@ -10,7 +10,7 @@ Ce fichier est la **checklist à parcourir avant chaque merge** d'une PR sur `ma
 
 ## Documentation
 
-- [ ] **`SESSION.md` mis à jour** : nouvelle entrée dans la section session courante avec PR titre, résumé, fichiers modifiés.
+- [ ] **`SESSION.md` mis à jour** : reflète l'état réel **après** la PR. Doit contenir objectif livré, fichiers modifiés, impacts (runtime / quant / documentation), limites, prochaine étape. Une PR ne doit pas recevoir `GO MERGE` si `SESSION.md` est absent, obsolète ou contradictoire avec les fichiers sources.
 - [ ] **`ARCHITECTURE.md` mis à jour** si la structure du code change (nouvelle route, nouveau cluster de fonctions, nouvelle table Supabase, modification de cache).
 - [ ] **`DATA_PIPELINE.md` mis à jour** si le flux d'une donnée change (provider, cache, TTL, devise, freshness).
 - [ ] **`TRADING_LOGIC.md` mis à jour** si le scoring, les setups, les règles d'ouverture/fermeture, ou l'apprentissage évoluent.
