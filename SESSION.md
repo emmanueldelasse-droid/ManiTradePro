@@ -3402,3 +3402,15 @@ Ce gel met fin à la phase d'exploration tous azimuts. La prochaine PR doit êtr
 - Références mises à jour dans `CLAUDE.md`, `CHECKLIST_MERGE.md`, `PROJECT_RULES.md`, `docs/project/AI_WORKFLOW.md`, table des sources canoniques de `GOVERNANCE.md`.
 - Aucune modification runtime. Aucun impact trading. Aucun impact worker/front/provider/SQL.
 - Prochaine étape (PR séparée) : ajouter le protocole officiel de reprise session.
+
+---
+
+# Session 2026-05-19 — Nettoyage `CLAUDE.md` après centralisation gouvernance
+
+- PR 2 documentaire : nettoyage de `CLAUDE.md` après la fusion `GPT_ROLE.md` → `GOVERNANCE.md`.
+- `CLAUDE.md` devient explicitement le **manuel opérationnel Claude Code** subordonné à `GOVERNANCE.md`.
+- Doublons de gouvernance supprimés dans `CLAUDE.md` : section "Validation obligatoire avant merge", section "Fichier obligatoire à lire", section "Agents et skills Claude Code" (détaillée).
+- Conservé : stack, workflow Git opérationnel, branche de dev, contraintes de déploiement, style code, thèmes, secrets, langue et vocabulaire, fichiers clés à lire.
+- Les règles de gouvernance pointent désormais explicitement vers `GOVERNANCE.md` (validation avant merge, agents/skills, gouvernance quant).
+- Aucune modification runtime. Aucun impact trading. Aucun impact worker/front/provider/SQL/config.
+- Prochaine étape (PR séparée) : protocole officiel de reprise session.
