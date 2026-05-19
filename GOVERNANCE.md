@@ -560,6 +560,39 @@ ChatGPT ne doit **PAS** donner `GO MERGE` si :
 - impacts non explicités ;
 - limites non mentionnées.
 
+### Résumé simple obligatoire avec chaque `GO MERGE`
+
+À chaque fois que ChatGPT donne un `GO MERGE`, il doit fournir **en même temps** un **résumé simple** de ce qui vient d'être livré, lisible par le créateur sans devoir relire toute la PR.
+
+Un `GO MERGE` **nu**, sans résumé, n'est **pas valide**.
+
+Le résumé doit contenir au minimum :
+
+- ce qui vient d'être livré ;
+- pourquoi la PR est validée ;
+- fichiers principaux modifiés ;
+- impact runtime : oui / non ;
+- impact quant : oui / non ;
+- risques restants éventuels ;
+- prochaine étape.
+
+Format recommandé :
+
+```
+GO MERGE
+
+Résumé simple :
+- Ce qu'on vient de faire :
+- Pourquoi c'est validé :
+- Fichiers touchés :
+- Impact runtime :
+- Impact quant :
+- Risques restants :
+- Prochaine étape :
+```
+
+Objectif : le créateur sait immédiatement ce qui vient d'être validé, sans avoir à relire le diff ni le body de PR.
+
 ---
 
 ## RÈGLE ANTI-HALLUCINATION
