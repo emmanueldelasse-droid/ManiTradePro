@@ -78,5 +78,5 @@ Items attendus :
 ## Sources existantes à consolider
 
 - `/SESSION.md` — discussions friction
-- `/ASSET_REGISTRY.md`
+- `docs/quant/ASSET_REGISTRY.md`
 - `/PROVIDERS_MATRIX.md`

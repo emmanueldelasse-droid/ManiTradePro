@@ -25,10 +25,10 @@
 | Front / UI / PWA | `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md` si flux modifié, `SESSION.md`, `KNOWN_ISSUES.md` si bug / dette | Éviter divergence front / back |
 | Provider / prix / quote / TTL / fallback | `PROVIDERS_MATRIX.md`, `docs/project/DATA_PIPELINE.md`, `PROJECT_RULES.md` si règle changée, `SESSION.md`, `KNOWN_ISSUES.md` si limite | Éviter faux live / faux prix |
 | Supabase / DB / migration | `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, fichier migration SQL si nécessaire | Éviter schéma invisible |
-| Trading logic / scoring / décision | `TRADING_LOGIC.md`, `SETUPS_REGISTRY.md` si setup impacté, `ASSET_REGISTRY.md` si actifs impactés, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter régression quant |
-| Setup nouveau / modifié / abandonné | `SETUPS_REGISTRY.md`, `TRADING_LOGIC.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `SESSION.md` | Garder statut setup exact |
-| Actif / univers / classification | `ASSET_REGISTRY.md`, `SETUPS_REGISTRY.md` si compatibilité setup impactée, `SESSION.md` | Éviter actifs mal classés |
-| Recherche quant / backtest / walk-forward | `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `docs/research/ANTI_LOOKAHEAD_RULES.md`, `docs/research/DATASET_GOVERNANCE.md`, `SETUPS_REGISTRY.md`, `SESSION.md` | Éviter overfit / lookahead |
+| Trading logic / scoring / décision | `TRADING_LOGIC.md`, `docs/quant/SETUPS_REGISTRY.md` si setup impacté, `docs/quant/ASSET_REGISTRY.md` si actifs impactés, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter régression quant |
+| Setup nouveau / modifié / abandonné | `docs/quant/SETUPS_REGISTRY.md`, `TRADING_LOGIC.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `SESSION.md` | Garder statut setup exact |
+| Actif / univers / classification | `docs/quant/ASSET_REGISTRY.md`, `docs/quant/SETUPS_REGISTRY.md` si compatibilité setup impactée, `SESSION.md` | Éviter actifs mal classés |
+| Recherche quant / backtest / walk-forward | `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `docs/research/ANTI_LOOKAHEAD_RULES.md`, `docs/research/DATASET_GOVERNANCE.md`, `docs/quant/SETUPS_REGISTRY.md`, `SESSION.md` | Éviter overfit / lookahead |
 | Risk / allocation / sizing / kill switch | fichiers risk / allocation si existants, `TRADING_LOGIC.md`, `PROJECT_RULES.md`, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter risque non documenté |
 | Broker réel / exécution argent réel | `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `docs/project/ARCHITECTURE.md`, `TRADING_LOGIC.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, `KNOWN_ISSUES.md` | Escalade obligatoire |
 | Bug corrigé / dette ajoutée | `KNOWN_ISSUES.md`, `SESSION.md`, fichier domaine concerné | Garder dette à jour |
@@ -43,7 +43,7 @@ Exemples acceptables :
 
 - `TRADING_LOGIC.md vérifié : aucun changement requis car la PR ne modifie pas le scoring.`
 - `PROVIDERS_MATRIX.md non modifié : aucun provider / TTL / fallback touché.`
-- `SETUPS_REGISTRY.md non modifié : la PR ne touche aucun setup, juste la documentation de gouvernance.`
+- `docs/quant/SETUPS_REGISTRY.md non modifié : la PR ne touche aucun setup, juste la documentation de gouvernance.`
 
 Justification non acceptable :
 

@@ -45,6 +45,6 @@ _Garder l'historique des features expérimentales qui ont été retirées, avec 
 
 ## Sources existantes à consolider
 
-- `/SETUPS_REGISTRY.md` — setups marqués `FRAGILE`, `DATA_INSUFFICIENT`, `EDGE_DEPENDS_ON_*`
+- `docs/quant/SETUPS_REGISTRY.md` — setups marqués `FRAGILE`, `DATA_INSUFFICIENT`, `EDGE_DEPENDS_ON_*`
 - `/SESSION.md` — historique expérimentations
 - `/docs/research/`

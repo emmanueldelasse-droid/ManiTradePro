@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/migrate-docs-project-architecture` (en cours — première migration physique : `ARCHITECTURE.md` + `DATA_PIPELINE.md` racine → `docs/project/`).
-- **Dernier merge connu** : PR #226 `docs(project): add markdown consolidation plan` (commit `ae0aef7` sur `main`).
+- **Branche / PR active** : `claude/migrate-docs-quant-registries` (en cours — migration `docs/quant/` : `SETUPS_REGISTRY.md` + `ASSET_REGISTRY.md` racine → `docs/quant/`, décision sur `TRADING_LOGIC.md`).
+- **Dernier merge connu** : PR #227 `docs(project): migrate architecture docs` (commit `1c8f220` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -35,24 +35,26 @@
 ## Dernière session / dernière PR mergée (bis)
 
 - **Date** : 2026-05-19.
-- **PR** : #226 — `docs(project): add markdown consolidation plan`.
-- **Objectif** : audit Markdown complet + plan officiel de consolidation par PR successives.
-- **Résultat** : merge squash sur `main` (commit `ae0aef7`). Plan créé (`docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`), comptages exacts après review ChatGPT, aucune migration physique.
-- **Fichiers modifiés** : `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (nouveau), `GOVERNANCE.md`, `docs/project/DOC_IMPACT_MATRIX.md`, `SESSION.md`.
+- **PR** : #227 — `docs(project): migrate architecture docs`.
+- **Objectif** : première migration physique — `ARCHITECTURE.md` + `DATA_PIPELINE.md` racine → `docs/project/`.
+- **Résultat** : merge squash sur `main` (commit `1c8f220`). Stubs racine de redirection en place, liens canoniques mis à jour, GOVERNANCE.md § *Document canonical sources* clarifié après review ChatGPT (NOGO initial).
+- **Fichiers ajoutés / migrés** : `docs/project/ARCHITECTURE.md` (344), `docs/project/DATA_PIPELINE.md` (640).
+- **Fichiers transformés en stubs** : `ARCHITECTURE.md` (racine), `DATA_PIPELINE.md` (racine).
 - **Impact runtime / quant** : aucun.
 - **Statut merge** : `GO MERGE` explicite reçu avec résumé simple, merge effectué en squash.
 
 ## PR en cours
 
-- **PR** : migration `docs/project/` (étape 1 du plan) — branche `claude/migrate-docs-project-architecture`.
-- **Objectif** : déplacer les sources canoniques `ARCHITECTURE.md` et `DATA_PIPELINE.md` de la racine vers `docs/project/`, en remplaçant les chemins racine par des stubs temporaires de redirection.
-- **Fichiers ajoutés (déplacement bloc)** : `docs/project/ARCHITECTURE.md` (344 lignes, contenu intégral de l'ancien `ARCHITECTURE.md` racine ; l'ancien stub de 18 lignes a été remplacé), `docs/project/DATA_PIPELINE.md` (640 lignes, contenu intégral de l'ancien `DATA_PIPELINE.md` racine).
-- **Fichiers transformés en stubs** : `ARCHITECTURE.md` (racine), `DATA_PIPELINE.md` (racine).
-- **Fichiers modifiés (liens canoniques)** : `GOVERNANCE.md` (table hybride + section spécialisée architecture), `CLAUDE.md` (Documentation permanente + Mémo merge), `CHECKLIST_MERGE.md` (Documentation + Cohérence), `docs/project/DOC_IMPACT_MATRIX.md` (lignes worker / front / provider / Supabase / broker), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire + ordre des PR), `SESSION.md`.
+- **PR** : migration `docs/quant/` (étape 2 du plan) — branche `claude/migrate-docs-quant-registries`.
+- **Objectif** : déplacer les sources canoniques `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md` de la racine vers `docs/quant/`, en remplaçant les chemins racine par des stubs temporaires de redirection. Trancher le sort documentaire de `TRADING_LOGIC.md`.
+- **Fichiers ajoutés / migrés (déplacement bloc)** : `docs/quant/SETUPS_REGISTRY.md` (529 lignes, contenu intégral de l'ancien `SETUPS_REGISTRY.md` racine ; l'ancien stub de 19 lignes a été remplacé), `docs/quant/ASSET_REGISTRY.md` (202 lignes, contenu intégral de l'ancien `ASSET_REGISTRY.md` racine ; l'ancien stub de 13 lignes a été remplacé).
+- **Fichiers transformés en stubs** : `SETUPS_REGISTRY.md` (racine, 12 lignes), `ASSET_REGISTRY.md` (racine, 12 lignes).
+- **Décision `TRADING_LOGIC.md`** : **reste racine** pour cette PR. Contenu transversal (scoring + pipeline + safety gate + sizing + fermeture + garde-fou devise), split entre `docs/project/` et `docs/quant/` reporté à une PR dédiée pour éviter de mélanger migration de registres et refonte de fond.
+- **Fichiers modifiés (liens canoniques)** : `GOVERNANCE.md` (table hybride + sections spécialisées trading et recherche du protocole de reprise + exemple), `CLAUDE.md` (Documentation permanente), `CHECKLIST_MERGE.md` (Documentation), `docs/project/DOC_IMPACT_MATRIX.md` (4 lignes : trading logic, setup, actif, recherche quant + exemple de justification), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire + ordre des PR + doublons recomputés), `docs/project/EXPERIMENTAL_FEATURES.md` (sources à consolider), `docs/quant/FRICTION_MODEL.md` (sources à consolider), `SESSION.md`.
 - **Impact runtime** : aucun.
-- **Impact quant** : aucun.
-- **Impact documentation** : `ARCHITECTURE.md` et `DATA_PIPELINE.md` désormais canoniques sous `docs/project/` ; stubs racine conservés pour compatibilité avec les anciens liens. Aucun contenu de fond perdu (copie bloc, aucune édition métier).
-- **Non inclus** : suppression des stubs racine, migration `docs/quant/`, migration `docs/monitoring/`, modification de contenu métier des documents déplacés.
+- **Impact quant** : aucun changement de fond. Aucun setup, score, registre, régime, moteur ou logique trading modifié sur le fond.
+- **Impact documentation** : `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md` désormais canoniques sous `docs/quant/` ; stubs racine conservés. Décision documentaire prise sur `TRADING_LOGIC.md`.
+- **Non inclus** : split de `TRADING_LOGIC.md`, migration `docs/monitoring/`, suppression des stubs racine.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
@@ -76,8 +78,8 @@
 
 ## Prochaines priorités
 
-1. **PR migration `docs/quant/`** (gouvernance) : déplacer `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, décider du sort de `TRADING_LOGIC.md`.
-2. **PR migration `docs/monitoring/`** (gouvernance) : déplacer `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md`.
+1. **PR migration `docs/monitoring/`** (gouvernance) : déplacer `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md`.
+2. **PR split `TRADING_LOGIC.md`** (gouvernance) : éclatement entre `docs/project/` (partie pipeline / safety / sizing / exécution) et `docs/quant/` (partie scoring / setups / régimes). Reporté à une PR dédiée car nécessite une refonte de fond.
 3. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
 4. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
 5. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
@@ -91,8 +93,8 @@
 - **Architecture code** : `docs/project/ARCHITECTURE.md` (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
 - **Pipeline de données** : `docs/project/DATA_PIPELINE.md` (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
 - **Logique trading / moteur** : `TRADING_LOGIC.md`.
-- **Setups quantitatifs** : `SETUPS_REGISTRY.md`.
-- **Classification actifs** : `ASSET_REGISTRY.md`.
+- **Setups quantitatifs** : `docs/quant/SETUPS_REGISTRY.md` (la racine `SETUPS_REGISTRY.md` est un stub temporaire de redirection).
+- **Classification actifs** : `docs/quant/ASSET_REGISTRY.md` (la racine `ASSET_REGISTRY.md` est un stub temporaire de redirection).
 - **Providers** : `PROVIDERS_MATRIX.md`.
 - **Bugs / dette** : `KNOWN_ISSUES.md`.
 - **Checklist merge** : `CHECKLIST_MERGE.md`.

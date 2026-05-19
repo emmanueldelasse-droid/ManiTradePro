@@ -51,10 +51,10 @@ Aide anti-oubli (non bloquante) : `npm run check:doc-impact`. Le script ne rempl
 - `PROVIDERS_MATRIX.md` — routage providers.
 - `KNOWN_ISSUES.md` — bugs et dette.
 - `CHECKLIST_MERGE.md` — checklist obligatoire avant tout merge.
-- `SETUPS_REGISTRY.md` — registre officiel des setups quantitatifs validés/testés/abandonnés.
-- `ASSET_REGISTRY.md` — classification provisoire des actifs compatibles avec les setups.
+- `docs/quant/SETUPS_REGISTRY.md` — registre officiel des setups quantitatifs validés/testés/abandonnés (la racine `SETUPS_REGISTRY.md` est un stub temporaire de redirection).
+- `docs/quant/ASSET_REGISTRY.md` — classification provisoire des actifs compatibles avec les setups (la racine `ASSET_REGISTRY.md` est un stub temporaire de redirection).
 
-Si une demande touche aux setups, aux backtests, au régime marché ou aux actifs compatibles, lire aussi `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md` avant toute réponse ou modification.
+Si une demande touche aux setups, aux backtests, au régime marché ou aux actifs compatibles, lire aussi `docs/quant/SETUPS_REGISTRY.md` et `docs/quant/ASSET_REGISTRY.md` avant toute réponse ou modification.
 
 À chaque merge, **parcourir `CHECKLIST_MERGE.md`** et mettre à jour les fichiers concernés AVANT le merge :
 - Modif architecture → `docs/project/ARCHITECTURE.md`

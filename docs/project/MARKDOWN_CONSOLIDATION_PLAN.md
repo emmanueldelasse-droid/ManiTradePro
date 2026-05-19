@@ -18,7 +18,7 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 
 ### Risques actuels
 
-- **Doublons potentiels** : après la première migration `docs/project/` (PR `claude/migrate-docs-project-architecture`), il reste 11 sources canoniques racine vivantes. 3 ont encore un pendant `/docs/*` au même nom (`SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md` — soit 4 stubs ; à migrer dans les PR suivantes), 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). `ARCHITECTURE.md` et `DATA_PIPELINE.md` sont désormais canoniques sous `docs/project/`, leurs anciens chemins racine sont des stubs temporaires de redirection.
+- **Doublons potentiels** : après les migrations `docs/project/` (PR #227) et `docs/quant/` (PR en cours `claude/migrate-docs-quant-registries`), il reste 9 sources canoniques racine vivantes. 2 ont encore un pendant `/docs/*` au même nom (`PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md` — à migrer dans la PR `docs/monitoring/`), 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md` sont désormais canoniques sous `docs/*`, leurs anciens chemins racine sont des stubs temporaires de redirection. `TRADING_LOGIC.md` reste racine (contenu transversal, split reporté à une PR dédiée).
 - **Confusion possible** : un contributeur peut écrire dans un squelette `/docs/*` au lieu de la source canonique racine.
 - **Lecture excessive** : la matrice d'impact documentaire pointe à la fois vers racine et `/docs/`, et le protocole de reprise de session liste explicitement les sources racine.
 - **Fichiers semi-actifs** : plusieurs squelettes `/docs/project/` et `/docs/quant/` contiennent des rôles + métadonnées sans contenu métier réel, ce qui peut donner une fausse impression de couverture documentaire.
@@ -38,9 +38,9 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `CHECKLIST_MERGE.md` | 182 | Checklist merge | Canonique | À consolider plus tard vers `docs/project/MERGE_PROTOCOL.md` |
 | `ARCHITECTURE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/ARCHITECTURE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 | `DATA_PIPELINE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/DATA_PIPELINE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `TRADING_LOGIC.md` | 501 | Logique du moteur | Canonique | À scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/` (PR migration quant) |
-| `SETUPS_REGISTRY.md` | 529 | Registre setups | Canonique | À déplacer vers `docs/quant/SETUPS_REGISTRY.md` (PR migration quant) |
-| `ASSET_REGISTRY.md` | 202 | Classification actifs | Canonique | À déplacer vers `docs/quant/ASSET_REGISTRY.md` (PR migration quant) |
+| `TRADING_LOGIC.md` | 501 | Logique du moteur (transversal) | Canonique racine | **Reste racine** : contenu transversal (scoring + pipeline + safety gate + sizing + fermeture + garde-fou devise). Split entre `docs/project/` et `docs/quant/` reporté à une PR dédiée. |
+| `SETUPS_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/SETUPS_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
+| `ASSET_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/ASSET_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 | `PROVIDERS_MATRIX.md` | 125 | Routage providers | Canonique | À déplacer vers `docs/monitoring/PROVIDERS_MATRIX.md` (PR migration monitoring) |
 | `KNOWN_ISSUES.md` | 331 | Bugs / dette | Canonique | À déplacer vers `docs/monitoring/KNOWN_ISSUES.md` (PR migration monitoring) |
 
@@ -57,8 +57,8 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `docs/project/PROD_SAFETY_RULES.md` | 74 | Squelette | Aucune source canonique racine | À enrichir plus tard |
 | `docs/project/EXPERIMENTAL_FEATURES.md` | 50 | Squelette | Aucune source canonique racine | À enrichir plus tard |
 | `docs/project/DOC_IMPACT_MATRIX.md` | 90 | **Canonique vivant** | (créé PR #224) | **Garder en place, déjà à son emplacement final** |
-| `docs/quant/SETUPS_REGISTRY.md` | 19 | Stub pointer | `SETUPS_REGISTRY.md` | À remplacer par la source canonique lors de la migration quant |
-| `docs/quant/ASSET_REGISTRY.md` | 13 | Stub pointer | `ASSET_REGISTRY.md` | À remplacer par la source canonique lors de la migration quant |
+| `docs/quant/SETUPS_REGISTRY.md` | 529 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle des setups |
+| `docs/quant/ASSET_REGISTRY.md` | 202 | **Canonique** *(migré depuis la racine)* | Canonique | Garder, source officielle des actifs |
 | `docs/quant/ALLOCATION_RULES.md` | 65 | Squelette | Aucune source canonique racine | À enrichir plus tard |
 | `docs/quant/BACKTEST_RULES.md` | 75 | Squelette | Aucune (couverture partielle dans `docs/research/`) | À fusionner avec docs/research/ plus tard |
 | `docs/quant/FRICTION_MODEL.md` | 82 | Squelette | Aucune source canonique racine | À enrichir plus tard |
@@ -179,12 +179,12 @@ Racine du repo (5 fichiers) :
    - Met à jour `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `CLAUDE.md`, `DOC_IMPACT_MATRIX.md`, `SESSION.md`. **Fait**.
    - Reste pour cette ligne : aucune autre action prévue. La consolidation `AI_WORKFLOW.md` / `MERGE_PROTOCOL.md` / squelettes prod safety / calibration / experimental est traitée dans une PR séparée si elle devient nécessaire.
 
-2. **PR migration `docs/quant/`**
-   - Déplace `SETUPS_REGISTRY.md` → `docs/quant/SETUPS_REGISTRY.md`.
-   - Déplace `ASSET_REGISTRY.md` → `docs/quant/ASSET_REGISTRY.md`.
-   - Décide du sort de `TRADING_LOGIC.md` (éclatement ou déplacement bloc).
-   - Crée des stubs racine pendant la transition.
-   - Met à jour la matrice et tous les renvois.
+2. **PR migration `docs/quant/`** *(partiellement réalisée — PR en cours `claude/migrate-docs-quant-registries`)*
+   - Déplace `SETUPS_REGISTRY.md` → `docs/quant/SETUPS_REGISTRY.md`. **Fait** (déplacement bloc 529 lignes).
+   - Déplace `ASSET_REGISTRY.md` → `docs/quant/ASSET_REGISTRY.md`. **Fait** (déplacement bloc 202 lignes).
+   - Décide du sort de `TRADING_LOGIC.md`. **Fait** : reste racine pour cette PR (contenu transversal : scoring + pipeline + safety gate + sizing + fermeture + garde-fou devise). Split entre `docs/project/` et `docs/quant/` reporté à une PR dédiée pour éviter de mélanger migration de registres et refonte de fond.
+   - Crée des stubs racine pendant la transition. **Fait** pour `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md`.
+   - Met à jour la matrice et tous les renvois. **Fait**.
 
 3. **PR migration `docs/monitoring/`**
    - Déplace `PROVIDERS_MATRIX.md` → `docs/monitoring/PROVIDERS_MATRIX.md`.

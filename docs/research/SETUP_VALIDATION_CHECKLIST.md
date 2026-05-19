@@ -135,7 +135,7 @@ Cocher exactement UNE case :
 - [ ] **L1.** Aucun moteur runtime modifié (Worker, frontend, providers, paper trading, broker, ordres).
 - [ ] **L2.** Aucun setup `VALIDATED_RESEARCH_CORE` antérieur dégradé sans débat.
 - [ ] **L3.** SESSION.md mis à jour avec section dédiée.
-- [ ] **L4.** Si setup ajouté à SETUPS_REGISTRY.md : fiche complète avec statut et caveats.
+- [ ] **L4.** Si setup ajouté à `docs/quant/SETUPS_REGISTRY.md` : fiche complète avec statut et caveats.
 - [ ] **L5.** Conformité avec `RESEARCH_FRAMEWORK_FREEZE_V1.md` confirmée.
 
 ---
