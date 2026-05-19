@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "setupId": "POST_EARNINGS_DRIFT",
+  "source": "EODHD",
+  "status": "DATASET_NOT_GENERATED_DRY_RUN",
+  "ingestedAt": null,
+  "reason": "Placeholder créé par PR #218. Pour générer le dataset réel, exécuter localement avec EODHD_API_KEY défini : node tools/backtests/pead-eodhd-ingestion-v1.mjs",
+  "scriptVersion": "tools/backtests/pead-eodhd-ingestion-v1.mjs",
+  "coverage": {
+    "symbolsRequested": 0,
+    "symbolsIngested": 0,
+    "eventsTotal": 0,
+    "completenessScore": 0
+  }
+}

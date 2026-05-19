@@ -3391,3 +3391,88 @@ Ce gel met fin à la phase d'exploration tous azimuts. La prochaine PR doit êtr
 - soit une décision politique sur le sourcing PEAD,
 - soit une PR strictement conforme au framework,
 - soit une mise à jour du framework lui-même via PR v2 explicite.
+
+---
+
+# PEAD EODHD Ingestion v1
+
+PR de **fondation dataset PEAD** : scripts d'ingestion EODHD + validation SEC. Pas un moteur PEAD, pas de backtest performance.
+
+Fichiers créés :
+
+```text
+tools/backtests/pead-eodhd-ingestion-v1.mjs       (ingestion EODHD avec dry-run fallback)
+tools/backtests/pead-sec-validation-v1.mjs        (validation SEC EDGAR sur échantillon)
+data/earnings/pead-eodhd-v1.json                  (placeholder vide, à générer côté user)
+data/earnings/pead-eodhd-v1.meta.json             (metadata)
+tools/backtests/output/pead-eodhd-ingestion-v1.{json,md}
+tools/backtests/output/pead-sec-validation-v1.{json,md}
+docs/research/PEAD_EODHD_INGESTION_V1.md          (doc complète, 10 sections)
+```
+
+## Mode dry-run (côté Claude)
+
+L'environnement Claude Code n'a pas accès à `EODHD_API_KEY`. Les scripts sont exécutés en **dry-run** :
+- syntax valide,
+- structure d'output validée,
+- dataset placeholder vide,
+- verdict `DATASET_NOT_GENERATED_DRY_RUN`.
+
+## Exécution réelle (côté utilisateur)
+
+```bash
+export EODHD_API_KEY="votre_clé"
+export SEC_USER_AGENT="VotreNom contact@email.com"
+
+# 1. Ingestion EODHD
+node tools/backtests/pead-eodhd-ingestion-v1.mjs
+
+# 2. Validation SEC (échantillon de 30)
+node tools/backtests/pead-sec-validation-v1.mjs
+```
+
+## Anti-look-ahead par construction
+
+- **Classification stricte** des earnings : PRE_MARKET / POST_MARKET / INTRADAY / UNKNOWN.
+- **INTRADAY et UNKNOWN marqués non-tradables** (qualityFlags).
+- **publishedAt reconstruit** avec heures fixes ET → UTC (~1h précision) :
+  - PRE_MARKET = `T13:00:00Z` (08:00 ET)
+  - POST_MARKET = `T22:00:00Z` (17:00 ET)
+- **qualityFlags** par event (MARKET_SESSION_UNKNOWN, EPS_ACTUAL_MISSING, etc.).
+- **Validation SEC** sur 30 earnings random : si filing date ±5 jours match → OK.
+
+## Limitations documentées
+
+- EODHD ne fournit pas `sourceConsensusDate` → risque look-ahead silencieux sur estimates.
+- Heures de publication estimées (~1h précision).
+- DST non géré (UTC-5 fixe).
+- Univers point-in-time non géré (survivorship documenté).
+
+## Verdicts possibles
+
+| Verdict | Conditions |
+|---|---|
+| DATASET_READY_FOR_PROTOTYPE | Score ≥ 80, UNKNOWN < 20 % |
+| PARTIAL_DATASET_READY | Score 50-80, UNKNOWN < 40 % |
+| HIGH_LOOKAHEAD_RISK | UNKNOWN ≥ 40 % |
+| DATASET_UNUSABLE | Score < 50 ou validation SEC FAILED |
+| DATASET_NOT_GENERATED_DRY_RUN | EODHD_API_KEY absent (côté Claude) |
+
+## Conformité framework
+
+- Pipeline 10 étapes (étape 2 dataset audit) ✓
+- DATASET_GOVERNANCE.md respecté (snapshots immutables, _meta.json, versionnement)
+- ANTI_LOOKAHEAD_RULES.md respecté (timing strict, qualityFlags)
+- Aucun moteur PEAD complet construit (interdiction respectée)
+
+## Non-régression
+
+Aucun moteur existant modifié. Aucune source amont modifiée. 7 nouveaux fichiers + SESSION.md. Aucun impact runtime (Worker, frontend, providers, paper trading, broker, ordres, endpoints inchangés).
+
+## Prochaines étapes
+
+1. **Côté utilisateur** : exécuter avec EODHD_API_KEY pour générer le dataset réel.
+2. **Re-exécuter audit** pour vérifier le verdict réel (DATASET_READY_FOR_PROTOTYPE espéré).
+3. **Exécuter SEC validation** sur l'échantillon.
+4. **Si verdicts OK** → PR `pead-signal-detect-v1` (génération de signaux sans backtest).
+5. **Puis** → PR `pead-backtest-v1` (backtest avec friction).
