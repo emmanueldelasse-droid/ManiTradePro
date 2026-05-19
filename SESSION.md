@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/session-start-protocol` (en cours — ajout du protocole officiel de reprise de session + règle de format ChatGPT ↔ Claude dans `GOVERNANCE.md`).
-- **Dernier merge connu** : PR #222 `docs(session): clean session state and enforce update rule` (commit `c6d6d91` sur `main`).
+- **Branche / PR active** : `claude/doc-impact-matrix` (en cours — matrice d'impact documentaire + contrôle anti-oubli dev-only).
+- **Dernier merge connu** : PR #223 `docs(governance): add official session start protocol` (commit `25a9582` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -32,19 +32,26 @@
 - **Impact documentation** : `SESSION.md` redevient un résumé d'état, pas un journal complet.
 - **Statut merge** : `GO MERGE` explicite reçu, merge effectué en squash.
 
+## Dernière session / dernière PR mergée (bis)
+
+- **Date** : 2026-05-19.
+- **PR** : #223 — `docs(governance): add official session start protocol`.
+- **Objectif** : ajouter le protocole officiel de reprise de session et la règle de format ChatGPT ↔ Claude dans `GOVERNANCE.md`.
+- **Résultat** : merge squash sur `main` (commit `25a9582`). Socle obligatoire à 5 fichiers, fichiers spécialisés par sujet, prompt unique / réponse en bloc unique.
+- **Fichiers modifiés** : `GOVERNANCE.md`, `CLAUDE.md`, `SESSION.md`, `CHECKLIST_MERGE.md`.
+- **Impact runtime / quant** : aucun.
+- **Statut merge** : `GO MERGE` explicite reçu, merge effectué en squash.
+
 ## PR en cours
 
-- **PR** : protocole officiel de reprise de session — branche `claude/session-start-protocol`.
-- **Objectif** : ajouter dans `GOVERNANCE.md` :
-  - le **socle obligatoire** à lire au début de chaque session (`GOVERNANCE.md`, `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `SESSION.md`, `KNOWN_ISSUES.md`) ;
-  - les **fichiers spécialisés** par sujet (architecture / trading / recherche quant / PR / workflow IA) ;
-  - la règle **prompt unique** ChatGPT → Claude ;
-  - la règle **réponse en bloc unique** Claude → ChatGPT.
-- **Fichiers modifiés** : `GOVERNANCE.md`, `CLAUDE.md` (renvoi court), `SESSION.md`, `CHECKLIST_MERGE.md` (ligne courte).
-- **Impact runtime** : aucun.
+- **PR** : matrice d'impact documentaire + contrôle anti-oubli — branche `claude/doc-impact-matrix`.
+- **Objectif** : éviter les oublis de mise à jour des fichiers mémoire en formalisant une matrice « si tu modifies X, mets aussi à jour Y », et fournir un script dev-only d'aide.
+- **Fichiers ajoutés** : `docs/project/DOC_IMPACT_MATRIX.md` (matrice officielle), `scripts/check-doc-impact.mjs` (aide dev-only).
+- **Fichiers modifiés** : `GOVERNANCE.md` (référence officielle + critères de refus), `CHECKLIST_MERGE.md` (section dédiée + section `Documentation impact` obligatoire dans le body), `CLAUDE.md` (renvoi court), `package.json` (commande `check:doc-impact`), `SESSION.md`.
+- **Impact runtime** : aucun (script dev-only, sans appel réseau, sans modification de fichier, exit code 0).
 - **Impact quant** : aucun.
-- **Impact documentation** : `GOVERNANCE.md` devient la source unique du protocole de reprise de session ; aucune obligation de lire tous les `.md` à chaque session.
-- **Non inclus** : matrice d'impact documentaire (PR suivante), contrôle anti-oubli (PR suivante), consolidation des fichiers Markdown (PR ultérieure).
+- **Impact documentation** : matrice officielle et critères de refus `GO MERGE` ajoutés.
+- **Non inclus** : consolidation / déplacement / suppression des fichiers Markdown (PR ultérieure).
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 
 ## Décisions actives
@@ -68,11 +75,10 @@
 
 ## Prochaines priorités
 
-1. **PR séparée — matrice d'impact documentaire + contrôle anti-oubli** (gouvernance) : table « si tu modifies X, alors mets aussi à jour Y » + script ou checklist pour détecter les oublis. Non incluse dans la PR `claude/session-start-protocol`.
-2. **PR séparée — consolidation / rangement des fichiers Markdown** (gouvernance) : alignement racine ↔ `/docs/` selon `STRUCTURE DOSSIERS OBLIGATOIRE`. Après la matrice d'impact.
-3. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
-4. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
-5. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+1. **PR séparée — consolidation / rangement des fichiers Markdown** (gouvernance) : alignement racine ↔ `/docs/` selon `STRUCTURE DOSSIERS OBLIGATOIRE`. Après la matrice d'impact.
+2. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
+3. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
+4. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
 
 ## Fichiers sources à consulter
 
@@ -88,11 +94,11 @@
 - **Providers** : `PROVIDERS_MATRIX.md`.
 - **Bugs / dette** : `KNOWN_ISSUES.md`.
 - **Checklist merge** : `CHECKLIST_MERGE.md`.
+- **Matrice d'impact documentaire** : `docs/project/DOC_IMPACT_MATRIX.md` (aide anti-oubli : `npm run check:doc-impact`).
 - **Framework recherche (gel actif)** : `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `docs/research/ANTI_LOOKAHEAD_RULES.md`, `docs/research/DATASET_GOVERNANCE.md`.
 
 ## Non encore fait
 
-- Matrice d'impact documentaire + contrôle anti-oubli (PR séparée à venir).
 - Consolidation / rangement des fichiers Markdown (PR ultérieure).
 - Sourcing dataset PEAD : décision politique en attente.
 - Walk-forward conditionnel régime sur RS Rotation simple : non lancé.
