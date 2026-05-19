@@ -17,7 +17,7 @@
 - **Ce qui est réel** : aucun trading capital réel. Rien.
 - **Ce qui est paper trading** : infrastructure paper existe (`mtp_positions`, `mtp_trades` Supabase) mais aucun setup n'est branché en automatique sans supervision humaine.
 - **Ce qui est recherche** : tous les setups quantitatifs en cours d'évaluation, sous le pipeline 10 étapes du Framework Freeze v1.
-- **Ce qui est expérimental** : MEAN_REVERSION, SECTOR_RELATIVE_STRENGTH v1, TREND_PULLBACK_DYNAMIC_SUPPORT v1 (cf. `SETUPS_REGISTRY.md`).
+- **Ce qui est expérimental** : MEAN_REVERSION, SECTOR_RELATIVE_STRENGTH v1, TREND_PULLBACK_DYNAMIC_SUPPORT v1 (cf. `docs/quant/SETUPS_REGISTRY.md`).
 - **Ce qui n'est pas encore live** : tout. Aucun setup `LIVE_READY` au 2026-05-19.
 
 ## Dernière session / dernière PR mergée
@@ -68,10 +68,10 @@
 
 ## Points de vigilance
 
-- **Aucun setup `LIVE_READY`** au 2026-05-19. Détail des statuts dans `SETUPS_REGISTRY.md`.
+- **Aucun setup `LIVE_READY`** au 2026-05-19. Détail des statuts dans `docs/quant/SETUPS_REGISTRY.md`.
 - **PEAD** : seule piste structurellement distincte de momentum, mais bloquée par absence de dataset earnings.
 - **RS Rotation simple** : crédible côté exécution mais fragile temporellement. Walk-forward conditionnel régime obligatoire avant tout passage live.
-- **Biais d'exécution historiques** : les anciens PF / winrate antérieurs aux audits PR #207 et #208 sont annulés. Voir bannière en tête de `SETUPS_REGISTRY.md`.
+- **Biais d'exécution historiques** : les anciens PF / winrate antérieurs aux audits PR #207 et #208 sont annulés. Voir bannière en tête de `docs/quant/SETUPS_REGISTRY.md`.
 - **Dépendance KV `MTP_CACHE`** : la cohérence prix cross-worker dépend du binding KV. Sans lui, bug cross-worker silencieux (cf. `PROJECT_RULES.md` R4).
 - **`buildSnapshotId`** : purement analytique, aucune dépendance live autorisée. Toute modif casse l'historique des snapshots.
 - **Documentation** : `SESSION.md` doit refléter l'état réel **après** chaque merge. Ne jamais y mettre une intention non livrée.
