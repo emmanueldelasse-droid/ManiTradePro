@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/markdown-consolidation-plan` (en cours — audit Markdown + plan de consolidation, sans déplacement ni suppression).
-- **Dernier merge connu** : PR #225 `docs(governance): require summary with GO MERGE` (commit `b33d1cf` sur `main`).
+- **Branche / PR active** : `claude/migrate-docs-project-architecture` (en cours — première migration physique : `ARCHITECTURE.md` + `DATA_PIPELINE.md` racine → `docs/project/`).
+- **Dernier merge connu** : PR #226 `docs(project): add markdown consolidation plan` (commit `ae0aef7` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -35,23 +35,24 @@
 ## Dernière session / dernière PR mergée (bis)
 
 - **Date** : 2026-05-19.
-- **PR** : #225 — `docs(governance): require summary with GO MERGE`.
-- **Objectif** : rendre obligatoire un résumé simple avec chaque `GO MERGE` donné par ChatGPT (un `GO MERGE` nu est invalide).
-- **Résultat** : merge squash sur `main` (commit `b33d1cf`). Sous-section ajoutée dans `GOVERNANCE.md` § *Workflow validation avant merge*, coche `CHECKLIST_MERGE.md` complétée.
-- **Fichiers modifiés** : `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`.
+- **PR** : #226 — `docs(project): add markdown consolidation plan`.
+- **Objectif** : audit Markdown complet + plan officiel de consolidation par PR successives.
+- **Résultat** : merge squash sur `main` (commit `ae0aef7`). Plan créé (`docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`), comptages exacts après review ChatGPT, aucune migration physique.
+- **Fichiers modifiés** : `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (nouveau), `GOVERNANCE.md`, `docs/project/DOC_IMPACT_MATRIX.md`, `SESSION.md`.
 - **Impact runtime / quant** : aucun.
 - **Statut merge** : `GO MERGE` explicite reçu avec résumé simple, merge effectué en squash.
 
 ## PR en cours
 
-- **PR** : audit Markdown + plan de consolidation — branche `claude/markdown-consolidation-plan`.
-- **Objectif** : auditer tous les fichiers `.md` du repo et produire un plan officiel de consolidation, **sans déplacement ni suppression dans cette PR**.
-- **Fichier ajouté** : `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire complet, structure cible, ordre des futures PR, règles de migration, ce qui ne doit pas être fait maintenant).
-- **Fichiers modifiés** : `GOVERNANCE.md` (1 phrase pointant le plan dans § *Document canonical sources*), `docs/project/DOC_IMPACT_MATRIX.md` (ligne *Consolidation Markdown future* enrichie avec le pointeur vers le plan), `SESSION.md`.
+- **PR** : migration `docs/project/` (étape 1 du plan) — branche `claude/migrate-docs-project-architecture`.
+- **Objectif** : déplacer les sources canoniques `ARCHITECTURE.md` et `DATA_PIPELINE.md` de la racine vers `docs/project/`, en remplaçant les chemins racine par des stubs temporaires de redirection.
+- **Fichiers ajoutés (déplacement bloc)** : `docs/project/ARCHITECTURE.md` (344 lignes, contenu intégral de l'ancien `ARCHITECTURE.md` racine ; l'ancien stub de 18 lignes a été remplacé), `docs/project/DATA_PIPELINE.md` (640 lignes, contenu intégral de l'ancien `DATA_PIPELINE.md` racine).
+- **Fichiers transformés en stubs** : `ARCHITECTURE.md` (racine), `DATA_PIPELINE.md` (racine).
+- **Fichiers modifiés (liens canoniques)** : `GOVERNANCE.md` (table hybride + section spécialisée architecture), `CLAUDE.md` (Documentation permanente + Mémo merge), `CHECKLIST_MERGE.md` (Documentation + Cohérence), `docs/project/DOC_IMPACT_MATRIX.md` (lignes worker / front / provider / Supabase / broker), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire + ordre des PR), `SESSION.md`.
 - **Impact runtime** : aucun.
 - **Impact quant** : aucun.
-- **Impact documentation** : plan officiel de consolidation Markdown ajouté ; ordre prudent en 6 PR successives proposé (project → quant → monitoring → décisions → nettoyage final → archivage backtests optionnel).
-- **Non inclus** : déplacement, suppression, fusion réelle de fichiers Markdown.
+- **Impact documentation** : `ARCHITECTURE.md` et `DATA_PIPELINE.md` désormais canoniques sous `docs/project/` ; stubs racine conservés pour compatibilité avec les anciens liens. Aucun contenu de fond perdu (copie bloc, aucune édition métier).
+- **Non inclus** : suppression des stubs racine, migration `docs/quant/`, migration `docs/monitoring/`, modification de contenu métier des documents déplacés.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
@@ -75,12 +76,11 @@
 
 ## Prochaines priorités
 
-1. **PR migration `docs/project/`** (gouvernance) : première PR d'exécution du plan `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`. Déplacer `ARCHITECTURE.md` et `DATA_PIPELINE.md` vers `docs/project/`, remplacer les squelettes, créer des stubs racine pendant la transition, mettre à jour tous les renvois.
-2. **PR migration `docs/quant/`** (gouvernance) : déplacer `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, décider du sort de `TRADING_LOGIC.md`.
-3. **PR migration `docs/monitoring/`** (gouvernance) : déplacer `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md`.
-4. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
-5. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
-6. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+1. **PR migration `docs/quant/`** (gouvernance) : déplacer `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, décider du sort de `TRADING_LOGIC.md`.
+2. **PR migration `docs/monitoring/`** (gouvernance) : déplacer `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md`.
+3. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
+4. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
+5. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
 
 ## Fichiers sources à consulter
 
@@ -88,8 +88,8 @@
 - **Manuel opérationnel Claude Code** : `CLAUDE.md`.
 - **Objectif produit / constitution** : `BOT_OBJECTIVE.md`.
 - **Règles techniques structurelles** : `PROJECT_RULES.md`.
-- **Architecture code** : `ARCHITECTURE.md`.
-- **Pipeline de données** : `DATA_PIPELINE.md`.
+- **Architecture code** : `docs/project/ARCHITECTURE.md` (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
+- **Pipeline de données** : `docs/project/DATA_PIPELINE.md` (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
 - **Logique trading / moteur** : `TRADING_LOGIC.md`.
 - **Setups quantitatifs** : `SETUPS_REGISTRY.md`.
 - **Classification actifs** : `ASSET_REGISTRY.md`.

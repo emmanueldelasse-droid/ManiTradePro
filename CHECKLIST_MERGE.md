@@ -35,8 +35,8 @@ Le body de PR doit contenir une section `## Documentation impact` structurée :
 ## Documentation
 
 - [ ] **`SESSION.md` mis à jour** : reflète l'état réel **après** la PR. Doit contenir objectif livré, fichiers modifiés, impacts (runtime / quant / documentation), limites, prochaine étape. Une PR ne doit pas recevoir `GO MERGE` si `SESSION.md` est absent, obsolète ou contradictoire avec les fichiers sources.
-- [ ] **`ARCHITECTURE.md` mis à jour** si la structure du code change (nouvelle route, nouveau cluster de fonctions, nouvelle table Supabase, modification de cache).
-- [ ] **`DATA_PIPELINE.md` mis à jour** si le flux d'une donnée change (provider, cache, TTL, devise, freshness).
+- [ ] **`docs/project/ARCHITECTURE.md` mis à jour** si la structure du code change (nouvelle route, nouveau cluster de fonctions, nouvelle table Supabase, modification de cache).
+- [ ] **`docs/project/DATA_PIPELINE.md` mis à jour** si le flux d'une donnée change (provider, cache, TTL, devise, freshness).
 - [ ] **`TRADING_LOGIC.md` mis à jour** si le scoring, les setups, les règles d'ouverture/fermeture, ou l'apprentissage évoluent.
 - [ ] **`PROVIDERS_MATRIX.md` mis à jour** si une source de données change ou un nouveau provider est ajouté.
 - [ ] **`KNOWN_ISSUES.md` mis à jour** : ajouter un nouveau bug découvert, marquer un bug résolu comme tel, documenter une nouvelle dette identifiée.
@@ -79,7 +79,7 @@ Le body de PR doit contenir une section `## Documentation impact` structurée :
 ## Cohérence
 
 - [ ] **Front et worker synchronisés** si la modification touche un format de payload (ex. ajout d'un champ `quality`, `currency`, `quotedAt`).
-- [ ] **Tailles de fichiers reflétées** dans `ARCHITECTURE.md` si elles ont sensiblement bougé (>500 lignes ajoutées/retirées).
+- [ ] **Tailles de fichiers reflétées** dans `docs/project/ARCHITECTURE.md` si elles ont sensiblement bougé (>500 lignes ajoutées/retirées).
 - [ ] **Pas de référence à un numéro de ligne** dans la doc (`L1234`, `app.js#L908`). Préférer `fonction X dans fichier Y`.
 - [ ] **Tous les `quality`, `currency`, `quotedAt` requis** sont effectivement présents dans le payload retourné par le worker.
 

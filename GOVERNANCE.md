@@ -367,43 +367,54 @@ Racine :
 ## DOCUMENT CANONICAL SOURCES
 
 > Objectif : formaliser explicitement le mode hybride temporaire **racine ↔ `/docs/`**
-> introduit par la PR de setup gouvernance (2026-05-19), tant que la migration
-> physique n'a pas été exécutée dans une PR dédiée.
+> introduit par la PR de setup gouvernance (2026-05-19), pendant l'exécution
+> progressive de la migration physique (plan officiel :
+> `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`).
 
 ### Mode hybride en vigueur
 
-Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` existent déjà
-à la racine du repo. Tant que la migration physique n'a pas eu lieu :
+Certains fichiers prévus par la `STRUCTURE DOSSIERS OBLIGATOIRE` ont déjà
+été migrés vers `/docs/*`, d'autres sont encore à la racine en attendant
+leur PR de migration dédiée. À tout instant, pour chaque sujet :
 
-- la **source canonique** reste à la racine ;
-- le fichier dans `/docs/*` est un **stub lecture seule** qui ne fait que
-  pointer vers la source canonique ;
-- toute modification de fond doit être faite **uniquement** sur la source
-  canonique ;
+- une **seule source canonique** fait foi (racine **ou** `/docs/*` selon
+  où en est la migration) ;
+- l'autre chemin, s'il existe, est un **stub lecture seule** (stub
+  pointer côté `/docs/*` avant migration, stub de redirection côté
+  racine après migration) ;
+- toute modification de fond doit être faite **uniquement** sur la
+  source canonique en vigueur ;
 - les stubs ne doivent **jamais** devenir des sources métier.
+
+La table ci-dessous indique pour chaque fichier où se trouve la source
+canonique actuelle et quel chemin de transition existe encore.
 
 ### Exemple
 
-- `/SETUPS_REGISTRY.md` = source canonique.
-- `docs/quant/SETUPS_REGISTRY.md` = stub lecture seule.
-- Toute modification doit être faite uniquement sur la source canonique.
+- `/SETUPS_REGISTRY.md` = source canonique (pas encore migrée).
+- `docs/quant/SETUPS_REGISTRY.md` = stub lecture seule pointant vers la
+  racine.
+- `docs/project/ARCHITECTURE.md` = source canonique (migrée).
+- `/ARCHITECTURE.md` = stub de redirection vers `docs/project/`.
+- Toute modification doit être faite uniquement sur la source canonique
+  en vigueur.
 
-### Liste exhaustive des sources canoniques racine (au 2026-05-19)
+### Sources canoniques actuelles et chemins de transition (au 2026-05-19)
 
-| Source canonique racine | Stub `/docs/` correspondant |
-|---|---|
-| `/ARCHITECTURE.md` | `docs/project/ARCHITECTURE.md` |
-| `/SETUPS_REGISTRY.md` | `docs/quant/SETUPS_REGISTRY.md` |
-| `/ASSET_REGISTRY.md` | `docs/quant/ASSET_REGISTRY.md` |
-| `/PROVIDERS_MATRIX.md` | `docs/monitoring/PROVIDERS_MATRIX.md` |
-| `/KNOWN_ISSUES.md` | `docs/monitoring/KNOWN_ISSUES.md` |
-| `/BOT_OBJECTIVE.md` | _(source actuelle de `docs/project/PROJECT_VISION.md` à venir)_ |
-| `/SESSION.md` | _(reste à la racine, cf. § `RÔLE DES FICHIERS`)_ |
-| `/CHECKLIST_MERGE.md` | _(source de la future `docs/project/MERGE_PROTOCOL.md`)_ |
-| `/GPT_ROLE.md` | _stub de redirection vers `GOVERNANCE.md` depuis 2026-05-19 ; n'est plus une source canonique_ |
-| `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ |
-| `/DATA_PIPELINE.md` | _(à consolider dans `docs/project/ARCHITECTURE.md` à terme)_ |
-| `/TRADING_LOGIC.md` | _(à scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/`)_ |
+| Source canonique actuelle | Chemin de transition (stub) | Statut migration |
+|---|---|---|
+| `docs/project/ARCHITECTURE.md` | `/ARCHITECTURE.md` = stub de redirection | **Migré** |
+| `docs/project/DATA_PIPELINE.md` | `/DATA_PIPELINE.md` = stub de redirection | **Migré** |
+| `/SETUPS_REGISTRY.md` | `docs/quant/SETUPS_REGISTRY.md` = stub pointer | À migrer (PR `docs/quant/`) |
+| `/ASSET_REGISTRY.md` | `docs/quant/ASSET_REGISTRY.md` = stub pointer | À migrer (PR `docs/quant/`) |
+| `/PROVIDERS_MATRIX.md` | `docs/monitoring/PROVIDERS_MATRIX.md` = stub pointer | À migrer (PR `docs/monitoring/`) |
+| `/KNOWN_ISSUES.md` | `docs/monitoring/KNOWN_ISSUES.md` = stub pointer | À migrer (PR `docs/monitoring/`) |
+| `/BOT_OBJECTIVE.md` | _(squelette `docs/project/PROJECT_VISION.md`)_ | À arbitrer plus tard |
+| `/SESSION.md` | _(reste à la racine, cf. § `RÔLE DES FICHIERS`)_ | Non migré (intentionnel) |
+| `/CHECKLIST_MERGE.md` | _(squelette `docs/project/MERGE_PROTOCOL.md`)_ | À arbitrer plus tard |
+| `/GPT_ROLE.md` | _stub de redirection vers `GOVERNANCE.md` depuis 2026-05-19_ | Déprécié |
+| `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ | À arbitrer plus tard |
+| `/TRADING_LOGIC.md` | _(à scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/`)_ | À arbitrer (PR `docs/quant/`) |
 
 ### Règles obligatoires
 
@@ -865,8 +876,8 @@ Après le socle obligatoire, lire les fichiers spécialisés correspondant au su
 
 Lire aussi :
 
-- `ARCHITECTURE.md`
-- `DATA_PIPELINE.md`
+- `docs/project/ARCHITECTURE.md`
+- `docs/project/DATA_PIPELINE.md`
 - `PROVIDERS_MATRIX.md`
 
 #### Trading / bot / paper trading / setups / scores / décisions / régimes / actifs

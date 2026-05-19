@@ -21,16 +21,16 @@
 | Gouvernance / règles projet | `GOVERNANCE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, `CLAUDE.md` si process Claude impacté | Éviter règles contradictoires |
 | Reprise session / workflow GPT ↔ Claude | `GOVERNANCE.md`, `CLAUDE.md`, `SESSION.md`, `CHECKLIST_MERGE.md` | Garder le protocole actif |
 | Objectif produit / passage réel | `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `SESSION.md`, `KNOWN_ISSUES.md` si limite identifiée | Garder la boussole produit |
-| Worker / routes API | `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SESSION.md`, `CHECKLIST_MERGE.md` | Documenter structure et flux |
-| Front / UI / PWA | `ARCHITECTURE.md`, `DATA_PIPELINE.md` si flux modifié, `SESSION.md`, `KNOWN_ISSUES.md` si bug / dette | Éviter divergence front / back |
-| Provider / prix / quote / TTL / fallback | `PROVIDERS_MATRIX.md`, `DATA_PIPELINE.md`, `PROJECT_RULES.md` si règle changée, `SESSION.md`, `KNOWN_ISSUES.md` si limite | Éviter faux live / faux prix |
-| Supabase / DB / migration | `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, fichier migration SQL si nécessaire | Éviter schéma invisible |
+| Worker / routes API | `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md`, `SESSION.md`, `CHECKLIST_MERGE.md` | Documenter structure et flux |
+| Front / UI / PWA | `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md` si flux modifié, `SESSION.md`, `KNOWN_ISSUES.md` si bug / dette | Éviter divergence front / back |
+| Provider / prix / quote / TTL / fallback | `PROVIDERS_MATRIX.md`, `docs/project/DATA_PIPELINE.md`, `PROJECT_RULES.md` si règle changée, `SESSION.md`, `KNOWN_ISSUES.md` si limite | Éviter faux live / faux prix |
+| Supabase / DB / migration | `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, fichier migration SQL si nécessaire | Éviter schéma invisible |
 | Trading logic / scoring / décision | `TRADING_LOGIC.md`, `SETUPS_REGISTRY.md` si setup impacté, `ASSET_REGISTRY.md` si actifs impactés, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter régression quant |
 | Setup nouveau / modifié / abandonné | `SETUPS_REGISTRY.md`, `TRADING_LOGIC.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `SESSION.md` | Garder statut setup exact |
 | Actif / univers / classification | `ASSET_REGISTRY.md`, `SETUPS_REGISTRY.md` si compatibilité setup impactée, `SESSION.md` | Éviter actifs mal classés |
 | Recherche quant / backtest / walk-forward | `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`, `docs/research/SETUP_VALIDATION_CHECKLIST.md`, `docs/research/ANTI_LOOKAHEAD_RULES.md`, `docs/research/DATASET_GOVERNANCE.md`, `SETUPS_REGISTRY.md`, `SESSION.md` | Éviter overfit / lookahead |
 | Risk / allocation / sizing / kill switch | fichiers risk / allocation si existants, `TRADING_LOGIC.md`, `PROJECT_RULES.md`, `SESSION.md`, `CHECKLIST_MERGE.md` | Éviter risque non documenté |
-| Broker réel / exécution argent réel | `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `ARCHITECTURE.md`, `TRADING_LOGIC.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, `KNOWN_ISSUES.md` | Escalade obligatoire |
+| Broker réel / exécution argent réel | `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `docs/project/ARCHITECTURE.md`, `TRADING_LOGIC.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, `KNOWN_ISSUES.md` | Escalade obligatoire |
 | Bug corrigé / dette ajoutée | `KNOWN_ISSUES.md`, `SESSION.md`, fichier domaine concerné | Garder dette à jour |
 | Documentation pure | `SESSION.md`, fichier documentaire concerné, `CHECKLIST_MERGE.md` si règle merge / process impactée | Garder trace claire |
 | Consolidation Markdown future | `GOVERNANCE.md`, `SESSION.md`, `CLAUDE.md`, `CHECKLIST_MERGE.md`, `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`, fichiers déplacés / stubs | Éviter sources canoniques cassées, suivre le plan officiel |
