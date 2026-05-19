@@ -671,7 +671,7 @@ Cette section liste les agents et skills Claude Code disponibles sur le projet e
 - Les agents tournent en **contexte isolé** : Claude ne voit que leur réponse finale.
 - Les agents **ne valident jamais** les décisions quant et **ne peuvent pas auto-merger**.
 - Claude reste **responsable de tout code commité**, même produit via un agent.
-- Toute utilisation d'un agent ou d'un skill non trivial **doit être déclarée explicitement** dans le body de la PR :
+- Toute utilisation d'un agent ou d'un skill non trivial **doit être déclarée explicitement** dans le body de la PR. **Le body de PR doit également déclarer explicitement l'absence** d'agent/skill (aucune déclaration implicite n'est admise) :
 
 ```text
 ## Agents / skills utilisés
@@ -681,7 +681,12 @@ Cette section liste les agents et skills Claude Code disponibles sur le projet e
 - Limites : <ce qui a été vérifié à la main par Claude après l'agent>
 ```
 
-Absence d'agent = absence implicite, rien à déclarer.
+Si aucun agent ni skill n'a été utilisé, écrire explicitement dans la PR :
+
+```text
+## Agents / skills utilisés
+Aucun.
+```
 
 ### Agents disponibles
 

@@ -7,7 +7,8 @@
 > - format validation.
 
 > **Statut :** squelette créé le 2026-05-19 (PR setup-governance-docs).
-> Sources canoniques : `GOVERNANCE.md` (gouvernance IA centralisée depuis la fusion de `GPT_ROLE.md` le 2026-05-19) + section "Validation obligatoire avant merge" de `CLAUDE.md`.
+> Source canonique unique de la gouvernance IA : `GOVERNANCE.md` (centralisée depuis la fusion de `GPT_ROLE.md` le 2026-05-19).
+> `CLAUDE.md` est le manuel opérationnel Claude Code ; il n'est **pas** une source canonique de gouvernance IA.
 
 ---
 
@@ -31,7 +32,7 @@ _À remplir._
 
 ## 4. Format de validation `GO merge` / `NOGO merge`
 
-_À remplir — extraire de `CLAUDE.md` § "Validation obligatoire avant merge" et `GOVERNANCE.md` § "Workflow validation avant merge"._
+_À remplir — extraire de `GOVERNANCE.md` § "Workflow validation avant merge"._
 
 ## 5. Cas d'escalade vers créateur ("Avis créateur requis")
 
@@ -47,5 +48,10 @@ _À synchroniser ici._
 
 ## Sources existantes à consolider
 
-- `/GOVERNANCE.md` § "Gouvernance ChatGPT ↔ Claude", § "Workflow validation avant merge", § "Règle anti-hallucination", § "Gouvernance quantitative", § "Agents et skills Claude Code", § "Mode de communication obligatoire", § "Format obligatoire des réponses"
-- `/CLAUDE.md` § "Validation obligatoire avant merge", § "Agents et skills Claude Code"
+Source canonique unique de gouvernance IA :
+
+- `/GOVERNANCE.md` § "Gouvernance ChatGPT ↔ Claude", § "Workflow validation avant merge", § "Règle anti-hallucination", § "Gouvernance quantitative", § "Agents et skills Claude Code", § "Mode de communication obligatoire", § "Format obligatoire des réponses".
+
+Référence opérationnelle (non canonique pour la gouvernance IA) :
+
+- `/CLAUDE.md` — manuel opérationnel Claude Code (conventions de session, déploiement, style code). Ne fait pas autorité sur la gouvernance IA ; en cas de conflit, `GOVERNANCE.md` prime.
