@@ -51,15 +51,15 @@ Claude Code **ne doit pas** traiter ces fichiers comme règles actives si `GOVER
 - `BOT_OBJECTIVE.md` — constitution officielle du projet (objectif réel, règles absolues). Source actuelle de `docs/project/PROJECT_VISION.md`.
 - `PROJECT_RULES.md` — règles techniques structurelles (séparation analytique/live, snapshotId, additivité du payload).
 - `SESSION.md` — état du projet.
-- `docs/project/ARCHITECTURE.md` — structure code après merge (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
-- `docs/project/DATA_PIPELINE.md` — flux de données par écran (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
-- `docs/quant/TRADING_LOGIC.md` — logique quant / scoring / setups / régimes (la racine `TRADING_LOGIC.md` est un stub temporaire de redirection).
+- `docs/project/ARCHITECTURE.md` — structure code après merge.
+- `docs/project/DATA_PIPELINE.md` — flux de données par écran.
+- `docs/quant/TRADING_LOGIC.md` — logique quant / scoring / setups / régimes.
 - `docs/project/TRADING_ENGINE.md` — logique moteur / exécution / paper trading / safety / sizing.
-- `docs/monitoring/PROVIDERS_MATRIX.md` — routage providers (la racine `PROVIDERS_MATRIX.md` est un stub temporaire de redirection).
-- `docs/monitoring/KNOWN_ISSUES.md` — bugs et dette (la racine `KNOWN_ISSUES.md` est un stub temporaire de redirection).
+- `docs/monitoring/PROVIDERS_MATRIX.md` — routage providers.
+- `docs/monitoring/KNOWN_ISSUES.md` — bugs et dette.
 - `CHECKLIST_MERGE.md` — checklist obligatoire avant tout merge.
-- `docs/quant/SETUPS_REGISTRY.md` — registre officiel des setups quantitatifs validés/testés/abandonnés (la racine `SETUPS_REGISTRY.md` est un stub temporaire de redirection).
-- `docs/quant/ASSET_REGISTRY.md` — classification provisoire des actifs compatibles avec les setups (la racine `ASSET_REGISTRY.md` est un stub temporaire de redirection).
+- `docs/quant/SETUPS_REGISTRY.md` — registre officiel des setups quantitatifs validés/testés/abandonnés.
+- `docs/quant/ASSET_REGISTRY.md` — classification provisoire des actifs compatibles avec les setups.
 
 Si une demande touche aux setups, aux backtests, au régime marché ou aux actifs compatibles, lire aussi `docs/quant/SETUPS_REGISTRY.md` et `docs/quant/ASSET_REGISTRY.md` avant toute réponse ou modification.
 

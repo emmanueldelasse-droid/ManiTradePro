@@ -33,7 +33,7 @@
 | Broker réel / exécution argent réel | `BOT_OBJECTIVE.md`, `PROJECT_RULES.md`, `docs/project/ARCHITECTURE.md`, `docs/project/TRADING_ENGINE.md`, `CHECKLIST_MERGE.md`, `SESSION.md`, `docs/monitoring/KNOWN_ISSUES.md` | Escalade obligatoire |
 | Bug corrigé / dette ajoutée | `docs/monitoring/KNOWN_ISSUES.md`, `SESSION.md`, fichier domaine concerné | Garder dette à jour |
 | Documentation pure | `SESSION.md`, fichier documentaire concerné, `CHECKLIST_MERGE.md` si règle merge / process impactée | Garder trace claire |
-| Consolidation Markdown future | `GOVERNANCE.md`, `SESSION.md`, `CLAUDE.md`, `CHECKLIST_MERGE.md`, `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`, fichiers déplacés / stubs | Éviter sources canoniques cassées, suivre le plan officiel |
+| Évolution future de structure documentaire | `GOVERNANCE.md` § *Document canonical sources*, `SESSION.md`, `CLAUDE.md`, `CHECKLIST_MERGE.md`, `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md`, `docs/decisions/` (nouvelle `DECISION-NNN-*.md` si la structure change), fichiers déplacés | La consolidation initiale est terminée ; toute évolution future suit la règle « une PR = un objectif » et est documentée comme décision structurante |
 | Décision structurante / historique | `docs/decisions/` (nouvelle `DECISION-NNN-*.md` ou mise à jour de statut), `GOVERNANCE.md` si règle active impactée, `SESSION.md`, fichier domaine concerné | Garder la trace du pourquoi sans polluer `SESSION.md` |
 
 ## Règle de justification

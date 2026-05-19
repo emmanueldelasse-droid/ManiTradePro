@@ -80,10 +80,14 @@ Contraintes / risques :
 Au 2026-05-19 :
 
 - `GOVERNANCE.md` est la source canonique unique pour la gouvernance IA / projet ;
-- `GPT_ROLE.md` est déprécié et reste un stub de redirection à la racine ;
-- `CLAUDE.md` est subordonné à `GOVERNANCE.md`.
+- `CLAUDE.md` est subordonné à `GOVERNANCE.md` ;
+- `GPT_ROLE.md` n'existe plus à la racine (cf. note datée ci-dessous).
+
+### 2026-05-19 — Stub `GPT_ROLE.md` supprimé
+
+Le stub `GPT_ROLE.md` racine a été supprimé lors de la PR de nettoyage final (`claude/final-doc-stub-cleanup`). Aucune référence active ne dépendait du stub au moment de la suppression. L'historique de la fusion `GPT_ROLE.md` → `GOVERNANCE.md` reste conservé dans cette décision.
 
 ## Suite éventuelle
 
-- Ne pas supprimer `GPT_ROLE.md` tant que les stubs racine ne sont pas traités dans une PR de nettoyage final.
 - Garder cette décision comme trace historique, même si l'organisation documentaire continue d'évoluer.
+- Toute nouvelle PR qui voudrait recréer un fichier `GPT_ROLE.md` doit d'abord passer par une nouvelle `DECISION-MMM` qui marque la présente décision `SUPERSEDED`.

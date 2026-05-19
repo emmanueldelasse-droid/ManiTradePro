@@ -69,7 +69,7 @@ Ce fichier-ci porte les règles **techniques structurelles** qui ne rentrent dan
   - le cache KV `kv:livequote:${symbol}` (TTL effectif 30 s, écriture via `writeLiveQuoteToKv`)
 - Le front **NE DOIT PAS** inventer ni recalculer un prix. Il lit le payload, point.
 - **Aucun prix périmé ne doit être affiché comme actuel**. Si `quoteQuality.executionSafe === false` (`stale`, `currency_mismatch`, etc.), le payload signale le problème via `validationStatus` et `reasons[]`. Le consommateur a la responsabilité de respecter ce signal.
-- Exception **volontaire** : `validateSymbolOnProviders` (validation à l'ajout d'un actif) court-circuite `resolveLiveQuote` pour tester chaque provider individuellement. Pas d'affichage. Documenté dans `KNOWN_ISSUES.md`.
+- Exception **volontaire** : `validateSymbolOnProviders` (validation à l'ajout d'un actif) court-circuite `resolveLiveQuote` pour tester chaque provider individuellement. Pas d'affichage. Documenté dans `docs/monitoring/KNOWN_ISSUES.md`.
 
 #### ⚠️ Dépendance d'infrastructure critique — binding KV `MTP_CACHE`
 
@@ -128,7 +128,7 @@ La cohérence prix cross-worker de R4 **dépend du binding KV `MTP_CACHE`** côt
 - Mettre à jour les fichiers concernés AVANT le merge :
   - `BOT_OBJECTIVE.md` si la nature du produit change
   - `SESSION.md` à chaque session
-  - `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `TRADING_LOGIC.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`, `CHECKLIST_MERGE.md`, `PROJECT_RULES.md` selon l'impact
+  - `docs/project/ARCHITECTURE.md`, `docs/project/DATA_PIPELINE.md`, `docs/quant/TRADING_LOGIC.md`, `docs/project/TRADING_ENGINE.md`, `docs/monitoring/PROVIDERS_MATRIX.md`, `docs/monitoring/KNOWN_ISSUES.md`, `CHECKLIST_MERGE.md`, `PROJECT_RULES.md` selon l'impact
 
 ### R11. Pas de "ça devrait aller"
 
@@ -152,13 +152,13 @@ Un setup n'est considéré comme `VALIDATED` que si :
 - son comportement par régime est connu,
 - ses actifs compatibles sont identifiés,
 - ses faiblesses sont documentées,
-- il est documenté dans `SETUPS_REGISTRY.md`.
+- il est documenté dans `docs/quant/SETUPS_REGISTRY.md`.
 
-Un setup non documenté dans `SETUPS_REGISTRY.md` ne doit pas être traité comme une vérité moteur.
+Un setup non documenté dans `docs/quant/SETUPS_REGISTRY.md` ne doit pas être traité comme une vérité moteur.
 
 ### Règle quant — classification actifs
 
-Un actif n'est considéré comme `ELITE`, `CORE`, `TACTICAL` ou `BLACKLIST` que s'il est documenté dans `ASSET_REGISTRY.md`.
+Un actif n'est considéré comme `ELITE`, `CORE`, `TACTICAL` ou `BLACKLIST` que s'il est documenté dans `docs/quant/ASSET_REGISTRY.md`.
 
 Tant que `asset-quality-engine-v1.mjs` n'existe pas, cette classification reste provisoire.
 
