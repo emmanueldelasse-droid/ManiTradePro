@@ -391,9 +391,9 @@ canonique actuelle et quel chemin de transition existe encore.
 
 ### Exemple
 
-- `/SETUPS_REGISTRY.md` = source canonique (pas encore migrée).
-- `docs/quant/SETUPS_REGISTRY.md` = stub lecture seule pointant vers la
-  racine.
+- `/PROVIDERS_MATRIX.md` = source canonique (pas encore migrée).
+- `docs/monitoring/PROVIDERS_MATRIX.md` = stub lecture seule pointant
+  vers la racine.
 - `docs/project/ARCHITECTURE.md` = source canonique (migrée).
 - `/ARCHITECTURE.md` = stub de redirection vers `docs/project/`.
 - Toute modification doit être faite uniquement sur la source canonique
@@ -405,8 +405,8 @@ canonique actuelle et quel chemin de transition existe encore.
 |---|---|---|
 | `docs/project/ARCHITECTURE.md` | `/ARCHITECTURE.md` = stub de redirection | **Migré** |
 | `docs/project/DATA_PIPELINE.md` | `/DATA_PIPELINE.md` = stub de redirection | **Migré** |
-| `/SETUPS_REGISTRY.md` | `docs/quant/SETUPS_REGISTRY.md` = stub pointer | À migrer (PR `docs/quant/`) |
-| `/ASSET_REGISTRY.md` | `docs/quant/ASSET_REGISTRY.md` = stub pointer | À migrer (PR `docs/quant/`) |
+| `docs/quant/SETUPS_REGISTRY.md` | `/SETUPS_REGISTRY.md` = stub de redirection | **Migré** |
+| `docs/quant/ASSET_REGISTRY.md` | `/ASSET_REGISTRY.md` = stub de redirection | **Migré** |
 | `/PROVIDERS_MATRIX.md` | `docs/monitoring/PROVIDERS_MATRIX.md` = stub pointer | À migrer (PR `docs/monitoring/`) |
 | `/KNOWN_ISSUES.md` | `docs/monitoring/KNOWN_ISSUES.md` = stub pointer | À migrer (PR `docs/monitoring/`) |
 | `/BOT_OBJECTIVE.md` | _(squelette `docs/project/PROJECT_VISION.md`)_ | À arbitrer plus tard |
@@ -414,7 +414,7 @@ canonique actuelle et quel chemin de transition existe encore.
 | `/CHECKLIST_MERGE.md` | _(squelette `docs/project/MERGE_PROTOCOL.md`)_ | À arbitrer plus tard |
 | `/GPT_ROLE.md` | _stub de redirection vers `GOVERNANCE.md` depuis 2026-05-19_ | Déprécié |
 | `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ | À arbitrer plus tard |
-| `/TRADING_LOGIC.md` | _(à scinder entre `docs/project/ARCHITECTURE.md` et `docs/quant/`)_ | À arbitrer (PR `docs/quant/`) |
+| `/TRADING_LOGIC.md` | _(contenu transversal : scoring, pipeline, safety gate, sizing, fermeture, garde-fou devise — split à faire dans une PR dédiée)_ | Reste racine, split reporté à une PR dédiée |
 
 ### Règles obligatoires
 
@@ -885,8 +885,8 @@ Lire aussi :
 Lire aussi :
 
 - `TRADING_LOGIC.md`
-- `SETUPS_REGISTRY.md`
-- `ASSET_REGISTRY.md`
+- `docs/quant/SETUPS_REGISTRY.md`
+- `docs/quant/ASSET_REGISTRY.md`
 
 #### Recherche quant / backtests / validation de setup / nouveau setup
 
@@ -896,8 +896,8 @@ Lire aussi :
 - `docs/research/SETUP_VALIDATION_CHECKLIST.md`
 - `docs/research/ANTI_LOOKAHEAD_RULES.md`
 - `docs/research/DATASET_GOVERNANCE.md`
-- `SETUPS_REGISTRY.md`
-- `ASSET_REGISTRY.md`
+- `docs/quant/SETUPS_REGISTRY.md`
+- `docs/quant/ASSET_REGISTRY.md`
 
 #### PR / merge / validation / livraison
 
