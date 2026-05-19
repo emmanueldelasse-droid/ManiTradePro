@@ -10,15 +10,23 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/final-doc-stub-cleanup` (en cours — nettoyage final : suppression des 7 stubs racine + `GPT_ROLE.md`, arbitrages `BOT_OBJECTIVE.md` reste racine).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — truth-sync documentaire des statuts setups : SECTOR_RS dégradé `VALIDATED_RESEARCH_CORE` → `FRAGILE / CONCENTRATION_EXCESSIVE`, ajout fiches manquantes au registre, unification vocabulaire de statuts, note runtime ≠ validation dans `TRADING_LOGIC.md`).
 - **Dernier merge connu** : PR #231 `docs(decisions): add first project decision record` (commit `a4249d8` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
 - **Ce qui est paper trading** : infrastructure paper existe (`mtp_positions`, `mtp_trades` Supabase) mais aucun setup n'est branché en automatique sans supervision humaine.
 - **Ce qui est recherche** : tous les setups quantitatifs en cours d'évaluation, sous le pipeline 10 étapes du Framework Freeze v1.
-- **Ce qui est expérimental** : MEAN_REVERSION, SECTOR_RELATIVE_STRENGTH v1, TREND_PULLBACK_DYNAMIC_SUPPORT v1 (cf. `docs/quant/SETUPS_REGISTRY.md`).
-- **Ce qui n'est pas encore live** : tout. Aucun setup `LIVE_READY` au 2026-05-19.
+- **Statuts setups officiels** (vocabulaire `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 8, détails dans `docs/quant/SETUPS_REGISTRY.md`) :
+  - RS Rotation simple → **`RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`**
+  - Mean Reversion → **`EXPERIMENTAL_ONLY / FRICTION_REQUIRED`**
+  - SECTOR_RELATIVE_STRENGTH v1 → **`FRAGILE / CONCENTRATION_EXCESSIVE`** (top 5 tickers = 103 % du PnL, edge non diversifiable)
+  - TREND_PULLBACK_DYNAMIC_SUPPORT v1 → **`FRAGILE`**
+  - GLD Breakout isolated → **`CONDITIONAL_RESEARCH_CANDIDATE`** (n=47, single-symbol)
+  - Pullback Momentum → **`DEAD / DO_NOT_TRADE`** (PR #207 INVALID_BACKTEST)
+  - Breakout agrégé → **`DEAD_AGGREGATED`** (PR #208)
+  - Volatility Compression → **`DEAD / ABANDONED`**
+- **Ce qui n'est pas encore live** : tout. **Aucun setup `VALIDATED_RESEARCH_CORE`** au 2026-05-19. **Aucun setup `LIVE_READY`** au 2026-05-19.
 
 ## Dernière session / dernière PR mergée
 
@@ -44,15 +52,19 @@
 
 ## PR en cours
 
-- **PR** : nettoyage final des stubs racine et arbitrages — branche `claude/final-doc-stub-cleanup`.
-- **Objectif** : terminer la consolidation Markdown en supprimant les 7 stubs racine de redirection, arbitrer le sort de `BOT_OBJECTIVE.md` et de `GPT_ROLE.md`.
-- **Fichiers supprimés** : `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md`, `KNOWN_ISSUES.md`, `TRADING_LOGIC.md`, `GPT_ROLE.md`.
-- **Arbitrages** : `BOT_OBJECTIVE.md` reste à la racine (squelette `docs/project/PROJECT_VISION.md` vide, migration future sous PR dédiée si besoin) ; `GPT_ROLE.md` supprimé (aucune référence active dépendante ; historique préservé dans `DECISION-001` + note datée 2026-05-19).
-- **Fichiers modifiés** : `GOVERNANCE.md` (header note GPT_ROLE, ordre de priorité, structure dossiers racine enrichie, § *Document canonical sources* réécrit en "État final post-nettoyage" avec 5 tables par dossier, phrase finale workflow IA), `CLAUDE.md` (retrait des annotations "stub temporaire de redirection"), `PROJECT_RULES.md` (5 lignes : KNOWN_ISSUES, ARCHITECTURE/DATA_PIPELINE/TRADING_LOGIC/TRADING_ENGINE/PROVIDERS_MATRIX, SETUPS_REGISTRY ×2, ASSET_REGISTRY), `BOT_OBJECTIVE.md` (6 lignes : KNOWN_ISSUES ×3, ARCHITECTURE, DATA_PIPELINE, TRADING_LOGIC scindée, PROVIDERS_MATRIX), `docs/project/DOC_IMPACT_MATRIX.md` (ligne "Évolution future structure" reformulée), `docs/project/MARKDOWN_CONSOLIDATION_PLAN.md` (inventaire actualisé avec lignes ~~strikethrough~~ pour stubs supprimés, étape 5 marquée réalisée), `docs/decisions/DECISION-001-...` (note datée § État actuel + § Suite éventuelle), `SESSION.md`.
+- **PR** : truth-sync documentaire des statuts setups — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Objectif unique** : établir une vérité unique sur les statuts setups. Aligner `SETUPS_REGISTRY.md`, `docs/setups/SECTOR_RELATIVE_STRENGTH.md`, `RESEARCH_FRAMEWORK_FREEZE_V1.md`, `TRADING_LOGIC.md` et `SESSION.md`. Aucune modification de paramètres, aucun setup activé, aucun statut optimiste, aucun nouveau setup créé. PR strictement documentaire.
+- **Fichiers modifiés** :
+  - `docs/quant/SETUPS_REGISTRY.md` — mapping de vocabulaire ajouté, table "Statuts officiels post-audit" enrichie de 2 lignes (SECTOR_RS v1, TREND_PULLBACK_DYNAMIC_SUPPORT v1), nouvelles fiches Setup 7 (SECTOR_RS v1) et Setup 8 (TREND_PULLBACK_DYNAMIC_SUPPORT v1), conclusion stratégique réécrite avec compteurs alignés sur Freeze v1.
+  - `docs/setups/SECTOR_RELATIVE_STRENGTH.md` — note de tête "recalibration de statut", § 10 réécrit (`FRAGILE / CONCENTRATION_EXCESSIVE` au lieu de `VALIDATED_RESEARCH_CORE`), conclusion finale reformulée ("non diversifiable en l'état, non tradable, non live-ready").
+  - `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md` — § 8 enrichi de 7 statuts manquants (`RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`, `CONDITIONAL_RESEARCH_CANDIDATE`, `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`, `FRAGILE / CONCENTRATION_EXCESSIVE`, `DEAD / DO_NOT_TRADE`, `DEAD_AGGREGATED`, `EDGE_DEPENDS_ON_AI_WINNERS` comme sous-cas), note truth-sync ajoutée pointant vers le mapping registre.
+  - `docs/quant/TRADING_LOGIC.md` — note forte "Détecteur runtime ≠ setup validé" ajoutée en tête du § *Setups détectés*, avec rappel statut exact de chaque détecteur (`pullback`, `breakout`, `mean_reversion`, etc.) et interdiction d'ouverture automatique sans `VALIDATED_RESEARCH_CORE` + `GO MERGE` ChatGPT dédié.
+  - `SESSION.md` — section "État actuel" : statuts setups exacts listés (8 setups, vocabulaire Freeze v1) ; branche / PR active mise à jour ; mention `LIVE_READY` durcie.
 - **Impact runtime** : aucun.
-- **Impact quant** : aucun.
-- **Impact documentation** : consolidation Markdown **terminée**. Racine réduite à 6 sources canoniques (`GOVERNANCE`, `BOT_OBJECTIVE`, `PROJECT_RULES`, `SESSION`, `CLAUDE`, `CHECKLIST_MERGE`). Tous les anciens chemins racine de transition supprimés. `GPT_ROLE.md` supprimé conformément à `DECISION-001` § *Suite éventuelle*.
-- **Non inclus** : migration de `BOT_OBJECTIVE.md` / `PROJECT_RULES.md` / `CHECKLIST_MERGE.md` (squelettes équivalents pas prêts), modification du fond métier, modification runtime, modification quant.
+- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation.
+- **Impact documentation** : oui. Vérité unique sur les statuts setups. Vocabulaire unifié sur celui du Freeze v1. Runtime ≠ validation explicité.
+- **Non inclus** : aucun backtest lancé, aucune modification de paramètres, aucun nouveau setup, aucune activation paper / live, aucune modification runtime.
+- **Conformité Research Framework Freeze v1** : OUI. PR strictement documentaire, statut conservateur retenu pour SECTOR_RS (`FRAGILE / CONCENTRATION_EXCESSIVE`), aucun setup `LIVE_READY`, aucun setup `VALIDATED_RESEARCH_CORE`.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
@@ -66,9 +78,12 @@
 
 ## Points de vigilance
 
+- **Aucun setup `VALIDATED_RESEARCH_CORE`** au 2026-05-19.
 - **Aucun setup `LIVE_READY`** au 2026-05-19. Détail des statuts dans `docs/quant/SETUPS_REGISTRY.md`.
+- **SECTOR_RS v1** : `FRAGILE / CONCENTRATION_EXCESSIVE`. PF brut 2.16 séduisant **mais** top 5 tickers = 103 % du PnL (sans eux PF = 0.94). Edge non diversifiable. À ne pas activer paper / live. Correction concentration + stress tests + audit `sectorMomentum` requis avant toute promotion.
 - **PEAD** : seule piste structurellement distincte de momentum, mais bloquée par absence de dataset earnings.
-- **RS Rotation simple** : crédible côté exécution mais fragile temporellement. Walk-forward conditionnel régime obligatoire avant tout passage live.
+- **RS Rotation simple** : crédible côté exécution mais fragile temporellement (0 cellule ROBUST/STABLE rolling). Walk-forward conditionnel régime + friction obligatoires avant tout passage paper / live.
+- **Détecteur runtime ≠ setup validé** : `detectConfiguration` côté worker continue d'exposer `pullback`, `breakout`, `mean_reversion`, etc. Aucun de ces détecteurs n'est `VALIDATED_RESEARCH_CORE` au sens Freeze v1. Aucun trade automatique sur ces détecteurs sans `GO MERGE` ChatGPT dédié. Cf. `docs/quant/TRADING_LOGIC.md` § *Setups détectés*.
 - **Biais d'exécution historiques** : les anciens PF / winrate antérieurs aux audits PR #207 et #208 sont annulés. Voir bannière en tête de `docs/quant/SETUPS_REGISTRY.md`.
 - **Dépendance KV `MTP_CACHE`** : la cohérence prix cross-worker dépend du binding KV. Sans lui, bug cross-worker silencieux (cf. `PROJECT_RULES.md` R4).
 - **`buildSnapshotId`** : purement analytique, aucune dépendance live autorisée. Toute modif casse l'historique des snapshots.
@@ -76,11 +91,20 @@
 
 ## Prochaines priorités
 
-1. **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
-2. **Walk-forward conditionnel régime sur RS Rotation simple** (quant) : prérequis avant tout passage paper / live.
-3. **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
-4. **Optionnel** : modernisation du script `scripts/check-doc-impact.mjs` pour retirer les noms racine obsolètes de son matcher (faux positifs identifiés depuis PR #228).
-5. **Optionnel** : archivage des outputs `tools/backtests/output/*.md` (hors gouvernance documentaire).
+Plan PR par PR validé par ChatGPT (réponse Q3, message 2026-05-19) :
+
+1. **PR documentaire truth-sync** (en cours sur `claude/setup-manitradepro-docs-gUwP1`).
+2. **RS Rotation walk-forward conditionnel régime + friction** : 3 splits stricts (2021-2022 → 2023, 2021-2023 → 2024, 2021-2024 → 2025), paramètres gelés, filtre NO_RISK_OFF appliqué split par split, friction obligatoire dès le baseline. Critère de succès : ≥ 2/3 splits PASS avec PF post-friction ≥ 1.3.
+3. **Mean Reversion friction-required** : friction ×1, ×2, ×3 sur `tools/backtests/backtest-meanrev-v1.mjs`. Critère : si PF ×2 ≥ 1.1 → candidat `CONDITIONAL_EDGE`, sinon `DEAD` ou maintien `EXPERIMENTAL_ONLY`.
+4. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
+5. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée (cf. `SETUP_VALIDATION_CHECKLIST.md` section A). Sinon, ne pas lancer (anti-hallucination + interdiction Freeze § 6.1 "1000 variantes sans hypothèse").
+
+Autres :
+
+- **Décision politique sur le sourcing PEAD** (quant) : trouver / abandonner le dataset earnings nécessaire pour valider PEAD.
+- **Toute PR future de recherche** : doit référencer `RESEARCH_FRAMEWORK_FREEZE_V1.md` et joindre la checklist `docs/research/SETUP_VALIDATION_CHECKLIST.md` cochée avec valeurs mesurées.
+- **Optionnel** : modernisation du script `scripts/check-doc-impact.mjs` pour retirer les noms racine obsolètes de son matcher (faux positifs identifiés depuis PR #228).
+- **Optionnel** : archivage des outputs `tools/backtests/output/*.md` (hors gouvernance documentaire).
 
 ## Fichiers sources à consulter
 

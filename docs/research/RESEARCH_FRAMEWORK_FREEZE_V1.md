@@ -213,12 +213,21 @@ Liste exhaustive des statuts possibles. Tout setup doit avoir exactement un stat
 |---|---|---|
 | **VALIDATED_RESEARCH_CORE** | 10/10 critères de section 4 remplis | Candidat pour shadow live (PR séparée) |
 | **CONDITIONAL_EDGE** | PF ≥ 1.3, ≥ 4/5 années, mais 1-2 caveats (concentration, edge decay) | Recherche additionnelle, pas tradable |
+| **RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED** | Exécution propre (inflation PF < ×1.05), edge backtest, MAIS 0 cellule ROBUST/STABLE en rolling walk-forward | Pas tradable tant que robustesse temporelle pas confirmée |
+| **CONDITIONAL_RESEARCH_CANDIDATE** | Edge isolé sur un actif unique, n faible (typiquement < 100 trades) | Cas d'étude, ne pas scaler à l'univers entier |
+| **EXPERIMENTAL_ONLY / FRICTION_REQUIRED** | Edge marginal (PF 1.1-1.3), friction obligatoire pour confirmer ou tuer le setup | Maintenu en observation, pas tradable |
 | **EXPERIMENTAL_ONLY** | Edge marginal (PF 1.1-1.3), ou hypothèse non confirmée | Maintenu en observation, pas tradable |
+| **FRAGILE / CONCENTRATION_EXCESSIVE** | PF brut intéressant mais critère § 4 "top 5 ticker share < 60 %" violé (concentration > 60 %, ou top 5 = quasi-totalité du PnL) | Pas tradable, edge non diversifiable, pas de promotion sans correction concentration |
 | **FRAGILE** | PF marginal, années positives < 4/5, ou stress test échoue | Pas tradable, peut être candidat à amélioration |
+| **DEAD / DO_NOT_TRADE** | PF < 1.0 sous exécution réaliste, ou setup structurellement défaillant | Abandon documenté, aucune réutilisation runtime |
+| **DEAD_AGGREGATED** | Agrégat sans edge (PF < 1) mais une variante isolée peut survivre (à classer en `CONDITIONAL_RESEARCH_CANDIDATE`) | Abandon de la famille agrégée |
 | **DEAD** | PF < 1.0 ou setup structurellement défaillant | Abandon documenté |
 | **INVALID_BACKTEST** | Audit anti-look-ahead révèle un PF gonflé > ×1.05 vs réaliste | Setup à corriger ou abandonner |
 | **DATA_INSUFFICIENT** | Pas de données pour tester | Documenté, sourcing à planifier |
 | **RESEARCH_FOUNDATION** | Setup en cours d'architecture, pas encore de backtest | Étape transitoire |
+| **EDGE_DEPENDS_ON_AI_WINNERS** | Sous-cas spécifique de `FRAGILE / CONCENTRATION_EXCESSIVE` — concentration top 5 sur tickers AI 2021-2025 | Identique à `FRAGILE / CONCENTRATION_EXCESSIVE`, mention conservée pour SECTOR_RS v1 |
+
+> **Note (truth-sync 2026-05-19)** : le tableau § 2 ("État honnête") utilise désormais le vocabulaire de ce § 8 comme source canonique. Tout setup doit avoir un statut listé ici ou être renvoyé à `docs/quant/SETUPS_REGISTRY.md` pour qualification. `docs/quant/SETUPS_REGISTRY.md` § *Mapping de vocabulaire* tient la table de correspondance entre l'ancien vocabulaire registre (`VALIDATED`, `RESEARCH_CANDIDATE`, etc.) et celui-ci.
 
 ---
 

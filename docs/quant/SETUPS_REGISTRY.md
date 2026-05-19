@@ -32,12 +32,31 @@ Les fiches détaillées plus bas (Setup 1 à 4) **restent en archive** pour la t
 
 | Statut | Signification |
 |---|---|
-| **VALIDATED** | Setup robuste confirmé, edge réel après exécution réaliste, ROBUST/STABLE en rolling, friction OK. _Aucun setup ne remplit ces conditions actuellement._ |
-| **RESEARCH_CANDIDATE** | Exécution propre, edge backtest, mais robustesse temporelle à confirmer. À tester sous friction + walk-forward conditionnel régime. |
+| **VALIDATED_RESEARCH_CORE** | Setup robuste confirmé, edge réel après exécution réaliste, ROBUST/STABLE en rolling, friction OK, concentration sous seuil. _Aucun setup ne remplit ces conditions actuellement._ Synonyme historique : `VALIDATED` (terme déprécié dans ce registre — cf. table de mapping § ci-dessous). |
+| **RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED** | Exécution propre, edge backtest, mais robustesse temporelle à confirmer. À tester sous friction + walk-forward conditionnel régime. |
 | **CONDITIONAL_RESEARCH_CANDIDATE** | Edge isolé sur un actif unique. Petit n. À surveiller mais ne pas extrapoler à l'univers entier. |
-| **EXPERIMENTAL_ONLY** | Edge marginal sous exécution réaliste, FRICTION_REQUIRED pour confirmer. Pas pour live. |
+| **EXPERIMENTAL_ONLY / FRICTION_REQUIRED** | Edge marginal sous exécution réaliste, friction obligatoire pour confirmer. Pas pour live. |
+| **FRAGILE / CONCENTRATION_EXCESSIVE** | PF brut intéressant mais critère diversification du Freeze v1 (top 5 ticker share < 60 %) violé. Edge observé mais non diversifiable. Non tradable. Pas de promotion possible sans correction concentration + stress tests + audit anti-look-ahead spécifique. |
+| **FRAGILE** | PF marginal, ou années positives < 4/5, ou stress test échoue. Pas tradable, peut être candidat à amélioration. |
 | **DEAD_AGGREGATED** | Agrégat sans edge (PF < 1) ou edge totalement consommé par les biais. Une variante isolée peut survivre — voir CONDITIONAL_RESEARCH_CANDIDATE. |
 | **DEAD** / **DO_NOT_TRADE** | Setup abandonné. Aucune utilisation, aucun trade réel, aucun candidat à l'allocation. |
+
+## Mapping de vocabulaire (truth-sync 2026-05-19)
+
+Le projet utilisait historiquement deux dialectes (`VALIDATED` côté registre, `VALIDATED_RESEARCH_CORE` côté `RESEARCH_FRAMEWORK_FREEZE_V1.md`). Pour éviter toute ambiguïté, ce registre adopte le vocabulaire du Freeze v1 comme source unique. Table de correspondance :
+
+| Ancien vocabulaire (registre)            | Nouveau vocabulaire (Freeze v1, canonique)             | Signifie LIVE_READY ? |
+|---|---|---|
+| `VALIDATED`                              | `VALIDATED_RESEARCH_CORE`                              | **Non** |
+| `RESEARCH_CANDIDATE`                     | `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`             | Non |
+| `CONDITIONAL_RESEARCH_CANDIDATE`         | `CONDITIONAL_RESEARCH_CANDIDATE`                       | Non |
+| `EXPERIMENTAL_ONLY`                      | `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`                | Non |
+| `FAILED`                                 | `DEAD` ou `DEAD / ABANDONED`                           | Non |
+| (nouveau)                                | `FRAGILE / CONCENTRATION_EXCESSIVE`                    | Non |
+| (nouveau)                                | `FRAGILE`                                              | Non |
+| (nouveau)                                | `INVALID_BACKTEST`                                     | Non |
+
+**Important** : `VALIDATED_RESEARCH_CORE` **n'est pas** équivalent à `LIVE_READY`. Le statut maximal d'un setup côté recherche reste `VALIDATED_RESEARCH_CORE`. Le passage `LIVE_READY` est un statut supplémentaire qui nécessite shadow live, paper live prolongé, slippage réel mesuré, kill-switch, etc. (cf. `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 5). **Aucun setup n'a accès à `LIVE_READY` actuellement.**
 
 ## Statuts officiels post-audit
 
@@ -49,6 +68,8 @@ Les fiches détaillées plus bas (Setup 1 à 4) **restent en archive** pour la t
 | `RELATIVE_STRENGTH_ROTATION` | **RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED** | CLEAN au sens exécution (PR #208, inflation ×1.01). MAIS 0 cellule ROBUST/STABLE en rolling walk-forward. Fragilité temporelle à corriger avant tout passage live. |
 | `VOLATILITY_COMPRESSION` | **DEAD / ABANDONED** | FAILED (PF 0.78, 0 robust/stable, 0 ALLOW v2). Setup officiellement abandonné. |
 | `GLD_BREAKOUT_ISOLATED` (exception) | **CONDITIONAL_RESEARCH_CANDIDATE** | Variante `GLD × breakout_h20_vol1.5_stop1_rr2` (cf. setup-variant-matrix tier STRONG). PF CURRENT 2.38 → NEXT_OPEN 1.80 sur 47 trades. Edge réel mais échantillon faible (n=47). À étudier comme cas isolé, ne PAS extrapoler à d'autres Breakout. |
+| `SECTOR_RELATIVE_STRENGTH v1` | **FRAGILE / CONCENTRATION_EXCESSIVE** | PF brut 2.16 (PR #211), 5/5 années positives, MAIS top 5 tickers (APLD, APP, PLTR, NBIS, UPST) = **103 %** du PnL — sans eux, PF tombe à **0.94** (`RESEARCH_FRAMEWORK_FREEZE_V1.md` § 2). Critère Freeze § 4 "top 5 ticker share < 60 %" violé. Aucun audit anti-look-ahead spécifique sur l'agrégation `sectorMomentum`. Aucun walk-forward conditionnel régime. Edge observé mais non diversifiable. **Non tradable.** Détail technique : `docs/setups/SECTOR_RELATIVE_STRENGTH.md`. |
+| `TREND_PULLBACK_DYNAMIC_SUPPORT v1` | **FRAGILE** | Améliore l'ancien Pullback (PF 1.045 vs 0.98 du PULLBACK_MOMENTUM) mais reste sous les critères minimum du Freeze § 4 (PF post-friction ≥ 1.3 non atteint). Concept Pullback marginal sous exécution réaliste (cf. `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 2). Pas tradable. |
 
 ## Pourquoi RS Rotation reste le seul candidat propre côté exécution
 
@@ -494,6 +515,82 @@ Exception isolée à la mort agrégée de BREAKOUT_EXPANSION. La cellule unique 
 
 ---
 
+# Setup 7 — Sector Relative Strength v1
+
+## Statut
+**FRAGILE / CONCENTRATION_EXCESSIVE** (truth-sync 2026-05-19).
+_Ancien statut historique proposé : `VALIDATED_RESEARCH_CORE` dans `docs/setups/SECTOR_RELATIVE_STRENGTH.md` § 10. Dégradé pour mise en cohérence avec `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 2 et § 4 (critère top 5 ticker share < 60 % violé)._
+
+## Fichier source
+- Fiche technique détaillée : `docs/setups/SECTOR_RELATIVE_STRENGTH.md`
+- Script de découverte : `tools/backtests/new-setup-discovery-lab-v1.mjs` (PR #211)
+
+## Description courte
+Rotation à deux niveaux : (1) momentum agrégé des secteurs, (2) top assets dans le top secteur. Paramètres gelés v1 : `lookback=90, topSectors=1, topAssetsPerSector=5, horizon=60, rebalance=10, regime=NO_RISK_OFF, execution=NEXT_OPEN, exit=FIXED_HOLD`.
+
+## Métriques brutes (référence PR #211)
+- Trades sur 5 ans : 445
+- Winrate : 54.61 %
+- PF post-friction : 2.16
+- Total R : 1 023.63 R
+- Max DD : 192.98 R
+- 5/5 années positives (PF 2022 = 1.08)
+
+## Pourquoi le statut reste `FRAGILE / CONCENTRATION_EXCESSIVE`
+- Top 5 tickers (APLD, APP, PLTR, NBIS, UPST) = **103 %** du PnL.
+- Sans ces top 5, PF tombe à **0.94** → edge non diversifiable.
+- Critère Freeze § 4 "top 5 ticker share < 60 %" violé.
+- Aucun audit anti-look-ahead spécifique sur l'agrégation `sectorMomentum` (le mécanisme RS Rotation simple est CLEAN PR #208, mais l'agrégation sectorielle n'a pas été auditée formellement).
+- Aucun walk-forward conditionnel par régime exécuté.
+- Aucun stress test friction ×2 / ×3 exécuté.
+- Pas de paper shadow, pas de sizing dynamique, pas de portfolio management multi-setup.
+
+## Conditions pour réviser le statut
+- Audit anti-look-ahead spécifique sur l'agrégation sectorielle (méthodologie PR #207 / PR #208).
+- Walk-forward 3 splits stricts avec ≥ 2/3 PASS.
+- Stress test "sans top 5" → PF ≥ 1.0.
+- Stress test "sans secteur dominant" → PF ≥ 1.0.
+- Stress test friction ×2 → PF ≥ 1.1.
+- Décision politique sur la diversification (pondération secteurs ? topSectors ≥ 2 ? plafonnement single-ticker ?).
+
+## Interdictions explicites
+- Pas d'activation paper automatique.
+- Pas d'activation live.
+- Pas de promotion `VALIDATED_RESEARCH_CORE` tant que la concentration n'est pas corrigée.
+- Pas d'extrapolation à d'autres univers (le résultat dépend de l'univers v2 actuel et de la période 2021-2025).
+
+---
+
+# Setup 8 — Trend Pullback Dynamic Support v1
+
+## Statut
+**FRAGILE** (truth-sync 2026-05-19).
+
+## Description courte
+Variante du Pullback Momentum tentant de corriger le look-ahead structurel via entry sur support dynamique. Cf. `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 2.
+
+## Métriques (référence Freeze v1)
+- PF 1.045 (vs 0.98 pour PULLBACK_MOMENTUM corrigé en NEXT_OPEN strict).
+- Sous le seuil minimum Freeze § 4 (`PF post-friction ≥ 1.3`).
+
+## Pourquoi le statut reste `FRAGILE`
+- Concept Pullback marginal sous exécution réaliste.
+- L'amélioration vs PULLBACK_MOMENTUM est marginale (+0.065 PF).
+- Pas de walk-forward 3 splits exécuté.
+- Pas de stress friction ×2 / ×3 exécuté.
+
+## Conditions pour réviser le statut
+- Hypothèse économique nouvelle documentée (cf. `SETUP_VALIDATION_CHECKLIST.md` section A).
+- Walk-forward 3 splits ≥ 2/3 PASS.
+- Friction ×2 PF ≥ 1.1.
+
+## Interdictions explicites
+- Pas d'activation paper automatique.
+- Pas d'activation live.
+- Pas d'extension du paramétrage sans hypothèse documentée (interdiction Freeze § 6.1 "1000 variantes sans hypothèse").
+
+---
+
 # Règle de validation future
 
 Un setup ne peut être marqué `VALIDATED` que si **toutes** les conditions suivantes sont remplies :
@@ -518,12 +615,16 @@ un moteur de sélection de leaders momentum structurels
 avec allocation adaptative selon le régime marché.
 ```
 
-**Mise à jour 2026-05-18** : suite aux audits PR #207 et PR #208, l'état actuel est :
+**Mise à jour 2026-05-19** (truth-sync vocabulaire aligné sur `RESEARCH_FRAMEWORK_FREEZE_V1.md`) :
 
-- **0 setup officiellement VALIDATED**.
-- 1 RESEARCH_CANDIDATE (RS Rotation) — sous réserve de robustesse temporelle améliorée.
-- 1 CONDITIONAL_RESEARCH_CANDIDATE (GLD breakout isolé) — single-symbol, n faible.
-- 1 EXPERIMENTAL_ONLY (Mean Reversion) — friction à valider.
-- 3 DEAD (Pullback, Breakout agrégé, Volatility Compression).
+- **0 setup `VALIDATED_RESEARCH_CORE`**.
+- **0 setup `LIVE_READY`**.
+- 1 `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED` : RS Rotation simple — sous réserve de robustesse temporelle améliorée + friction validée.
+- 1 `CONDITIONAL_RESEARCH_CANDIDATE` : GLD breakout isolé — single-symbol, n=47.
+- 1 `EXPERIMENTAL_ONLY / FRICTION_REQUIRED` : Mean Reversion — friction à valider.
+- 2 `FRAGILE` :
+  - SECTOR_RELATIVE_STRENGTH v1 — `FRAGILE / CONCENTRATION_EXCESSIVE` (top 5 = 103 % du PnL).
+  - TREND_PULLBACK_DYNAMIC_SUPPORT v1 — `FRAGILE` (PF 1.045 sous seuil minimum).
+- 3 `DEAD` : Pullback Momentum (`DEAD / DO_NOT_TRADE`), Breakout agrégé (`DEAD_AGGREGATED`), Volatility Compression (`DEAD / ABANDONED`).
 
-Conséquence : **aucun setup ne peut être activé live actuellement**. ManiTradePro reste un environnement de recherche jusqu'à ce qu'une PR de correction code + walk-forward conditionnel régime + friction validation permette de qualifier au moins 1 setup en VALIDATED selon la nouvelle règle.
+Conséquence : **aucun setup ne peut être activé live actuellement**. ManiTradePro reste un environnement de recherche jusqu'à ce que **(a)** au moins un setup atteigne `VALIDATED_RESEARCH_CORE` selon les 10 critères du Freeze v1 § 4, **(b)** puis franchisse le shadow live + paper live prolongé pour atteindre `LIVE_READY` (Freeze v1 § 5).

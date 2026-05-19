@@ -1,8 +1,10 @@
 # SECTOR_RELATIVE_STRENGTH v1
 
-> Premier setup robuste crédible formalisé du projet ManiTradePro. Issu de [`new-setup-discovery-lab-v1`](../../tools/backtests/new-setup-discovery-lab-v1.mjs) (PR #211).
+> Setup de recherche intéressant mais non diversifiable en l'état, non tradable, non live-ready. Issu de [`new-setup-discovery-lab-v1`](../../tools/backtests/new-setup-discovery-lab-v1.mjs) (PR #211).
 >
-> **Classification : VALIDATED_RESEARCH_CORE** — pas LIVE_READY, pas PRODUCTION_READY. À traiter comme un cœur de recherche stabilisé, pas comme une stratégie de trading active.
+> **Classification : FRAGILE / CONCENTRATION_EXCESSIVE** — pas tradable, pas LIVE_READY, pas PRODUCTION_READY. À traiter comme une observation de recherche utile, pas comme une stratégie de trading active ni comme un cœur de recherche stabilisé.
+>
+> **Note 2026-05-19 — recalibration de statut** : la version initiale de cette fiche (PR #211) proposait `VALIDATED_RESEARCH_CORE`. Le statut a été dégradé à `FRAGILE / CONCENTRATION_EXCESSIVE` après prise en compte des critères `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 4 (top 5 ticker share < 60 %, mesuré à **103 %** sur APLD/APP/PLTR/NBIS/UPST — sans eux, PF tombe à **0.94**). Les chiffres historiques restent intéressants comme observation, mais l'edge **n'est pas diversifiable** en l'état. Voir § 10. Cette recalibration n'invalide pas techniquement le travail PR #211 ; elle aligne le statut avec la méthodologie qui fait autorité (Freeze v1).
 
 ---
 
@@ -233,16 +235,28 @@ Les deux setups partagent le même univers et le même régime filter, mais le m
 
 ## 10. Final recommendation
 
-### Statut officiel proposé
+### Statut officiel actuel
 
-**`VALIDATED_RESEARCH_CORE`**
+**`FRAGILE / CONCENTRATION_EXCESSIVE`** (truth-sync 2026-05-19, aligné sur `RESEARCH_FRAMEWORK_FREEZE_V1.md` § 2 et § 4).
 
-Justification :
-- Le setup remplit les 7 critères de la nouvelle règle de validation post-audit (cf. SETUPS_REGISTRY.md, section "Post execution-bias audit status").
-- Le PF post-friction 2.16, 5/5 années positives, edge decay favorable, exécution propre.
-- C'est le premier setup du projet à atteindre ce niveau de robustesse documentée.
+Raisons (toutes méthodologiques, aucune n'invalide les chiffres bruts de la PR #211) :
 
-### Pourquoi PAS `LIVE_READY` ni `PRODUCTION_READY`
+- **Concentration rédhibitoire** : top 5 tickers (APLD, APP, PLTR, NBIS, UPST) = **103 %** du PnL. Sans eux, PF tombe à **0.94**. L'edge mesuré dépend entièrement de 5 actifs sur 158 — il n'est pas diversifiable.
+- **Critère Freeze § 4 violé** : top 5 ticker share doit être < 60 % pour qu'un setup puisse atteindre `VALIDATED_RESEARCH_CORE`. Mesuré à 103 %. Le critère est dur, pas négociable sans débat ChatGPT séparé.
+- **Aucun audit anti-look-ahead spécifique** sur l'agrégation `sectorMomentum` (le mécanisme RS Rotation simple est CLEAN PR #208, mais l'agrégation sectorielle est un mécanisme distinct non audité formellement).
+- **Aucun walk-forward conditionnel par régime** exécuté.
+- **Aucun stress test friction ×2 / ×3** exécuté.
+
+Conséquence : pas de promotion `VALIDATED_RESEARCH_CORE`. Pas de `LIVE_READY`. Pas d'activation paper automatique. Le setup reste **un cas d'étude de recherche**, pas une stratégie.
+
+### Présentation honnête du setup
+
+- **Chiffres historiques intéressants** : PF brut 2.16, 5/5 années positives, edge decay favorable (×0.68). Ces chiffres restent valides comme observation.
+- **Edge observé mais non diversifiable** : sans les 5 stars AI 2021-2025, l'edge disparaît. Le mécanisme capture la concentration AI, pas un edge sectoriel généralisable.
+- **Statut non tradable** : non `LIVE_READY`, non `PRODUCTION_READY`, non `VALIDATED_RESEARCH_CORE`.
+- **Pas de promotion possible** sans : (a) correction de la concentration (pondération secteurs, plafonnement single-ticker, topSectors ≥ 2 avec audit), (b) stress tests friction ×2 / ×3, (c) audit anti-look-ahead spécifique sur `sectorMomentum`, (d) walk-forward conditionnel par régime ≥ 2/3 PASS.
+
+### Pourquoi PAS `LIVE_READY` ni `PRODUCTION_READY` (raisons additionnelles)
 
 - **Pas de live shadow** : aucun paper trading parallèle. On n'a pas mesuré l'écart backtest / réel.
 - **Pas de sizing dynamique** : taille fixe = 1R par position. En réel, il faut un sizing volatility-aware (Kelly fraction, ATR-based, ou vol targeting).
@@ -256,7 +270,7 @@ Justification :
 2. **Walk-forward conditionnel** par régime (durcir la robustesse temporelle).
 3. **Comparaison fine RS Rotation vs SECTOR_RS** : matrice de corrélation trade-by-trade, périodes complémentaires.
 4. **Stress tests friction ×2, ×3** (cf. section 9).
-5. **Mise à jour SETUPS_REGISTRY.md** avec le nouveau statut VALIDATED_RESEARCH_CORE pour SECTOR_RS.
+5. **Mise à jour SETUPS_REGISTRY.md** avec un statut révisé (cible plafond : `CONDITIONAL_EDGE` si concentration corrigée, sinon maintien `FRAGILE / CONCENTRATION_EXCESSIVE`). Toute promotion `VALIDATED_RESEARCH_CORE` reste subordonnée au respect des 10 critères Freeze v1 § 4.
 6. **Sourcer earnings dates** pour débloquer POST_EARNINGS_DRIFT (cf. new-setup-discovery-lab section 3).
 
 ### Interdictions associées à cette config v1
@@ -268,4 +282,4 @@ Justification :
 
 ---
 
-> **Conclusion** : SECTOR_RELATIVE_STRENGTH v1 est le **premier setup robuste crédible** du projet ManiTradePro. C'est une découverte de recherche, pas une stratégie de trading. Le terrain est posé pour aller plus loin proprement.
+> **Conclusion** : SECTOR_RELATIVE_STRENGTH v1 est un setup de recherche intéressant mais **non diversifiable en l'état**, **non tradable**, **non live-ready**. C'est une découverte de recherche utile, pas une stratégie de trading. Pour aller plus loin proprement, il faut d'abord corriger la concentration top 5 (103 % du PnL), exécuter les stress tests friction ×2/×3, et auditer l'agrégation sectorielle pour look-ahead.
