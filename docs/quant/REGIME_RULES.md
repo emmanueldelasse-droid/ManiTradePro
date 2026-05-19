@@ -56,4 +56,4 @@ Items attendus :
 
 - `/SESSION.md` — discussions régimes marché
 - `/docs/research/`
-- `/TRADING_LOGIC.md`
+- `docs/quant/TRADING_LOGIC.md` (modulateurs régime)

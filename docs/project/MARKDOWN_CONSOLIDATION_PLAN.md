@@ -18,7 +18,7 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 
 ### Risques actuels
 
-- **Doublons potentiels** : après les migrations `docs/project/` (PR #227), `docs/quant/` (PR #228) et `docs/monitoring/` (PR en cours `claude/migrate-docs-monitoring`), il reste 7 sources canoniques racine vivantes. Aucune n'a encore de pendant `/docs/*` au même nom. 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). `ARCHITECTURE.md`, `DATA_PIPELINE.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `PROVIDERS_MATRIX.md` et `KNOWN_ISSUES.md` sont désormais canoniques sous `docs/*`, leurs anciens chemins racine sont des stubs temporaires de redirection. `TRADING_LOGIC.md` reste racine (contenu transversal, split reporté à une PR dédiée).
+- **Doublons potentiels** : après les migrations `docs/project/` (PR #227), `docs/quant/` (PR #228), `docs/monitoring/` (PR #229) et le split `TRADING_LOGIC.md` (PR en cours `claude/split-trading-logic`), il reste 6 sources canoniques racine vivantes. Aucune n'a de pendant `/docs/*` au même nom. 2 ont un pendant fonctionnel sous un autre nom (`BOT_OBJECTIVE.md` ↔ `docs/project/PROJECT_VISION.md`, `CHECKLIST_MERGE.md` ↔ `docs/project/MERGE_PROTOCOL.md`). 7 stubs racine de redirection sont en place : `/ARCHITECTURE.md`, `/DATA_PIPELINE.md`, `/SETUPS_REGISTRY.md`, `/ASSET_REGISTRY.md`, `/PROVIDERS_MATRIX.md`, `/KNOWN_ISSUES.md`, `/TRADING_LOGIC.md`. Le contenu de `TRADING_LOGIC.md` a été réparti entre `docs/quant/TRADING_LOGIC.md` (scoring / setups / régimes / modulateurs / apprentissage) et `docs/project/TRADING_ENGINE.md` (pipeline / safety gate / sizing / règles ouverture / fermeture / garde-fou devise / paper trading).
 - **Confusion possible** : un contributeur peut écrire dans un squelette `/docs/*` au lieu de la source canonique racine.
 - **Lecture excessive** : la matrice d'impact documentaire pointe à la fois vers racine et `/docs/`, et le protocole de reprise de session liste explicitement les sources racine.
 - **Fichiers semi-actifs** : plusieurs squelettes `/docs/project/` et `/docs/quant/` contiennent des rôles + métadonnées sans contenu métier réel, ce qui peut donner une fausse impression de couverture documentaire.
@@ -38,7 +38,9 @@ Clarifier la structure documentaire Markdown du repo sans casser les sources can
 | `CHECKLIST_MERGE.md` | 182 | Checklist merge | Canonique | À consolider plus tard vers `docs/project/MERGE_PROTOCOL.md` |
 | `ARCHITECTURE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/ARCHITECTURE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 | `DATA_PIPELINE.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/project/DATA_PIPELINE.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
-| `TRADING_LOGIC.md` | 501 | Logique du moteur (transversal) | Canonique racine | **Reste racine** : contenu transversal (scoring + pipeline + safety gate + sizing + fermeture + garde-fou devise). Split entre `docs/project/` et `docs/quant/` reporté à une PR dédiée. |
+| `TRADING_LOGIC.md` | 13 | Stub temporaire de redirection | Stub | **Splitté** entre `docs/quant/TRADING_LOGIC.md` (scoring / setups / régimes / modulateurs / apprentissage) et `docs/project/TRADING_ENGINE.md` (pipeline / safety / sizing / ouverture / fermeture / garde-fou devise). Stub racine à supprimer lors de la PR de nettoyage final. |
+| `docs/quant/TRADING_LOGIC.md` | 262 | **Canonique** *(extrait du split)* | Canonique | Garder, source officielle de la logique quant |
+| `docs/project/TRADING_ENGINE.md` | 307 | **Canonique** *(extrait du split)* | Canonique | Garder, source officielle de la logique moteur / exécution |
 | `SETUPS_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/SETUPS_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 | `ASSET_REGISTRY.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/quant/ASSET_REGISTRY.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
 | `PROVIDERS_MATRIX.md` | 12 | Stub temporaire de redirection | Stub | **Déplacé** vers `docs/monitoring/PROVIDERS_MATRIX.md`. Stub racine à supprimer lors de la PR de nettoyage final. |
@@ -131,7 +133,7 @@ Racine du repo (5 fichiers) :
 
 - `SETUPS_REGISTRY.md` (déplacé depuis la racine)
 - `ASSET_REGISTRY.md` (déplacé depuis la racine)
-- `TRADING_LOGIC.md` ou éclatement entre `docs/project/ARCHITECTURE.md` (partie pipeline) et `docs/quant/` (logique scoring / setup)
+- `docs/quant/TRADING_LOGIC.md` (logique scoring / setups / régimes) et `docs/project/TRADING_ENGINE.md` (logique moteur / exécution / safety / sizing) *(éclatement réalisé)*
 - `ALLOCATION_RULES.md`, `BACKTEST_RULES.md`, `FRICTION_MODEL.md`, `REGIME_RULES.md`, `RISK_ENGINE_RULES.md`, `WALK_FORWARD_RULES.md` *(squelettes à enrichir au besoin)*
 
 `docs/research/` (inchangé, déjà canonique) :
@@ -182,7 +184,7 @@ Racine du repo (5 fichiers) :
 2. **PR migration `docs/quant/`** *(partiellement réalisée — PR en cours `claude/migrate-docs-quant-registries`)*
    - Déplace `SETUPS_REGISTRY.md` → `docs/quant/SETUPS_REGISTRY.md`. **Fait** (déplacement bloc 529 lignes).
    - Déplace `ASSET_REGISTRY.md` → `docs/quant/ASSET_REGISTRY.md`. **Fait** (déplacement bloc 202 lignes).
-   - Décide du sort de `TRADING_LOGIC.md`. **Fait** : reste racine pour cette PR (contenu transversal : scoring + pipeline + safety gate + sizing + fermeture + garde-fou devise). Split entre `docs/project/` et `docs/quant/` reporté à une PR dédiée pour éviter de mélanger migration de registres et refonte de fond.
+   - Décide du sort de `TRADING_LOGIC.md`. **Fait** : reste racine pour la PR #228 (contenu transversal), **split exécuté** dans la PR `claude/split-trading-logic` (création de `docs/quant/TRADING_LOGIC.md` et `docs/project/TRADING_ENGINE.md`, stub racine de redirection).
    - Crée des stubs racine pendant la transition. **Fait** pour `SETUPS_REGISTRY.md` et `ASSET_REGISTRY.md`.
    - Met à jour la matrice et tous les renvois. **Fait**.
 

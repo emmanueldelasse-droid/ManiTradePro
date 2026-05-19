@@ -391,12 +391,14 @@ canonique actuelle et quel chemin de transition existe encore.
 
 ### Exemple
 
-- `/TRADING_LOGIC.md` = source canonique (split entre `docs/project/` et
-  `docs/quant/` reporté à une PR dédiée).
 - `docs/project/ARCHITECTURE.md` = source canonique (migrée).
 - `/ARCHITECTURE.md` = stub de redirection vers `docs/project/`.
 - `docs/monitoring/PROVIDERS_MATRIX.md` = source canonique (migrée).
 - `/PROVIDERS_MATRIX.md` = stub de redirection vers `docs/monitoring/`.
+- `docs/quant/TRADING_LOGIC.md` et `docs/project/TRADING_ENGINE.md` =
+  sources canoniques (split de l'ancien `/TRADING_LOGIC.md`).
+- `/TRADING_LOGIC.md` = stub de redirection vers les deux fichiers
+  spécialisés.
 - Toute modification doit être faite uniquement sur la source canonique
   en vigueur.
 
@@ -415,7 +417,7 @@ canonique actuelle et quel chemin de transition existe encore.
 | `/CHECKLIST_MERGE.md` | _(squelette `docs/project/MERGE_PROTOCOL.md`)_ | À arbitrer plus tard |
 | `/GPT_ROLE.md` | _stub de redirection vers `GOVERNANCE.md` depuis 2026-05-19_ | Déprécié |
 | `/PROJECT_RULES.md` | _(à consolider dans `docs/project/` à terme)_ | À arbitrer plus tard |
-| `/TRADING_LOGIC.md` | _(contenu transversal : scoring, pipeline, safety gate, sizing, fermeture, garde-fou devise — split à faire dans une PR dédiée)_ | Reste racine, split reporté à une PR dédiée |
+| `docs/quant/TRADING_LOGIC.md` + `docs/project/TRADING_ENGINE.md` | `/TRADING_LOGIC.md` = stub de redirection vers les deux fichiers spécialisés | **Migré (split)** |
 
 ### Règles obligatoires
 
@@ -537,7 +539,7 @@ Principes structurels et non négociables :
 - relire PR + diffs ;
 - challenger hypothèses, conclusions et risques ;
 - vérifier impacts (architecture, quant, sécurité), régressions potentielles, risques d'overfit ;
-- vérifier la cohérence globale entre `SESSION.md`, `SETUPS_REGISTRY.md`, `ASSET_REGISTRY.md`, `TRADING_LOGIC.md`, `PROJECT_RULES.md`, `CHECKLIST_MERGE.md` et la présente gouvernance ;
+- vérifier la cohérence globale entre `SESSION.md`, `docs/quant/SETUPS_REGISTRY.md`, `docs/quant/ASSET_REGISTRY.md`, `docs/quant/TRADING_LOGIC.md`, `docs/project/TRADING_ENGINE.md`, `PROJECT_RULES.md`, `CHECKLIST_MERGE.md` et la présente gouvernance ;
 - répondre formellement par `GO MERGE` ou `NOGO merge` + raisons.
 
 ---
@@ -885,7 +887,8 @@ Lire aussi :
 
 Lire aussi :
 
-- `TRADING_LOGIC.md`
+- `docs/quant/TRADING_LOGIC.md`
+- `docs/project/TRADING_ENGINE.md`
 - `docs/quant/SETUPS_REGISTRY.md`
 - `docs/quant/ASSET_REGISTRY.md`
 

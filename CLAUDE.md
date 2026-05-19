@@ -47,7 +47,8 @@ Aide anti-oubli (non bloquante) : `npm run check:doc-impact`. Le script ne rempl
 - `SESSION.md` — état du projet.
 - `docs/project/ARCHITECTURE.md` — structure code après merge (la racine `ARCHITECTURE.md` est un stub temporaire de redirection).
 - `docs/project/DATA_PIPELINE.md` — flux de données par écran (la racine `DATA_PIPELINE.md` est un stub temporaire de redirection).
-- `TRADING_LOGIC.md` — logique du moteur.
+- `docs/quant/TRADING_LOGIC.md` — logique quant / scoring / setups / régimes (la racine `TRADING_LOGIC.md` est un stub temporaire de redirection).
+- `docs/project/TRADING_ENGINE.md` — logique moteur / exécution / paper trading / safety / sizing.
 - `docs/monitoring/PROVIDERS_MATRIX.md` — routage providers (la racine `PROVIDERS_MATRIX.md` est un stub temporaire de redirection).
 - `docs/monitoring/KNOWN_ISSUES.md` — bugs et dette (la racine `KNOWN_ISSUES.md` est un stub temporaire de redirection).
 - `CHECKLIST_MERGE.md` — checklist obligatoire avant tout merge.
@@ -59,7 +60,7 @@ Si une demande touche aux setups, aux backtests, au régime marché ou aux actif
 À chaque merge, **parcourir `CHECKLIST_MERGE.md`** et mettre à jour les fichiers concernés AVANT le merge :
 - Modif architecture → `docs/project/ARCHITECTURE.md`
 - Modif flux donnée → `docs/project/DATA_PIPELINE.md`
-- Modif logique trading → `TRADING_LOGIC.md`
+- Modif logique trading → `docs/quant/TRADING_LOGIC.md` (scoring) ou `docs/project/TRADING_ENGINE.md` (exécution / sizing)
 - Modif provider → `docs/monitoring/PROVIDERS_MATRIX.md`
 - Découverte bug → `docs/monitoring/KNOWN_ISSUES.md`
 - Toute évolution → `SESSION.md`

@@ -37,7 +37,8 @@ Le body de PR doit contenir une section `## Documentation impact` structurée :
 - [ ] **`SESSION.md` mis à jour** : reflète l'état réel **après** la PR. Doit contenir objectif livré, fichiers modifiés, impacts (runtime / quant / documentation), limites, prochaine étape. Une PR ne doit pas recevoir `GO MERGE` si `SESSION.md` est absent, obsolète ou contradictoire avec les fichiers sources.
 - [ ] **`docs/project/ARCHITECTURE.md` mis à jour** si la structure du code change (nouvelle route, nouveau cluster de fonctions, nouvelle table Supabase, modification de cache).
 - [ ] **`docs/project/DATA_PIPELINE.md` mis à jour** si le flux d'une donnée change (provider, cache, TTL, devise, freshness).
-- [ ] **`TRADING_LOGIC.md` mis à jour** si le scoring, les setups, les règles d'ouverture/fermeture, ou l'apprentissage évoluent.
+- [ ] **`docs/quant/TRADING_LOGIC.md` mis à jour** si le scoring, les setups, les régimes, les modulateurs ou l'apprentissage évoluent.
+- [ ] **`docs/project/TRADING_ENGINE.md` mis à jour** si les règles d'ouverture / fermeture, le sizing, la safety gate, le garde-fou devise, le paper trading ou l'orchestration cron évoluent.
 - [ ] **`docs/monitoring/PROVIDERS_MATRIX.md` mis à jour** si une source de données change ou un nouveau provider est ajouté.
 - [ ] **`docs/monitoring/KNOWN_ISSUES.md` mis à jour** : ajouter un nouveau bug découvert, marquer un bug résolu comme tel, documenter une nouvelle dette identifiée.
 - [ ] **`CLAUDE.md` mis à jour** si une règle de processus change (workflow git, déploiement, conventions).

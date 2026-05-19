@@ -62,4 +62,4 @@ _À remplir — coordonner avec `REGIME_RULES.md`._
 ## Sources existantes à consolider
 
 - `/SESSION.md` § "Architecture cible" (Top 3-5 trades max)
-- `/TRADING_LOGIC.md`
+- `docs/project/TRADING_ENGINE.md` (sizing) + `docs/quant/TRADING_LOGIC.md` (scoring)

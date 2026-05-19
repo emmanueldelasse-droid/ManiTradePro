@@ -75,5 +75,5 @@ _À remplir — ordre de priorité quand plusieurs règles risk s'activent simul
 ## Sources existantes à consolider
 
 - `/SESSION.md` — discussions risk
-- `/TRADING_LOGIC.md`
+- `docs/project/TRADING_ENGINE.md` (risk limits, kill switch) + `docs/quant/TRADING_LOGIC.md` (apprentissage adaptatif)
 - `/cloudflare-worker/worker.js` — fonction `validateConfiguration` (exception merge selon `CLAUDE.md`)
