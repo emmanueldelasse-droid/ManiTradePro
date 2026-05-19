@@ -1,22 +1,38 @@
-# CLAUDE.md — ManiTradePro
+# CLAUDE.md — Manuel opérationnel Claude Code
 
-> Règles permanentes pour toute session Claude Code sur ce repo.
-> **Priorité absolue : `GOVERNANCE.md`** — fichier officiel de gouvernance projet, prioritaire sur tout autre document, à lire AVANT toute analyse, implémentation, review ou merge.
-> Lire ensuite `SESSION.md` — le fichier de continuité vivant.
+> Ce fichier explique comment Claude Code doit travailler concrètement dans le repo ManiTradePro.
+>
+> Il est **subordonné à `GOVERNANCE.md`**. En cas de conflit, `GOVERNANCE.md` fait toujours autorité.
+
+## Source de gouvernance
+
+Toute règle de gouvernance, validation, merge, rôle ChatGPT / Claude, agents, skills ou gouvernance quantitative est définie dans :
+
+`GOVERNANCE.md`
+
+`CLAUDE.md` ne doit pas dupliquer ces règles. Il explique uniquement comment Claude Code les applique concrètement dans ce repo.
+
+Pointeurs utiles dans `GOVERNANCE.md` :
+- § *Gouvernance ChatGPT ↔ Claude*
+- § *Workflow validation avant merge*
+- § *Règle anti-hallucination*
+- § *Gouvernance quantitative*
+- § *Agents et skills Claude Code*
 
 ## Documentation permanente (IMPÉRATIVE — mai 2026)
 
-À chaque session, **lire AVANT toute modif** (ordre de priorité officiel défini dans `GOVERNANCE.md`) :
-- `GOVERNANCE.md` — **fichier de gouvernance projet officiel** (priorité #1). Définit rôles, règles merge/mémoire/validation, structure dossiers `/docs/`, interdictions absolues.
-- `BOT_OBJECTIVE.md` — **constitution officielle du projet** : objectif réel, règles absolues, ce que le bot est et n'est pas. Source actuelle de `docs/project/PROJECT_VISION.md`.
-- `PROJECT_RULES.md` — règles techniques structurelles (séparation analytique/live, snapshotId, additivité du payload)
-- `SESSION.md` — état du projet
-- `ARCHITECTURE.md` — structure code après merge
-- `DATA_PIPELINE.md` — flux de données par écran
-- `TRADING_LOGIC.md` — logique du moteur
-- `PROVIDERS_MATRIX.md` — routage providers
-- `KNOWN_ISSUES.md` — bugs et dette
-- `CHECKLIST_MERGE.md` — checklist obligatoire avant tout merge
+À chaque session, **lire AVANT toute modif**. L'ordre de priorité canonique est défini dans `GOVERNANCE.md` § *Ordre de priorité* ; la liste ci-dessous précise les fichiers opérationnels utiles dans ce repo :
+
+- `GOVERNANCE.md` — gouvernance projet (priorité absolue).
+- `BOT_OBJECTIVE.md` — constitution officielle du projet (objectif réel, règles absolues). Source actuelle de `docs/project/PROJECT_VISION.md`.
+- `PROJECT_RULES.md` — règles techniques structurelles (séparation analytique/live, snapshotId, additivité du payload).
+- `SESSION.md` — état du projet.
+- `ARCHITECTURE.md` — structure code après merge.
+- `DATA_PIPELINE.md` — flux de données par écran.
+- `TRADING_LOGIC.md` — logique du moteur.
+- `PROVIDERS_MATRIX.md` — routage providers.
+- `KNOWN_ISSUES.md` — bugs et dette.
+- `CHECKLIST_MERGE.md` — checklist obligatoire avant tout merge.
 - `SETUPS_REGISTRY.md` — registre officiel des setups quantitatifs validés/testés/abandonnés.
 - `ASSET_REGISTRY.md` — classification provisoire des actifs compatibles avec les setups.
 
@@ -32,6 +48,17 @@ Si une demande touche aux setups, aux backtests, au régime marché ou aux actif
 
 Un merge n'est PAS considéré comme terminé tant que la doc n'est pas à jour. La doc doit représenter l'ÉTAT RÉEL APRÈS MERGE, jamais une intention ou un futur.
 
+## Validation avant merge
+
+Règles canoniques : voir `GOVERNANCE.md` § *Workflow validation avant merge* et § *Gouvernance ChatGPT ↔ Claude*.
+
+Application concrète dans ce repo :
+- Aucun merge important sans `GO MERGE explicite de ChatGPT`.
+- Tous les `.md` impactés mis à jour avant la demande de validation.
+- `CHECKLIST_MERGE.md` parcourue et reportée dans le body de la PR.
+- Diffs, impacts techniques, impacts quantitatifs fournis dans le body.
+- Le body de PR doit déclarer explicitement les agents/skills utilisés — y compris l'absence (cf. `GOVERNANCE.md` § *Agents et skills Claude Code*).
+
 ## Règle workflow Git (IMPÉRATIVE)
 
 **Après toute livraison fonctionnelle significative, créer une PR vers `main` et la signaler explicitement à l'utilisateur.**
@@ -42,7 +69,7 @@ Erreur type à NE PAS répéter : pousser 4 commits sur la branche de feature, m
 
 1. Après chaque chunk de commits qui résout un problème utilisateur ou livre un feature complet :
    - Vérifier avec `git log origin/main..origin/<branche-active>` si des commits sont derrière `main`.
-   - Si oui : **créer la PR immédiatement** via `mcp__github__create_pull_request` et **la merger directement** (squash, titre `<scope>: <résumé> (#<num>)` pour matcher l'historique). L'utilisateur a explicitement demandé l'auto-merge (session 2026-05-12) — pas la peine d'attendre une review humaine pour les changements de routine.
+   - Si oui : **créer la PR immédiatement** via `mcp__github__create_pull_request`. Le merge reste subordonné à la gouvernance (`GOVERNANCE.md` § *Workflow validation avant merge*) — pour les changements de routine purement additifs, l'auto-merge est autorisé conformément à `CHECKLIST_MERGE.md` § *Auto-merge autorisé pour les PRs additives validées*. Squash, titre `<scope>: <résumé> (#<num>)` pour matcher l'historique.
 2. Donner le lien de la PR à l'utilisateur **après** le merge avec le statut du déploiement (Pages / Worker).
 3. Ne **jamais** dire "tout est poussé" sans avoir vérifié l'état vs `main`. "Poussé sur la branche" ≠ "livré à l'utilisateur" tant que la PR n'est pas mergée.
 4. **Exceptions à l'auto-merge — demander avant de merger** si :
@@ -129,41 +156,10 @@ Deux thèmes : **dark** (default) et **light** via `.app-shell.theme-light`. Tou
 
 Jamais de commit contenant `.env`, credentials, ou valeurs de secrets. Si découvert par accident : signaler et demander à l'utilisateur de rotate.
 
----
-
-# Validation obligatoire avant merge
-
-Claude ne doit jamais merger directement une PR importante sans validation explicite de ChatGPT.
-
-Avant chaque merge :
-- tous les `.md` impactés doivent être mis à jour,
-- `CHECKLIST_MERGE.md` doit être remplie,
-- les diffs doivent être fournis,
-- les impacts techniques doivent être documentés,
-- les impacts quant doivent être documentés.
-
-Claude doit ensuite attendre :
-
-```text
-GO MERGE explicite de ChatGPT
-```
-
-Sans ce GO explicite :
-- pas de merge,
-- pas de push sur `main`.
-
-## Fichier obligatoire à lire
-
-Avant toute réflexion stratégique ou validation importante :
-
-```text
-GOVERNANCE.md
-```
-
-(`GPT_ROLE.md` est désormais un stub de redirection — toute la gouvernance IA est centralisée dans `GOVERNANCE.md`.)
-
 ## Agents et skills Claude Code
 
-- La liste complète des agents et skills disponibles, leur rôle, leurs limites et les règles de délégation sont documentés dans `GOVERNANCE.md` (section *Agents et skills Claude Code*).
-- **Toute utilisation d'un agent dans une PR doit être déclarée explicitement** dans le body : agent utilisé, tâche déléguée, résultat, limites éventuelles.
-- Les moteurs quant restent implémentés directement par Claude, sans délégation à un agent isolé. Les agents ne remplacent jamais la revue ChatGPT.
+Règles canoniques : voir `GOVERNANCE.md` § *Agents et skills Claude Code*.
+
+Application concrète :
+- **Toute utilisation d'un agent dans une PR doit être déclarée explicitement** dans le body. L'absence d'agent/skill doit elle aussi être déclarée explicitement (`## Agents / skills utilisés` + `Aucun.`).
+- Les moteurs quant restent implémentés directement par Claude, sans délégation à un agent isolé.
