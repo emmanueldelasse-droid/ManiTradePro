@@ -1,0 +1,458 @@
+{
+  "generatedAt": "2026-05-20T06:54:09.811Z",
+  "scope": "RS Rotation robustness hardening — focused depth analysis on the frozen baseline (complementary to rs-rotation-robustness-lab-v1.mjs which sweeps breadth).",
+  "baseline": {
+    "lookback": 90,
+    "horizon": 20,
+    "topN": 10,
+    "rebalance": 10,
+    "minMomentum": 12,
+    "exit": "fixed_hold",
+    "regime": "NO_RISK_OFF",
+    "universe": "mixed"
+  },
+  "executionModel": {
+    "entry": "open[i+1] (NEXT_OPEN, signal en fin de jour i)",
+    "exit": "open[i+1+horizon] (fixed hold)",
+    "friction": {
+      "spreadOneWayPct": 0.05,
+      "slippageOneWayPct": 0.05,
+      "commissionOneWayPct": 0.05,
+      "roundTripPct": 0.3,
+      "overnightGapPenaltyPctPerDay": 0.02,
+      "conversionToR": "5% = 1R",
+      "formula": "frictionR = (0.30 + 0.02 × holdDays) / 5",
+      "source": "rs-rotation-robustness-lab-v1.mjs § Friction model (formule canonique projet)"
+    },
+    "lookAheadGuards": [
+      "entry = open[i+1] (jamais close[i], jamais ema[i])",
+      "exit = open[i+1+horizon] (jamais close[i])",
+      "momentum = (close[i] - close[i-lookback]) / close[i-lookback] (causal)",
+      "régime = SPY/QQQ/SMH > EMA200[i] (causal, EMA récurrente)"
+    ]
+  },
+  "universe": {
+    "name": "mixed",
+    "description": "Tous les groupes UNIVERSE de universe-v2.mjs flat.",
+    "loadedSymbols": 158,
+    "totalRequested": 191,
+    "survivorshipBias": "Univers ex-post (survivants 2021-2025). Pas de delistés. Limitation documentée — cf. RESEARCH_FRAMEWORK_FREEZE_V1.md § 10."
+  },
+  "baseline_NO_RISK_OFF": {
+    "summary": {
+      "trades": 929,
+      "wins": 506,
+      "losses": 423,
+      "winrate": 54.47,
+      "expectancyR": 0.7427,
+      "profitFactor": 1.532,
+      "totalR": 689.94,
+      "maxDrawdownR": 226.21,
+      "longestLossStreak": 19
+    },
+    "yearly": {
+      "2021": {
+        "trades": 170,
+        "pf": 1.537,
+        "totalR": 146.28
+      },
+      "2022": {
+        "trades": 59,
+        "pf": 0.144,
+        "totalR": -92.97
+      },
+      "2023": {
+        "trades": 250,
+        "pf": 2.054,
+        "totalR": 280.96
+      },
+      "2024": {
+        "trades": 250,
+        "pf": 1.685,
+        "totalR": 240.09
+      },
+      "2025": {
+        "trades": 200,
+        "pf": 1.388,
+        "totalR": 115.57
+      }
+    }
+  },
+  "regimes": {
+    "ALL_REGIMES": {
+      "trades": 1091,
+      "summary": {
+        "trades": 1091,
+        "wins": 577,
+        "losses": 514,
+        "winrate": 52.89,
+        "expectancyR": 0.5963,
+        "profitFactor": 1.426,
+        "totalR": 650.6,
+        "maxDrawdownR": 311.66,
+        "longestLossStreak": 19
+      },
+      "yearly": {
+        "2021": {
+          "trades": 170,
+          "pf": 1.537,
+          "totalR": 146.28
+        },
+        "2022": {
+          "trades": 197,
+          "pf": 0.549,
+          "totalR": -138.42
+        },
+        "2023": {
+          "trades": 250,
+          "pf": 2.054,
+          "totalR": 280.96
+        },
+        "2024": {
+          "trades": 250,
+          "pf": 1.685,
+          "totalR": 240.09
+        },
+        "2025": {
+          "trades": 224,
+          "pf": 1.366,
+          "totalR": 121.67
+        }
+      }
+    },
+    "NO_RISK_OFF": {
+      "trades": 929,
+      "summary": {
+        "trades": 929,
+        "wins": 506,
+        "losses": 423,
+        "winrate": 54.47,
+        "expectancyR": 0.7427,
+        "profitFactor": 1.532,
+        "totalR": 689.94,
+        "maxDrawdownR": 226.21,
+        "longestLossStreak": 19
+      },
+      "yearly": {
+        "2021": {
+          "trades": 170,
+          "pf": 1.537,
+          "totalR": 146.28
+        },
+        "2022": {
+          "trades": 59,
+          "pf": 0.144,
+          "totalR": -92.97
+        },
+        "2023": {
+          "trades": 250,
+          "pf": 2.054,
+          "totalR": 280.96
+        },
+        "2024": {
+          "trades": 250,
+          "pf": 1.685,
+          "totalR": 240.09
+        },
+        "2025": {
+          "trades": 200,
+          "pf": 1.388,
+          "totalR": 115.57
+        }
+      }
+    },
+    "RANGE_ONLY": {
+      "trades": 290,
+      "summary": {
+        "trades": 290,
+        "wins": 172,
+        "losses": 118,
+        "winrate": 59.31,
+        "expectancyR": 0.7749,
+        "profitFactor": 1.701,
+        "totalR": 224.71,
+        "maxDrawdownR": 81.91,
+        "longestLossStreak": 10
+      },
+      "yearly": {
+        "2021": null,
+        "2022": {
+          "trades": 40,
+          "pf": 0.257,
+          "totalR": -38.95
+        },
+        "2023": {
+          "trades": 200,
+          "pf": 2.553,
+          "totalR": 288.86
+        },
+        "2024": {
+          "trades": 10,
+          "pf": 999,
+          "totalR": 22.31
+        },
+        "2025": {
+          "trades": 40,
+          "pf": 0.422,
+          "totalR": -47.51
+        }
+      }
+    },
+    "RISK_ON_ONLY": {
+      "trades": 529,
+      "summary": {
+        "trades": 529,
+        "wins": 254,
+        "losses": 275,
+        "winrate": 48.02,
+        "expectancyR": 0.4653,
+        "profitFactor": 1.28,
+        "totalR": 246.15,
+        "maxDrawdownR": 222.1,
+        "longestLossStreak": 19
+      },
+      "yearly": {
+        "2021": {
+          "trades": 60,
+          "pf": 0.585,
+          "totalR": -72.8
+        },
+        "2022": {
+          "trades": 19,
+          "pf": 0.038,
+          "totalR": -54.02
+        },
+        "2023": {
+          "trades": 50,
+          "pf": 0.902,
+          "totalR": -7.9
+        },
+        "2024": {
+          "trades": 240,
+          "pf": 1.621,
+          "totalR": 217.78
+        },
+        "2025": {
+          "trades": 160,
+          "pf": 1.756,
+          "totalR": 163.08
+        }
+      }
+    }
+  },
+  "walkForward": {
+    "method": "3 splits stricts paramètres gelés (cf. RESEARCH_FRAMEWORK_FREEZE_V1.md § 3.5).",
+    "threshold": {
+      "passLive": "PF test ≥ 1.0 ET trades test ≥ 10",
+      "passRobust": "PF test ≥ 1.3 ET trades test ≥ 20"
+    },
+    "splits": [
+      {
+        "name": "S1",
+        "trainYears": [
+          "2021",
+          "2022"
+        ],
+        "testYears": [
+          "2023"
+        ],
+        "train": {
+          "trades": 229,
+          "wins": 114,
+          "losses": 115,
+          "winrate": 49.78,
+          "expectancyR": 0.2328,
+          "profitFactor": 1.14,
+          "totalR": 53.32,
+          "maxDrawdownR": 226.21,
+          "longestLossStreak": 19
+        },
+        "test": {
+          "trades": 250,
+          "wins": 152,
+          "losses": 98,
+          "winrate": 60.8,
+          "expectancyR": 1.1239,
+          "profitFactor": 2.054,
+          "totalR": 280.96,
+          "maxDrawdownR": 81.91,
+          "longestLossStreak": 10
+        },
+        "passLive": true,
+        "passRobust": true
+      },
+      {
+        "name": "S2",
+        "trainYears": [
+          "2021",
+          "2022",
+          "2023"
+        ],
+        "testYears": [
+          "2024"
+        ],
+        "train": {
+          "trades": 479,
+          "wins": 266,
+          "losses": 213,
+          "winrate": 55.53,
+          "expectancyR": 0.6979,
+          "profitFactor": 1.516,
+          "totalR": 334.28,
+          "maxDrawdownR": 226.21,
+          "longestLossStreak": 19
+        },
+        "test": {
+          "trades": 250,
+          "wins": 133,
+          "losses": 117,
+          "winrate": 53.2,
+          "expectancyR": 0.9604,
+          "profitFactor": 1.685,
+          "totalR": 240.09,
+          "maxDrawdownR": 139.59,
+          "longestLossStreak": 14
+        },
+        "passLive": true,
+        "passRobust": true
+      },
+      {
+        "name": "S3",
+        "trainYears": [
+          "2021",
+          "2022",
+          "2023",
+          "2024"
+        ],
+        "testYears": [
+          "2025"
+        ],
+        "train": {
+          "trades": 729,
+          "wins": 399,
+          "losses": 330,
+          "winrate": 54.73,
+          "expectancyR": 0.7879,
+          "profitFactor": 1.576,
+          "totalR": 574.37,
+          "maxDrawdownR": 226.21,
+          "longestLossStreak": 19
+        },
+        "test": {
+          "trades": 200,
+          "wins": 107,
+          "losses": 93,
+          "winrate": 53.5,
+          "expectancyR": 0.5778,
+          "profitFactor": 1.388,
+          "totalR": 115.57,
+          "maxDrawdownR": 121.69,
+          "longestLossStreak": 14
+        },
+        "passLive": true,
+        "passRobust": true
+      }
+    ],
+    "passLive": 3,
+    "passRobust": 3
+  },
+  "concentration": {
+    "universeSize": 96,
+    "positiveContributors": 60,
+    "sumPositiveR": 927.34,
+    "top5": [
+      {
+        "symbol": "SOL",
+        "trades": 29,
+        "totalR": 107.608,
+        "sharePctOfPositive": 11.6
+      },
+      {
+        "symbol": "APLD",
+        "trades": 49,
+        "totalR": 94.184,
+        "sharePctOfPositive": 10.16
+      },
+      {
+        "symbol": "AVAX",
+        "trades": 21,
+        "totalR": 90.947,
+        "sharePctOfPositive": 9.81
+      },
+      {
+        "symbol": "APP",
+        "trades": 41,
+        "totalR": 86.687,
+        "sharePctOfPositive": 9.35
+      },
+      {
+        "symbol": "PLTR",
+        "trades": 31,
+        "totalR": 71.824,
+        "sharePctOfPositive": 7.75
+      }
+    ],
+    "top5SumPositiveR": 451.25,
+    "top5SharePctOfPositive": 48.66,
+    "top5SharePctOfAbs": 38.74,
+    "singleMaxSharePctOfPositive": 11.6,
+    "pfWithoutTop5": 1.22,
+    "totalRWithoutTop5": 238.69,
+    "tradesWithoutTop5": 758
+  },
+  "drawdown": {
+    "maxDrawdownR": 226.21,
+    "longestLossStreak": 19,
+    "worstDD": {
+      "magnitudeR": 226.21,
+      "startDate": "2021-11-03",
+      "endDate": "2022-12-14",
+      "durationTrades": 105
+    }
+  },
+  "worst": {
+    "worstYear": {
+      "year": "2022",
+      "pf": 0.144,
+      "trades": 59,
+      "totalR": -92.97
+    },
+    "worstSplit": {
+      "name": "S3",
+      "testPf": 1.388,
+      "testTrades": 200
+    }
+  },
+  "verdict": {
+    "status": "KEEP_RESEARCH_CANDIDATE",
+    "reasons": [
+      "Pire année (2022) PF = 0.144 < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés."
+    ],
+    "vocabulary": "Freeze v1 + truth-sync 2026-05-19. Interdit ici : VALIDATED_RESEARCH_CORE, LIVE_READY.",
+    "note": "Statut proposé par ce script. La promotion finale reste subordonnée à validation ChatGPT (gouvernance projet)."
+  },
+  "limitations": [
+    "Univers ex-post (survivants 2021-2025). Pas de delistés.",
+    "Friction simplifiée uniforme (pas de modulation par actif : crypto vs ETF vs leveraged).",
+    "Pas de short-side (long-only).",
+    "Pas de sizing dynamique (taille fixe = 1 unité par position, 5 % = 1R).",
+    "Pas de modélisation des coûts de financement (overnight rates pour positions levered).",
+    "Pas de comparaison multi-univers (réservé au lab existant `rs-rotation-robustness-lab-v1.mjs`).",
+    "Walk-forward fixe sur années calendaires (pas de rolling glissant).",
+    "Régimes calculés sur SPY+QQQ+SMH uniquement (pas de VIX, données non disponibles dans le repo)."
+  ],
+  "rollback": {
+    "runtime": "Aucun rollback nécessaire — aucun fichier runtime modifié.",
+    "documentation": "Si verdict contesté, rollback documentaire = git revert de la PR sans impact moteur.",
+    "outputs": "tools/backtests/output/rs-rotation-robustness-v1.json et .md sont produits à chaque exécution — supprimables sans impact."
+  },
+  "sources": [
+    "tools/backtests/backtest-relative-strength-rotation-v1.mjs (variante de référence rs_90d_top10_hold20)",
+    "tools/backtests/rs-rotation-robustness-lab-v1.mjs (formule friction canonique, baseline)",
+    "tools/backtests/universe-v2.mjs (univers ex-post 2021-2025)",
+    "docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md (§ 3.5 walk-forward, § 4 critères promotion)",
+    "docs/research/ANTI_LOOKAHEAD_RULES.md (entry NEXT_OPEN, fenêtres causales)",
+    "docs/quant/SETUPS_REGISTRY.md (Setup 3 — RS Rotation, statut courant RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED)",
+    "data/*.json (OHLC 2021-2025)"
+  ]
+}

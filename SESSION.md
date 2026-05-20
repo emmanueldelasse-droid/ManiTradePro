@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — truth-sync documentaire des statuts setups : SECTOR_RS dégradé `VALIDATED_RESEARCH_CORE` → `FRAGILE / CONCENTRATION_EXCESSIVE`, ajout fiches manquantes au registre, unification vocabulaire de statuts, note runtime ≠ validation dans `TRADING_LOGIC.md`).
-- **Dernier merge connu** : PR #231 `docs(decisions): add first project decision record` (commit `a4249d8` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R1 RS Rotation robustness improvement evidence : nouveau script `tools/backtests/rs-rotation-robustness-v1.mjs` + outputs JSON/MD. **Aucune promotion proposée** — RS Rotation devient le candidat de recherche le plus crédible du repo, mais le robustness hardening reste incomplet. Statut officiel inchangé `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`).
+- **Dernier merge connu** : PR #233 `docs(setups): truth-sync setup statuses across registry, freeze and session` (commit `19872ac` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,19 +52,26 @@
 
 ## PR en cours
 
-- **PR** : truth-sync documentaire des statuts setups — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Objectif unique** : établir une vérité unique sur les statuts setups. Aligner `SETUPS_REGISTRY.md`, `docs/setups/SECTOR_RELATIVE_STRENGTH.md`, `RESEARCH_FRAMEWORK_FREEZE_V1.md`, `TRADING_LOGIC.md` et `SESSION.md`. Aucune modification de paramètres, aucun setup activé, aucun statut optimiste, aucun nouveau setup créé. PR strictement documentaire.
+- **PR** : PR-R1 RS Rotation robustness improvement evidence — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Objectif unique** : produire une évidence forte d'amélioration de robustesse pour RS Rotation (walk-forward STRICT train/test, friction systématique, analyse concentration top 5 explicite, drawdown deep-dive). **Aucune promotion de statut proposée** — le robustness hardening reste incomplet (bear 2022 PF 0.14). Aucune modification runtime, aucun nouveau setup créé, aucune activation paper/live.
+- **Fichiers créés** :
+  - `tools/backtests/rs-rotation-robustness-v1.mjs` — script focal (~600 lignes) complémentaire de `rs-rotation-robustness-lab-v1.mjs` (le lab fait la breadth, ce script fait la depth sur la baseline gelée).
+  - `tools/backtests/output/rs-rotation-robustness-v1.json` — sortie machine-readable.
+  - `tools/backtests/output/rs-rotation-robustness-v1.md` — rapport humain avec section dédiée § 9bis "Why this is NOT yet `CONDITIONAL_EDGE`".
 - **Fichiers modifiés** :
-  - `docs/quant/SETUPS_REGISTRY.md` — mapping de vocabulaire ajouté, table "Statuts officiels post-audit" enrichie de 2 lignes (SECTOR_RS v1, TREND_PULLBACK_DYNAMIC_SUPPORT v1), nouvelles fiches Setup 7 (SECTOR_RS v1) et Setup 8 (TREND_PULLBACK_DYNAMIC_SUPPORT v1), conclusion stratégique réécrite avec compteurs alignés sur Freeze v1.
-  - `docs/setups/SECTOR_RELATIVE_STRENGTH.md` — note de tête "recalibration de statut", § 10 réécrit (`FRAGILE / CONCENTRATION_EXCESSIVE` au lieu de `VALIDATED_RESEARCH_CORE`), conclusion finale reformulée ("non diversifiable en l'état, non tradable, non live-ready").
-  - `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md` — § 8 enrichi de 7 statuts manquants (`RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`, `CONDITIONAL_RESEARCH_CANDIDATE`, `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`, `FRAGILE / CONCENTRATION_EXCESSIVE`, `DEAD / DO_NOT_TRADE`, `DEAD_AGGREGATED`, `EDGE_DEPENDS_ON_AI_WINNERS` comme sous-cas), note truth-sync ajoutée pointant vers le mapping registre.
-  - `docs/quant/TRADING_LOGIC.md` — note forte "Détecteur runtime ≠ setup validé" ajoutée en tête du § *Setups détectés*, avec rappel statut exact de chaque détecteur (`pullback`, `breakout`, `mean_reversion`, etc.) et interdiction d'ouverture automatique sans `VALIDATED_RESEARCH_CORE` + `GO MERGE` ChatGPT dédié.
-  - `SESSION.md` — section "État actuel" : statuts setups exacts listés (8 setups, vocabulaire Freeze v1) ; branche / PR active mise à jour ; mention `LIVE_READY` durcie.
-- **Impact runtime** : aucun.
-- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation.
-- **Impact documentation** : oui. Vérité unique sur les statuts setups. Vocabulaire unifié sur celui du Freeze v1. Runtime ≠ validation explicité.
-- **Non inclus** : aucun backtest lancé, aucune modification de paramètres, aucun nouveau setup, aucune activation paper / live, aucune modification runtime.
-- **Conformité Research Framework Freeze v1** : OUI. PR strictement documentaire, statut conservateur retenu pour SECTOR_RS (`FRAGILE / CONCENTRATION_EXCESSIVE`), aucun setup `LIVE_READY`, aucun setup `VALIDATED_RESEARCH_CORE`.
+  - `docs/quant/SETUPS_REGISTRY.md` — Setup 3 (RS Rotation) enrichi d'une section "Mise à jour 2026-05-19 — PR-R1 robustness improvement evidence (statut inchangé)" : résultats baseline + walk-forward + concentration + caveat 2022, **statut officiel maintenu** `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`, liste explicite des 10 items requis avant promotion `CONDITIONAL_EDGE`.
+  - `SESSION.md` — branche/PR active, dernier merge connu, prochaines priorités.
+- **Résultat synthétique** :
+  - Baseline NO_RISK_OFF frictionné : 929 trades, **PF 1.53**, totalR 689.94 R, max DD 226.21 R, longest loss streak 19.
+  - Walk-forward 3 splits stricts paramètres gelés : **3/3 PASS live** ET **3/3 PASS robust** (S1 test PF 2.05, S2 test PF 1.69, S3 test PF 1.39).
+  - Concentration : top 5 = **48.66 %** (< 60 % seuil Freeze § 4), PF sans top 5 = **1.22** (> 1.05) → edge diversifiable.
+  - **Caveat structurel majeur** : pire année **2022 PF 0.14** — RS Rotation reste insuffisamment résilient en bear / transitions régime.
+  - **Verdict produit par le script** : `KEEP_RESEARCH_CANDIDATE` (seuil interne durci : pire année < 0.9 bloque toute promotion `CONDITIONAL_EDGE`).
+- **Impact runtime** : aucun. Aucun fichier `.js`/`.mjs` runtime touché (worker, front, providers, broker, paper trading, sw.js : zéro modification).
+- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation runtime.
+- **Impact documentation** : oui. Setup 3 enrichi d'une preuve quantitative durcie + liste des items requis avant promotion. **Statut officiel inchangé**.
+- **Non inclus** : aucune promotion de statut (la promotion `CONDITIONAL_EDGE` reste subordonnée à 10 items listés dans `SETUPS_REGISTRY.md` Setup 3), aucune activation paper/live, aucun stub `WALK_FORWARD_RULES.md` / `FRICTION_MODEL.md` / `BACKTEST_RULES.md` enrichi (réservé à PR documentaire dédiée).
+- **Conformité Research Framework Freeze v1** : OUI. Entry NEXT_OPEN strict, friction systématique dès le baseline, paramètres gelés ex-ante, aucune ré-optimisation entre les splits, aucune annonce `LIVE_READY` ni `VALIDATED_RESEARCH_CORE`, statut officiel `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED` maintenu (correction ChatGPT 2026-05-19 — robustness hardening still incomplete).
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
@@ -91,13 +98,15 @@
 
 ## Prochaines priorités
 
-Plan PR par PR validé par ChatGPT (réponse Q3, message 2026-05-19) :
+Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajusté post-PR #233) :
 
-1. **PR documentaire truth-sync** (en cours sur `claude/setup-manitradepro-docs-gUwP1`).
-2. **RS Rotation walk-forward conditionnel régime + friction** : 3 splits stricts (2021-2022 → 2023, 2021-2023 → 2024, 2021-2024 → 2025), paramètres gelés, filtre NO_RISK_OFF appliqué split par split, friction obligatoire dès le baseline. Critère de succès : ≥ 2/3 splits PASS avec PF post-friction ≥ 1.3.
+1. ✅ **PR documentaire truth-sync** mergée (PR #233, commit `19872ac` sur `main`).
+2. 🟡 **PR-R1 RS Rotation robustness improvement evidence** (en cours sur `claude/setup-manitradepro-docs-gUwP1`) : walk-forward strict 3/3 PASS robust, concentration top 5 = 48.66 %, edge diversifiable. **Aucune promotion proposée** — RS Rotation devient le candidat de recherche le plus crédible du repo, mais reste insuffisamment résilient en bear (2022 PF 0.14). Promotion `CONDITIONAL_EDGE` subordonnée à 10 items à exécuter en PR séparées (stress friction ×2/×3, transitions régime, rolling glissant, etc. — cf. `SETUPS_REGISTRY.md` Setup 3).
 3. **Mean Reversion friction-required** : friction ×1, ×2, ×3 sur `tools/backtests/backtest-meanrev-v1.mjs`. Critère : si PF ×2 ≥ 1.1 → candidat `CONDITIONAL_EDGE`, sinon `DEAD` ou maintien `EXPERIMENTAL_ONLY`.
 4. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
 5. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée (cf. `SETUP_VALIDATION_CHECKLIST.md` section A). Sinon, ne pas lancer (anti-hallucination + interdiction Freeze § 6.1 "1000 variantes sans hypothèse").
+6. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md` avec la méthodologie canonique projet (PR dédiée, `une PR = un objectif`).
+7. **Décomposition `SESSION.md`** (cf. priorité ChatGPT post-PR #233) : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
 
 Autres :
 

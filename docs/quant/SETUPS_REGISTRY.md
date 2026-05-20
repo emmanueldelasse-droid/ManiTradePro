@@ -254,6 +254,40 @@ breakout_h10_vol12
 **RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED** (post-audit, cf. section "Post execution-bias audit status" en tête de fichier).
 _Ancien statut : VALIDATED — rétrogradé. L'exécution est propre (audit PR #208 CLEAN, ×1.01 d'inflation), MAIS la robustesse temporelle est insuffisante (0 cellule ROBUST/STABLE en rolling walk-forward 3 splits). Les métriques détaillées ci-dessous restent valides comme référence historique mais ne garantissent pas la performance future tant que la robustesse n'est pas confirmée._
 
+### Mise à jour 2026-05-19 — PR-R1 robustness improvement evidence (statut inchangé)
+
+Le script `tools/backtests/rs-rotation-robustness-v1.mjs` (PR-R1) apporte une **évidence forte d'amélioration de robustesse** pour RS Rotation, sans promotion de statut. Walk-forward STRICT train/test 3 splits, friction systématique, analyse concentration top 5 explicite, drawdown deep-dive.
+
+Résultats sur la baseline gelée `rs_90d_top10_hold20` :
+
+- Baseline NO_RISK_OFF frictionné : **929 trades, PF 1.53, totalR 689.94 R, max DD 226.21 R, longest loss streak 19**.
+- Walk-forward 3 splits stricts paramètres gelés : **3/3 splits PASS live (PF test ≥ 1.0)** et **3/3 splits PASS robust (PF test ≥ 1.3)** — S1 test PF 2.05, S2 test PF 1.69, S3 test PF 1.39.
+- Concentration : top 5 = **48.66 %** du PnL positif (< 60 % seuil Freeze § 4 critère G). PF sans top 5 = **1.22** (> 1.05 minimum) — edge diversifiable, contraste fort avec SECTOR_RS v1 (103 %).
+- Caveat structurel majeur : pire année = **2022 PF 0.14** (59 trades, totalR -92.97 R) — RS Rotation reste insuffisamment résilient en bear / transitions régime.
+
+**Statut officiel inchangé : `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`.**
+
+Cette PR est présentée comme **strong robustness improvement evidence**, pas comme une proposition de promotion. Le verdict produit par le script est `KEEP_RESEARCH_CANDIDATE` (seuil interne durci : pire année < 0.9 bloque toute promotion `CONDITIONAL_EDGE`).
+
+Promotion `CONDITIONAL_EDGE` subordonnée à l'exécution préalable, par PR séparées (`une PR = un objectif`), des items suivants — au minimum :
+
+1. Stress friction ×2 (PF ≥ 1.1 critère Freeze § 4 I2).
+2. Stress friction ×3 (PF ≥ 1.0 souhaité critère Freeze § 4 I3).
+3. Analyse transitions régime (bascule RISK_ON → RISK_OFF en cours de hold).
+4. Analyse clusters de pertes (les 19 perdantes consécutives sont-elles concentrées en 2022 ou réparties ?).
+5. Rolling walk-forward glissant (train 24 mois → test 6 mois, pas de 3 mois).
+6. Validation univers alternatif (ETF only, Big Tech only, univers historique reconstruit).
+7. Audit survivorship plus propre (intégrer delistés / fusions / faillites si données disponibles).
+8. Test réduction hold en bear.
+9. Analyse protection crash (mécanisme de sortie dynamique).
+10. Analyse volatility filter (VIX, breadth, ou proxy).
+
+Promotion `VALIDATED_RESEARCH_CORE` reste subordonnée aux 10/10 critères Freeze § 4 + audit anti-look-ahead spécifique sur l'agrégation RS Rotation. Promotion `LIVE_READY` reste subordonnée à shadow live + paper live prolongé (Freeze § 5).
+
+RS Rotation devient **le candidat de recherche le plus crédible du repo** à date — mais le statut effectif ne change pas tant que les caveats structurels ne sont pas résolus.
+
+Rapport complet : `tools/backtests/output/rs-rotation-robustness-v1.md` (cf. § 9bis "Why this is NOT yet `CONDITIONAL_EDGE`").
+
 ## Objectif
 Sélectionner les leaders structurels du marché.
 
