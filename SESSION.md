@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R1 RS Rotation robustness improvement evidence : nouveau script `tools/backtests/rs-rotation-robustness-v1.mjs` + outputs JSON/MD. **Aucune promotion proposée** — RS Rotation devient le candidat de recherche le plus crédible du repo, mais le robustness hardening reste incomplet. Statut officiel inchangé `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`).
-- **Dernier merge connu** : PR #233 `docs(setups): truth-sync setup statuses across registry, freeze and session` (commit `19872ac` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R3A Mean Reversion diagnostic and adjustment candidate review : rapport `docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md`. Diagnostic exploratoire, aucun script, aucun backtest, aucun changement de statut officiel).
+- **Dernier merge connu** : PR #234 `research(rs-rotation): robustness hardening v1 — walk-forward strict, concentration, drawdown` (commit `1641abf` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,26 +52,25 @@
 
 ## PR en cours
 
-- **PR** : PR-R1 RS Rotation robustness improvement evidence — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Objectif unique** : produire une évidence forte d'amélioration de robustesse pour RS Rotation (walk-forward STRICT train/test, friction systématique, analyse concentration top 5 explicite, drawdown deep-dive). **Aucune promotion de statut proposée** — le robustness hardening reste incomplet (bear 2022 PF 0.14). Aucune modification runtime, aucun nouveau setup créé, aucune activation paper/live.
+- **PR** : PR-R3A Mean Reversion diagnostic and adjustment candidate review — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Objectif unique** : déterminer si une version économiquement défendable de Mean Reversion swing existe encore pour ManiTradePro. **Pas un test, pas un script, pas un backtest** — uniquement un rapport diagnostic analytique fondé sur le code et les outputs existants. Aucune modification runtime, aucun nouveau setup créé, aucune activation paper/live, aucun changement de statut officiel.
 - **Fichiers créés** :
-  - `tools/backtests/rs-rotation-robustness-v1.mjs` — script focal (~600 lignes) complémentaire de `rs-rotation-robustness-lab-v1.mjs` (le lab fait la breadth, ce script fait la depth sur la baseline gelée).
-  - `tools/backtests/output/rs-rotation-robustness-v1.json` — sortie machine-readable.
-  - `tools/backtests/output/rs-rotation-robustness-v1.md` — rapport humain avec section dédiée § 9bis "Why this is NOT yet `CONDITIONAL_EDGE`".
+  - `docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md` — rapport diagnostic (~650 lignes) structuré en 12 sections.
 - **Fichiers modifiés** :
-  - `docs/quant/SETUPS_REGISTRY.md` — Setup 3 (RS Rotation) enrichi d'une section "Mise à jour 2026-05-19 — PR-R1 robustness improvement evidence (statut inchangé)" : résultats baseline + walk-forward + concentration + caveat 2022, **statut officiel maintenu** `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`, liste explicite des 10 items requis avant promotion `CONDITIONAL_EDGE`.
-  - `SESSION.md` — branche/PR active, dernier merge connu, prochaines priorités.
-- **Résultat synthétique** :
-  - Baseline NO_RISK_OFF frictionné : 929 trades, **PF 1.53**, totalR 689.94 R, max DD 226.21 R, longest loss streak 19.
-  - Walk-forward 3 splits stricts paramètres gelés : **3/3 PASS live** ET **3/3 PASS robust** (S1 test PF 2.05, S2 test PF 1.69, S3 test PF 1.39).
-  - Concentration : top 5 = **48.66 %** (< 60 % seuil Freeze § 4), PF sans top 5 = **1.22** (> 1.05) → edge diversifiable.
-  - **Caveat structurel majeur** : pire année **2022 PF 0.14** — RS Rotation reste insuffisamment résilient en bear / transitions régime.
-  - **Verdict produit par le script** : `KEEP_RESEARCH_CANDIDATE` (seuil interne durci : pire année < 0.9 bloque toute promotion `CONDITIONAL_EDGE`).
-- **Impact runtime** : aucun. Aucun fichier `.js`/`.mjs` runtime touché (worker, front, providers, broker, paper trading, sw.js : zéro modification).
-- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation runtime.
-- **Impact documentation** : oui. Setup 3 enrichi d'une preuve quantitative durcie + liste des items requis avant promotion. **Statut officiel inchangé**.
-- **Non inclus** : aucune promotion de statut (la promotion `CONDITIONAL_EDGE` reste subordonnée à 10 items listés dans `SETUPS_REGISTRY.md` Setup 3), aucune activation paper/live, aucun stub `WALK_FORWARD_RULES.md` / `FRICTION_MODEL.md` / `BACKTEST_RULES.md` enrichi (réservé à PR documentaire dédiée).
-- **Conformité Research Framework Freeze v1** : OUI. Entry NEXT_OPEN strict, friction systématique dès le baseline, paramètres gelés ex-ante, aucune ré-optimisation entre les splits, aucune annonce `LIVE_READY` ni `VALIDATED_RESEARCH_CORE`, statut officiel `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED` maintenu (correction ChatGPT 2026-05-19 — robustness hardening still incomplete).
+  - `SESSION.md` — branche/PR active, dernier merge connu (PR #234), PR en cours réécrite, prochaines priorités réordonnées.
+- **Question centrale du rapport** : "Le marché moderne a-t-il structurellement cassé le mean reversion swing sur single names ?" Réponse provisoire diagnostic : probablement OUI sur single names momentum / AI / crypto ; probablement NON sur ETF larges passifs (flux passifs, arbitrage NAV, compression dispersion, rebalancing institutionnel).
+- **Variantes candidates proposées (max 3, hypothèse économique avant test)** :
+  - **V1 `meanrev_etf_range_short`** — piste prioritaire, logique microstructurelle ETF larges en RANGE.
+  - **V2 `meanrev_quality_no_risk_off`** — suspicion méthodologique élevée (risque momentum déguisé), vérification anti-déguisement obligatoire avant validation.
+  - **V3 `meanrev_oversold_recovery`** — présomption d'overfit par défaut, charge de preuve plus lourde, à tester en dernier uniquement si V1 et V2 passent.
+- **Variables / axes interdits explicites** : crypto, small caps spéculatives, hypergrowth IA, penny stocks, leveraged ETF, sans filtre régime, sans friction baseline, intraday ultra-fréquent, pseudo-market-making, spread capture, latence, rebonds tick-level, execution priority, rebonds news ultra courts.
+- **Garde-fou central** : "Un setup qui nécessite trop de filtres pour survivre est potentiellement déjà mort." Max 4 filtres simultanés justifiés indépendamment.
+- **Conclusion explicitement autorisée** : "Mean Reversion n'est peut-être plus un axe prioritaire pour ManiTradePro." Le classement `DEAD / ABANDONED` à terme reste acceptable.
+- **Plan PR-R3B/C/D suivant** (uniquement si `GO MERGE`) : PR-R3B test isolé V1 → PR-R3C V2 anti-déguisement (uniquement si V1 passe) → PR-R3D V3 stress max (uniquement si V1 ET V2 montrent un edge réel).
+- **Impact runtime** : aucun.
+- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation runtime. Aucun nouveau setup créé.
+- **Impact documentation** : oui. Création d'un rapport de recherche exploratoire dans `docs/research/`. **Statut officiel Mean Reversion inchangé** : `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`.
+- **Conformité Research Framework Freeze v1** : OUI. Hypothèse économique avant test obligatoire (V1/V2/V3 toutes documentées avant tout test ex-ante), aucune optimisation post-hoc, aucune grille massive (max 3 variantes), aucune promotion, aucune annonce `LIVE_READY` ni `VALIDATED_RESEARCH_CORE`. Cohérence avec la phase projet "recherche d'hypothèses économiques survivables" (cadrage méta ChatGPT 2026-05-19).
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 
 ## Décisions actives
@@ -101,12 +100,16 @@
 Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajusté post-PR #233) :
 
 1. ✅ **PR documentaire truth-sync** mergée (PR #233, commit `19872ac` sur `main`).
-2. 🟡 **PR-R1 RS Rotation robustness improvement evidence** (en cours sur `claude/setup-manitradepro-docs-gUwP1`) : walk-forward strict 3/3 PASS robust, concentration top 5 = 48.66 %, edge diversifiable. **Aucune promotion proposée** — RS Rotation devient le candidat de recherche le plus crédible du repo, mais reste insuffisamment résilient en bear (2022 PF 0.14). Promotion `CONDITIONAL_EDGE` subordonnée à 10 items à exécuter en PR séparées (stress friction ×2/×3, transitions régime, rolling glissant, etc. — cf. `SETUPS_REGISTRY.md` Setup 3).
-3. **Mean Reversion friction-required** : friction ×1, ×2, ×3 sur `tools/backtests/backtest-meanrev-v1.mjs`. Critère : si PF ×2 ≥ 1.1 → candidat `CONDITIONAL_EDGE`, sinon `DEAD` ou maintien `EXPERIMENTAL_ONLY`.
-4. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
-5. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée (cf. `SETUP_VALIDATION_CHECKLIST.md` section A). Sinon, ne pas lancer (anti-hallucination + interdiction Freeze § 6.1 "1000 variantes sans hypothèse").
-6. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md` avec la méthodologie canonique projet (PR dédiée, `une PR = un objectif`).
-7. **Décomposition `SESSION.md`** (cf. priorité ChatGPT post-PR #233) : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
+2. ✅ **PR-R1 RS Rotation robustness improvement evidence** mergée (PR #234, commit `1641abf` sur `main`). Statut RS Rotation inchangé `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`. 10 items requis avant toute promotion `CONDITIONAL_EDGE`.
+3. 🟡 **PR-R3A Mean Reversion diagnostic** (en cours) : rapport `docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md`. 3 variantes proposées (V1 ETF RANGE prioritaire, V2 QUALITY suspect, V3 OVERSOLD présomption overfit). Conclusion autorisée : Mean Reversion peut-être plus un axe prioritaire.
+4. **PR-R3B test isolé V1 Mean Reversion** (subordonné à `GO MERGE` PR-R3A) : test V1 `meanrev_etf_range_short` isolé, friction baseline, walk-forward 3 splits stricts, concentration analyse. Décision binaire `KEEP_RESEARCH_CANDIDATE` / `DEAD_AGGREGATED`.
+5. **PR-R3C V2 anti-déguisement** (uniquement si V1 passe) : vérification stricte momentum-pullback déguisé.
+6. **PR-R3D V3 stress max** (uniquement si V1 ET V2 passent).
+7. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
+8. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée (cf. `SETUP_VALIDATION_CHECKLIST.md` section A). Sinon, ne pas lancer.
+9. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md` avec la méthodologie canonique projet (PR dédiée, `une PR = un objectif`).
+10. **Décomposition `SESSION.md`** (cf. priorité ChatGPT post-PR #233) : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
+11. **RS Rotation hardening complement** (uniquement après PR-R3A/B/C/D décidée) : exécuter au moins 1-2 des 10 items listés dans `SETUPS_REGISTRY.md` Setup 3 § PR-R1 update (stress friction ×2/×3 prioritaire — plus rapide à exécuter et critère Freeze § 4 I2/I3 explicite).
 
 Autres :
 
