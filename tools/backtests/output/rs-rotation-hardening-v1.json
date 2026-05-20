@@ -1,0 +1,764 @@
+{
+  "generatedAt": "2026-05-20T18:28:43.065Z",
+  "scope": "RS Rotation Hardening Phase 1 — stress tests A.1-A.8 + regime validation B (4 régimes officiels v1).",
+  "baseline": {
+    "lookback": 90,
+    "horizon": 20,
+    "topN": 10,
+    "rebalance": 10,
+    "minMomentum": 12,
+    "exit": "fixed_hold",
+    "regime": "NO_RISK_OFF",
+    "universe": "mixed"
+  },
+  "tradingUniverseSize": 169,
+  "totalDates": 1255,
+  "regimeDistrib": {
+    "RISK_ON": 566,
+    "RANGE": 243,
+    "RISK_OFF": 111,
+    "HIGH_VOL": 135
+  },
+  "regimeDistribPct": {
+    "RISK_ON": 53.6,
+    "RANGE": 23,
+    "RISK_OFF": 10.5,
+    "HIGH_VOL": 12.8
+  },
+  "baselineGrossTrades": 930,
+  "stressA": {
+    "A1_friction": {
+      "x1": {
+        "trades": 930,
+        "wins": 506,
+        "losses": 424,
+        "winrate": 54.41,
+        "expectancyR": 0.741,
+        "profitFactor": 1.532,
+        "totalR": 689.1,
+        "maxDrawdownR": 222.82,
+        "longestLossStreak": 19,
+        "trades_n": 930
+      },
+      "x2": {
+        "trades": 930,
+        "wins": 488,
+        "losses": 442,
+        "winrate": 52.47,
+        "expectancyR": 0.601,
+        "profitFactor": 1.412,
+        "totalR": 558.9,
+        "maxDrawdownR": 237.66,
+        "longestLossStreak": 19,
+        "trades_n": 930
+      },
+      "x3": {
+        "trades": 930,
+        "wins": 469,
+        "losses": 461,
+        "winrate": 50.43,
+        "expectancyR": 0.461,
+        "profitFactor": 1.302,
+        "totalR": 428.7,
+        "maxDrawdownR": 254.34,
+        "longestLossStreak": 24,
+        "trades_n": 930
+      }
+    },
+    "A2_slippage": {
+      "0.00%": {
+        "trades": 930,
+        "wins": 506,
+        "losses": 424,
+        "winrate": 54.41,
+        "expectancyR": 0.741,
+        "profitFactor": 1.532,
+        "totalR": 689.1,
+        "maxDrawdownR": 222.82,
+        "longestLossStreak": 19,
+        "slippageOneWayPct": 0
+      },
+      "0.05%": {
+        "trades": 930,
+        "wins": 503,
+        "losses": 427,
+        "winrate": 54.09,
+        "expectancyR": 0.721,
+        "profitFactor": 1.514,
+        "totalR": 670.5,
+        "maxDrawdownR": 224.94,
+        "longestLossStreak": 19,
+        "slippageOneWayPct": 0.05
+      },
+      "0.10%": {
+        "trades": 930,
+        "wins": 499,
+        "losses": 431,
+        "winrate": 53.66,
+        "expectancyR": 0.701,
+        "profitFactor": 1.497,
+        "totalR": 651.9,
+        "maxDrawdownR": 227.06,
+        "longestLossStreak": 19,
+        "slippageOneWayPct": 0.1
+      },
+      "0.20%": {
+        "trades": 930,
+        "wins": 494,
+        "losses": 436,
+        "winrate": 53.12,
+        "expectancyR": 0.661,
+        "profitFactor": 1.462,
+        "totalR": 614.7,
+        "maxDrawdownR": 231.3,
+        "longestLossStreak": 19,
+        "slippageOneWayPct": 0.2
+      }
+    },
+    "A3_executionDelay": {
+      "+0d": {
+        "trades": 930,
+        "wins": 506,
+        "losses": 424,
+        "winrate": 54.41,
+        "expectancyR": 0.741,
+        "profitFactor": 1.532,
+        "totalR": 689.1,
+        "maxDrawdownR": 222.82,
+        "longestLossStreak": 19,
+        "daysDelay": 0
+      },
+      "+1d": {
+        "trades": 930,
+        "wins": 495,
+        "losses": 435,
+        "winrate": 53.23,
+        "expectancyR": 0.7322,
+        "profitFactor": 1.538,
+        "totalR": 680.95,
+        "maxDrawdownR": 202.47,
+        "longestLossStreak": 22,
+        "daysDelay": 1
+      },
+      "+2d": {
+        "trades": 920,
+        "wins": 501,
+        "losses": 419,
+        "winrate": 54.46,
+        "expectancyR": 0.6808,
+        "profitFactor": 1.492,
+        "totalR": 626.38,
+        "maxDrawdownR": 197.89,
+        "longestLossStreak": 18,
+        "daysDelay": 2
+      },
+      "+5d": {
+        "trades": 920,
+        "wins": 492,
+        "losses": 428,
+        "winrate": 53.48,
+        "expectancyR": 0.5873,
+        "profitFactor": 1.418,
+        "totalR": 540.27,
+        "maxDrawdownR": 213.04,
+        "longestLossStreak": 24,
+        "daysDelay": 5
+      }
+    },
+    "A4_topPerformerExclusion": {
+      "base": {
+        "trades": 930,
+        "wins": 506,
+        "losses": 424,
+        "winrate": 54.41,
+        "expectancyR": 0.741,
+        "profitFactor": 1.532,
+        "totalR": 689.1,
+        "maxDrawdownR": 222.82,
+        "longestLossStreak": 19
+      },
+      "noTop5Symbols": {
+        "trades": 759,
+        "wins": 399,
+        "losses": 360,
+        "winrate": 52.57,
+        "expectancyR": 0.3134,
+        "profitFactor": 1.219,
+        "totalR": 237.85,
+        "maxDrawdownR": 192.7,
+        "longestLossStreak": 22,
+        "removedSymbols": [
+          "SOL",
+          "APLD",
+          "AVAX",
+          "APP",
+          "PLTR"
+        ]
+      },
+      "noTop10Symbols": {
+        "trades": 619,
+        "wins": 334,
+        "losses": 285,
+        "winrate": 53.96,
+        "expectancyR": 0.1046,
+        "profitFactor": 1.082,
+        "totalR": 64.73,
+        "maxDrawdownR": 152.34,
+        "longestLossStreak": 19,
+        "removedSymbols": [
+          "SOL",
+          "APLD",
+          "AVAX",
+          "APP",
+          "PLTR",
+          "AEHR",
+          "UPST",
+          "SMCI",
+          "MSTR",
+          "BBAI"
+        ]
+      },
+      "noTop3Dates": {
+        "trades": 900,
+        "wins": 490,
+        "losses": 410,
+        "winrate": 54.44,
+        "expectancyR": 0.6125,
+        "profitFactor": 1.434,
+        "totalR": 551.21,
+        "maxDrawdownR": 222.82,
+        "longestLossStreak": 19,
+        "removedDates": [
+          "2025-01-10",
+          "2023-05-09",
+          "2024-11-25"
+        ]
+      },
+      "noTop5AndTop3Dates": {
+        "trades": 738,
+        "wins": 389,
+        "losses": 349,
+        "winrate": 52.71,
+        "expectancyR": 0.214,
+        "profitFactor": 1.148,
+        "totalR": 157.91,
+        "maxDrawdownR": 192.7,
+        "longestLossStreak": 22
+      }
+    },
+    "A5_sectorStress": {
+      "sectorRanking": [
+        {
+          "group": "AI_MOMENTUM",
+          "trades": 251,
+          "totalR": 405.61
+        },
+        {
+          "group": "CRYPTO",
+          "trades": 138,
+          "totalR": 257.43
+        },
+        {
+          "group": "CYBER_CLOUD",
+          "trades": 93,
+          "totalR": 43.78
+        },
+        {
+          "group": "LEVERAGED",
+          "trades": 56,
+          "totalR": 21.9
+        },
+        {
+          "group": "EUROPE",
+          "trades": 13,
+          "totalR": 8.53
+        },
+        {
+          "group": "FINANCIALS",
+          "trades": 4,
+          "totalR": 3.56
+        },
+        {
+          "group": "SEMIS",
+          "trades": 156,
+          "totalR": 3.52
+        },
+        {
+          "group": "ETFs_US_SECTORS",
+          "trades": 7,
+          "totalR": 2.19
+        },
+        {
+          "group": "QUALITY_DEFENSIVE",
+          "trades": 19,
+          "totalR": 1.41
+        },
+        {
+          "group": "ETFs_COMMODITIES",
+          "trades": 1,
+          "totalR": -0.18
+        },
+        {
+          "group": "INDUSTRIALS",
+          "trades": 2,
+          "totalR": -1.59
+        },
+        {
+          "group": "CONSUMER_GROWTH",
+          "trades": 60,
+          "totalR": -4.31
+        },
+        {
+          "group": "SOFTWARE",
+          "trades": 47,
+          "totalR": -20.06
+        },
+        {
+          "group": "BIG_TECH",
+          "trades": 83,
+          "totalR": -32.69
+        }
+      ],
+      "dominantSector": "AI_MOMENTUM",
+      "withoutDominantSector": {
+        "trades": 679,
+        "wins": 367,
+        "losses": 312,
+        "winrate": 54.05,
+        "expectancyR": 0.4175,
+        "profitFactor": 1.331,
+        "totalR": 283.49,
+        "maxDrawdownR": 180.58,
+        "longestLossStreak": 17
+      }
+    },
+    "A6_bearStress": {
+      "year2022": {
+        "trades": 60,
+        "wins": 17,
+        "losses": 43,
+        "winrate": 28.33,
+        "expectancyR": -1.5207,
+        "profitFactor": 0.146,
+        "totalR": -91.24,
+        "maxDrawdownR": 91.72,
+        "longestLossStreak": 8
+      },
+      "excludingYear2022": {
+        "trades": 870,
+        "wins": 489,
+        "losses": 381,
+        "winrate": 56.21,
+        "expectancyR": 0.8969,
+        "profitFactor": 1.657,
+        "totalR": 780.34,
+        "maxDrawdownR": 139.59,
+        "longestLossStreak": 17
+      }
+    },
+    "A7_concentrationSweep": {
+      "topN_5": {
+        "trades": 465,
+        "wins": 254,
+        "losses": 211,
+        "winrate": 54.62,
+        "expectancyR": 0.892,
+        "profitFactor": 1.538,
+        "totalR": 414.8,
+        "maxDrawdownR": 118.16,
+        "longestLossStreak": 13,
+        "topN": 5
+      },
+      "topN_10": {
+        "trades": 930,
+        "wins": 506,
+        "losses": 424,
+        "winrate": 54.41,
+        "expectancyR": 0.741,
+        "profitFactor": 1.532,
+        "totalR": 689.1,
+        "maxDrawdownR": 222.82,
+        "longestLossStreak": 19,
+        "topN": 10
+      },
+      "topN_20": {
+        "trades": 1818,
+        "wins": 968,
+        "losses": 850,
+        "winrate": 53.25,
+        "expectancyR": 0.4336,
+        "profitFactor": 1.359,
+        "totalR": 788.2,
+        "maxDrawdownR": 355.38,
+        "longestLossStreak": 32,
+        "topN": 20
+      }
+    },
+    "A8_volExpansion": {
+      "threshold": "realized vol SPY 20j > 25 % annualisée",
+      "highVol": {
+        "trades": 10,
+        "wins": 8,
+        "losses": 2,
+        "winrate": 80,
+        "expectancyR": 1.1935,
+        "profitFactor": 5.637,
+        "totalR": 11.94,
+        "maxDrawdownR": 2.39,
+        "longestLossStreak": 1
+      },
+      "normalVol": {
+        "trades": 920,
+        "wins": 498,
+        "losses": 422,
+        "winrate": 54.13,
+        "expectancyR": 0.736,
+        "profitFactor": 1.524,
+        "totalR": 677.16,
+        "maxDrawdownR": 222.82,
+        "longestLossStreak": 19
+      }
+    }
+  },
+  "regimeMatrix": {
+    "RISK_ON": {
+      "trades": 530,
+      "wins": 254,
+      "losses": 276,
+      "winrate": 47.92,
+      "expectancyR": 0.4638,
+      "profitFactor": 1.28,
+      "totalR": 245.79,
+      "maxDrawdownR": 222.46,
+      "longestLossStreak": 19,
+      "daysInRegime": 566,
+      "yearly": {
+        "2021": {
+          "trades": 60,
+          "wins": 18,
+          "losses": 42,
+          "winrate": 30,
+          "expectancyR": -1.2133,
+          "profitFactor": 0.585,
+          "totalR": -72.8,
+          "maxDrawdownR": 131.09,
+          "longestLossStreak": 17
+        },
+        "2022": {
+          "trades": 20,
+          "wins": 3,
+          "losses": 17,
+          "winrate": 15,
+          "expectancyR": -2.7189,
+          "profitFactor": 0.038,
+          "totalR": -54.38,
+          "maxDrawdownR": 54.8,
+          "longestLossStreak": 8
+        },
+        "2023": {
+          "trades": 50,
+          "wins": 20,
+          "losses": 30,
+          "winrate": 40,
+          "expectancyR": -0.158,
+          "profitFactor": 0.902,
+          "totalR": -7.9,
+          "maxDrawdownR": 38.83,
+          "longestLossStreak": 5
+        },
+        "2024": {
+          "trades": 240,
+          "wins": 123,
+          "losses": 117,
+          "winrate": 51.25,
+          "expectancyR": 0.9074,
+          "profitFactor": 1.621,
+          "totalR": 217.78,
+          "maxDrawdownR": 139.59,
+          "longestLossStreak": 14
+        },
+        "2025": {
+          "trades": 160,
+          "wins": 90,
+          "losses": 70,
+          "winrate": 56.25,
+          "expectancyR": 1.0192,
+          "profitFactor": 1.756,
+          "totalR": 163.08,
+          "maxDrawdownR": 72.75,
+          "longestLossStreak": 12
+        }
+      }
+    },
+    "RANGE": {
+      "trades": 390,
+      "wins": 244,
+      "losses": 146,
+      "winrate": 62.56,
+      "expectancyR": 1.1061,
+      "profitFactor": 2.042,
+      "totalR": 431.37,
+      "maxDrawdownR": 81.91,
+      "longestLossStreak": 10,
+      "daysInRegime": 243,
+      "yearly": {
+        "2021": {
+          "trades": 110,
+          "wins": 79,
+          "losses": 31,
+          "winrate": 71.82,
+          "expectancyR": 1.9703,
+          "profitFactor": 3.208,
+          "totalR": 216.74,
+          "maxDrawdownR": 36.55,
+          "longestLossStreak": 3
+        },
+        "2022": {
+          "trades": 40,
+          "wins": 14,
+          "losses": 26,
+          "winrate": 35,
+          "expectancyR": -0.9216,
+          "profitFactor": 0.268,
+          "totalR": -36.86,
+          "maxDrawdownR": 39.87,
+          "longestLossStreak": 8
+        },
+        "2023": {
+          "trades": 200,
+          "wins": 132,
+          "losses": 68,
+          "winrate": 66,
+          "expectancyR": 1.4443,
+          "profitFactor": 2.553,
+          "totalR": 288.86,
+          "maxDrawdownR": 81.91,
+          "longestLossStreak": 10
+        },
+        "2024": {
+          "trades": 10,
+          "wins": 10,
+          "losses": 0,
+          "winrate": 100,
+          "expectancyR": 2.2084,
+          "profitFactor": 999,
+          "totalR": 22.08,
+          "maxDrawdownR": 0,
+          "longestLossStreak": 0
+        },
+        "2025": {
+          "trades": 30,
+          "wins": 9,
+          "losses": 21,
+          "winrate": 30,
+          "expectancyR": -1.9815,
+          "profitFactor": 0.254,
+          "totalR": -59.45,
+          "maxDrawdownR": 60.26,
+          "longestLossStreak": 7
+        }
+      }
+    },
+    "RISK_OFF": {
+      "trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "winrate": 0,
+      "expectancyR": 0,
+      "profitFactor": 0,
+      "totalR": 0,
+      "maxDrawdownR": 0,
+      "longestLossStreak": 0,
+      "daysInRegime": 111,
+      "yearly": {
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": null
+      }
+    },
+    "HIGH_VOL": {
+      "trades": 10,
+      "wins": 8,
+      "losses": 2,
+      "winrate": 80,
+      "expectancyR": 1.1935,
+      "profitFactor": 5.637,
+      "totalR": 11.94,
+      "maxDrawdownR": 2.39,
+      "longestLossStreak": 1,
+      "daysInRegime": 135,
+      "yearly": {
+        "2021": null,
+        "2022": null,
+        "2023": null,
+        "2024": null,
+        "2025": {
+          "trades": 10,
+          "wins": 8,
+          "losses": 2,
+          "winrate": 80,
+          "expectancyR": 1.1935,
+          "profitFactor": 5.637,
+          "totalR": 11.94,
+          "maxDrawdownR": 2.39,
+          "longestLossStreak": 1
+        }
+      }
+    }
+  },
+  "survivalMap": {
+    "baseline_F1": {
+      "pf": 1.532,
+      "verdict": "SURVIVES"
+    },
+    "friction_x2": {
+      "pf": 1.412,
+      "verdict": "SURVIVES"
+    },
+    "friction_x3": {
+      "pf": 1.302,
+      "verdict": "SURVIVES"
+    },
+    "slippage_0_05": {
+      "pf": 1.514,
+      "verdict": "SURVIVES"
+    },
+    "slippage_0_10": {
+      "pf": 1.497,
+      "verdict": "SURVIVES"
+    },
+    "slippage_0_20": {
+      "pf": 1.462,
+      "verdict": "SURVIVES"
+    },
+    "delay_1d": {
+      "pf": 1.538,
+      "verdict": "SURVIVES"
+    },
+    "delay_2d": {
+      "pf": 1.492,
+      "verdict": "SURVIVES"
+    },
+    "delay_5d": {
+      "pf": 1.418,
+      "verdict": "SURVIVES"
+    },
+    "noTop5Symbols": {
+      "pf": 1.219,
+      "verdict": "SURVIVES"
+    },
+    "noTop10Symbols": {
+      "pf": 1.082,
+      "verdict": "MARGINAL"
+    },
+    "noTop3Dates": {
+      "pf": 1.434,
+      "verdict": "SURVIVES"
+    },
+    "noTop5AndTop3Dates": {
+      "pf": 1.148,
+      "verdict": "MARGINAL"
+    },
+    "withoutDominantSector": {
+      "pf": 1.331,
+      "verdict": "SURVIVES",
+      "removedSector": "AI_MOMENTUM"
+    },
+    "year2022_only": {
+      "pf": 0.146,
+      "verdict": "KILLED"
+    },
+    "excludingYear2022": {
+      "pf": 1.657,
+      "verdict": "SURVIVES"
+    },
+    "topN_5": {
+      "pf": 1.538,
+      "verdict": "SURVIVES"
+    },
+    "topN_10": {
+      "pf": 1.532,
+      "verdict": "SURVIVES"
+    },
+    "topN_20": {
+      "pf": 1.359,
+      "verdict": "SURVIVES"
+    },
+    "highVol_only": {
+      "pf": 5.637,
+      "verdict": "SURVIVES"
+    },
+    "normalVol_only": {
+      "pf": 1.524,
+      "verdict": "SURVIVES"
+    },
+    "regime_RISK_ON": {
+      "pf": 1.28,
+      "verdict": "SURVIVES"
+    },
+    "regime_RANGE": {
+      "pf": 2.042,
+      "verdict": "SURVIVES"
+    },
+    "regime_RISK_OFF": {
+      "pf": 0,
+      "verdict": "KILLED"
+    },
+    "regime_HIGH_VOL": {
+      "pf": 5.637,
+      "verdict": "SURVIVES"
+    }
+  },
+  "verdict": {
+    "status": "HARDENED_FRAGILE",
+    "reasons": [
+      "PF 2022 = 0.146 < 0.5 → survivance bear catastrophique.",
+      "Stress tests : 21 survives / 2 marginal / 2 killed (8.0 % killed)."
+    ],
+    "survivalSummary": {
+      "SURVIVES": 21,
+      "MARGINAL": 2,
+      "KILLED": 2
+    },
+    "killPct": 8
+  },
+  "vocabulary": {
+    "statuses": [
+      "HARDENED_ROBUST_CANDIDATE",
+      "HARDENED_MARGINAL",
+      "HARDENED_FRAGILE",
+      "STRUCTURALLY_WEAK_HARDENED_DEAD"
+    ],
+    "forbidden": [
+      "VALIDATED_RESEARCH_CORE",
+      "LIVE_READY",
+      "CONDITIONAL_EDGE"
+    ],
+    "note": "Aucune promotion de statut depuis ce script. Statut Setup 3 (RS Rotation) reste RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED tant que GO MERGE ChatGPT non reçu sur PR dédiée."
+  },
+  "limitations": [
+    "Univers ex-post 2021-2025 (survivants).",
+    "Slippage proxy uniforme (pas modulé par classe d'actif).",
+    "Délai d'exécution proxy (entry NEXT_OPEN + N jours, pas modélisation broker fine).",
+    "Régime HIGH_VOL = realized vol SPY 20j > 25 % annualisée (définition opérationnelle, pas standard universel).",
+    "Sector group = première occurrence dans UNIVERSE (un symbole appartient à un seul group, ce qui est imparfait pour les actifs cross-thématiques).",
+    "Pas de modélisation des taux de financement (overnight) ni des coûts de borrow short (non applicable car long-only).",
+    "Walk-forward strict 3-splits déjà couvert par rs-rotation-robustness-v1.mjs — pas redoublé ici pour éviter la duplication. Cf. PR #234 commit 1641abf."
+  ],
+  "rollback": {
+    "runtime": "Aucun — aucun fichier runtime modifié.",
+    "documentation": "git revert de la PR — aucun impact moteur.",
+    "outputs": "Reproductibles à chaque exécution du script — supprimables sans impact."
+  },
+  "sources": [
+    "tools/backtests/rs-rotation-robustness-v1.mjs (baseline gelée, méthodologie héritée)",
+    "tools/backtests/rs-rotation-robustness-lab-v1.mjs (breadth via sweeps)",
+    "tools/backtests/universe-v2.mjs (univers source)",
+    "docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md (critères § 4 friction ×2/×3, concentration, survivance bear)",
+    "docs/project/TRADING_PHILOSOPHY.md (architecture 5 couches, garde-fou anti-empilement filtres, refus microstructure)",
+    "docs/quant/SETUPS_REGISTRY.md Setup 3 (statut courant + 10 items items requis avant CONDITIONAL_EDGE)",
+    "Brief créateur 2026-05-19 « PHASE QUANT HARDENING V1 »"
+  ]
+}

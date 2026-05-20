@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R3B-v3 rerun strict sur dataset complet : créateur a téléchargé les 11 ETF manquants côté local et poussé sur main commit `cdbc1cb`. Rerun strict effectué avec paramètres gelés inchangés. 7 trades sur 15 ETF × 5 ans en RANGE. Indicateurs qualitatifs catastrophiques (concentration 100 %, friction ×2 sous 1.0, sans top 3 → 0). Verdict script NEEDS_MORE_DATA. Statut Setup 4 inchangé).
-- **Dernier merge connu** : commit `cdbc1cb` `data: add missing SPDR sector ETF OHLC datasets` sur `main` (créateur a téléchargé les 11 ETF SPDR). Précédent : PR #238 `research(meanrev): PR-R3B-v2 dataset integrity fix` (commit `f826acc`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-RS-HARDENING Phase 1 : nouveau script `tools/backtests/rs-rotation-hardening-v1.mjs`. 8 stress tests A.1-A.8 + matrice 4 régimes officiels v1 (RISK_ON, RANGE, RISK_OFF, HIGH_VOL). Findings : friction résistante jusqu'à ×3 (PF 1.30), RANGE = régime optimal (PF 2.04), HIGH_VOL très positif petit sample (PF 5.64 n=10), 2022 PF 0.146 catastrophique. Survival 21/25 SURVIVES, 2 MARGINAL, 2 KILLED. Verdict `HARDENED_FRAGILE` (un seul critère fail : bear 2022). Statut Setup 3 inchangé `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`).
+- **Dernier merge connu** : PR #239 `research(meanrev): PR-R3B-v3 strict rerun on completed 15 ETF dataset` (commit `c91a23a` sur `main`). Précédents : `cdbc1cb` (créateur ETF SPDR), PR #238 (`f826acc`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,44 +52,44 @@
 
 ## PR en cours
 
-- **PR** : PR-R3B-v3 rerun strict Mean Reversion V1 ETF Range Short sur dataset complet — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Contexte** : créateur a complété le dataset (commit `cdbc1cb` sur main) en téléchargeant les 11 ETF SPDR via le `SYMBOL_MAP` fixé en PR #238. Tous les 15 ETF cibles disposent maintenant de 1255 candles 2021-01-04 → 2025-12-31.
-- **Objectif unique** : rerun STRICTEMENT IDENTIQUE de `tools/backtests/meanrev-etf-range-v1.mjs` avec **zéro modification** des paramètres setup. Seule différence vs v1/v2 : dataset complet.
-- **Vérification anti-modification** : `git diff f826acc tools/backtests/meanrev-etf-range-v1.mjs` = 0 lignes. Script gelé inchangé.
-- **Résultats rerun** (friction ×1) :
-  - Univers de trading effectif : **15/15 ETF** (SPY, QQQ, IWM, MDY, DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC).
-  - Dates communes : 1255 (2021-01-04 → 2025-12-31).
-  - Jours RANGE : 139 / 1255 (11.1 %).
-  - **Signaux générés : 7** (sur ~2085 opportunités-jour théoriques en RANGE).
-  - PF baseline : **1.06** (marginal).
-  - Total R : 0.11 R (cumulé sur 5 ans).
-  - Max DD : 1.42 R. Longest loss streak : 2.
-- **Indicateurs qualitatifs catastrophiques** :
-  - Top 5 share : **100 %** du PnL positif.
-  - PF sans top 5 : **0.304**.
-  - Sans top 3 dates : PF 0, totalR **-1.86**.
-  - Friction ×2 : PF **0.764** (sous 1.0).
-  - Friction ×3 : PF 0.557.
-  - Walk-forward : **0/3 PASS live** ET **0/3 PASS robust**.
-- **Verdict script** : `NEEDS_MORE_DATA` (sample 7 < 30 — règle de prudence statistique).
-- **Conclusion qualitative honnête** : l'hypothèse V1 est probablement illusoire pour les paramètres gelés. Statistiquement n=7 trop faible pour DEAD formel, mais indicateurs qualitatifs convergent vers absence d'edge.
-- **Fichiers modifiés v3** :
-  - `docs/quant/SETUPS_REGISTRY.md` — Setup 4 enrichi note PR-R3B-v3 (rerun strict 15 ETF, chiffres, indicateurs qualitatifs, options ChatGPT). **Statut officiel inchangé** : `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`.
-  - `tools/backtests/output/meanrev-etf-range-v1.{json,md}` — régénérés par rerun strict (nouveaux chiffres avec dataset complet).
-  - `SESSION.md` — état mis à jour.
-- **Fichiers inchangés (strict prohibition brief)** :
-  - `tools/backtests/meanrev-etf-range-v1.mjs` (zéro changement).
-  - `tools/backtests/download-eodhd-2025.mjs` (déjà corrigé en PR #238).
-  - Aucun runtime, aucun autre registre, aucun autre fichier doc.
-- **Décision ChatGPT requise (options)** :
-  - **(A)** Accepter `NEEDS_MORE_DATA` script + sous-variante `DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK` dans Setup 4. Pas de PR-R3C/D.
-  - **(B)** Basculer V1 en `DEAD_AGGREGATED` malgré n=7, vu les indicateurs qualitatifs. PR documentaire courte.
-  - **(C)** Reformuler V1bis dans PR-R3A bis avec hypothèse économique distincte et paramètres calibrés ex-ante. Interdit ici (tuning post-hoc).
+- **PR** : PR-RS-HARDENING Phase 1 — stress tests + regime validation — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Mission créateur** : phase "RS Rotation Hardening" — robustesse, survivabilité, stabilité multi-régime, résistance friction, contrôle concentration, gestion exposition. Cette PR couvre la **Phase 1** (A stress tests + B regime validation). Les phases C (exposure control) et D (quality metrics) sont des designs d'architecture qui méritent des PR séparées (`une PR = un objectif`).
+- **Scope Phase 1** :
+  - A. 8 stress tests : A.1 friction ×1/×2/×3, A.2 slippage 0.05/0.10/0.20 %, A.3 délai +1d/+2d/+5d, A.4 sans top 5/10 symboles + sans top 3 dates + combinés, A.5 stress sectoriel (sans secteur dominant), A.6 bear 2022 isolé, A.7 concentration sweep topN 5/10/20, A.8 volatility expansion (rvol SPY > 25 % annualisée).
+  - B. Matrice par régime 4 états officiels v1 (RISK_ON, RANGE, RISK_OFF, HIGH_VOL).
+- **Paramètres baseline gelés** ex-ante (identiques `rs-rotation-robustness-v1.mjs` PR #234).
+- **Fichiers créés** :
+  - `tools/backtests/rs-rotation-hardening-v1.mjs` (~780 lignes, focal sur Phase 1).
+  - `tools/backtests/output/rs-rotation-hardening-v1.json` (~25 KB).
+  - `tools/backtests/output/rs-rotation-hardening-v1.md` (~18 sections, survival map + verdict).
+- **Fichiers modifiés** :
+  - `docs/quant/SETUPS_REGISTRY.md` — Setup 3 enrichi d'une note PR-RS-HARDENING Phase 1 (résultats stress + matrice régime + findings + implications produit). **Statut officiel Setup 3 inchangé** : `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`.
+  - `SESSION.md` — branche/PR active, dernier merge, PR en cours, priorités.
+- **Résultat synthétique** :
+  - **Friction stress** : PF ×1=**1.53**, ×2=**1.41**, ×3=**1.30** → RS Rotation résiste à friction extrême (critères Freeze § 4 I2 ≥ 1.10 et I3 ≥ 1.00 passés).
+  - **Matrice régime** :
+    - RANGE : 390 trades, PF **2.04** — **régime optimal** confirmé.
+    - RISK_ON : 530 trades, PF 1.28 (marginal positif).
+    - RISK_OFF : 0 trades (filtré baseline NO_RISK_OFF).
+    - HIGH_VOL : 10 trades, PF 5.64 (sample faible).
+  - **Survival map** : **21/25 SURVIVES**, 2 MARGINAL, 2 KILLED (8 % killed).
+  - **Caveat unique structurel** : 2022 PF **0.146** (catastrophique) — confirme le seul point fragile déjà identifié PR #234.
+  - **Verdict** : `HARDENED_FRAGILE` — un seul critère structurel critique fail (2022).
+- **Findings majeurs** :
+  1. Friction n'est **pas** le problème de RS Rotation. Hypothèse historique "friction tue l'edge" invalidée.
+  2. RANGE est le **régime optimal** (PF 2.04), pas RISK_ON. Confirme la conclusion historique de SETUPS_REGISTRY Setup 3.
+  3. HIGH_VOL minoritaire mais positif (à confirmer en condition de moindre exclusion baseline).
+  4. 2022 reste le seul point structurel catastrophique. Le filtre NO_RISK_OFF n'immunise pas — c'est l'année entière qui est fragile.
+- **Implications produit** (à confirmer dans PR séparée Context Engine) :
+  - Context Engine devrait **autoriser RS Rotation prioritairement en RANGE**, secondairement en RISK_ON, **désactiver** en RISK_OFF.
+  - Filtre HIGH_VOL à étudier séparément (sample faible actuel à cause de NO_RISK_OFF override).
+  - Mécanisme "protection bear" explicite (kill switch / exposure scaling) reste à concevoir — couche C "exposure control" du brief, hors scope Phase 1.
 - **Impact runtime** : aucun.
 - **Impact quant (fond)** : aucun. Aucun paramètre setup modifié. Aucun nouveau setup. Aucune promotion.
-- **Impact documentation** : oui. Setup 4 enrichi note PR-R3B-v3. Statut officiel inchangé.
-- **Conformité brief ChatGPT** : OUI. Rerun strictement identique, aucune modification, aucune relâche, verdict honnête sur chiffres réels.
-- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
+- **Impact documentation** : oui. Setup 3 enrichi note Phase 1 + findings + implications produit. Statut officiel inchangé.
+- **Non inclus** : Phases C (exposure control : max positions secteur, max concentration, volatility scaling, risk budget, correlation caps, allocation dynamique) et D (quality metrics : confiance statistique, sample confidence, regime confidence, edge durability, fragility score, concentration risk score) — réservées à PR séparées avec design d'architecture dédié.
+- **Conformité brief créateur + Research Framework Freeze v1** : OUI. Stress tests systématiques, aucune optimisation, aucun cherry-picking, paramètres baseline gelés, vocabulaire ne permet pas de promotion (`CONDITIONAL_EDGE`/`VALIDATED_RESEARCH_CORE`/`LIVE_READY` interdits en sortie).
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT` (et/ou créateur).
 
 ## Décisions actives
 
@@ -123,14 +123,17 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 4. ✅ **PR-VISION Architecture produit + philosophie** mergée (PR #236, commit `44a39e6` sur `main`).
 5. ❌ **PR-R3B v1 test isolé V1 Mean Reversion** (PR #237 fermée NOGO ChatGPT — univers incomplet 4/15 ETF).
 6. ✅ **PR-R3B-v2 dataset integrity fix** mergée (PR #238, commit `f826acc`) — cause racine identifiée, SYMBOL_MAP fixé.
-7. ✅ **Dataset complété par créateur** (commit `cdbc1cb` sur main) — 11 ETF SPDR ajoutés (DIA + 10 sectoriels).
-8. 🟡 **PR-R3B-v3 rerun strict sur dataset complet 15 ETF** (en cours) : 7 trades, PF 1.06 marginal, concentration 100 %, friction ×2 < 1, sans top 3 → 0. Verdict NEEDS_MORE_DATA sample 7 < 30 mais indicateurs qualitatifs catastrophiques. Décision ChatGPT requise : (A) DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK, (B) DEAD_AGGREGATED malgré n=7, (C) PR-R3A bis V1bis.
-5. **PR-R3C V2 anti-déguisement** (uniquement si V1 passe) : vérification stricte momentum-pullback déguisé.
-6. **PR-R3D V3 stress max** (uniquement si V1 ET V2 passent).
-7. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
-8. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée (cf. `SETUP_VALIDATION_CHECKLIST.md` section A). Sinon, ne pas lancer.
-9. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md` avec la méthodologie canonique projet (PR dédiée, `une PR = un objectif`).
-10. **Décomposition `SESSION.md`** (cf. priorité ChatGPT post-PR #233) : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
+7. ✅ **Dataset SPDR complété** (commit `cdbc1cb` créateur) — 11 ETF SPDR ajoutés (DIA + 10 sectoriels).
+8. ✅ **PR-R3B-v3 rerun strict 15 ETF** mergée (PR #239, commit `c91a23a`) — verdict NEEDS_MORE_DATA + indicateurs qualitatifs catastrophiques. Décision A/B/C Mean Reversion en attente.
+9. 🟡 **PR-RS-HARDENING Phase 1** (en cours) — stress tests A.1-A.8 + matrice 4 régimes. Verdict `HARDENED_FRAGILE`. Findings : friction résistante ×3, RANGE régime optimal (PF 2.04), 2022 PF 0.146 caveat unique.
+10. **PR-RS-HARDENING Phase 2** (subordonnée GO Phase 1) — design Context Engine couche 2.1.
+11. **PR-RS-HARDENING Phase 3** (subordonnée Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
+12. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
+13. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
+14. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
+15. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
+16. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md`.
+17. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
 11. **RS Rotation hardening complement** (uniquement après PR-R3A/B/C/D décidée) : exécuter au moins 1-2 des 10 items listés dans `SETUPS_REGISTRY.md` Setup 3 § PR-R1 update (stress friction ×2/×3 prioritaire — plus rapide à exécuter et critère Freeze § 4 I2/I3 explicite).
 
 Autres :
