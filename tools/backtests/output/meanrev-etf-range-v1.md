@@ -1,6 +1,6 @@
 # PR-R3B — Mean Reversion V1 ETF Range Short — test isolé
 
-> Généré le 2026-05-20T16:25:53.208Z par `tools/backtests/meanrev-etf-range-v1.mjs`.
+> Généré le 2026-05-20T16:36:55.242Z par `tools/backtests/meanrev-etf-range-v1.mjs`.
 
 **⚠ Analyse strictement offline.** Aucun ordre, aucun broker. Aucun fichier runtime modifié. Paramètres GELÉS ex-ante. Aucune ré-optimisation. Test UNIQUE.
 

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-20T16:25:53.208Z",
+  "generatedAt": "2026-05-20T16:36:55.242Z",
   "scope": "PR-R3B Mean Reversion V1 ETF Range Short — test isolé.",
   "hypothesis": "Les ETF larges et sectoriels possèdent encore des mécanismes de retour à la moyenne court terme grâce aux flux passifs, à l'arbitrage NAV, aux rebalancing institutionnels, et à la dilution idiosyncratique. Cet effet serait potentiellement exploitable UNIQUEMENT en marché RANGE, sur horizon court, avec excès temporaires, sans actifs momentum extrêmes.",
   "params": {
