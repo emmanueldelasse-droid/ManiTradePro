@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R3A Mean Reversion diagnostic and adjustment candidate review : rapport `docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md`. Diagnostic exploratoire, aucun script, aucun backtest, aucun changement de statut officiel).
-- **Dernier merge connu** : PR #234 `research(rs-rotation): robustness hardening v1 — walk-forward strict, concentration, drawdown` (commit `1641abf` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-VISION Architecture produit + philosophie de moteur : création `docs/project/TRADING_PHILOSOPHY.md` (architecture 5 couches), remplissage `docs/project/PROJECT_VISION.md` (squelette → vision produit consolidée), pointeur architecture dans `TRADING_LOGIC.md`, univers cible 40-120 actifs dans `ASSET_REGISTRY.md`).
+- **Dernier merge connu** : PR #235 `research(meanrev): PR-R3A diagnostic and adjustment candidate review` (commit `fc622fa` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,8 +52,40 @@
 
 ## PR en cours
 
-- **PR** : PR-R3A Mean Reversion diagnostic and adjustment candidate review — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Objectif unique** : déterminer si une version économiquement défendable de Mean Reversion swing existe encore pour ManiTradePro. **Pas un test, pas un script, pas un backtest** — uniquement un rapport diagnostic analytique fondé sur le code et les outputs existants. Aucune modification runtime, aucun nouveau setup créé, aucune activation paper/live, aucun changement de statut officiel.
+- **PR** : PR-VISION Architecture produit + philosophie de moteur — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Objectif unique** : formaliser officiellement l'architecture logique cible du moteur ManiTradePro (5 couches contexte → sélection → setup → timing → mesure), le rôle exact de chaque couche, les setups prioritaires en familles (pas en instances), l'univers cible 40-120 actifs liquides, le refus explicite du scalping/HFT/patterns de bougies seuls, et le principe directeur "moins de setups mais meilleurs setups". Aucune modification runtime, aucun setup activé, aucun backtest lancé, aucun paramètre optimisé, aucune promotion.
+- **Fichiers créés** :
+  - `docs/project/TRADING_PHILOSOPHY.md` — architecture moteur cible 5 couches, principe "un setup ≠ un edge", setups prioritaires en familles, univers cible 40-120 actifs, horizons (swing/intraday lent uniquement), patterns de bougies seuls ≠ edge, roadmap état actuel vs cible, principe "moins de setups, mieux validés", interdictions absolues, reformulation finale du projet (~580 lignes, 12 sections).
+- **Fichiers modifiés** :
+  - `docs/project/PROJECT_VISION.md` — squelette → vision produit consolidée pointant vers `TRADING_PHILOSOPHY.md` pour le détail technique et vers `BOT_OBJECTIVE.md` pour les règles dures.
+  - `docs/quant/TRADING_LOGIC.md` — pointeur explicite vers `TRADING_PHILOSOPHY.md` en tête de fichier (architecture cible vs logique actuelle).
+  - `docs/quant/ASSET_REGISTRY.md` — nouvelle section "Univers cible stratégique — 40 à 120 actifs liquides" en complément de la classification technique ELITE/CORE/TACTICAL/BLACKLIST existante (auto-générée par `asset-quality-engine-v1.mjs`).
+  - `SESSION.md` — branche/PR active, dernier merge connu (PR #235), PR en cours réécrite, prochaines priorités réordonnées.
+- **Définitions officielles ajoutées** :
+  - **Un setup ≠ un edge** — un setup est une réponse conditionnelle à un contexte ; un edge est un setup dont l'hypothèse économique survit exécution réaliste + friction + walk-forward + concentration.
+  - **Context Engine** = quel setup a le droit d'être actif.
+  - **RS Rotation / Asset Selection** = quels actifs sont éligibles.
+  - **Setup Activation** = quel setup détecté sur ces actifs.
+  - **Candle Timing Engine** = quand entrer précisément.
+  - **Paper Trading Measurement** = mesurer l'edge réel vs théorique.
+  - **Logique d'exécution** : Contexte → Sélection actifs → Setup → Timing → Risk → Mesure.
+  - **Setups prioritaires en familles** : Pullback Momentum (instance historique `DEAD`), Breakout Expansion après compression (`DEAD_AGGREGATED`) — la priorisation produit signifie **reconstruire** des variantes économiquement défendables, pas réactiver les anciennes.
+  - **Mean Reversion = axe secondaire** (abandon `DEAD / ABANDONED` autorisé).
+  - **RS Rotation = couche d'infrastructure**, pas un setup autonome.
+  - **Univers cible 40-120 actifs liquides** — ETF US indices + ETF sectoriels + ETF thématiques + leaders US large cap + quality/defensive + crypto majeures.
+  - **Refus explicites** : scalping, HFT, tick trading, microstructure, market making déguisé, patterns de bougies seuls, score universel.
+- **Articulation** :
+  - `BOT_OBJECTIVE.md` = constitution produit (autorité dure).
+  - `PROJECT_VISION.md` = vision produit consolidée (cette PR).
+  - `TRADING_PHILOSOPHY.md` = architecture moteur cible 5 couches détail technique (cette PR).
+  - `SETUPS_REGISTRY.md` = statuts officiels setups (inchangé par cette PR).
+  - `TRADING_LOGIC.md` = logique quant **actuelle** (pointeur ajouté vers `TRADING_PHILOSOPHY.md` pour cible).
+- **Impact runtime** : aucun.
+- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation. Aucun nouveau setup créé. Aucun backtest exécuté.
+- **Impact documentation** : oui. Architecture produit formalisée, philosophie de moteur explicitée, univers cible défini, refus explicites consignés.
+- **Statuts setups inchangés** : tous les statuts dans `SETUPS_REGISTRY.md` restent en l'état (RS Rotation `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`, Mean Reversion `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`, etc.).
+- **Conformité gouvernance** : OUI. PR documentaire pure. `une PR = un objectif` respecté (objectif = formaliser l'architecture produit). Aucune contradiction avec `BOT_OBJECTIVE.md`, `RESEARCH_FRAMEWORK_FREEZE_V1.md`, `SETUPS_REGISTRY.md`.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
 - **Fichiers créés** :
   - `docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md` — rapport diagnostic (~650 lignes) structuré en 12 sections.
 - **Fichiers modifiés** :
@@ -100,9 +132,10 @@
 Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajusté post-PR #233) :
 
 1. ✅ **PR documentaire truth-sync** mergée (PR #233, commit `19872ac` sur `main`).
-2. ✅ **PR-R1 RS Rotation robustness improvement evidence** mergée (PR #234, commit `1641abf` sur `main`). Statut RS Rotation inchangé `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`. 10 items requis avant toute promotion `CONDITIONAL_EDGE`.
-3. 🟡 **PR-R3A Mean Reversion diagnostic** (en cours) : rapport `docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md`. 3 variantes proposées (V1 ETF RANGE prioritaire, V2 QUALITY suspect, V3 OVERSOLD présomption overfit). Conclusion autorisée : Mean Reversion peut-être plus un axe prioritaire.
-4. **PR-R3B test isolé V1 Mean Reversion** (subordonné à `GO MERGE` PR-R3A) : test V1 `meanrev_etf_range_short` isolé, friction baseline, walk-forward 3 splits stricts, concentration analyse. Décision binaire `KEEP_RESEARCH_CANDIDATE` / `DEAD_AGGREGATED`.
+2. ✅ **PR-R1 RS Rotation robustness improvement evidence** mergée (PR #234, commit `1641abf` sur `main`).
+3. ✅ **PR-R3A Mean Reversion diagnostic** mergée (PR #235, commit `fc622fa` sur `main`).
+4. 🟡 **PR-VISION Architecture produit + philosophie** (en cours) : création `TRADING_PHILOSOPHY.md` + remplissage `PROJECT_VISION.md` + pointeurs `TRADING_LOGIC.md` et `ASSET_REGISTRY.md`. Aucun runtime, aucune promotion, aucun statut changé.
+5. **PR-R3B test isolé V1 Mean Reversion** (subordonné à signal ChatGPT dédié post-merge PR-VISION) : test V1 `meanrev_etf_range_short` isolé, friction baseline, walk-forward 3 splits stricts, concentration analyse. Décision binaire `KEEP_RESEARCH_CANDIDATE` / `DEAD_AGGREGATED`.
 5. **PR-R3C V2 anti-déguisement** (uniquement si V1 passe) : vérification stricte momentum-pullback déguisé.
 6. **PR-R3D V3 stress max** (uniquement si V1 ET V2 passent).
 7. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
