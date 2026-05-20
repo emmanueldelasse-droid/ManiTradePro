@@ -570,16 +570,22 @@ function classifyVerdict({ baseSummary, conc, wf, dd, worst }) {
     return { status: "KEEP_RESEARCH_CANDIDATE", reasons };
   }
 
-  // Worst year PF < 0.9 (bear)
+  // Worst year PF — seuil conservateur durci (ChatGPT directive 2026-05-19) :
+  // si pire année < 0.9, RS Rotation reste insuffisamment résilient en bear
+  // → KEEP_RESEARCH_CANDIDATE, pas CONDITIONAL_EDGE.
+  // Une promotion CONDITIONAL_EDGE nécessite stress tests friction ×2/×3,
+  // analyse transitions régime, rolling walk-forward glissant, etc.
+  // (cf. § *Why this is NOT yet CONDITIONAL_EDGE* du rapport Markdown).
   if (worst.worstYear && worst.worstYear.pf < 0.9) {
-    reasons.push(`Pire année (${worst.worstYear.year}) PF = ${worst.worstYear.pf} < 0.9.`);
-    return { status: "CONDITIONAL_EDGE", reasons };
+    reasons.push(`Pire année (${worst.worstYear.year}) PF = ${worst.worstYear.pf} < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés.`);
+    return { status: "KEEP_RESEARCH_CANDIDATE", reasons };
   }
 
   // 3/3 splits passent live + PF baseline ≥ 1.3 + concentration OK + worst year OK
-  // → candidat possible CONDITIONAL_EDGE (jamais VALIDATED_RESEARCH_CORE depuis ce script)
+  // → candidat possible CONDITIONAL_EDGE (jamais VALIDATED_RESEARCH_CORE depuis ce script).
+  // Nécessite explicitement pas de trou bear majeur.
   if (wf.passRobust >= 2 && baseSummary.profitFactor >= 1.30) {
-    reasons.push(`Walk-forward : ${wf.passRobust}/3 splits PF test ≥ 1.3. PF baseline = ${baseSummary.profitFactor}. Concentration acceptable. Promotion CONDITIONAL_EDGE proposée — VALIDATED_RESEARCH_CORE reste subordonné à shadow live + paper (Freeze § 5).`);
+    reasons.push(`Walk-forward : ${wf.passRobust}/3 splits PF test ≥ 1.3. PF baseline = ${baseSummary.profitFactor}. Concentration acceptable. Pire année ≥ 0.9. Promotion CONDITIONAL_EDGE proposée — VALIDATED_RESEARCH_CORE reste subordonné à shadow live + paper (Freeze § 5).`);
     return { status: "CONDITIONAL_EDGE", reasons };
   }
 
@@ -926,6 +932,37 @@ function buildMarkdown(r) {
   L.push("");
   L.push("- `VALIDATED_RESEARCH_CORE` — nécessite validation ChatGPT séparée + 10/10 critères Freeze § 4 + audit anti-look-ahead spécifique.");
   L.push("- `LIVE_READY` — nécessite shadow live + paper live prolongé + slippage réel + kill-switch + portfolio management.");
+  L.push("");
+
+  L.push("## 9bis. Why this is NOT yet `CONDITIONAL_EDGE`");
+  L.push("");
+  L.push("Bien que RS Rotation montre des **améliorations de robustesse fortes** (walk-forward 3/3 PASS robust, concentration acceptable, edge diversifiable), le statut reste conservativement à `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`. Raisons explicites :");
+  L.push("");
+  L.push("1. **Pire année 2022 PF = 0.14** (59 trades, totalR -92.97 R sur la baseline NO_RISK_OFF). Le filtre régime NO_RISK_OFF n'a pas immunisé le setup contre le bear 2022 — il l'a juste atténué. Les transitions rapides de régime peuvent encore frapper en cours de hold (`horizon = 20` jours, le régime peut basculer en cours de trade).");
+  L.push("");
+  L.push(`2. **Max drawdown 226.21 R** (~33 % du Total R baseline). Drawdown réel mesuré sur l'historique. Indique une volatilité de l'equity curve très significative — exige un capital tampon majeur en condition réelle, pas modélisé ici.`);
+  L.push("");
+  L.push(`3. **Longest loss streak = 19 trades consécutifs perdants**. Sans sizing dynamique, ce streak en condition live induit une pression psychologique et un drawdown intra-période qui peut sortir le système de son régime statistique attendu.`);
+  L.push("");
+  L.push(`4. **Survivorship bias non quantifié**. L'univers \`universe-v2.mjs\` contient les survivants 2021-2025. Aucun delisté, aucune fusion défavorable, aucun ticker en faillite. La performance future sur un univers point-in-time réel sera probablement < à l'historique mesuré ici.`);
+  L.push("");
+  L.push(`5. **Friction simplifiée uniforme**. Modèle 0.30 % round-trip + 0.02 %/j identique pour ETF SPY, crypto MSTR, leveraged SOXL. Les frictions réelles divergent fortement par classe d'actif — le PF 1.53 peut chuter sensiblement avec friction calibrée par actif (cf. \`tools/backtests/friction-model-v1.mjs\` heuristique v1).`);
+  L.push("");
+  L.push("6. **Stress tests friction ×2 et ×3 non exécutés**. Le seuil Freeze § 4 critère I2 demande PF ≥ 1.1 à friction ×2, et critère I3 demande PF ≥ 1.0 souhaité à friction ×3. Tant que ces tests n'ont pas tourné, le PF post-friction peut être surévalué.");
+  L.push("");
+  L.push("7. **Audit anti-look-ahead spécifique non exécuté** sur l'agrégation RS Rotation. La PR #208 a audité le mécanisme RS simple (CLEAN ×1.01 d'inflation) mais l'agrégation actuelle de ce script (NEXT_OPEN + momentum causal) n'a pas eu son audit symétrique formel.");
+  L.push("");
+  L.push("8. **Pas d'analyse transitions régime**. Le bascule RISK_ON → RISK_OFF mid-hold (régime en jour i autorisé, régime en jour i+10 = RISK_OFF) n'est pas traité ici. Le filtre n'applique qu'à l'entrée, pas dynamiquement.");
+  L.push("");
+  L.push("9. **Pas d'analyse de clusters de pertes**. Les 19 pertes consécutives sont-elles distribuées sur 2022 uniquement, ou clusterisées dans des sous-périodes spécifiques (bascules régime, news macro) ? Non analysé.");
+  L.push("");
+  L.push("10. **Rolling walk-forward glissant non exécuté**. Les 3 splits sont calendaires (par années). Un rolling glissant (par exemple : train 24 mois → test 6 mois, pas de 3 mois) donnerait une mesure de stabilité plus continue.");
+  L.push("");
+  L.push("11. **Pas de validation sur univers alternatif**. Tester l'edge sur un univers différent (par exemple uniquement ETF, uniquement Big Tech, ou un univers historique reconstruit) confirmerait que le mécanisme n'est pas dépendant d'un sous-set précis.");
+  L.push("");
+  L.push("12. **Pas de test réduction hold en bear** ni de **volatility filter**. Une stratégie réellement antifragile devrait avoir un mécanisme de protection crash actif — pas seulement un filtre régime statique à l'entrée.");
+  L.push("");
+  L.push("**Conséquence** : RS Rotation devient **le candidat de recherche le plus crédible du repo** à date, mais le statut effectif reste **`RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`**. Cette PR est présentée comme **robustness improvement evidence**, pas comme une proposition de promotion. La promotion `CONDITIONAL_EDGE` est subordonnée à l'exécution des stress tests, transitions régime, et rolling walk-forward listés ci-dessus (à découper en PR séparées, `une PR = un objectif`).");
   L.push("");
 
   L.push("## 10. Limites");

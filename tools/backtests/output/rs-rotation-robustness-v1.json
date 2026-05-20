@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-19T22:06:27.717Z",
+  "generatedAt": "2026-05-20T06:54:09.811Z",
   "scope": "RS Rotation robustness hardening — focused depth analysis on the frozen baseline (complementary to rs-rotation-robustness-lab-v1.mjs which sweeps breadth).",
   "baseline": {
     "lookback": 90,
@@ -424,9 +424,9 @@
     }
   },
   "verdict": {
-    "status": "CONDITIONAL_EDGE",
+    "status": "KEEP_RESEARCH_CANDIDATE",
     "reasons": [
-      "Pire année (2022) PF = 0.144 < 0.9."
+      "Pire année (2022) PF = 0.144 < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés."
     ],
     "vocabulary": "Freeze v1 + truth-sync 2026-05-19. Interdit ici : VALIDATED_RESEARCH_CORE, LIVE_READY.",
     "note": "Statut proposé par ce script. La promotion finale reste subordonnée à validation ChatGPT (gouvernance projet)."

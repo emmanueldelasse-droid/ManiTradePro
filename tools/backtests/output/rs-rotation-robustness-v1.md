@@ -1,6 +1,6 @@
 # RS Rotation Robustness Hardening v1 — ManiTradePro
 
-> Généré le 2026-05-19T22:06:27.717Z par `tools/backtests/rs-rotation-robustness-v1.mjs`.
+> Généré le 2026-05-20T06:54:09.811Z par `tools/backtests/rs-rotation-robustness-v1.mjs`.
 
 **⚠ Analyse strictement offline.** Aucun ordre, aucun broker, aucun endpoint live. Aucun fichier runtime modifié. Modèle d'exécution réaliste (NEXT_OPEN + friction obligatoire). Paramètres gelés ex-ante (aucune ré-optimisation entre les splits).
 
@@ -164,11 +164,11 @@ Top 5 contributeurs positifs :
 
 ## 9. Verdict conservateur
 
-**Statut recommandé : `CONDITIONAL_EDGE`**
+**Statut recommandé : `KEEP_RESEARCH_CANDIDATE`**
 
 Raisons :
 
-- Pire année (2022) PF = 0.144 < 0.9.
+- Pire année (2022) PF = 0.144 < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés.
 
 Vocabulaire : Freeze v1 + truth-sync 2026-05-19. Interdit ici : VALIDATED_RESEARCH_CORE, LIVE_READY.
 
@@ -186,6 +186,36 @@ Note : Statut proposé par ce script. La promotion finale reste subordonnée à 
 
 - `VALIDATED_RESEARCH_CORE` — nécessite validation ChatGPT séparée + 10/10 critères Freeze § 4 + audit anti-look-ahead spécifique.
 - `LIVE_READY` — nécessite shadow live + paper live prolongé + slippage réel + kill-switch + portfolio management.
+
+## 9bis. Why this is NOT yet `CONDITIONAL_EDGE`
+
+Bien que RS Rotation montre des **améliorations de robustesse fortes** (walk-forward 3/3 PASS robust, concentration acceptable, edge diversifiable), le statut reste conservativement à `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`. Raisons explicites :
+
+1. **Pire année 2022 PF = 0.14** (59 trades, totalR -92.97 R sur la baseline NO_RISK_OFF). Le filtre régime NO_RISK_OFF n'a pas immunisé le setup contre le bear 2022 — il l'a juste atténué. Les transitions rapides de régime peuvent encore frapper en cours de hold (`horizon = 20` jours, le régime peut basculer en cours de trade).
+
+2. **Max drawdown 226.21 R** (~33 % du Total R baseline). Drawdown réel mesuré sur l'historique. Indique une volatilité de l'equity curve très significative — exige un capital tampon majeur en condition réelle, pas modélisé ici.
+
+3. **Longest loss streak = 19 trades consécutifs perdants**. Sans sizing dynamique, ce streak en condition live induit une pression psychologique et un drawdown intra-période qui peut sortir le système de son régime statistique attendu.
+
+4. **Survivorship bias non quantifié**. L'univers `universe-v2.mjs` contient les survivants 2021-2025. Aucun delisté, aucune fusion défavorable, aucun ticker en faillite. La performance future sur un univers point-in-time réel sera probablement < à l'historique mesuré ici.
+
+5. **Friction simplifiée uniforme**. Modèle 0.30 % round-trip + 0.02 %/j identique pour ETF SPY, crypto MSTR, leveraged SOXL. Les frictions réelles divergent fortement par classe d'actif — le PF 1.53 peut chuter sensiblement avec friction calibrée par actif (cf. `tools/backtests/friction-model-v1.mjs` heuristique v1).
+
+6. **Stress tests friction ×2 et ×3 non exécutés**. Le seuil Freeze § 4 critère I2 demande PF ≥ 1.1 à friction ×2, et critère I3 demande PF ≥ 1.0 souhaité à friction ×3. Tant que ces tests n'ont pas tourné, le PF post-friction peut être surévalué.
+
+7. **Audit anti-look-ahead spécifique non exécuté** sur l'agrégation RS Rotation. La PR #208 a audité le mécanisme RS simple (CLEAN ×1.01 d'inflation) mais l'agrégation actuelle de ce script (NEXT_OPEN + momentum causal) n'a pas eu son audit symétrique formel.
+
+8. **Pas d'analyse transitions régime**. Le bascule RISK_ON → RISK_OFF mid-hold (régime en jour i autorisé, régime en jour i+10 = RISK_OFF) n'est pas traité ici. Le filtre n'applique qu'à l'entrée, pas dynamiquement.
+
+9. **Pas d'analyse de clusters de pertes**. Les 19 pertes consécutives sont-elles distribuées sur 2022 uniquement, ou clusterisées dans des sous-périodes spécifiques (bascules régime, news macro) ? Non analysé.
+
+10. **Rolling walk-forward glissant non exécuté**. Les 3 splits sont calendaires (par années). Un rolling glissant (par exemple : train 24 mois → test 6 mois, pas de 3 mois) donnerait une mesure de stabilité plus continue.
+
+11. **Pas de validation sur univers alternatif**. Tester l'edge sur un univers différent (par exemple uniquement ETF, uniquement Big Tech, ou un univers historique reconstruit) confirmerait que le mécanisme n'est pas dépendant d'un sous-set précis.
+
+12. **Pas de test réduction hold en bear** ni de **volatility filter**. Une stratégie réellement antifragile devrait avoir un mécanisme de protection crash actif — pas seulement un filtre régime statique à l'entrée.
+
+**Conséquence** : RS Rotation devient **le candidat de recherche le plus crédible du repo** à date, mais le statut effectif reste **`RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`**. Cette PR est présentée comme **robustness improvement evidence**, pas comme une proposition de promotion. La promotion `CONDITIONAL_EDGE` est subordonnée à l'exécution des stress tests, transitions régime, et rolling walk-forward listés ci-dessus (à découper en PR séparées, `une PR = un objectif`).
 
 ## 10. Limites
 
