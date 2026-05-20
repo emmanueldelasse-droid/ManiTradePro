@@ -1,6 +1,6 @@
 # PR-R3B — Mean Reversion V1 ETF Range Short — test isolé
 
-> Généré le 2026-05-20T16:36:55.242Z par `tools/backtests/meanrev-etf-range-v1.mjs`.
+> Généré le 2026-05-20T18:01:55.168Z par `tools/backtests/meanrev-etf-range-v1.mjs`.
 
 **⚠ Analyse strictement offline.** Aucun ordre, aucun broker. Aucun fichier runtime modifié. Paramètres GELÉS ex-ante. Aucune ré-optimisation. Test UNIQUE.
 
@@ -36,11 +36,8 @@
 ## 3. Univers
 
 - Univers cible prévu (brief ChatGPT) : `ETFs_US_INDEX` + `ETFs_US_SECTORS` = **15 ETF** : SPY, QQQ, IWM, DIA, MDY, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC.
-- Univers effectif (présents dans le dataset projet) : **4 ETF** : SPY, QQQ, IWM, MDY.
-- **⚠ DATASET_GAP** : 11/15 ETF ABSENTS du dataset projet (`DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC`). Ratio gap = 73 %.
-- OHLC chargés (incluant SPY/QQQ/SMH pour régime) : 5.
-
-**Finding structurel #1 — DATASET_GAP** : l'hypothèse économique V1 (cf. R3A) cible explicitement les ETF larges **et** sectoriels. Les ETF sectoriels (SPDR `XLE`/`XLF`/`XLV`/…) ne sont pas dans `data/*.json`. Le test ne couvre donc que les ETF d'indice large (SPY/QQQ/IWM/MDY). Les conclusions ci-dessous **ne peuvent pas** se généraliser à l'hypothèse V1 complète tant que ce gap dataset n'est pas comblé.
+- Univers effectif (présents dans le dataset projet) : **15 ETF** : SPY, QQQ, IWM, DIA, MDY, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC.
+- OHLC chargés (incluant SPY/QQQ/SMH pour régime) : 16.
 
 ## 4. Définition opérationnelle du régime RANGE
 
@@ -62,33 +59,19 @@
 - Friction formule : `frictionR = (0.30 + 0.02 × holdDays) / 5` × multiplier (5 % = 1R)
 - Multipliers testés : ×1, ×2, ×3
 
-## 5bis. Finding structurel #2 — FILTERS_TOO_STRICT_FOR_LARGE_ETF
-
-**0 signal généré** sur 4 ETF × 139 jours RANGE = ~556 opportunités-jour théoriques.
-
-Les paramètres gelés ex-ante (RSI(14) < 25 ET prix < EMA20 × 0.97) **ne se déclenchent quasiment jamais** sur les ETF larges US (SPY/QQQ/IWM/MDY) en régime RANGE. Raisons probables :
-
-- RSI(14) < 25 sur un ETF d'indice large = excès statistique rare (≈ < 1 % des jours, et concentré en bear violent — pas en RANGE).
-- Distance EMA20 < -3 % sur indice large = mouvement amplitude rare (les indices sont par construction moins volatils que les single names).
-- La conjonction des deux + filtre RANGE = quasi-impossible.
-
-**Conséquence méthodologique** : l'opérationnalisation V1 du diagnostic R3A (paramètres calibrés implicitement pour des ETF sectoriels ou des leaders volatils) **n'est pas adaptée** aux ETF d'indice large. Soit (a) il faut tester sur les ETF sectoriels (absents du dataset — cf. finding #1), soit (b) il faut reformuler V1 avec des paramètres explicitement calibrés pour les ETF d'indice large (RSI < 30 + distEMA20 < -1 %, par exemple — **mais cela nécessite une nouvelle PR-R3A bis avec hypothèse économique distincte**, pas une modification post-hoc des paramètres de V1).
-
-**Pour respecter la règle anti-overfit** : aucune modification des paramètres V1 dans cette PR. Le résultat 0-signal est consigné honnêtement comme **information utile**, pas comme échec à corriger.
-
 ## 6. Baseline F×1 (friction baseline projet)
 
 | Métrique | Valeur |
 |---|---:|
-| Signaux générés (avant friction) | 0 |
-| Trades (= signaux, exit géré) | 0 |
-| Wins / Losses | 0 / 0 |
-| Winrate | 0.00 % |
-| Expectancy R | 0.0000 |
-| **Profit factor (frictionné F×1)** | **0.00** |
-| Total R | 0.00 |
-| Max drawdown R | 0.00 |
-| Longest loss streak | 0 |
+| Signaux générés (avant friction) | 7 |
+| Trades (= signaux, exit géré) | 7 |
+| Wins / Losses | 4 / 3 |
+| Winrate | 57.14 % |
+| Expectancy R | 0.0159 |
+| **Profit factor (frictionné F×1)** | **1.06** |
+| Total R | 0.11 |
+| Max drawdown R | 1.42 |
+| Longest loss streak | 2 |
 
 PF par année :
 
@@ -96,7 +79,7 @@ PF par année :
 |---|---:|---:|---:|
 | 2021 | _aucun trade_ | n/a | n/a |
 | 2022 | _aucun trade_ | n/a | n/a |
-| 2023 | _aucun trade_ | n/a | n/a |
+| 2023 | 7 | 1.06 | 0.11 |
 | 2024 | _aucun trade_ | n/a | n/a |
 | 2025 | _aucun trade_ | n/a | n/a |
 
@@ -104,9 +87,9 @@ PF par année :
 
 | Split | Train years | Test years | Train trades | Train PF | Test trades | Test PF | Test totalR | Pass live (≥1.0) | Pass robust (≥1.20) |
 |---|---|---|---:|---:|---:|---:|---:|---|---|
-| S1 | 2021-2022 | 2023 | 0 | 0.00 | 0 | **0.00** | 0.00 | ✗ | ✗ |
-| S2 | 2021-2022-2023 | 2024 | 0 | 0.00 | 0 | **0.00** | 0.00 | ✗ | ✗ |
-| S3 | 2021-2022-2023-2024 | 2025 | 0 | 0.00 | 0 | **0.00** | 0.00 | ✗ | ✗ |
+| S1 | 2021-2022 | 2023 | 0 | 0.00 | 7 | **1.06** | 0.11 | ✗ | ✗ |
+| S2 | 2021-2022-2023 | 2024 | 7 | 1.06 | 0 | **0.00** | 0.00 | ✗ | ✗ |
+| S3 | 2021-2022-2023-2024 | 2025 | 7 | 1.06 | 0 | **0.00** | 0.00 | ✗ | ✗ |
 
 **Splits PASS live** : 0 / 3.
 
@@ -114,32 +97,35 @@ PF par année :
 
 ## 8. Concentration top 5 contributeurs
 
-- Symboles ayant tradé : **0**
-- Symboles avec contribution positive : **undefined**
-- Somme positive (R) : **n/a**
-- **Top 5 share** (% du PnL positif) : **n/a %**
-- Single max share : n/a %
-- **PF sans top 5** : **n/a**
-- Total R sans top 5 : n/a (sur undefined trades)
+- Symboles ayant tradé : **3**
+- Symboles avec contribution positive : **1**
+- Somme positive (R) : **1.41**
+- **Top 5 share** (% du PnL positif) : **100.00 %**
+- Single max share : 100.00 %
+- **PF sans top 5** : **0.30**
+- Total R sans top 5 : -1.30 (sur 6 trades)
 
 Top 5 contributeurs positifs :
 
 | Rang | Symbole | Trades | Total R | Share % |
 |---:|---|---:|---:|---:|
+| 1 | XLU | 1 | 1.41 | 100.00 % |
 
 ## 9. Drawdown deep-dive
 
-- Max drawdown : **0.00 R**
-- Longest loss streak : **0** trades consécutifs perdants
-- Worst drawdown magnitude : 0.00 R sur 0 trades
+- Max drawdown : **1.42 R**
+- Longest loss streak : **2** trades consécutifs perdants
+  - Fenêtre : 2023-03-13 → 2023-03-14
+- Worst drawdown magnitude : 1.42 R sur 2 trades
+  - Période : 2023-03-13 → 2023-03-14
 
 **Clusters de pertes (≥ 5 trades consécutifs perdants)** : 0
 
 ## 10. Dépendance aux dates extrêmes
 
-- **Sans top 3 dates gagnantes** : PF = **0.00**, Total R = 0.00 (sur 0 trades).
-- Top 3 dates retirées : 
-- **Sans top 5 dates gagnantes** : PF = **0.00**, Total R = 0.00 (sur 0 trades).
+- **Sans top 3 dates gagnantes** : PF = **0.00**, Total R = -1.86 (sur 3 trades).
+- Top 3 dates retirées : `2023-10-05`, `2023-03-15`, `2023-10-06`
+- **Sans top 5 dates gagnantes** : PF = **0.00**, Total R = -1.42 (sur 2 trades).
 
 **Lecture** : si PF sans top 3 dates < 1.0, l'edge dépend de quelques événements (rebonds de crash, recovery exceptionnelle) — pas reproductible.
 
@@ -147,7 +133,7 @@ Top 5 contributeurs positifs :
 
 | Sous-groupe | Trades | Winrate | Expectancy R | PF | Total R |
 |---|---:|---:|---:|---:|---:|
-| Stable (régime entry == régime exit) | 0 | 0.00 % | 0.0000 | 0.00 | 0.00 |
+| Stable (régime entry == régime exit) | 7 | 57.14 % | 0.0159 | 1.06 | 0.11 |
 | Transition (régime change mid-hold) | 0 | 0.00 % | 0.0000 | 0.00 | 0.00 |
 
 **Lecture** : si la branche transition est très négative, le setup est fragile aux bascules régime mid-hold (limite du filtre statique à l'entrée).
@@ -156,9 +142,9 @@ Top 5 contributeurs positifs :
 
 | Friction | Trades | PF | Total R | Max DD | WF passLive | WF passRobust |
 |---|---:|---:|---:|---:|---|---|
-| ×1 (baseline) | 0 | 0.00 | 0.00 | 0.00 | 0/3 | 0/3 |
-| ×2 | 0 | 0.00 | 0.00 | 0.00 | 0/3 | 0/3 |
-| ×3 | 0 | 0.00 | 0.00 | 0.00 | 0/3 | 0/3 |
+| ×1 (baseline) | 7 | 1.06 | 0.11 | 1.42 | 0/3 | 0/3 |
+| ×2 | 7 | 0.76 | -0.51 | 1.58 | 0/3 | 0/3 |
+| ×3 | 7 | 0.56 | -1.14 | 1.74 | 0/3 | 0/3 |
 
 **Critères Freeze § 4** : friction ×2 PF ≥ 1.10 attendu, friction ×3 PF ≥ 1.0 souhaité.
 
@@ -166,15 +152,15 @@ Top 5 contributeurs positifs :
 
 | Critère | Seuil | Valeur | Pass |
 |---|---|---|---|
-| Sample minimum | ≥ 30 trades | 0 | ✗ |
-| PF baseline F×1 | ≥ 1.20 | 0.00 | ✗ |
-| PF friction ×2 | ≥ 1.10 | 0.00 | ✗ |
+| Sample minimum | ≥ 30 trades | 7 | ✗ |
+| PF baseline F×1 | ≥ 1.20 | 1.06 | ✗ |
+| PF friction ×2 | ≥ 1.10 | 0.76 | ✗ |
 | WF pass robust | ≥ 2/3 splits PF test ≥ 1.20 | 0/3 | ✗ |
-| Top 5 share | < 70 % | n/a % | ✓ |
-| PF sans top 5 | ≥ 1.05 | n/a | ✓ |
+| Top 5 share | < 70 % | 100.00 % | ✗ |
+| PF sans top 5 | ≥ 1.05 | 0.30 | ✗ |
 | 2022 PF | ≥ 0.5 | n/a | ✓ |
 | Sans top 3 dates PF | ≥ 1.0 | 0.00 | ✗ |
-| Max DD / Total R | ≤ 1.5 | n/a | ✓ |
+| Max DD / Total R | ≤ 1.5 | 12.91 | ✗ |
 
 ## 14. Verdict
 
@@ -182,9 +168,7 @@ Top 5 contributeurs positifs :
 
 Raisons :
 
-- DATASET_GAP : 11/15 ETF de l'univers cible absents du dataset projet (DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC). L'univers effectif est limité à 4 ETF (SPY, QQQ, IWM, MDY).
-- FILTERS_TOO_STRICT_FOR_LARGE_ETF : 0 signal généré sur 4 ETF × 139 jours RANGE = ~556 opportunités-jour. Les paramètres gelés (RSI(14) < 25 ET prix < EMA20 × 0.97) ne se déclenchent quasiment jamais sur les ETF larges US (SPY/QQQ/IWM/MDY) en régime RANGE. Conclusion structurelle : l'opérationnalisation V1 proposée dans le diagnostic R3A n'est pas testable sur l'univers disponible.
-- Sample insuffisant : 0 trades. RANGE strict + univers ETF + signal RSI<25 produit trop peu de signaux pour conclure quantitativement.
+- Sample insuffisant : 7 trades. RANGE strict + univers ETF + signal RSI<25 produit trop peu de signaux pour conclure quantitativement.
 
 Note : Le statut effectif Setup 4 Mean Reversion dans SETUPS_REGISTRY.md reste inchangé tant que GO MERGE ChatGPT explicite n'est pas reçu.
 

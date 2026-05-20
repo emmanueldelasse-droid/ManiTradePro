@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-20T16:36:55.242Z",
+  "generatedAt": "2026-05-20T18:01:55.168Z",
   "scope": "PR-R3B Mean Reversion V1 ETF Range Short — test isolé.",
   "hypothesis": "Les ETF larges et sectoriels possèdent encore des mécanismes de retour à la moyenne court terme grâce aux flux passifs, à l'arbitrage NAV, aux rebalancing institutionnels, et à la dilution idiosyncratique. Cet effet serait potentiellement exploitable UNIQUEMENT en marché RANGE, sur horizon court, avec excès temporaires, sans actifs momentum extrêmes.",
   "params": {
@@ -24,7 +24,18 @@
     "SPY",
     "QQQ",
     "IWM",
-    "MDY"
+    "DIA",
+    "MDY",
+    "XLE",
+    "XLF",
+    "XLV",
+    "XLI",
+    "XLP",
+    "XLY",
+    "XLB",
+    "XLU",
+    "XLRE",
+    "XLC"
   ],
   "datasetGap": {
     "expected": [
@@ -48,10 +59,8 @@
       "SPY",
       "QQQ",
       "IWM",
-      "MDY"
-    ],
-    "missing": [
       "DIA",
+      "MDY",
       "XLE",
       "XLF",
       "XLV",
@@ -63,9 +72,10 @@
       "XLRE",
       "XLC"
     ],
-    "gapRatio": 0.73
+    "missing": [],
+    "gapRatio": 0
   },
-  "universeSizeLoaded": 5,
+  "universeSizeLoaded": 16,
   "rangeDays": 139,
   "totalDays": 1255,
   "rangeDaysPct": 11.08,
@@ -88,23 +98,27 @@
       "RSI[i] causal (recursive smoothing on close[0..i])"
     ]
   },
-  "signalCount": 0,
+  "signalCount": 7,
   "baseline_F1": {
     "summary": {
-      "trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "winrate": 0,
-      "expectancyR": 0,
-      "profitFactor": 0,
-      "totalR": 0,
-      "maxDrawdownR": 0,
-      "longestLossStreak": 0
+      "trades": 7,
+      "wins": 4,
+      "losses": 3,
+      "winrate": 57.14,
+      "expectancyR": 0.0159,
+      "profitFactor": 1.06,
+      "totalR": 0.11,
+      "maxDrawdownR": 1.42,
+      "longestLossStreak": 2
     },
     "yearly": {
       "2021": null,
       "2022": null,
-      "2023": null,
+      "2023": {
+        "trades": 7,
+        "pf": 1.06,
+        "totalR": 0.11
+      },
       "2024": null,
       "2025": null
     },
@@ -131,15 +145,15 @@
             "longestLossStreak": 0
           },
           "test": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 4,
+            "losses": 3,
+            "winrate": 57.14,
+            "expectancyR": 0.0159,
+            "profitFactor": 1.06,
+            "totalR": 0.11,
+            "maxDrawdownR": 1.42,
+            "longestLossStreak": 2
           },
           "passLive": false,
           "passRobust": false
@@ -155,15 +169,15 @@
             "2024"
           ],
           "train": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 4,
+            "losses": 3,
+            "winrate": 57.14,
+            "expectancyR": 0.0159,
+            "profitFactor": 1.06,
+            "totalR": 0.11,
+            "maxDrawdownR": 1.42,
+            "longestLossStreak": 2
           },
           "test": {
             "trades": 0,
@@ -191,15 +205,15 @@
             "2025"
           ],
           "train": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 4,
+            "losses": 3,
+            "winrate": 57.14,
+            "expectancyR": 0.0159,
+            "profitFactor": 1.06,
+            "totalR": 0.11,
+            "maxDrawdownR": 1.42,
+            "longestLossStreak": 2
           },
           "test": {
             "trades": 0,
@@ -220,64 +234,91 @@
       "passRobust": 0
     },
     "concentration": {
-      "universeSize": 0,
-      "top5": [],
-      "top5SharePctOfPositive": null,
-      "pfWithoutTop5": null,
-      "singleMaxSharePctOfPositive": null
+      "universeSize": 3,
+      "positiveContributors": 1,
+      "sumPositiveR": 1.41,
+      "top5": [
+        {
+          "symbol": "XLU",
+          "trades": 1,
+          "totalR": 1.408,
+          "sharePctOfPositive": 100
+        }
+      ],
+      "top5SharePctOfPositive": 100,
+      "singleMaxSharePctOfPositive": 100,
+      "pfWithoutTop5": 0.304,
+      "totalRWithoutTop5": -1.3,
+      "tradesWithoutTop5": 6
     },
     "drawdown": {
-      "maxDD": 0,
-      "longestLossStreak": 0,
-      "longestLossStreakWindow": null,
+      "maxDD": 1.42,
+      "longestLossStreak": 2,
+      "longestLossStreakWindow": {
+        "startDate": "2023-03-13",
+        "endDate": "2023-03-14",
+        "tradesIndices": [
+          0,
+          1
+        ]
+      },
       "worstDD": {
-        "magnitudeR": 0,
-        "startDate": null,
-        "endDate": null,
-        "durationTrades": 0
+        "magnitudeR": 1.42,
+        "startDate": "2023-03-13",
+        "endDate": "2023-03-14",
+        "durationTrades": 2
       },
       "lossClusters5plus": []
     },
     "withoutTop3Dates": {
-      "topDates": [],
+      "topDates": [
+        "2023-10-05",
+        "2023-03-15",
+        "2023-10-06"
+      ],
       "summary": {
-        "trades": 0,
+        "trades": 3,
         "wins": 0,
-        "losses": 0,
+        "losses": 3,
         "winrate": 0,
-        "expectancyR": 0,
+        "expectancyR": -0.6212,
         "profitFactor": 0,
-        "totalR": 0,
-        "maxDrawdownR": 0,
-        "longestLossStreak": 0
+        "totalR": -1.86,
+        "maxDrawdownR": 1.86,
+        "longestLossStreak": 3
       }
     },
     "withoutTop5Dates": {
-      "topDates": [],
+      "topDates": [
+        "2023-10-05",
+        "2023-03-15",
+        "2023-10-06",
+        "2023-10-09"
+      ],
       "summary": {
-        "trades": 0,
+        "trades": 2,
         "wins": 0,
-        "losses": 0,
+        "losses": 2,
         "winrate": 0,
-        "expectancyR": 0,
+        "expectancyR": -0.711,
         "profitFactor": 0,
-        "totalR": 0,
-        "maxDrawdownR": 0,
-        "longestLossStreak": 0
+        "totalR": -1.42,
+        "maxDrawdownR": 1.42,
+        "longestLossStreak": 2
       }
     },
     "regimeTransitions": {
       "stable": {
-        "count": 0,
-        "trades": 0,
-        "wins": 0,
-        "losses": 0,
-        "winrate": 0,
-        "expectancyR": 0,
-        "profitFactor": 0,
-        "totalR": 0,
-        "maxDrawdownR": 0,
-        "longestLossStreak": 0
+        "count": 7,
+        "trades": 7,
+        "wins": 4,
+        "losses": 3,
+        "winrate": 57.14,
+        "expectancyR": 0.0159,
+        "profitFactor": 1.06,
+        "totalR": 0.11,
+        "maxDrawdownR": 1.42,
+        "longestLossStreak": 2
       },
       "transition": {
         "count": 0,
@@ -295,15 +336,15 @@
   },
   "friction_F2": {
     "summary": {
-      "trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "winrate": 0,
-      "expectancyR": 0,
-      "profitFactor": 0,
-      "totalR": 0,
-      "maxDrawdownR": 0,
-      "longestLossStreak": 0
+      "trades": 7,
+      "wins": 3,
+      "losses": 4,
+      "winrate": 42.86,
+      "expectancyR": -0.0732,
+      "profitFactor": 0.764,
+      "totalR": -0.51,
+      "maxDrawdownR": 1.58,
+      "longestLossStreak": 2
     },
     "walkForward": {
       "splits": [
@@ -328,15 +369,15 @@
             "longestLossStreak": 0
           },
           "test": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 3,
+            "losses": 4,
+            "winrate": 42.86,
+            "expectancyR": -0.0732,
+            "profitFactor": 0.764,
+            "totalR": -0.51,
+            "maxDrawdownR": 1.58,
+            "longestLossStreak": 2
           },
           "passLive": false,
           "passRobust": false
@@ -352,15 +393,15 @@
             "2024"
           ],
           "train": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 3,
+            "losses": 4,
+            "winrate": 42.86,
+            "expectancyR": -0.0732,
+            "profitFactor": 0.764,
+            "totalR": -0.51,
+            "maxDrawdownR": 1.58,
+            "longestLossStreak": 2
           },
           "test": {
             "trades": 0,
@@ -388,15 +429,15 @@
             "2025"
           ],
           "train": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 3,
+            "losses": 4,
+            "winrate": 42.86,
+            "expectancyR": -0.0732,
+            "profitFactor": 0.764,
+            "totalR": -0.51,
+            "maxDrawdownR": 1.58,
+            "longestLossStreak": 2
           },
           "test": {
             "trades": 0,
@@ -419,15 +460,15 @@
   },
   "friction_F3": {
     "summary": {
-      "trades": 0,
-      "wins": 0,
-      "losses": 0,
-      "winrate": 0,
-      "expectancyR": 0,
-      "profitFactor": 0,
-      "totalR": 0,
-      "maxDrawdownR": 0,
-      "longestLossStreak": 0
+      "trades": 7,
+      "wins": 2,
+      "losses": 5,
+      "winrate": 28.57,
+      "expectancyR": -0.1623,
+      "profitFactor": 0.557,
+      "totalR": -1.14,
+      "maxDrawdownR": 1.74,
+      "longestLossStreak": 2
     },
     "walkForward": {
       "splits": [
@@ -452,15 +493,15 @@
             "longestLossStreak": 0
           },
           "test": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 2,
+            "losses": 5,
+            "winrate": 28.57,
+            "expectancyR": -0.1623,
+            "profitFactor": 0.557,
+            "totalR": -1.14,
+            "maxDrawdownR": 1.74,
+            "longestLossStreak": 2
           },
           "passLive": false,
           "passRobust": false
@@ -476,15 +517,15 @@
             "2024"
           ],
           "train": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 2,
+            "losses": 5,
+            "winrate": 28.57,
+            "expectancyR": -0.1623,
+            "profitFactor": 0.557,
+            "totalR": -1.14,
+            "maxDrawdownR": 1.74,
+            "longestLossStreak": 2
           },
           "test": {
             "trades": 0,
@@ -512,15 +553,15 @@
             "2025"
           ],
           "train": {
-            "trades": 0,
-            "wins": 0,
-            "losses": 0,
-            "winrate": 0,
-            "expectancyR": 0,
-            "profitFactor": 0,
-            "totalR": 0,
-            "maxDrawdownR": 0,
-            "longestLossStreak": 0
+            "trades": 7,
+            "wins": 2,
+            "losses": 5,
+            "winrate": 28.57,
+            "expectancyR": -0.1623,
+            "profitFactor": 0.557,
+            "totalR": -1.14,
+            "maxDrawdownR": 1.74,
+            "longestLossStreak": 2
           },
           "test": {
             "trades": 0,
@@ -544,9 +585,7 @@
   "verdict": {
     "status": "NEEDS_MORE_DATA",
     "reasons": [
-      "DATASET_GAP : 11/15 ETF de l'univers cible absents du dataset projet (DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC). L'univers effectif est limité à 4 ETF (SPY, QQQ, IWM, MDY).",
-      "FILTERS_TOO_STRICT_FOR_LARGE_ETF : 0 signal généré sur 4 ETF × 139 jours RANGE = ~556 opportunités-jour. Les paramètres gelés (RSI(14) < 25 ET prix < EMA20 × 0.97) ne se déclenchent quasiment jamais sur les ETF larges US (SPY/QQQ/IWM/MDY) en régime RANGE. Conclusion structurelle : l'opérationnalisation V1 proposée dans le diagnostic R3A n'est pas testable sur l'univers disponible.",
-      "Sample insuffisant : 0 trades. RANGE strict + univers ETF + signal RSI<25 produit trop peu de signaux pour conclure quantitativement."
+      "Sample insuffisant : 7 trades. RANGE strict + univers ETF + signal RSI<25 produit trop peu de signaux pour conclure quantitativement."
     ],
     "vocabulary": "Statuts autorisés ici : KEEP_RESEARCH_CANDIDATE, DEAD_AGGREGATED, DEAD / ABANDONED, NEEDS_MORE_DATA. Interdits : VALIDATED_RESEARCH_CORE, LIVE_READY, CONDITIONAL_EDGE (réservé à une PR ultérieure, jamais auto-appliqué).",
     "note": "Le statut effectif Setup 4 Mean Reversion dans SETUPS_REGISTRY.md reste inchangé tant que GO MERGE ChatGPT explicite n'est pas reçu."
@@ -556,11 +595,11 @@
     "pfBaselineMin120": false,
     "pfF2Min110": false,
     "wfPassRobustMin2of3": false,
-    "top5ShareUnder70": true,
-    "pfWithoutTop5Min105": true,
+    "top5ShareUnder70": false,
+    "pfWithoutTop5Min105": false,
     "year2022MinPf05": true,
     "withoutTop3DatesPfMin10": false,
-    "ddRatioMax15": true
+    "ddRatioMax15": false
   },
   "limitations": [
     "Univers ex-post (survivants 2021-2025). Pas de delistés.",
