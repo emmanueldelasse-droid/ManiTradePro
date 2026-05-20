@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R3B-v2 dataset integrity fix : PR #237 v1 fermée NOGO par ChatGPT. v2 corrige la cause racine du gap (désynchro `SYMBOL_MAP` de `download-eodhd-2025.mjs` avec `universe-v2.mjs`), ajoute les 11 ETF manquants au `SYMBOL_MAP`. Comblement effectif du dataset non exécutable depuis environnement Claude managé (pas de `EODHD_API_KEY` + allowlist réseau bloque eodhd.com/yahoo.com) → procédure documentée côté créateur. Aucun paramètre setup modifié. Verdict officiel : V1 non testable avec le dataset projet actuel).
-- **Dernier merge connu** : PR #236 `docs(vision): formalise product architecture and trading philosophy` (commit `44a39e6` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R3B-v3 rerun strict sur dataset complet : créateur a téléchargé les 11 ETF manquants côté local et poussé sur main commit `cdbc1cb`. Rerun strict effectué avec paramètres gelés inchangés. 7 trades sur 15 ETF × 5 ans en RANGE. Indicateurs qualitatifs catastrophiques (concentration 100 %, friction ×2 sous 1.0, sans top 3 → 0). Verdict script NEEDS_MORE_DATA. Statut Setup 4 inchangé).
+- **Dernier merge connu** : commit `cdbc1cb` `data: add missing SPDR sector ETF OHLC datasets` sur `main` (créateur a téléchargé les 11 ETF SPDR). Précédent : PR #238 `research(meanrev): PR-R3B-v2 dataset integrity fix` (commit `f826acc`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,30 +52,44 @@
 
 ## PR en cours
 
-- **PR** : PR-R3B-v2 dataset integrity fix Mean Reversion V1 ETF Range Short — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Contexte** : PR-R3B v1 (PR #237) fermée NOGO par ChatGPT — verdict NEEDS_MORE_DATA pas considéré comme validation réelle de l'hypothèse V1 puisque univers incomplet. Mission v2 : combler l'univers ET rerun strict avec mêmes paramètres gelés.
-- **Objectif unique** : corriger la cause racine du DATASET_GAP identifié par PR-R3B v1 (11 ETF de l'univers cible V1 absents du dataset projet). **Aucune autre modification autorisée** par le brief ChatGPT.
-- **Cause racine identifiée et confirmée** : désynchronisation entre `tools/backtests/universe-v2.mjs` (qui contient DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC dans ses groupes `ETFs_US_INDEX` + `ETFs_US_SECTORS`) et `tools/backtests/download-eodhd-2025.mjs` (dont le `SYMBOL_MAP` n'incluait pas ces 11 ETF). Bug d'inventaire, pas un bug provider ni un problème survivorship.
-- **Fix appliqué dans v2** : ajout des 11 ETF au `SYMBOL_MAP` (suffixe `.US` standard EODHD).
-- **Comblement effectif du dataset — non exécutable depuis l'environnement Claude managé** :
-  - `.env` ne contient pas `EODHD_API_KEY`.
-  - Allowlist réseau de l'environnement bloque eodhd.com (HTTP 403) et yahoo.com (HTTP 403).
-  - Procédure de comblement documentée à exécuter côté créateur (cf. `SETUPS_REGISTRY.md` Setup 4 § Mise à jour PR-R3B-v2).
-- **Rerun strict effectué** : `node tools/backtests/meanrev-etf-range-v1.mjs` re-exécuté **sans aucune modification de paramètres**. Résultat identique : 0 signal (logique — les ETF sectoriels restent absents tant que le créateur n'a pas lancé le download avec sa clé EODHD). Outputs JSON/MD régénérés cohérents.
-- **Fichiers modifiés v2** :
-  - `tools/backtests/download-eodhd-2025.mjs` — ajout des 11 ETF au `SYMBOL_MAP` + commentaire-procédure de comblement.
-  - `docs/quant/SETUPS_REGISTRY.md` — Setup 4 enrichi d'une note PR-R3B-v2 : cause racine confirmée, fix script, procédure de comblement créateur, verdict officiel intermédiaire "V1 non testable avec le dataset projet actuel".
+- **PR** : PR-R3B-v3 rerun strict Mean Reversion V1 ETF Range Short sur dataset complet — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Contexte** : créateur a complété le dataset (commit `cdbc1cb` sur main) en téléchargeant les 11 ETF SPDR via le `SYMBOL_MAP` fixé en PR #238. Tous les 15 ETF cibles disposent maintenant de 1255 candles 2021-01-04 → 2025-12-31.
+- **Objectif unique** : rerun STRICTEMENT IDENTIQUE de `tools/backtests/meanrev-etf-range-v1.mjs` avec **zéro modification** des paramètres setup. Seule différence vs v1/v2 : dataset complet.
+- **Vérification anti-modification** : `git diff f826acc tools/backtests/meanrev-etf-range-v1.mjs` = 0 lignes. Script gelé inchangé.
+- **Résultats rerun** (friction ×1) :
+  - Univers de trading effectif : **15/15 ETF** (SPY, QQQ, IWM, MDY, DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC).
+  - Dates communes : 1255 (2021-01-04 → 2025-12-31).
+  - Jours RANGE : 139 / 1255 (11.1 %).
+  - **Signaux générés : 7** (sur ~2085 opportunités-jour théoriques en RANGE).
+  - PF baseline : **1.06** (marginal).
+  - Total R : 0.11 R (cumulé sur 5 ans).
+  - Max DD : 1.42 R. Longest loss streak : 2.
+- **Indicateurs qualitatifs catastrophiques** :
+  - Top 5 share : **100 %** du PnL positif.
+  - PF sans top 5 : **0.304**.
+  - Sans top 3 dates : PF 0, totalR **-1.86**.
+  - Friction ×2 : PF **0.764** (sous 1.0).
+  - Friction ×3 : PF 0.557.
+  - Walk-forward : **0/3 PASS live** ET **0/3 PASS robust**.
+- **Verdict script** : `NEEDS_MORE_DATA` (sample 7 < 30 — règle de prudence statistique).
+- **Conclusion qualitative honnête** : l'hypothèse V1 est probablement illusoire pour les paramètres gelés. Statistiquement n=7 trop faible pour DEAD formel, mais indicateurs qualitatifs convergent vers absence d'edge.
+- **Fichiers modifiés v3** :
+  - `docs/quant/SETUPS_REGISTRY.md` — Setup 4 enrichi note PR-R3B-v3 (rerun strict 15 ETF, chiffres, indicateurs qualitatifs, options ChatGPT). **Statut officiel inchangé** : `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`.
+  - `tools/backtests/output/meanrev-etf-range-v1.{json,md}` — régénérés par rerun strict (nouveaux chiffres avec dataset complet).
   - `SESSION.md` — état mis à jour.
-- **Fichiers inchangés v2 (interdiction stricte par brief)** :
-  - `tools/backtests/meanrev-etf-range-v1.mjs` (zéro changement — paramètres gelés inchangés).
-  - Méthodologie inchangée. Hypothèse économique inchangée.
-  - Aucun fichier runtime modifié.
-- **Verdict officiel intermédiaire** : **V1 `meanrev_etf_range_short` n'est pas testable avec le dataset projet actuel.** Cohérent avec la directive brief ChatGPT § *Si les ETF sont introuvables*. Le verdict quantitatif réel attend l'exécution de la procédure de comblement côté créateur, puis une PR-R3B-v3 dédiée au rerun avec dataset complet.
+- **Fichiers inchangés (strict prohibition brief)** :
+  - `tools/backtests/meanrev-etf-range-v1.mjs` (zéro changement).
+  - `tools/backtests/download-eodhd-2025.mjs` (déjà corrigé en PR #238).
+  - Aucun runtime, aucun autre registre, aucun autre fichier doc.
+- **Décision ChatGPT requise (options)** :
+  - **(A)** Accepter `NEEDS_MORE_DATA` script + sous-variante `DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK` dans Setup 4. Pas de PR-R3C/D.
+  - **(B)** Basculer V1 en `DEAD_AGGREGATED` malgré n=7, vu les indicateurs qualitatifs. PR documentaire courte.
+  - **(C)** Reformuler V1bis dans PR-R3A bis avec hypothèse économique distincte et paramètres calibrés ex-ante. Interdit ici (tuning post-hoc).
 - **Impact runtime** : aucun.
 - **Impact quant (fond)** : aucun. Aucun paramètre setup modifié. Aucun nouveau setup. Aucune promotion.
-- **Impact documentation** : oui. Setup 4 enrichi de la note PR-R3B-v2. Statut officiel inchangé `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`.
-- **Conformité brief ChatGPT** : OUI. Seule modification autorisée appliquée (ajout ETF au SYMBOL_MAP). Aucune optimisation, aucune dérive scope, aucune relâche de filtres, aucun "faire apparaître" de trades.
-- **Statut merge** : attente `GO MERGE explicite de ChatGPT` sur PR-R3B-v2.
+- **Impact documentation** : oui. Setup 4 enrichi note PR-R3B-v3. Statut officiel inchangé.
+- **Conformité brief ChatGPT** : OUI. Rerun strictement identique, aucune modification, aucune relâche, verdict honnête sur chiffres réels.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 
 ## Décisions actives
 
@@ -107,9 +121,10 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 2. ✅ **PR-R1 RS Rotation robustness improvement evidence** mergée (PR #234, commit `1641abf` sur `main`).
 3. ✅ **PR-R3A Mean Reversion diagnostic** mergée (PR #235, commit `fc622fa` sur `main`).
 4. ✅ **PR-VISION Architecture produit + philosophie** mergée (PR #236, commit `44a39e6` sur `main`).
-5. ❌ **PR-R3B test isolé V1 Mean Reversion** (PR #237 fermée NOGO par ChatGPT 2026-05-19 — univers incomplet, test non concluant).
-6. 🟡 **PR-R3B-v2 dataset integrity fix** (en cours) : cause racine identifiée (désynchro SYMBOL_MAP / universe-v2), fix appliqué, procédure de comblement créateur documentée. Comblement effectif hors capacités env Claude (allowlist réseau + pas d'EODHD key). Verdict officiel intermédiaire : V1 non testable avec dataset projet actuel.
-7. **PR-R3B-v3** (subordonné comblement dataset par créateur) : rerun strict après téléchargement 11 ETF par créateur, mêmes paramètres gelés, verdict quantitatif réel.
+5. ❌ **PR-R3B v1 test isolé V1 Mean Reversion** (PR #237 fermée NOGO ChatGPT — univers incomplet 4/15 ETF).
+6. ✅ **PR-R3B-v2 dataset integrity fix** mergée (PR #238, commit `f826acc`) — cause racine identifiée, SYMBOL_MAP fixé.
+7. ✅ **Dataset complété par créateur** (commit `cdbc1cb` sur main) — 11 ETF SPDR ajoutés (DIA + 10 sectoriels).
+8. 🟡 **PR-R3B-v3 rerun strict sur dataset complet 15 ETF** (en cours) : 7 trades, PF 1.06 marginal, concentration 100 %, friction ×2 < 1, sans top 3 → 0. Verdict NEEDS_MORE_DATA sample 7 < 30 mais indicateurs qualitatifs catastrophiques. Décision ChatGPT requise : (A) DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK, (B) DEAD_AGGREGATED malgré n=7, (C) PR-R3A bis V1bis.
 5. **PR-R3C V2 anti-déguisement** (uniquement si V1 passe) : vérification stricte momentum-pullback déguisé.
 6. **PR-R3D V3 stress max** (uniquement si V1 ET V2 passent).
 7. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.

@@ -522,6 +522,61 @@ Cohérent avec la directive brief ChatGPT § *Si les ETF sont introuvables* :
 - ✅ Aucune modification de la méthodologie walk-forward / concentration / drawdown / friction.
 - ✅ Aucune modification runtime.
 
+### Mise à jour 2026-05-19 — PR-R3B-v3 — rerun strict sur dataset complet 15 ETF (statut inchangé)
+
+**Dataset complété par le créateur** (commit `cdbc1cb` sur main) : 11 ETF manquants (`DIA`, `XLE`, `XLF`, `XLV`, `XLI`, `XLP`, `XLY`, `XLB`, `XLU`, `XLRE`, `XLC`) téléchargés via le `SYMBOL_MAP` fixé en PR-R3B-v2. Tous les 15 ETF disposent désormais de 1255 candles couvrant exactement 2021-01-04 → 2025-12-31.
+
+**Rerun strict effectué** : `node tools/backtests/meanrev-etf-range-v1.mjs` avec **zéro modification** des paramètres setup (`git diff` sur le script = 0 ligne). Univers de trading effectif = 15/15 ETF.
+
+**Résultats quantitatifs** (friction baseline ×1) :
+
+| Métrique | Valeur |
+|---|---:|
+| Signaux générés sur 5 ans × 15 ETF × 139 jours RANGE | **7** |
+| Trades | 7 |
+| Winrate | (à constater dans le rapport) |
+| **Profit factor frictionné F×1** | **1.06** (marginal) |
+| Expectancy R | ~0.016 |
+| Total R | **0.11 R** (peanuts cumulés sur 5 ans) |
+| Max drawdown R | 1.42 |
+| Longest loss streak | 2 |
+
+**Indicateurs qualitatifs catastrophiques** :
+
+| Stress | PF / Total R | Interprétation |
+|---|---:|---|
+| **Top 5 share** | **100 %** du PnL positif | les 7 trades sont concentrés sur ≤ 5 symboles — edge non diversifiable par construction |
+| **PF sans top 5** | **0.304** | l'edge disparaît totalement quand on retire les top 5 (logique avec n=7 ≤ 5 symboles) |
+| **Sans top 3 dates** | PF 0, totalR **-1.86** | l'edge dépend entièrement de 3 dates — sans elles, perte nette |
+| **Friction ×2** | PF **0.764** | edge consommé sous friction réaliste |
+| **Friction ×3** | PF 0.557 | catastrophique |
+| **Walk-forward 3 splits** | **0/3 PASS live** ET **0/3 PASS robust** | aucune cellule temporelle vivante |
+| **Régime transitions** | 7 stable / 0 transition | par défaut de signal en période instable |
+
+**Verdict produit par le script** : `NEEDS_MORE_DATA` (sample 7 < 30 — règle de prudence statistique du script). **Aucune promotion**. Aucun changement de statut Setup 4.
+
+**Interprétation honnête (brutalement)** :
+
+- Avec dataset complet, l'opérationnalisation V1 produit **7 trades sur 5 ans × 15 ETF en RANGE** — soit < 1.5 trades / an / univers entier. C'est **statistiquement vide** ET **opérationnellement inexploitable**.
+- Le PF baseline 1.06 est **marginal** et **structurellement dépendant** des dates extrêmes (sans top 3 → PF 0).
+- L'edge **disparaît sous friction réaliste** (×2 → PF 0.76).
+- La concentration **100 %** sur ≤ 5 symboles confirme l'absence d'edge diversifiable.
+- Le walk-forward 0/3 confirme l'absence de robustesse temporelle.
+
+**Conclusion qualitative** : l'hypothèse économique V1 (`meanrev_etf_range_short`) est **probablement** illusoire pour les paramètres gelés ex-ante (RSI < 25 + distEMA20 < -3 % + RANGE strict). Les mécanismes microstructurels décrits dans le diagnostic R3A (flux passifs, arbitrage NAV, rebalancing) **n'opèrent pas suffisamment** pour générer des signaux exploitables avec ces seuils — ou alors les seuils sont incompatibles avec la signature statistique réelle des excès ETF.
+
+**Important** : statistiquement, n=7 trades est trop faible pour formaliser un classement `DEAD_AGGREGATED` officiel. Le verdict script `NEEDS_MORE_DATA` est défendable méthodologiquement. **Mais qualitativement**, les indicateurs convergent vers absence d'edge.
+
+**Statut officiel Setup 4** : **inchangé** — reste `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`. V1 marquée comme **testée et structurellement faible**, **sample insuffisant pour classement DEAD formel**.
+
+**Décision ChatGPT requise (options)** :
+
+- **(A)** Accepter le verdict `NEEDS_MORE_DATA` script et classer V1 en sous-variante `DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK` dans Setup 4. Pas de PR-R3C/D séquentielles — l'hypothèse V1 ne mérite pas qu'on aille plus loin.
+- **(B)** Basculer V1 en `DEAD_AGGREGATED` malgré n=7, en acceptant que les indicateurs qualitatifs catastrophiques (concentration 100 %, friction ×2 < 1, sans top 3 → 0) suffisent à invalider l'hypothèse. PR documentaire courte.
+- **(C)** Reformuler V1bis dans une PR-R3A bis avec hypothèse économique distincte et paramètres calibrés ex-ante (par exemple RSI < 30 + distEMA20 < -1.5 %, ou approche par compression ATR au lieu de RSI). **Interdit ici** — ce serait du tuning post-hoc.
+
+Rapport complet : `tools/backtests/output/meanrev-etf-range-v1.md`.
+
 ## Fichier de test
 
 ```text
