@@ -464,6 +464,64 @@ Interprétation :
 **EXPERIMENTAL_ONLY / FRICTION_REQUIRED** (post-audit, cf. section "Post execution-bias audit status" en tête de fichier).
 _Ancien statut : FAILED — légèrement réactivé en EXPERIMENTAL_ONLY suite à l'audit PR #208. Le setup MEAN_REVERSION conserve un PF marginal après exécution réaliste (1.43 → 1.21, MEDIUM_RISK). À tester sous friction avant toute décision définitive. Ne pas réintégrer dans le pipeline d'allocation tant que friction non validée._
 
+### Mise à jour 2026-05-19 — PR-R3B test isolé V1 ETF Range Short — findings critiques (statut inchangé)
+
+Le script `tools/backtests/meanrev-etf-range-v1.mjs` (PR-R3B) a tenté de tester la variante V1 du diagnostic R3A (`meanrev_etf_range_short`) avec paramètres gelés ex-ante (RSI(14) < 25, prix < EMA20 × 0.97, régime RANGE strict, horizon max 10j, stop -1.5 × ATR, friction baseline projet, walk-forward 3 splits stricts). **Verdict** : `NEEDS_MORE_DATA`.
+
+Deux findings structurels critiques :
+
+1. **DATASET_GAP** : 11/15 ETF de l'univers cible V1 sont **absents** du dataset projet `data/` (`DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC`). L'univers effectif disponible est limité à **4 ETF** d'indice large : SPY, QQQ, IWM, MDY. Les ETF sectoriels SPDR (qui constituent une partie centrale de l'hypothèse V1 sur les flux passifs + arbitrage NAV) ne sont pas testables.
+2. **FILTERS_TOO_STRICT_FOR_LARGE_ETF** : sur les 4 ETF disponibles × 139 jours RANGE = ~556 opportunités-jour théoriques, **0 signal généré**. Les paramètres gelés (RSI < 25 ET prix < EMA20 × 0.97) sont trop extrêmes pour les ETF d'indice large US, qui sont structurellement moins volatils que les single names ou les ETF sectoriels.
+
+**Conséquence** : l'opérationnalisation V1 n'est **pas testable** sur l'univers ManiTradePro disponible. Aucune conclusion `DEAD / ABANDONED` ne peut être tirée — on ne peut pas dire qu'un setup est mort si on ne l'a jamais testé.
+
+Décision ChatGPT requise (3 options possibles, hors scope de PR-R3B) :
+
+- **(A)** Sourcer les OHLC ETF sectoriels (XLE/XLF/XLV/XLI/XLP/XLY/XLB/XLU/XLRE/XLC) puis relancer PR-R3B sur l'univers complet 15 ETF avec les **mêmes paramètres gelés**. Voie la plus saine méthodologiquement.
+- **(B)** Accepter que V1 est non-testable sur le dataset actuel et la classer `DATA_INSUFFICIENT` (statut Freeze § 8) en sous-variante de Setup 4. Le statut officiel Setup 4 reste `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`, V1 marquée comme bloquée par dataset.
+- **(C)** Reformuler une hypothèse V1bis dans une PR-R3A bis avec paramètres calibrés ex-ante pour ETF d'indice large (par exemple RSI < 30 + distEMA20 < -1.5 %). **Interdiction** de modifier les paramètres V1 dans PR-R3B — ce serait du tuning post-hoc.
+
+**Statut officiel Setup 4** : **inchangé** — reste `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`. V1 marquée comme **non testée** plutôt que testée et échouée. Rapport complet : `tools/backtests/output/meanrev-etf-range-v1.md`.
+
+### Mise à jour 2026-05-19 — PR-R3B-v2 — cause racine identifiée + fix script de téléchargement + V1 non testable avec dataset projet actuel
+
+**NOGO merge PR #237 (PR-R3B v1)** acté par ChatGPT 2026-05-19 : "le test actuel ne valide PAS réellement l'hypothèse V1 car l'univers est incomplet". Nouvelle mission **PR-R3B-v2** : compléter le dataset ET rerun strict avec **mêmes paramètres gelés**.
+
+**Cause racine du gap (confirmée)** : désynchronisation entre `tools/backtests/universe-v2.mjs` (qui contient `ETFs_US_INDEX` = SPY/QQQ/IWM/DIA/MDY et `ETFs_US_SECTORS` = XLE/XLF/.../XLC, 15 ETF au total) et `tools/backtests/download-eodhd-2025.mjs` (dont le `SYMBOL_MAP` **ne contenait pas** les 11 ETF manquants). Bug d'inventaire historique, pas un bug de loader, pas un problème provider, pas un problème survivorship.
+
+**Fix appliqué dans PR-R3B-v2** : ajout des 11 ETF au `SYMBOL_MAP` de `download-eodhd-2025.mjs` (DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC en suffixe `.US` standard EODHD).
+
+**Comblement effectif du dataset — non exécutable depuis l'environnement Claude managé** :
+
+- `.env` ne contient pas `EODHD_API_KEY` côté environnement Claude.
+- L'allowlist réseau de l'environnement bloque les requêtes vers `eodhd.com` et `yahoo.com` (HTTP 403 "Host not in allowlist").
+- Conclusion technique : **le téléchargement effectif des 11 ETF doit être lancé côté créateur** depuis son environnement local Windows avec sa clé EODHD.
+
+**Procédure de comblement** (à exécuter côté créateur) :
+
+1. Vérifier que `.env` du repo local contient `EODHD_API_KEY=...`.
+2. Lancer `node tools/backtests/download-eodhd-2025.mjs` (le script télécharge tous les symboles du `SYMBOL_MAP`, y compris les 11 ETF nouvellement ajoutés).
+3. Vérifier que `data/{DIA,XLE,XLF,XLV,XLI,XLP,XLY,XLB,XLU,XLRE,XLC}_2025.json` sont créés.
+4. Relancer `node tools/backtests/meanrev-etf-range-v1.mjs` pour rerun strict identique avec **mêmes paramètres gelés** (aucune modification de RSI/EMA/ATR/horizon/stop/RANGE/friction/walk-forward — interdit par le brief).
+5. Pousser les nouveaux fichiers `data/*.json` + rerun outputs dans une PR-R3B-v3 dédiée pour le verdict quantitatif réel.
+
+**Verdict officiel intermédiaire (en attendant comblement dataset côté créateur)** :
+
+> **V1 `meanrev_etf_range_short` n'est pas testable avec le dataset projet actuel.**
+
+Cohérent avec la directive brief ChatGPT § *Si les ETF sont introuvables* :
+
+> "NE PAS improviser. NE PAS remplacer par d'autres actifs. NE PAS élargir univers. NE PAS modifier hypothèse. La conclusion officielle devra devenir : V1 non testable avec le dataset actuel projet."
+
+**Statut officiel Setup 4** : toujours **inchangé** — reste `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`. V1 marquée comme **non testée par défaut de dataset**, fix appliqué au niveau du script de download. La résolution complète attend l'exécution de la procédure de comblement par le créateur (étapes 1-5 ci-dessus).
+
+**Aucune autre modification** dans PR-R3B-v2 :
+- ✅ Aucune modification des paramètres setup V1 (`rsiThreshold`, `distEmaFactor`, `entry`, `exit`, `horizonMaxDays`, `stopAtrMultiple`, etc. — tous inchangés et gelés).
+- ✅ Aucune modification du fichier de test `meanrev-etf-range-v1.mjs` (rerun strict produit le **même** résultat 0-signal cohérent avec l'absence persistante des ETF dans le dataset).
+- ✅ Aucune modification de l'hypothèse économique.
+- ✅ Aucune modification de la méthodologie walk-forward / concentration / drawdown / friction.
+- ✅ Aucune modification runtime.
+
 ## Fichier de test
 
 ```text

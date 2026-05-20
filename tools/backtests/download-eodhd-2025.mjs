@@ -254,7 +254,30 @@ SPGI: "SPGI.US",
 
   EURUSD: "EURUSD.FOREX",
   GBPUSD: "GBPUSD.FOREX",
-  USDJPY: "USDJPY.FOREX"
+  USDJPY: "USDJPY.FOREX",
+
+  // === ETF d'indice large manquants (ajoutés PR-R3B-v2, 2026-05-19) ===
+  // Désynchronisation historique entre `universe-v2.mjs` (qui contenait
+  // DIA, XLE/XLF/.../XLC) et ce SYMBOL_MAP : ces ETF n'étaient pas
+  // téléchargés. PR-R3B a détecté le gap (11/15 ETF manquants pour
+  // l'univers cible V1 Mean Reversion). Pour combler proprement :
+  //
+  //   1. Mettre la clé `EODHD_API_KEY=...` dans `.env`.
+  //   2. Lancer `node tools/backtests/download-eodhd-2025.mjs`.
+  //   3. Vérifier que `data/{DIA,XLE,XLF,...,XLC}_2025.json` sont créés.
+  //   4. Relancer `node tools/backtests/meanrev-etf-range-v1.mjs` pour le
+  //      rerun strict avec les MÊMES paramètres gelés.
+  DIA: "DIA.US",
+  XLE: "XLE.US",
+  XLF: "XLF.US",
+  XLV: "XLV.US",
+  XLI: "XLI.US",
+  XLP: "XLP.US",
+  XLY: "XLY.US",
+  XLB: "XLB.US",
+  XLU: "XLU.US",
+  XLRE: "XLRE.US",
+  XLC: "XLC.US"
 };
 
 fs.mkdirSync("./data", { recursive: true });

@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-VISION Architecture produit + philosophie de moteur : création `docs/project/TRADING_PHILOSOPHY.md` (architecture 5 couches), remplissage `docs/project/PROJECT_VISION.md` (squelette → vision produit consolidée), pointeur architecture dans `TRADING_LOGIC.md`, univers cible 40-120 actifs dans `ASSET_REGISTRY.md`).
-- **Dernier merge connu** : PR #235 `research(meanrev): PR-R3A diagnostic and adjustment candidate review` (commit `fc622fa` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-R3B-v2 dataset integrity fix : PR #237 v1 fermée NOGO par ChatGPT. v2 corrige la cause racine du gap (désynchro `SYMBOL_MAP` de `download-eodhd-2025.mjs` avec `universe-v2.mjs`), ajoute les 11 ETF manquants au `SYMBOL_MAP`. Comblement effectif du dataset non exécutable depuis environnement Claude managé (pas de `EODHD_API_KEY` + allowlist réseau bloque eodhd.com/yahoo.com) → procédure documentée côté créateur. Aucun paramètre setup modifié. Verdict officiel : V1 non testable avec le dataset projet actuel).
+- **Dernier merge connu** : PR #236 `docs(vision): formalise product architecture and trading philosophy` (commit `44a39e6` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,58 +52,30 @@
 
 ## PR en cours
 
-- **PR** : PR-VISION Architecture produit + philosophie de moteur — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Objectif unique** : formaliser officiellement l'architecture logique cible du moteur ManiTradePro (5 couches contexte → sélection → setup → timing → mesure), le rôle exact de chaque couche, les setups prioritaires en familles (pas en instances), l'univers cible 40-120 actifs liquides, le refus explicite du scalping/HFT/patterns de bougies seuls, et le principe directeur "moins de setups mais meilleurs setups". Aucune modification runtime, aucun setup activé, aucun backtest lancé, aucun paramètre optimisé, aucune promotion.
-- **Fichiers créés** :
-  - `docs/project/TRADING_PHILOSOPHY.md` — architecture moteur cible 5 couches, principe "un setup ≠ un edge", setups prioritaires en familles, univers cible 40-120 actifs, horizons (swing/intraday lent uniquement), patterns de bougies seuls ≠ edge, roadmap état actuel vs cible, principe "moins de setups, mieux validés", interdictions absolues, reformulation finale du projet (~580 lignes, 12 sections).
-- **Fichiers modifiés** :
-  - `docs/project/PROJECT_VISION.md` — squelette → vision produit consolidée pointant vers `TRADING_PHILOSOPHY.md` pour le détail technique et vers `BOT_OBJECTIVE.md` pour les règles dures.
-  - `docs/quant/TRADING_LOGIC.md` — pointeur explicite vers `TRADING_PHILOSOPHY.md` en tête de fichier (architecture cible vs logique actuelle).
-  - `docs/quant/ASSET_REGISTRY.md` — nouvelle section "Univers cible stratégique — 40 à 120 actifs liquides" en complément de la classification technique ELITE/CORE/TACTICAL/BLACKLIST existante (auto-générée par `asset-quality-engine-v1.mjs`).
-  - `SESSION.md` — branche/PR active, dernier merge connu (PR #235), PR en cours réécrite, prochaines priorités réordonnées.
-- **Définitions officielles ajoutées** :
-  - **Un setup ≠ un edge** — un setup est une réponse conditionnelle à un contexte ; un edge est un setup dont l'hypothèse économique survit exécution réaliste + friction + walk-forward + concentration.
-  - **Context Engine** = quel setup a le droit d'être actif.
-  - **RS Rotation / Asset Selection** = quels actifs sont éligibles.
-  - **Setup Activation** = quel setup détecté sur ces actifs.
-  - **Candle Timing Engine** = quand entrer précisément.
-  - **Paper Trading Measurement** = mesurer l'edge réel vs théorique.
-  - **Logique d'exécution** : Contexte → Sélection actifs → Setup → Timing → Risk → Mesure.
-  - **Setups prioritaires en familles** : Pullback Momentum (instance historique `DEAD`), Breakout Expansion après compression (`DEAD_AGGREGATED`) — la priorisation produit signifie **reconstruire** des variantes économiquement défendables, pas réactiver les anciennes.
-  - **Mean Reversion = axe secondaire** (abandon `DEAD / ABANDONED` autorisé).
-  - **RS Rotation = couche d'infrastructure**, pas un setup autonome.
-  - **Univers cible 40-120 actifs liquides** — ETF US indices + ETF sectoriels + ETF thématiques + leaders US large cap + quality/defensive + crypto majeures.
-  - **Refus explicites** : scalping, HFT, tick trading, microstructure, market making déguisé, patterns de bougies seuls, score universel.
-- **Articulation** :
-  - `BOT_OBJECTIVE.md` = constitution produit (autorité dure).
-  - `PROJECT_VISION.md` = vision produit consolidée (cette PR).
-  - `TRADING_PHILOSOPHY.md` = architecture moteur cible 5 couches détail technique (cette PR).
-  - `SETUPS_REGISTRY.md` = statuts officiels setups (inchangé par cette PR).
-  - `TRADING_LOGIC.md` = logique quant **actuelle** (pointeur ajouté vers `TRADING_PHILOSOPHY.md` pour cible).
+- **PR** : PR-R3B-v2 dataset integrity fix Mean Reversion V1 ETF Range Short — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Contexte** : PR-R3B v1 (PR #237) fermée NOGO par ChatGPT — verdict NEEDS_MORE_DATA pas considéré comme validation réelle de l'hypothèse V1 puisque univers incomplet. Mission v2 : combler l'univers ET rerun strict avec mêmes paramètres gelés.
+- **Objectif unique** : corriger la cause racine du DATASET_GAP identifié par PR-R3B v1 (11 ETF de l'univers cible V1 absents du dataset projet). **Aucune autre modification autorisée** par le brief ChatGPT.
+- **Cause racine identifiée et confirmée** : désynchronisation entre `tools/backtests/universe-v2.mjs` (qui contient DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC dans ses groupes `ETFs_US_INDEX` + `ETFs_US_SECTORS`) et `tools/backtests/download-eodhd-2025.mjs` (dont le `SYMBOL_MAP` n'incluait pas ces 11 ETF). Bug d'inventaire, pas un bug provider ni un problème survivorship.
+- **Fix appliqué dans v2** : ajout des 11 ETF au `SYMBOL_MAP` (suffixe `.US` standard EODHD).
+- **Comblement effectif du dataset — non exécutable depuis l'environnement Claude managé** :
+  - `.env` ne contient pas `EODHD_API_KEY`.
+  - Allowlist réseau de l'environnement bloque eodhd.com (HTTP 403) et yahoo.com (HTTP 403).
+  - Procédure de comblement documentée à exécuter côté créateur (cf. `SETUPS_REGISTRY.md` Setup 4 § Mise à jour PR-R3B-v2).
+- **Rerun strict effectué** : `node tools/backtests/meanrev-etf-range-v1.mjs` re-exécuté **sans aucune modification de paramètres**. Résultat identique : 0 signal (logique — les ETF sectoriels restent absents tant que le créateur n'a pas lancé le download avec sa clé EODHD). Outputs JSON/MD régénérés cohérents.
+- **Fichiers modifiés v2** :
+  - `tools/backtests/download-eodhd-2025.mjs` — ajout des 11 ETF au `SYMBOL_MAP` + commentaire-procédure de comblement.
+  - `docs/quant/SETUPS_REGISTRY.md` — Setup 4 enrichi d'une note PR-R3B-v2 : cause racine confirmée, fix script, procédure de comblement créateur, verdict officiel intermédiaire "V1 non testable avec le dataset projet actuel".
+  - `SESSION.md` — état mis à jour.
+- **Fichiers inchangés v2 (interdiction stricte par brief)** :
+  - `tools/backtests/meanrev-etf-range-v1.mjs` (zéro changement — paramètres gelés inchangés).
+  - Méthodologie inchangée. Hypothèse économique inchangée.
+  - Aucun fichier runtime modifié.
+- **Verdict officiel intermédiaire** : **V1 `meanrev_etf_range_short` n'est pas testable avec le dataset projet actuel.** Cohérent avec la directive brief ChatGPT § *Si les ETF sont introuvables*. Le verdict quantitatif réel attend l'exécution de la procédure de comblement côté créateur, puis une PR-R3B-v3 dédiée au rerun avec dataset complet.
 - **Impact runtime** : aucun.
-- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation. Aucun nouveau setup créé. Aucun backtest exécuté.
-- **Impact documentation** : oui. Architecture produit formalisée, philosophie de moteur explicitée, univers cible défini, refus explicites consignés.
-- **Statuts setups inchangés** : tous les statuts dans `SETUPS_REGISTRY.md` restent en l'état (RS Rotation `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`, Mean Reversion `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`, etc.).
-- **Conformité gouvernance** : OUI. PR documentaire pure. `une PR = un objectif` respecté (objectif = formaliser l'architecture produit). Aucune contradiction avec `BOT_OBJECTIVE.md`, `RESEARCH_FRAMEWORK_FREEZE_V1.md`, `SETUPS_REGISTRY.md`.
-- **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
-- **Fichiers créés** :
-  - `docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md` — rapport diagnostic (~650 lignes) structuré en 12 sections.
-- **Fichiers modifiés** :
-  - `SESSION.md` — branche/PR active, dernier merge connu (PR #234), PR en cours réécrite, prochaines priorités réordonnées.
-- **Question centrale du rapport** : "Le marché moderne a-t-il structurellement cassé le mean reversion swing sur single names ?" Réponse provisoire diagnostic : probablement OUI sur single names momentum / AI / crypto ; probablement NON sur ETF larges passifs (flux passifs, arbitrage NAV, compression dispersion, rebalancing institutionnel).
-- **Variantes candidates proposées (max 3, hypothèse économique avant test)** :
-  - **V1 `meanrev_etf_range_short`** — piste prioritaire, logique microstructurelle ETF larges en RANGE.
-  - **V2 `meanrev_quality_no_risk_off`** — suspicion méthodologique élevée (risque momentum déguisé), vérification anti-déguisement obligatoire avant validation.
-  - **V3 `meanrev_oversold_recovery`** — présomption d'overfit par défaut, charge de preuve plus lourde, à tester en dernier uniquement si V1 et V2 passent.
-- **Variables / axes interdits explicites** : crypto, small caps spéculatives, hypergrowth IA, penny stocks, leveraged ETF, sans filtre régime, sans friction baseline, intraday ultra-fréquent, pseudo-market-making, spread capture, latence, rebonds tick-level, execution priority, rebonds news ultra courts.
-- **Garde-fou central** : "Un setup qui nécessite trop de filtres pour survivre est potentiellement déjà mort." Max 4 filtres simultanés justifiés indépendamment.
-- **Conclusion explicitement autorisée** : "Mean Reversion n'est peut-être plus un axe prioritaire pour ManiTradePro." Le classement `DEAD / ABANDONED` à terme reste acceptable.
-- **Plan PR-R3B/C/D suivant** (uniquement si `GO MERGE`) : PR-R3B test isolé V1 → PR-R3C V2 anti-déguisement (uniquement si V1 passe) → PR-R3D V3 stress max (uniquement si V1 ET V2 montrent un edge réel).
-- **Impact runtime** : aucun.
-- **Impact quant (fond)** : aucun. Pas de modification de variantes, de seuils, de friction, ni d'allocation runtime. Aucun nouveau setup créé.
-- **Impact documentation** : oui. Création d'un rapport de recherche exploratoire dans `docs/research/`. **Statut officiel Mean Reversion inchangé** : `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`.
-- **Conformité Research Framework Freeze v1** : OUI. Hypothèse économique avant test obligatoire (V1/V2/V3 toutes documentées avant tout test ex-ante), aucune optimisation post-hoc, aucune grille massive (max 3 variantes), aucune promotion, aucune annonce `LIVE_READY` ni `VALIDATED_RESEARCH_CORE`. Cohérence avec la phase projet "recherche d'hypothèses économiques survivables" (cadrage méta ChatGPT 2026-05-19).
-- **Statut merge** : attente `GO MERGE explicite de ChatGPT` accompagné d'un résumé simple.
+- **Impact quant (fond)** : aucun. Aucun paramètre setup modifié. Aucun nouveau setup. Aucune promotion.
+- **Impact documentation** : oui. Setup 4 enrichi de la note PR-R3B-v2. Statut officiel inchangé `EXPERIMENTAL_ONLY / FRICTION_REQUIRED`.
+- **Conformité brief ChatGPT** : OUI. Seule modification autorisée appliquée (ajout ETF au SYMBOL_MAP). Aucune optimisation, aucune dérive scope, aucune relâche de filtres, aucun "faire apparaître" de trades.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT` sur PR-R3B-v2.
 
 ## Décisions actives
 
@@ -134,8 +106,10 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 1. ✅ **PR documentaire truth-sync** mergée (PR #233, commit `19872ac` sur `main`).
 2. ✅ **PR-R1 RS Rotation robustness improvement evidence** mergée (PR #234, commit `1641abf` sur `main`).
 3. ✅ **PR-R3A Mean Reversion diagnostic** mergée (PR #235, commit `fc622fa` sur `main`).
-4. 🟡 **PR-VISION Architecture produit + philosophie** (en cours) : création `TRADING_PHILOSOPHY.md` + remplissage `PROJECT_VISION.md` + pointeurs `TRADING_LOGIC.md` et `ASSET_REGISTRY.md`. Aucun runtime, aucune promotion, aucun statut changé.
-5. **PR-R3B test isolé V1 Mean Reversion** (subordonné à signal ChatGPT dédié post-merge PR-VISION) : test V1 `meanrev_etf_range_short` isolé, friction baseline, walk-forward 3 splits stricts, concentration analyse. Décision binaire `KEEP_RESEARCH_CANDIDATE` / `DEAD_AGGREGATED`.
+4. ✅ **PR-VISION Architecture produit + philosophie** mergée (PR #236, commit `44a39e6` sur `main`).
+5. ❌ **PR-R3B test isolé V1 Mean Reversion** (PR #237 fermée NOGO par ChatGPT 2026-05-19 — univers incomplet, test non concluant).
+6. 🟡 **PR-R3B-v2 dataset integrity fix** (en cours) : cause racine identifiée (désynchro SYMBOL_MAP / universe-v2), fix appliqué, procédure de comblement créateur documentée. Comblement effectif hors capacités env Claude (allowlist réseau + pas d'EODHD key). Verdict officiel intermédiaire : V1 non testable avec dataset projet actuel.
+7. **PR-R3B-v3** (subordonné comblement dataset par créateur) : rerun strict après téléchargement 11 ETF par créateur, mêmes paramètres gelés, verdict quantitatif réel.
 5. **PR-R3C V2 anti-déguisement** (uniquement si V1 passe) : vérification stricte momentum-pullback déguisé.
 6. **PR-R3D V3 stress max** (uniquement si V1 ET V2 passent).
 7. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.

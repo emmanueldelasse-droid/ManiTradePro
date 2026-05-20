@@ -1,0 +1,589 @@
+{
+  "generatedAt": "2026-05-20T16:36:55.242Z",
+  "scope": "PR-R3B Mean Reversion V1 ETF Range Short — test isolé.",
+  "hypothesis": "Les ETF larges et sectoriels possèdent encore des mécanismes de retour à la moyenne court terme grâce aux flux passifs, à l'arbitrage NAV, aux rebalancing institutionnels, et à la dilution idiosyncratique. Cet effet serait potentiellement exploitable UNIQUEMENT en marché RANGE, sur horizon court, avec excès temporaires, sans actifs momentum extrêmes.",
+  "params": {
+    "universe": [
+      "ETFs_US_INDEX",
+      "ETFs_US_SECTORS"
+    ],
+    "rsiThreshold": 25,
+    "distEmaFactor": 0.97,
+    "entry": "NEXT_OPEN",
+    "exit": "ema20_or_horizon",
+    "horizonMaxDays": 10,
+    "stopAtrMultiple": 1.5,
+    "rsiPeriod": 14,
+    "emaPeriod": 20,
+    "atrPeriod": 14,
+    "rangeSpyEma200BandPct": 0.05,
+    "rangeSpyEma200SlopePct": 0.005,
+    "rangeSlopeLookbackDays": 20
+  },
+  "tradingUniverse": [
+    "SPY",
+    "QQQ",
+    "IWM",
+    "MDY"
+  ],
+  "datasetGap": {
+    "expected": [
+      "SPY",
+      "QQQ",
+      "IWM",
+      "DIA",
+      "MDY",
+      "XLE",
+      "XLF",
+      "XLV",
+      "XLI",
+      "XLP",
+      "XLY",
+      "XLB",
+      "XLU",
+      "XLRE",
+      "XLC"
+    ],
+    "loaded": [
+      "SPY",
+      "QQQ",
+      "IWM",
+      "MDY"
+    ],
+    "missing": [
+      "DIA",
+      "XLE",
+      "XLF",
+      "XLV",
+      "XLI",
+      "XLP",
+      "XLY",
+      "XLB",
+      "XLU",
+      "XLRE",
+      "XLC"
+    ],
+    "gapRatio": 0.73
+  },
+  "universeSizeLoaded": 5,
+  "rangeDays": 139,
+  "totalDays": 1255,
+  "rangeDaysPct": 11.08,
+  "executionModel": {
+    "entry": "open[i+1] (NEXT_OPEN)",
+    "exit": "first of: stop hit (low ≤ entry - 1.5*ATR), close ≥ ema20, horizon 10j (exit open[i+11])",
+    "friction": {
+      "formula": "frictionR = (0.30 + 0.02 × holdDays) / 5",
+      "multipliers": [
+        1,
+        2,
+        3
+      ],
+      "conversionToR": "5 % = 1R"
+    },
+    "lookAheadGuards": [
+      "entry = open[i+1] (never close[i] or intra-bar)",
+      "stop computed from ATR[i] (causal)",
+      "regime computed from EMA200[i] and slope over [i-20..i] (causal)",
+      "RSI[i] causal (recursive smoothing on close[0..i])"
+    ]
+  },
+  "signalCount": 0,
+  "baseline_F1": {
+    "summary": {
+      "trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "winrate": 0,
+      "expectancyR": 0,
+      "profitFactor": 0,
+      "totalR": 0,
+      "maxDrawdownR": 0,
+      "longestLossStreak": 0
+    },
+    "yearly": {
+      "2021": null,
+      "2022": null,
+      "2023": null,
+      "2024": null,
+      "2025": null
+    },
+    "walkForward": {
+      "splits": [
+        {
+          "name": "S1",
+          "trainYears": [
+            "2021",
+            "2022"
+          ],
+          "testYears": [
+            "2023"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        },
+        {
+          "name": "S2",
+          "trainYears": [
+            "2021",
+            "2022",
+            "2023"
+          ],
+          "testYears": [
+            "2024"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        },
+        {
+          "name": "S3",
+          "trainYears": [
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "testYears": [
+            "2025"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        }
+      ],
+      "passLive": 0,
+      "passRobust": 0
+    },
+    "concentration": {
+      "universeSize": 0,
+      "top5": [],
+      "top5SharePctOfPositive": null,
+      "pfWithoutTop5": null,
+      "singleMaxSharePctOfPositive": null
+    },
+    "drawdown": {
+      "maxDD": 0,
+      "longestLossStreak": 0,
+      "longestLossStreakWindow": null,
+      "worstDD": {
+        "magnitudeR": 0,
+        "startDate": null,
+        "endDate": null,
+        "durationTrades": 0
+      },
+      "lossClusters5plus": []
+    },
+    "withoutTop3Dates": {
+      "topDates": [],
+      "summary": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "winrate": 0,
+        "expectancyR": 0,
+        "profitFactor": 0,
+        "totalR": 0,
+        "maxDrawdownR": 0,
+        "longestLossStreak": 0
+      }
+    },
+    "withoutTop5Dates": {
+      "topDates": [],
+      "summary": {
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "winrate": 0,
+        "expectancyR": 0,
+        "profitFactor": 0,
+        "totalR": 0,
+        "maxDrawdownR": 0,
+        "longestLossStreak": 0
+      }
+    },
+    "regimeTransitions": {
+      "stable": {
+        "count": 0,
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "winrate": 0,
+        "expectancyR": 0,
+        "profitFactor": 0,
+        "totalR": 0,
+        "maxDrawdownR": 0,
+        "longestLossStreak": 0
+      },
+      "transition": {
+        "count": 0,
+        "trades": 0,
+        "wins": 0,
+        "losses": 0,
+        "winrate": 0,
+        "expectancyR": 0,
+        "profitFactor": 0,
+        "totalR": 0,
+        "maxDrawdownR": 0,
+        "longestLossStreak": 0
+      }
+    }
+  },
+  "friction_F2": {
+    "summary": {
+      "trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "winrate": 0,
+      "expectancyR": 0,
+      "profitFactor": 0,
+      "totalR": 0,
+      "maxDrawdownR": 0,
+      "longestLossStreak": 0
+    },
+    "walkForward": {
+      "splits": [
+        {
+          "name": "S1",
+          "trainYears": [
+            "2021",
+            "2022"
+          ],
+          "testYears": [
+            "2023"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        },
+        {
+          "name": "S2",
+          "trainYears": [
+            "2021",
+            "2022",
+            "2023"
+          ],
+          "testYears": [
+            "2024"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        },
+        {
+          "name": "S3",
+          "trainYears": [
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "testYears": [
+            "2025"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        }
+      ],
+      "passLive": 0,
+      "passRobust": 0
+    }
+  },
+  "friction_F3": {
+    "summary": {
+      "trades": 0,
+      "wins": 0,
+      "losses": 0,
+      "winrate": 0,
+      "expectancyR": 0,
+      "profitFactor": 0,
+      "totalR": 0,
+      "maxDrawdownR": 0,
+      "longestLossStreak": 0
+    },
+    "walkForward": {
+      "splits": [
+        {
+          "name": "S1",
+          "trainYears": [
+            "2021",
+            "2022"
+          ],
+          "testYears": [
+            "2023"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        },
+        {
+          "name": "S2",
+          "trainYears": [
+            "2021",
+            "2022",
+            "2023"
+          ],
+          "testYears": [
+            "2024"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        },
+        {
+          "name": "S3",
+          "trainYears": [
+            "2021",
+            "2022",
+            "2023",
+            "2024"
+          ],
+          "testYears": [
+            "2025"
+          ],
+          "train": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "test": {
+            "trades": 0,
+            "wins": 0,
+            "losses": 0,
+            "winrate": 0,
+            "expectancyR": 0,
+            "profitFactor": 0,
+            "totalR": 0,
+            "maxDrawdownR": 0,
+            "longestLossStreak": 0
+          },
+          "passLive": false,
+          "passRobust": false
+        }
+      ],
+      "passLive": 0,
+      "passRobust": 0
+    }
+  },
+  "verdict": {
+    "status": "NEEDS_MORE_DATA",
+    "reasons": [
+      "DATASET_GAP : 11/15 ETF de l'univers cible absents du dataset projet (DIA, XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC). L'univers effectif est limité à 4 ETF (SPY, QQQ, IWM, MDY).",
+      "FILTERS_TOO_STRICT_FOR_LARGE_ETF : 0 signal généré sur 4 ETF × 139 jours RANGE = ~556 opportunités-jour. Les paramètres gelés (RSI(14) < 25 ET prix < EMA20 × 0.97) ne se déclenchent quasiment jamais sur les ETF larges US (SPY/QQQ/IWM/MDY) en régime RANGE. Conclusion structurelle : l'opérationnalisation V1 proposée dans le diagnostic R3A n'est pas testable sur l'univers disponible.",
+      "Sample insuffisant : 0 trades. RANGE strict + univers ETF + signal RSI<25 produit trop peu de signaux pour conclure quantitativement."
+    ],
+    "vocabulary": "Statuts autorisés ici : KEEP_RESEARCH_CANDIDATE, DEAD_AGGREGATED, DEAD / ABANDONED, NEEDS_MORE_DATA. Interdits : VALIDATED_RESEARCH_CORE, LIVE_READY, CONDITIONAL_EDGE (réservé à une PR ultérieure, jamais auto-appliqué).",
+    "note": "Le statut effectif Setup 4 Mean Reversion dans SETUPS_REGISTRY.md reste inchangé tant que GO MERGE ChatGPT explicite n'est pas reçu."
+  },
+  "passFailChecklist": {
+    "sampleMin30": false,
+    "pfBaselineMin120": false,
+    "pfF2Min110": false,
+    "wfPassRobustMin2of3": false,
+    "top5ShareUnder70": true,
+    "pfWithoutTop5Min105": true,
+    "year2022MinPf05": true,
+    "withoutTop3DatesPfMin10": false,
+    "ddRatioMax15": true
+  },
+  "limitations": [
+    "Univers ex-post (survivants 2021-2025). Pas de delistés.",
+    "Friction simplifiée uniforme (pas de modulation par classe d'actif ETF index vs ETF sectoriel).",
+    "Long-only (pas de short-side).",
+    "Pas de sizing dynamique (taille fixe = 1 unité, 5 % = 1R).",
+    "Régime RANGE = SPY proche EMA200 + pente faible. Définition opérationnelle, pas seul standard possible.",
+    "Walk-forward sur années calendaires (pas de rolling glissant).",
+    "Pas de VIX intégré.",
+    "Exit `close ≥ ema20` peut sortir trop tôt après un rebond intra-day vers ema20 — convention conservatrice retenue."
+  ],
+  "rollback": {
+    "runtime": "Aucun. Aucun fichier runtime modifié.",
+    "documentation": "git revert de la PR — aucun impact moteur.",
+    "outputs": "Reproductibles à chaque exécution du script — supprimables sans impact."
+  },
+  "sources": [
+    "docs/research/MEAN_REVERSION_DIAGNOSTIC_R3A.md (hypothèse économique V1, paramètres gelés)",
+    "tools/backtests/rs-rotation-robustness-v1.mjs (modèle méthodologique walk-forward + friction + concentration)",
+    "tools/backtests/backtest-meanrev-v1.mjs (référence historique — variantes RSI 25/30/35 déjà testées)",
+    "tools/backtests/universe-v2.mjs (univers ETF source)",
+    "docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md § 3.5 walk-forward, § 4 critères, § 6.3 interdictions",
+    "docs/project/TRADING_PHILOSOPHY.md § 4.4 Mean Reversion comme axe secondaire",
+    "Directives ChatGPT 2026-05-19 (PR-R3B mission, méthodologie obligatoire, critères PASS/FAIL)."
+  ]
+}
