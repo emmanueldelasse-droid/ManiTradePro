@@ -200,3 +200,72 @@ Conclusion :
 ```text
 Qualité structurelle > quantité d'actifs.
 ```
+
+---
+
+# Univers cible stratégique — 40 à 120 actifs liquides (PR-VISION, 2026-05-19)
+
+> Cette section formalise l'**univers cible produit** pour ManiTradePro. Elle vit en complément de la classification technique ELITE/CORE/TACTICAL/BLACKLIST ci-dessus (qui est calculée automatiquement par `asset-quality-engine-v1.mjs` sur les backtests existants). L'univers cible est une **couche stratégique** au-dessus de la classification technique — il définit **quels actifs ont le droit d'entrer dans le moteur**, indépendamment de leur tier individuel.
+>
+> Source officielle de l'architecture produit : `docs/project/TRADING_PHILOSOPHY.md` § 5.
+
+## Principe
+
+> **Qualité structurelle > quantité d'actifs.** Le moteur opère sur **40 à 120 actifs maximum**, sélectionnés sur liquidité, couverture sectorielle, historique disponible, et compatibilité avec les setups prioritaires.
+
+## Composition cible
+
+| Catégorie | Cible | Source actuelle (univers v2) |
+|---|---:|---|
+| **ETF US indices** | 5-10 | SPY, QQQ, IWM, DIA, MDY |
+| **ETF sectoriels** | 10-15 | XLE, XLF, XLV, XLI, XLP, XLY, XLB, XLU, XLRE, XLC |
+| **ETF thématiques** (semis, cyber, AI) | 5-10 | SMH, SOXX, SOXQ, XSD, PSI, CIBR, BOTZ, IGV, IGM, IYW, XLK, FTEC, VGT |
+| **Leaders US grandes capitalisations** | 10-20 | NVDA, AAPL, MSFT, AMZN, GOOGL, META, AVGO, ASML, TSM, NFLX, ORCL, et autres `ELITE`/`CORE` |
+| **Quality / defensive** | 5-10 | COST, LLY, JNJ, PG, KO, MSCI, SPGI, WM, ELV, VRTX |
+| **Crypto majeures uniquement** | 3-5 | BTC, ETH, SOL (BNB, AVAX optionnels selon liquidité) |
+| **Total cible** | **40-70** (extension max 120 si justification stricte) |
+
+## Exclusions par défaut
+
+- **Penny stocks** (< 5 USD ou < 50 M USD volume jour).
+- **Small caps spéculatives** sans historique stable (AEHR, ACLS, BBAI, SOUN, WOLF, etc. — à réintégrer uniquement si setup les justifie).
+- **Crypto altcoins illiquides** ou récentes (CRWV, IBIT en dehors de la liquidité majeure).
+- **FX exotiques** (EURUSD, GBPUSD, USDJPY — actuellement `BLACKLIST` car non backtestés sur swing).
+- **ETF à effet de levier** par défaut (SOXL, TQQQ, USD, ROM) — réintégration possible si setup le justifie, mais avec friction et risque ajustés (cf. `friction-model-v1.mjs` profil `high`).
+- **Actifs `BLACKLIST`** de la classification technique ci-dessus (54 actifs au 2026-05-19) — sauf réhabilitation explicite par un setup dédié.
+
+## Pourquoi pas scanner « tout le marché »
+
+Détail dans `docs/project/TRADING_PHILOSOPHY.md` § 5.3. Synthèse :
+
+1. **Bruit statistique** : sur 5000 tickers US, la probabilité d'observer un faux signal "par chance" explose.
+2. **Friction / liquidité** : 80 % des tickers US ont une liquidité inexploitable pour du swing.
+3. **Survivorship aggravé** : un univers très large maximise le biais survivors-only.
+4. **Coût d'observation** : scanner 5000 tickers en daily est possible, en 1h/4h sur providers actuels c'est inutilisable (quotas).
+5. **Cohérence stratégique** : contradiction directe avec la logique contextuelle en 5 couches.
+
+## Articulation avec la classification technique ELITE/CORE/TACTICAL/BLACKLIST
+
+L'univers cible stratégique (40-120) **filtre l'entrée du moteur**. La classification technique **filtre l'allocation à l'intérieur de l'univers cible**.
+
+```
+Univers global (5000+ tickers US)
+   ↓ filtre liquidité, secteur, historique, refus FX/penny/altcoins
+Univers cible produit (40-120 actifs)
+   ↓ classification technique sur backtests
+ELITE (29) → strong allocation
+CORE  (60) → normal allocation
+TACTICAL (38) → reduced allocation
+WATCHLIST → observation
+BLACKLIST (54) → none
+   ↓ contexte + setup détecté + timing + risk
+Trade paper
+```
+
+**Conséquence** : la classification automatique ci-dessus opère actuellement sur **181 actifs** (l'univers `universe-v2.mjs`). L'univers cible produit (40-120) est un **sous-ensemble** de cet univers, à formaliser dans une PR future (sélection explicite des symboles, exclusions documentées par actif). Cette PR-VISION pose la **règle stratégique** ; la **liste opérationnelle exacte** sera produite séparément (futur `docs/quant/UNIVERSE_TARGET_V1.md` ou équivalent).
+
+## Refus explicites (rappel)
+
+- Pas de scalping → univers ne comprend pas les tickers ultra-volatils utilisés pour ça (penny stocks, altcoins illiquides).
+- Pas de HFT → univers ne dépend pas d'une couverture exhaustive temps réel.
+- Pas de patterns de bougies seuls → univers ne contient pas de tickers sélectionnés pour leur seul comportement de bougie historique.

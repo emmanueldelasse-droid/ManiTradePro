@@ -5,6 +5,8 @@
 > Contenu issu de l'ancien `TRADING_LOGIC.md` racine (split documentaire — PR `claude/split-trading-logic`). Aucun changement de fond métier.
 >
 > La logique moteur / exécution / paper trading / safety gate / sizing / ouverture / fermeture / garde-fou devise vit dans `docs/project/TRADING_ENGINE.md`.
+>
+> **L'architecture produit cible en 5 couches** (Contexte → Sélection actifs → Setup → Timing → Risk → Mesure), la **philosophie de setup** (un setup ≠ un edge, familles vs instances), l'**univers cible 40-120 actifs** et les **refus explicites** (scalping, HFT, patterns de bougies seuls) sont définis dans **`docs/project/TRADING_PHILOSOPHY.md`** (PR-VISION, 2026-05-19). Ce fichier `TRADING_LOGIC.md` décrit la logique quant **actuelle** (scoring, setups détectés, modulateurs, apprentissage) ; `TRADING_PHILOSOPHY.md` décrit l'**architecture cible** et la distance à parcourir.
 
 Voir aussi :
 - `docs/quant/SETUPS_REGISTRY.md` — registre officiel des setups validés / testés / abandonnés.
