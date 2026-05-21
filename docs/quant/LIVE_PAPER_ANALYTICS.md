@@ -70,6 +70,8 @@ Attaché à `mtp_positions.analysis_snapshot.livePaperAnalytics` (JSONB, additif
   regime: "RISK_ON" | "RANGE" | "RISK_OFF" | "HIGH_VOL" | null,
   regimeConfidence: 0-100 | null,
   contextSnapshot: null,                             // V1 worker : non capturé inline
+  contextCaptureStatus:                              // PR-LIVE-PAPER-EXEC-1b — sentinelle explicite
+    "CAPTURED" | "NOT_CAPTURED_RUNTIME_SAFE" | "NOT_CAPTURED_NO_INPUT",
   setupAuthorization: {                              // observation CTX-3, jamais bloquante
     version: "setup-authorization-matrix-v1",
     setupId, allowed: true|false|null,
@@ -80,6 +82,18 @@ Attaché à `mtp_positions.analysis_snapshot.livePaperAnalytics` (JSONB, additif
     strategicScore, decisionScore, safetyScore, exploitabilityScore
   } | null,
   plan: { entry, stopLoss, takeProfit, rr, horizon } | null,
+  riskContext: {                                     // PR-LIVE-PAPER-EXEC-1b — lecture seule
+    allocationPct,                                   // settings.allocation_per_trade_pct
+    riskPerTradePct,                                 // settings.risk_per_trade_pct
+    maxOpenPositions,                                // settings.max_open_positions
+    maxPositionsPerSymbol,                           // settings.max_positions_per_symbol
+    currentOpenPositions,                            // runtime counter (null si indispo)
+    symbolExposurePct,                               // runtime % invested sur ce symbole
+    portfolioExposurePct,                            // runtime % capital engagé global
+    postStopCooldownActive,                          // runtime flag cooldown post-stop
+    executionSafety,                                 // evaluateExecutionSafety().safe
+    quoteValidationStatus,                           // liveContext.quoteQuality.validationStatus
+  } | null,
   dataQuality: null,                                 // V1 worker : non capturé inline
   quoteQuality: {                                    // miroir de liveContext.quoteQuality
     executionSafe, trustScore, validationStatus, reasons: [...]
@@ -87,10 +101,37 @@ Attaché à `mtp_positions.analysis_snapshot.livePaperAnalytics` (JSONB, additif
   warnings: [
     "ctx3_would_block:regime_blocked:RISK_ON|status:FRAGILE",
     "quote_quality_unsafe_at_open",
+    "risk_context_not_provided" | "risk_context_all_fields_null",  // PR-LIVE-PAPER-EXEC-1b
     // ...
   ]
 }
 ```
+
+#### `contextCaptureStatus` — sentinelle explicite (PR-LIVE-PAPER-EXEC-1b)
+
+Évite toute ambiguïté côté consommateurs offline (rapports, replays). 3 valeurs possibles :
+
+- **`CAPTURED`** : `contextSnapshot` est rempli avec un snapshot CTX-2 réel.
+- **`NOT_CAPTURED_RUNTIME_SAFE`** : omission **volontaire** côté worker pour ne pas introduire de dépendance runtime sur les 16 ETF du contexte V1. Ce n'est **pas un bug** — c'est une décision d'architecture documentée § 4.
+- **`NOT_CAPTURED_NO_INPUT`** : absence non documentée (ne devrait pas se produire en V1 worker, signal d'anomalie pour une PR future).
+
+#### `riskContext` — état du risk engine (PR-LIVE-PAPER-EXEC-1b)
+
+Capture **lecture seule** des paramètres et stats du risk engine au moment de l'ouverture. **Aucun impact décisionnel.** Aucun champ ne modifie sizing ni allocation.
+
+Champs disponibles depuis `settings` (paramètres bot) :
+
+- `allocationPct`, `riskPerTradePct`, `maxOpenPositions`, `maxPositionsPerSymbol`.
+
+Champs runtime (peuvent être `null` selon le point d'appel — V1 worker laisse ces 4 à `null` car non accessibles depuis `buildTrainingPositionRowFromSignal`) :
+
+- `currentOpenPositions`, `symbolExposurePct`, `portfolioExposurePct`, `postStopCooldownActive`.
+
+Champs dérivés de `liveContext.quoteQuality` :
+
+- `executionSafety` (`quoteQuality.executionSafe`), `quoteValidationStatus`.
+
+Si `riskContext` n'est pas fourni → warning `risk_context_not_provided` + champ `null`. Si tous les champs sont `null` après normalisation → warning `risk_context_all_fields_null`.
 
 ### 2.2 À la clôture — `livePaperOutcome`
 
@@ -244,7 +285,7 @@ Helper exposé : `markSectorLeadershipUntrusted(contextSnapshot)` côté module 
 
 ## 7. Tests
 
-`tools/quant/test/live-paper-analytics-v1.test.mjs` — 11 tests `node:test` :
+`tools/quant/test/live-paper-analytics-v1.test.mjs` — 18 tests `node:test` (11 PR-LIVE-PAPER-ANALYTICS-1 + 7 PR-LIVE-PAPER-EXEC-1b) :
 
 1. Création metadata analytics à l'ouverture (structure complète).
 2. Clôture outcome (structure + signalQuality calculé).
@@ -258,9 +299,19 @@ Helper exposé : `markSectorLeadershipUntrusted(contextSnapshot)` côté module 
 10. (bonus) `LIVE_PAPER_ENGINE_SETUP_MAP_V1` — DEAD setups non mappés.
 11. (bonus) inputs invalides → null + warnings, jamais d'exception.
 
+Tests PR-LIVE-PAPER-EXEC-1b (7) :
+
+- **EXEC-1b A** : immutabilité des inputs (les helpers ne mutent jamais les objets reçus).
+- **EXEC-1b B** : déterminisme sizing/plan (mêmes inputs → champs `plan` et `scores` strictement identiques).
+- **EXEC-1b C** : CTX-3 blocked → metadata warning UNIQUEMENT, `plan` et `scores` identiques entre cas allowed/blocked.
+- **EXEC-1b D** : `riskContext` absent → aucun crash, warning explicite ; aussi `buildRiskContextV1(null/undefined/invalid)` null-safe.
+- **EXEC-1b E** : worker instrumentation failure → ouverture continue (simulation `try/catch` silencieux côté worker).
+- **EXEC-1b F** : `contextCaptureStatus` présent et correct selon le cas (CAPTURED / NOT_CAPTURED_RUNTIME_SAFE / NOT_CAPTURED_NO_INPUT).
+- **EXEC-1b G** : aucun `LIVE_READY` / `broker` même avec `riskContext` riche.
+
 ```bash
 node --test tools/quant/test/live-paper-analytics-v1.test.mjs
-# tests 11 / pass 11 / fail 0
+# tests 18 / pass 18 / fail 0
 ```
 
 ---

@@ -11,8 +11,10 @@ import assert from "node:assert/strict";
 import {
   LIVE_PAPER_ANALYTICS_V1_VERSION,
   LIVE_PAPER_ENGINE_SETUP_MAP_V1,
+  CONTEXT_CAPTURE_STATUS,
   buildLivePaperAnalyticsV1,
   buildLivePaperOutcomeV1,
+  buildRiskContextV1,
   assessSignalQualityV1,
   markSectorLeadershipUntrusted,
   normalizeValidationStatus,
@@ -63,7 +65,8 @@ test("1. Création metadata analytics à l'ouverture — structure complète", (
   assert.equal(meta.plan.rr, 2.5);
   assert.equal(meta.plan.horizon, "swing");
   assert.equal(meta.quoteQuality.executionSafe, true);
-  assert.deepEqual(meta.warnings, []);
+  // PR-LIVE-PAPER-EXEC-1b : warning explicite si riskContext non fourni.
+  assert.deepEqual(meta.warnings, ["risk_context_not_provided"]);
 });
 
 test("2. Clôture — outcome structure + signalQuality calculé", () => {
@@ -295,6 +298,217 @@ test("bonus C : LIVE_PAPER_ENGINE_SETUP_MAP_V1 — DEAD setups NON mappés", () 
   assert.equal(LIVE_PAPER_ENGINE_SETUP_MAP_V1.continuation, undefined);
 });
 
+// === PR-LIVE-PAPER-EXEC-1b : tests non-régression + riskContext =============
+
+test("EXEC-1b A : immutabilité — l'input n'est jamais muté par les helpers", () => {
+  // Test "même payload avant/après instrumentation → même décision".
+  // Garantie via immutabilité des inputs : si le helper ne mute pas son
+  // input, la fonction caller (worker) peut continuer à utiliser le même
+  // objet pour la décision réelle sans collision.
+  const inputAnalytics = {
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    setupId: "RS_ROTATION_SIMPLE",
+    plan: { entry: 100, stopLoss: 95, takeProfit: 110, rr: 2, horizon: "swing" },
+    scores: { strategicScore: 70, decisionScore: 68, safetyScore: 65, exploitabilityScore: 60 },
+    quoteQuality: { executionSafe: true, validationStatus: "live", reasons: ["a"] },
+    contextSnapshot: { regime: "RANGE", sectorLeadership: { leaders: ["XLV"], laggards: ["XLU"] } },
+    riskContext: { allocationPct: 8, riskPerTradePct: 1 },
+    warnings: ["pre_existing"],
+  };
+  const snapshotBefore = JSON.stringify(inputAnalytics);
+  const _ = buildLivePaperAnalyticsV1(inputAnalytics);
+  const snapshotAfter = JSON.stringify(inputAnalytics);
+  assert.equal(snapshotBefore, snapshotAfter,
+    "buildLivePaperAnalyticsV1 ne doit pas muter son input");
+
+  const inputOutcome = {
+    closedAt: "2024-07-05T20:00:00.000Z",
+    exitReason: "take_profit",
+    qualityFlags: ["a", "b"],
+    quoteQualityAtClose: { executionSafe: true, reasons: ["x"] },
+    warnings: ["pre_existing_out"],
+  };
+  const ob = JSON.stringify(inputOutcome);
+  buildLivePaperOutcomeV1(inputOutcome);
+  const oa = JSON.stringify(inputOutcome);
+  assert.equal(ob, oa, "buildLivePaperOutcomeV1 ne doit pas muter son input");
+});
+
+test("EXEC-1b B : même input → même output (sizing/plan stables)", () => {
+  // Test "même trade avant/après instrumentation → même sizing".
+  // Démontré en V1 par l'immutabilité de l'input + déterminisme strict.
+  const input = {
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    setupId: "RS_ROTATION_SIMPLE",
+    plan: { entry: 580.5, stopLoss: 565, takeProfit: 620, rr: 2.5, horizon: "swing" },
+    scores: { strategicScore: 72, decisionScore: 70, safetyScore: 65, exploitabilityScore: 58 },
+    riskContext: { allocationPct: 8, riskPerTradePct: 1, maxOpenPositions: 10 },
+  };
+  const out1 = buildLivePaperAnalyticsV1(input);
+  const out2 = buildLivePaperAnalyticsV1(input);
+  // Les champs reflétant les valeurs d'entrée (plan, scores) sont
+  // strictement préservés — donc le sizing dérivé côté worker reste
+  // identique (le worker ne re-calcule pas son sizing à partir de notre
+  // metadata).
+  assert.deepEqual(out1.plan, out2.plan);
+  assert.deepEqual(out1.scores, out2.scores);
+  assert.deepEqual(out1.riskContext, out2.riskContext);
+  assert.equal(out1.plan.entry, 580.5);
+  assert.equal(out1.plan.stopLoss, 565);
+  assert.equal(out1.plan.takeProfit, 620);
+});
+
+test("EXEC-1b C : CTX-3 blocked → metadata warning UNIQUEMENT, aucune influence", () => {
+  // Renforcement du test #4 de PR #249 : on vérifie que la metadata
+  // contient l'observation mais que la fonction NE MODIFIE PAS d'autres
+  // champs (pas de mutation du plan, pas de mutation du sizing inféré).
+  const inputBlocked = {
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    setupId: "MEAN_REVERSION",
+    engineSetupType: "mean_reversion",
+    regime: "RISK_ON",
+    plan: { entry: 100, stopLoss: 95, takeProfit: 110, rr: 2, horizon: "swing" },
+    scores: { strategicScore: 70, decisionScore: 68 },
+    setupAuthorization: {
+      version: "setup-authorization-matrix-v1",
+      setupId: "MEAN_REVERSION",
+      allowed: false,
+      blockedBy: ["regime_blocked:RISK_ON"],
+      met: [], unmet: ["vol.state in [LOW,NORMAL]"],
+      warnings: [], snapshotRegime: "RISK_ON",
+      statusRef: "EXPERIMENTAL_ONLY / FRICTION_REQUIRED",
+    },
+  };
+  const inputAllowed = { ...inputBlocked, setupAuthorization: { ...inputBlocked.setupAuthorization, allowed: true, blockedBy: [] } };
+
+  const metaBlocked = buildLivePaperAnalyticsV1(inputBlocked);
+  const metaAllowed = buildLivePaperAnalyticsV1(inputAllowed);
+
+  // Plan ET scores doivent être STRICTEMENT identiques entre les deux cas
+  // (la matrice CTX-3 ne doit JAMAIS muter ces champs).
+  assert.deepEqual(metaBlocked.plan, metaAllowed.plan);
+  assert.deepEqual(metaBlocked.scores, metaAllowed.scores);
+
+  // Seuls les champs setupAuthorization et warnings doivent différer.
+  assert.equal(metaBlocked.setupAuthorization.allowed, false);
+  assert.equal(metaAllowed.setupAuthorization.allowed, true);
+  assert.ok(metaBlocked.warnings.some((w) => w.startsWith("ctx3_would_block:")));
+  assert.ok(!metaAllowed.warnings.some((w) => w.startsWith("ctx3_would_block:")));
+});
+
+test("EXEC-1b D : riskContext absent → aucun crash, warning explicite", () => {
+  // Pas de riskContext fourni.
+  const m1 = buildLivePaperAnalyticsV1({ capturedAt: "2024-06-28T15:30:00.000Z", setupId: "RS_ROTATION_SIMPLE" });
+  assert.equal(m1.riskContext, null);
+  assert.ok(m1.warnings.includes("risk_context_not_provided"));
+
+  // riskContext fourni mais vide (tous champs null après normalisation).
+  const m2 = buildLivePaperAnalyticsV1({
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    setupId: "RS_ROTATION_SIMPLE",
+    riskContext: { allocationPct: null, riskPerTradePct: null, maxOpenPositions: null },
+  });
+  assert.ok(m2.riskContext !== null);
+  assert.ok(m2.warnings.includes("risk_context_all_fields_null"));
+
+  // riskContext valide.
+  const m3 = buildLivePaperAnalyticsV1({
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    setupId: "RS_ROTATION_SIMPLE",
+    riskContext: { allocationPct: 8, riskPerTradePct: 1, maxOpenPositions: 10 },
+  });
+  assert.equal(m3.riskContext.allocationPct, 8);
+  assert.equal(m3.riskContext.riskPerTradePct, 1);
+  assert.equal(m3.riskContext.maxOpenPositions, 10);
+  assert.equal(m3.riskContext.currentOpenPositions, null);
+  assert.ok(!m3.warnings.includes("risk_context_not_provided"));
+  assert.ok(!m3.warnings.includes("risk_context_all_fields_null"));
+
+  // buildRiskContextV1 directement : null safe.
+  const r1 = buildRiskContextV1(null);
+  assert.equal(r1.allocationPct, null);
+  assert.equal(r1.executionSafety, null);
+  const r2 = buildRiskContextV1(undefined);
+  assert.equal(r2.maxOpenPositions, null);
+  const r3 = buildRiskContextV1({ allocationPct: "NaN", riskPerTradePct: 1.5 });
+  assert.equal(r3.allocationPct, null);
+  assert.equal(r3.riskPerTradePct, 1.5);
+});
+
+test("EXEC-1b E : worker instrumentation failure → ouverture continue (simulation)", () => {
+  // On simule le comportement du try/catch silencieux côté worker :
+  // si lpaBuildAnalyticsAtOpen plante (ex. accès à propriété sur null
+  // non protégé en V2 future), le caller doit continuer comme avant.
+  // Test du pattern :
+  let openingCompleted = false;
+  let analyticsAttached = null;
+  function workerLikeOpen(brokenHelper) {
+    // Simulation d'un row paper "comme avant".
+    const row = { id: "TEST", status: "open", entry_price: 100, stop_loss: 95 };
+    try {
+      analyticsAttached = brokenHelper();
+      row.analysis_snapshot = { livePaperAnalytics: analyticsAttached };
+    } catch (e) {
+      // silencieux par construction
+    }
+    openingCompleted = true;
+    return row;
+  }
+  const row = workerLikeOpen(() => { throw new Error("synthetic instrumentation failure"); });
+  assert.equal(openingCompleted, true, "ouverture doit aboutir malgré crash instrumentation");
+  assert.equal(row.status, "open");
+  assert.equal(row.entry_price, 100);
+  assert.equal(row.stop_loss, 95);
+  // Pas de livePaperAnalytics attaché (catch silencieux).
+  assert.equal(row.analysis_snapshot, undefined);
+});
+
+test("EXEC-1b F : contextCaptureStatus présent et correct", () => {
+  // Sans contextSnapshot, sans hint explicite → NOT_CAPTURED_NO_INPUT.
+  const m1 = buildLivePaperAnalyticsV1({ capturedAt: "2024-06-28T15:30:00.000Z" });
+  assert.equal(m1.contextCaptureStatus, "NOT_CAPTURED_NO_INPUT");
+
+  // Avec hint runtime safe explicite (cas worker V1).
+  const m2 = buildLivePaperAnalyticsV1({
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    contextCaptureStatus: "NOT_CAPTURED_RUNTIME_SAFE",
+  });
+  assert.equal(m2.contextCaptureStatus, "NOT_CAPTURED_RUNTIME_SAFE");
+
+  // Avec contextSnapshot fourni → CAPTURED.
+  const m3 = buildLivePaperAnalyticsV1({
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    contextSnapshot: { regime: "RISK_ON" },
+  });
+  assert.equal(m3.contextCaptureStatus, "CAPTURED");
+
+  // Sentinelle exportée.
+  assert.deepEqual(Object.values(CONTEXT_CAPTURE_STATUS).sort(), [
+    "CAPTURED", "NOT_CAPTURED_NO_INPUT", "NOT_CAPTURED_RUNTIME_SAFE",
+  ]);
+});
+
+test("EXEC-1b G : aucun LIVE_READY / broker même avec riskContext riche", () => {
+  // Renforcement test #6 (PR #249) : on s'assure qu'AUCUN champ
+  // LIVE_READY/broker n'apparaît même avec riskContext rempli.
+  const meta = buildLivePaperAnalyticsV1({
+    capturedAt: "2024-06-28T15:30:00.000Z",
+    setupId: "RS_ROTATION_SIMPLE",
+    riskContext: {
+      allocationPct: 8, riskPerTradePct: 1, maxOpenPositions: 10,
+      maxPositionsPerSymbol: 1, currentOpenPositions: 3,
+      symbolExposurePct: 0, portfolioExposurePct: 24,
+      postStopCooldownActive: false, executionSafety: true,
+      quoteValidationStatus: "live",
+    },
+    contextSnapshot: { regime: "RISK_ON", sectorLeadership: { leaders: [] } },
+  });
+  const ser = JSON.stringify(meta);
+  assert.ok(!ser.includes("LIVE_READY"));
+  assert.ok(!ser.toLowerCase().includes("broker"));
+  assert.ok(!ser.includes("real_money"));
+});
+
 test("bonus D : inputs invalides → null + warnings, jamais d'exception", () => {
   // Aucun input → metadata avec champs null
   const m = buildLivePaperAnalyticsV1();
@@ -302,7 +516,10 @@ test("bonus D : inputs invalides → null + warnings, jamais d'exception", () =>
   assert.equal(m.setupId, null);
   assert.equal(m.regime, null);
   assert.equal(m.contextSnapshot, null);
-  assert.deepEqual(m.warnings, []);
+  // PR-LIVE-PAPER-EXEC-1b : warning émis si riskContext absent (toujours).
+  assert.deepEqual(m.warnings, ["risk_context_not_provided"]);
+  assert.equal(m.riskContext, null);
+  assert.equal(m.contextCaptureStatus, "NOT_CAPTURED_NO_INPUT");
 
   // Inputs corrompus
   const m2 = buildLivePaperAnalyticsV1({
