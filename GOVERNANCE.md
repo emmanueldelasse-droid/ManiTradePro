@@ -990,7 +990,8 @@ Le prompt ChatGPT → Claude doit contenir, quand pertinent :
 - fichiers interdits à modifier ;
 - livrable attendu ;
 - format de réponse attendu ;
-- règle de non-merge sans validation ChatGPT.
+- règle de non-merge sans validation ChatGPT ;
+- **agents / skills Claude Code à utiliser** (cf. § *Délégation d'agents par ChatGPT* ci-dessous).
 
 ChatGPT **ne doit pas** envoyer à Claude :
 
@@ -1000,6 +1001,70 @@ ChatGPT **ne doit pas** envoyer à Claude :
 - des demi-prompts ;
 - des instructions implicites ;
 - des validations ambiguës.
+
+### Délégation d'agents par ChatGPT
+
+> Règle officielle 2026-05-19 (PR-GOV-AGENTS).
+
+Lorsque ChatGPT rédige un prompt pour Claude, il doit **explicitement** identifier et recommander l'usage des agents Claude Code disponibles (cf. § *Agents et skills Claude Code*) **quand l'usage est pertinent**.
+
+**Cas où ChatGPT doit explicitement suggérer un agent** :
+
+| Type de tâche | Agent recommandé | Raison |
+|---|---|---|
+| Exploration de code volumineuse, lecture de nombreux fichiers, inventaire | `Explore` | Lecture parallèle ciblée, ne pollue pas le contexte Claude principal |
+| Recherche multi-étapes complexe ou exploration ouverte | `general-purpose` | Contexte isolé, peut paralléliser |
+| Design d'implémentation, plan technique avant code | `Plan` | Read-only, retourne plan structuré |
+| Bug UI / CSS / thème / layout / modal / touch / responsive | `bug-hunter` | Spécialisé sur les 6 classes de bugs UI ManiTradePro récurrentes |
+| Questions Claude Code / SDK / API Anthropic | `claude-code-guide` | Spécialisé |
+| Configuration status line CLI Claude Code | `statusline-setup` | Spécialisé cosmétique CLI |
+
+**Format de recommandation dans le prompt** :
+
+ChatGPT doit inclure une section explicite, par exemple :
+
+```text
+AGENTS RECOMMANDÉS
+- Explore (subagent_type: Explore) pour inventorier rapidement les fichiers
+  X, Y, Z avant rédaction. Préciser quoi chercher : statut, dates, liens.
+- general-purpose (subagent_type: general-purpose) si une recherche
+  multi-étapes ouverte est nécessaire pour le sujet A.
+```
+
+ou simplement :
+
+```text
+AGENTS RECOMMANDÉS : aucun.
+(la tâche est ciblée, Claude peut tout faire en lecture directe).
+```
+
+**Pourquoi** :
+
+1. **Économie de contexte Claude principal** : déléguer la lecture lourde / l'exploration permet à Claude principal de garder de la marge pour la rédaction et la décision finale.
+2. **Spécialisation** : `bug-hunter` connaît les 6 patterns UI projet ; `Explore` est optimisé pour la lecture rapide ; `Plan` pour le design — chacun fait mieux que `general-purpose` sur son créneau.
+3. **Auditabilité** : si ChatGPT suggère explicitement l'agent, Claude le déclare dans le body de PR (cf. § *Agents et skills Claude Code* — règle de déclaration obligatoire). La trace est claire.
+4. **Évite l'oubli** : sans suggestion explicite ChatGPT, Claude tend à tout faire en direct par défaut, ce qui peut surcharger le contexte sur des tâches volumineuses.
+
+**Limites de la règle** :
+
+- ChatGPT **suggère** ; Claude **décide** in fine si l'agent est réellement pertinent dans le contexte d'exécution. Claude peut refuser une suggestion en justifiant (par exemple "agent inutile, la tâche est trop ciblée").
+- Pour les tâches **quant**, les agents ne valident jamais (cf. § *Gouvernance quantitative*) — la suggestion d'agent par ChatGPT ne court-circuite pas cette règle.
+- Si **aucun agent n'est pertinent**, ChatGPT doit l'écrire explicitement (`AGENTS RECOMMANDÉS : aucun.`). Cela évite l'ambiguïté.
+- Les agents ne valident jamais une décision de merge (cf. § *Interdictions communes*). La suggestion d'agent ne change pas la chaîne de validation ChatGPT → créateur.
+
+**Cohérence avec § *Agents et skills Claude Code*** : la suggestion par ChatGPT s'inscrit **en amont** du workflow déjà codifié :
+
+```
+ChatGPT (suggère agents)
+   ↓
+Claude (décide + utilise ou refuse en justifiant)
+   ↓
+Claude (déclare dans body de PR)
+   ↓
+ChatGPT (challenge / GO MERGE)
+```
+
+ChatGPT reste **responsable** de la pertinence de la suggestion. Suggérer un agent inadapté = bruit. Suggérer aucun agent pour une tâche manifestement adaptée (ex: inventaire 20 fichiers) = perte d'efficacité projet.
 
 ### Sens Claude → ChatGPT : réponse en bloc unique
 
