@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/context-engine-v1-bY95Y` (en cours — PR-CTX-2 : Context Engine V1 — module analytique pur lisant 16 ETF, classification régime 4-état via lib canonique `regime-rules-v1.mjs`, breadth sectorielle, leadership 20j/63j vs SPY, VIX-proxy via realized vol SPY 20j, confirmation défensive TLT/GLD. Read-only, aucun runtime, aucun setup activé).
-- **Dernier merge connu** : PR #245 `docs(regime): canonise market regimes V1 + factor into shared lib (CLEAN-2)` (commit `cac413c` sur `main`).
+- **Branche / PR active** : `claude/setup-authorization-matrix-v1` (en cours — PR-CTX-3 : matrice déclarative pure d'autorisation par setup, alignée sur les statuts officiels `SETUPS_REGISTRY.md`. 5 setups × 4 régimes officiels V1. Aucun branchement runtime. Aucune consommation de `sectorLeadership` tant que KNOWN_ISSUES #15 OPEN).
+- **Dernier merge connu** : PR #246 `quant(context): add Context Engine V1 analytical module (PR-CTX-2)` (commit `31c9a6b` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -68,27 +68,49 @@
 - **Impact runtime / quant** : aucun. Pure factorisation.
 - **Statut merge** : `GO MERGE` reçu (créateur).
 
+## Dernière session / dernière PR mergée (quinquies)
+
+- **Date** : 2026-05-21.
+- **PR** : #246 — `quant(context): add Context Engine V1 analytical module (PR-CTX-2)`.
+- **Objectif** : module analytique pur Context Engine V1 produisant un snapshot lisible, déterministe et testable du contexte marché (régime, breadth, leadership sectoriel, vol-proxy SPY 20j, défensifs TLT/GLD) à partir de 16 ETF figés. Régime délégué à la lib canonique CLEAN-2 (`regime-rules-v1.mjs`). Aucun appel VIX externe.
+- **Résultat** : merge squash sur `main` (commit `31c9a6b`). Tests 6/6 pass. Smoke réel sur datasets 2021-2025 : regime RISK_ON, rvol 0.0861 LOW, 0 warning. Issue qualité données #15 ajoutée (splits non ajustés XLY/XLE/XLU détectés).
+- **Impact runtime / quant** : aucun. Module read-only.
+- **Statut merge** : `GO MERGE` reçu (ChatGPT).
+
 ## PR en cours
 
-- **PR** : PR-CTX-2 — Context Engine V1 analytical module — branche `claude/context-engine-v1-bY95Y`.
-- **Mission créateur** (2026-05-21, mission PR-CTX-2 post-CLEAN-2 mergée) : créer un module analytique pur **Context Engine V1** pour produire un contexte marché lisible, déterministe et testable à partir d'inputs historiques (16 ETF). Prépare PR-CTX-3 mais ne l'implémente pas. Read-only. Aucun effet runtime.
-- **Objectif unique** : nouveau module `tools/quant/lib/context-engine-v1.mjs` produisant `buildContextSnapshotV1({ asOf, candlesBySymbol }) → { regime, regimeConfidence, breadth, sectorLeadership, vol, defensiveConfirmation, warnings, dataQuality }`. Régime délégué intégralement à la lib canonique CLEAN-2 (`regime-rules-v1.mjs`). VIX-proxy via realized vol SPY 20j (aucun appel VIX externe).
-- **Univers contexte V1 figé** (16 symboles) : SPY, QQQ, SMH (tendance primaire) ; XLK, XLF, XLE, XLV, XLI, XLY, XLP, XLU, XLB, XLRE, XLC (breadth sectorielle SPDR) ; TLT, GLD (confirmation défensive).
+- **PR** : PR-CTX-3 — Setup Authorization Matrix V1 — branche `claude/setup-authorization-matrix-v1`.
+- **Mission créateur** (2026-05-21, mission PR-CTX-3 post-CTX-2 mergée) : créer une matrice DÉCLARATIVE pure qui décrit, par setup, dans quels régimes il est autorisé, bloqué ou préféré. La matrice ne décide pas encore — elle décrit. PR-CTX-5 décidera du branchement runtime.
+- **Objectif unique** : nouveau module `tools/quant/lib/setup-authorization-matrix-v1.mjs` exportant `SETUP_AUTHORIZATION_MATRIX_V1` (5 setups × 4 régimes officiels V1) + helpers `getSetupAuthorizationV1`, `isSetupAllowedInRegimeV1`, `explainSetupAuthorizationV1(setupId, contextSnapshot)`. La matrice reflète strictement les statuts officiels `SETUPS_REGISTRY.md` (truth-sync 2026-05-19), elle ne les modifie pas.
+- **Setups couverts** (5, conformes au brief) :
+  - `RS_ROTATION_SIMPLE` (`RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`) : autorisé `RANGE`, `RISK_ON` ; bloqué `RISK_OFF`, `HIGH_VOL`.
+  - `MEAN_REVERSION` (`EXPERIMENTAL_ONLY / FRICTION_REQUIRED`) : autorisé `RANGE` seulement.
+  - `SECTOR_RELATIVE_STRENGTH` (`FRAGILE / CONCENTRATION_EXCESSIVE`) : `blockedByStatus: true`, bloqué partout.
+  - `TREND_PULLBACK_DYNAMIC_SUPPORT` (`FRAGILE`) : `blockedByStatus: true`, bloqué partout.
+  - `GLD_BREAKOUT_ISOLATED` (`CONDITIONAL_RESEARCH_CANDIDATE`) : autorisé `RISK_ON`, `RANGE` ; restreint à GLD via `symbolWhitelist`.
 - **Fichiers créés** :
-  - `tools/quant/lib/context-engine-v1.mjs` (nouveau, ~370 lignes) — module pur, déterministe, exporte `buildContextSnapshotV1` + `CONTEXT_V1_UNIVERSE`. Pas d'I/O, pas de Date.now(), pas d'aléa. Réutilise `classifyFourStateRegimeV1`, `REGIME_V1_EMA_PERIOD`, `REGIME_V1_HIGH_VOL_RVOL_THRESHOLD`, `REGIME_V1_HIGH_VOL_RVOL_WINDOW_DAYS`, `REGIME_V1_METADATA` de la lib canonique.
-  - `tools/quant/test/context-engine-v1.test.mjs` (nouveau, ~210 lignes) — 5 tests `node:test` obligatoires (RISK_ON canonique, HIGH_VOL override, RISK_OFF canonique, données insuffisantes sans exception, déterminisme byte-à-byte) + 1 test bonus de forme. PRNG seedé (mulberry32) pour reproductibilité.
-  - `tools/quant/context-engine-smoke-v1.mjs` (nouveau, ~110 lignes) — smoke script chargeant les 16 datasets `data/{SYMBOL}_2025.json` et produisant `tools/quant/output/context-engine-smoke-v1.json`.
-  - `docs/quant/CONTEXT_ENGINE.md` (nouveau, ~340 lignes) — source canonique : rôle, philosophie, univers, inputs V1, outputs V1, limites, non-consommation runtime, relation REGIME_RULES.md, relation future PR-CTX-3, tests, ce que le module ne fait pas, règles d'évolution.
-  - `tools/quant/output/context-engine-smoke-v1.json` — sortie smoke générée (snapshot reproductible).
+  - `tools/quant/lib/setup-authorization-matrix-v1.mjs` (~230 lignes) — matrice figée `Object.freeze`, helpers purs, invariant validator.
+  - `tools/quant/test/setup-authorization-matrix-v1.test.mjs` (~210 lignes) — 6 tests obligatoires brief (setup inconnu, RISK_OFF bloque RS, HIGH_VOL bloque directionnels fragiles, GLD découplé du leadership sectoriel, aucun usage de XLY/XLE/XLU tant que #15 OPEN, déterminisme JSON) + 6 tests bonus (forme exhaustive, preferredConditions informatives, blockedConditions bloquantes, regime invalide géré, snapshot.regime=null sans exception, couverture exhaustive des 5 setups).
+  - `docs/quant/SETUP_AUTHORIZATION_MATRIX.md` (~310 lignes) — source canonique : rôle, philosophie, couverture, contrat API, DSL conditions, statuts par setup, invariants, tests, intégration de bout en bout, limites, règles d'évolution, relation PR-CTX-5.
 - **Fichiers modifiés** :
   - `SESSION.md` — cette mise à jour.
-  - `docs/monitoring/KNOWN_ISSUES.md` — ajout issue #15 : dette qualité données (splits non ajustés détectés sur certains ETF sectoriels via smoke run).
-- **Smoke run réel sur datasets 2021-2025** (asOf = 2025-12-31) : régime `RISK_ON` (confidence 100), rvol SPY 20j = 0.0861 (état `LOW`), breadth 7/14 (50 % riskOn), leaders {XLV, XLF, XLC}, laggards {XLU, XLE, XLY} (NB: laggards reflètent en partie des splits non ajustés cf. KNOWN_ISSUES #15), défensifs TLT=NEUTRAL GLD=NEUTRAL, 0 warning.
-- **Validation tests** : `node --test tools/quant/test/context-engine-v1.test.mjs` → 6/6 pass, 121 ms.
-- **Impact runtime** : **aucun**. `cloudflare-worker/worker.js` non touché. `assets/app.js` non touché. Aucun setup activé. Aucun statut setup modifié. Aucune `validateConfiguration` modifiée. Aucun appel runtime.
-- **Impact quant (fond)** : aucun. Aucune formule régime modifiée. Aucun paramètre tuné. Aucun setup validé / promu / dégradé. Aucun verdict touché. Module analytique pur préparatoire.
-- **Impact documentation** : oui. `docs/quant/CONTEXT_ENGINE.md` devient la source canonique du Context Engine V1. `KNOWN_ISSUES.md` reflète la dette qualité données détectée.
-- **Interdictions respectées** : pas de VIX externe, pas de prédiction, pas de scoring opaque, pas d'IA, pas de branchement runtime, pas de touch worker.js, pas de touch frontend, pas de modification SETUPS_REGISTRY / ASSET_REGISTRY / authorization matrix, pas de feature flag.
+- **Invariants explicites garantis par tests** :
+  1. Aucune référence à `sectorLeadership` dans la matrice tant que KNOWN_ISSUES #15 OPEN.
+  2. Aucun symbole `XLY` / `XLE` / `XLU` n'apparaît dans la matrice.
+  3. Tous les setups déclarent `doNotDependOnSectorLeadership: true`.
+  4. Régimes référencés strictement dans `{RISK_ON, RANGE, RISK_OFF, HIGH_VOL}`.
+  5. `allowedRegimes ∩ blockedRegimes = ∅` pour chaque setup.
+- **Sanity check intégration PR-CTX-2 → PR-CTX-3** sur smoke réel (asOf 2025-12-31, regime RISK_ON, vol.state LOW) :
+  - RS_ROTATION_SIMPLE : `allowed=true`
+  - MEAN_REVERSION : `allowed=false`, `blockedBy=["regime_blocked:RISK_ON"]`
+  - SECTOR_RELATIVE_STRENGTH : `allowed=false`, `blockedBy=["status:FRAGILE / CONCENTRATION_EXCESSIVE", "regime_blocked:RISK_ON"]`
+  - TREND_PULLBACK_DYNAMIC_SUPPORT : `allowed=false`, `blockedBy=["status:FRAGILE", "regime_blocked:RISK_ON"]`
+  - GLD_BREAKOUT_ISOLATED : `allowed=true`
+- **Validation tests** : `node --test tools/quant/test/setup-authorization-matrix-v1.test.mjs` → 12/12 pass, 126 ms.
+- **Impact runtime** : **aucun**. `cloudflare-worker/worker.js` non touché. `assets/app.js` non touché. Aucun setup activé. Aucun statut SETUPS_REGISTRY modifié. Aucune `validateConfiguration` modifiée. Aucun trade automatique. Aucun setup promu LIVE_READY.
+- **Impact quant (fond)** : aucun. La matrice **reflète** les statuts officiels — elle ne les modifie pas.
+- **Impact documentation** : oui. `docs/quant/SETUP_AUTHORIZATION_MATRIX.md` devient la source canonique de la matrice d'autorisation.
+- **Interdictions respectées** : pas de runtime, pas de modification SETUPS_REGISTRY, pas de promotion LIVE_READY, pas de consommation de sectorLeadership tant que #15 OPEN, pas de feature flag, pas de touch worker.js / frontend, pas de modification de l'authorization matrix worker existante.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 ## Décisions actives
 
@@ -130,8 +152,8 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 12. ✅ **PR CLEAN-1 canonisation friction V1** mergée (PR #243, commit `700ecc2`).
 13. ✅ **PR-GOV-AGENTS** mergée (PR #244, commit `8b3ccc0`) — règle "ChatGPT recommande agents Claude" dans GOVERNANCE.md § Format obligatoire.
 14. ✅ **PR CLEAN-2 canonisation régimes 4 états** mergée (PR #245, commit `cac413c`) — `REGIME_RULES.md` canonique + lib partagée `tools/quant/lib/regime-rules-v1.mjs` + migration 3 scripts actifs. Validation byte-à-byte 3/3 IDENTICAL. 8 scripts historiques en dette CLEAN-2b. Prerequisite PR-CTX-2.
-15. 🟡 **PR-CTX-2 Context Engine V1 analytical module** (en cours, branche `claude/context-engine-v1-bY95Y`) — module analytique pur lisant 16 ETF, classification régime 4-état via lib CLEAN-2, breadth, leadership 20j/63j vs SPY, VIX-proxy via realized vol SPY 20j, défensifs TLT/GLD. 5 tests node:test obligatoires (pass) + smoke réel. Read-only, aucun runtime, aucun setup activé. Prerequisite PR-CTX-3.
-24. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
+15. ✅ **PR-CTX-2 Context Engine V1 analytical module** mergée (PR #246, commit `31c9a6b`) — module analytique pur lisant 16 ETF, classification régime 4-état via lib CLEAN-2, breadth, leadership 20j/63j vs SPY, VIX-proxy via realized vol SPY 20j, défensifs TLT/GLD. 6 tests node:test (pass) + smoke réel. Read-only, aucun runtime. Issue qualité données #15 ouverte (splits non ajustés XLY/XLE/XLU).
+16. 🟡 **PR-CTX-3 Setup Authorization Matrix V1** (en cours, branche `claude/setup-authorization-matrix-v1`) — matrice DÉCLARATIVE pure pour 5 setups × 4 régimes officiels V1, alignée sur les statuts SETUPS_REGISTRY. Aucun statut modifié. Aucun branchement runtime. Invariants vérifiés par tests (aucune consommation `sectorLeadership` / XLY/XLE/XLU tant que #15 OPEN). 12 tests node:test (pass) + sanity check intégration avec snapshot CTX-2 réel.
 25. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
 22. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
 23. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
