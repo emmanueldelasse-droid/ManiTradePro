@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR CLEAN-2 : canonisation officielle des Market Regimes V1 — création doc canonique `docs/quant/REGIME_RULES.md`, création module technique `tools/quant/lib/regime-rules-v1.mjs`, migration 3 scripts actifs avec validation anti-régression byte-à-byte 3/3 IDENTICAL).
-- **Dernier merge connu** : PR #244 `docs(governance): require ChatGPT to suggest Claude Code agents in prompts` (commit `8b3ccc0` sur `main`).
+- **Branche / PR active** : `claude/context-engine-v1-bY95Y` (en cours — PR-CTX-2 : Context Engine V1 — module analytique pur lisant 16 ETF, classification régime 4-état via lib canonique `regime-rules-v1.mjs`, breadth sectorielle, leadership 20j/63j vs SPY, VIX-proxy via realized vol SPY 20j, confirmation défensive TLT/GLD. Read-only, aucun runtime, aucun setup activé).
+- **Dernier merge connu** : PR #245 `docs(regime): canonise market regimes V1 + factor into shared lib (CLEAN-2)` (commit `cac413c` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -59,23 +59,36 @@
 - **Impact runtime / quant** : aucun.
 - **Statut merge** : `GO MERGE` reçu (créateur).
 
+## Dernière session / dernière PR mergée (quater)
+
+- **Date** : 2026-05-21.
+- **PR** : #245 — `docs(regime): canonise market regimes V1 + factor into shared lib (CLEAN-2)`.
+- **Objectif** : factoriser la définition des régimes marché V1 dans `docs/quant/REGIME_RULES.md` (doc) + `tools/quant/lib/regime-rules-v1.mjs` (module pur déterministe).
+- **Résultat** : merge squash sur `main` (commit `cac413c`). Source canonique unique pour les 4 régimes officiels (RISK_ON, RANGE, RISK_OFF, HIGH_VOL override). 3 scripts actifs migrés avec validation anti-régression byte-à-byte 3/3 IDENTICAL. 8 scripts historiques en dette CLEAN-2b documentée.
+- **Impact runtime / quant** : aucun. Pure factorisation.
+- **Statut merge** : `GO MERGE` reçu (créateur).
+
 ## PR en cours
 
-- **PR** : PR CLEAN-2 — canonisation officielle Market Regimes V1 — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Mission créateur** (2026-05-19, mission CLEAN-2 post-CLEAN-1) : éliminer les définitions dupliquées du régime marché (4 états officiels : RISK_ON / RANGE / RISK_OFF / HIGH_VOL priority override) en créant 1. une définition documentaire canonique unique 2. une définition technique déterministe unique 3. en empêchant toute future duplication. Refactor strictement structurel.
-- **Objectif unique** : factoriser la définition des régimes marché V1 dans `docs/quant/REGIME_RULES.md` (doc) + `tools/quant/lib/regime-rules-v1.mjs` (module pur déterministe). Pattern identique à CLEAN-1 (friction).
-- **Fichiers créés / modifiés** :
-  - `docs/quant/REGIME_RULES.md` (stub vide → ~330 lignes canoniques) : 10 sections — philosophie, limitations volontaires (pas de 15 sous-régimes, pas d'IA, pas de probas pseudo-scientifiques), 4 régimes détaillés (3.2-3.5), distribution 2021-2025 observée, implémentation technique, dette technique CLEAN-2b (8 scripts historiques non migrés), interdictions, articulation avec autres docs, vérification anti-régression, règles d'évolution.
-  - `tools/quant/lib/regime-rules-v1.mjs` (nouveau, ~170 lignes) : module pur déterministe — 4 fonctions exportées (`classifyMarketRegimeV1`, `isHighVolOverride`, `classifyFourStateRegimeV1`, `normalizeRegimeState`), constantes (`REGIME_V1_EMA_PERIOD=200`, `REGIME_V1_HIGH_VOL_RVOL_THRESHOLD=0.25`, `REGIME_V1_HIGH_VOL_RVOL_WINDOW_DAYS=20`), metadata `REGIME_V1_METADATA` figée. Aucune logique nouvelle. Pure factorisation des définitions inline existantes.
-  - `tools/backtests/rs-rotation-robustness-v1.mjs` migré : import du module canonique + remplacement classification inline par `classifyMarketRegimeV1()`.
-  - `tools/backtests/rs-rotation-robustness-lab-v1.mjs` migré : même pattern.
-  - `tools/backtests/rs-rotation-hardening-v1.mjs` migré : import 3-state + 4-state + constantes HIGH_VOL aliasées sur la lib canonique.
-- **Validation anti-régression** : 3/3 outputs JSON byte-à-byte IDENTICAL (avec/sans migration sur dataset constant). Méthodologie : run with-migration → save outputs → `git checkout HEAD --` sur scripts → run pre-migration sur même dataset → diff outputs → 0 différence.
-- **Dette technique assumée** (CLEAN-2b documentée dans REGIME_RULES.md § *Dette technique*) : 8 scripts historiques conservent leur définition inline pour préserver leurs outputs ancrant PR #207, #208, #210, #211 — `tools/backtests/market-regime-v1.mjs`, `backtest-pullback-yearly-walkforward.mjs`, `backtest-multi-setup-grid.mjs`, `backtest-relative-strength-rotation-regime-v1.mjs`, `new-setup-discovery-lab-v1.mjs`, `sector-rs-destruction-tests-v1.mjs`, `sector-rs-concentration-control-v1.mjs`, `trend-pullback-dynamic-support-v1.mjs`. Migration possible en CLEAN-2b après re-validation byte-à-byte.
-- **Impact runtime** : aucun. Worker.js non touché. Aucun setup runtime modifié.
-- **Impact quant (fond)** : aucun. Aucune formule modifiée. Aucun paramètre modifié. Aucun verdict setup touché. Aucun PF / WR changé.
-- **Impact documentation** : oui. `docs/quant/REGIME_RULES.md` devient la source canonique unique. Dette CLEAN-2b documentée explicitement.
-- **Conformité brief créateur CLEAN-2** : OUI. Aucune formule modifiée. Aucun paramètre modifié. Aucun résultat modifié. Aucun statut setup touché. Validation byte-à-byte explicite.
+- **PR** : PR-CTX-2 — Context Engine V1 analytical module — branche `claude/context-engine-v1-bY95Y`.
+- **Mission créateur** (2026-05-21, mission PR-CTX-2 post-CLEAN-2 mergée) : créer un module analytique pur **Context Engine V1** pour produire un contexte marché lisible, déterministe et testable à partir d'inputs historiques (16 ETF). Prépare PR-CTX-3 mais ne l'implémente pas. Read-only. Aucun effet runtime.
+- **Objectif unique** : nouveau module `tools/quant/lib/context-engine-v1.mjs` produisant `buildContextSnapshotV1({ asOf, candlesBySymbol }) → { regime, regimeConfidence, breadth, sectorLeadership, vol, defensiveConfirmation, warnings, dataQuality }`. Régime délégué intégralement à la lib canonique CLEAN-2 (`regime-rules-v1.mjs`). VIX-proxy via realized vol SPY 20j (aucun appel VIX externe).
+- **Univers contexte V1 figé** (16 symboles) : SPY, QQQ, SMH (tendance primaire) ; XLK, XLF, XLE, XLV, XLI, XLY, XLP, XLU, XLB, XLRE, XLC (breadth sectorielle SPDR) ; TLT, GLD (confirmation défensive).
+- **Fichiers créés** :
+  - `tools/quant/lib/context-engine-v1.mjs` (nouveau, ~370 lignes) — module pur, déterministe, exporte `buildContextSnapshotV1` + `CONTEXT_V1_UNIVERSE`. Pas d'I/O, pas de Date.now(), pas d'aléa. Réutilise `classifyFourStateRegimeV1`, `REGIME_V1_EMA_PERIOD`, `REGIME_V1_HIGH_VOL_RVOL_THRESHOLD`, `REGIME_V1_HIGH_VOL_RVOL_WINDOW_DAYS`, `REGIME_V1_METADATA` de la lib canonique.
+  - `tools/quant/test/context-engine-v1.test.mjs` (nouveau, ~210 lignes) — 5 tests `node:test` obligatoires (RISK_ON canonique, HIGH_VOL override, RISK_OFF canonique, données insuffisantes sans exception, déterminisme byte-à-byte) + 1 test bonus de forme. PRNG seedé (mulberry32) pour reproductibilité.
+  - `tools/quant/context-engine-smoke-v1.mjs` (nouveau, ~110 lignes) — smoke script chargeant les 16 datasets `data/{SYMBOL}_2025.json` et produisant `tools/quant/output/context-engine-smoke-v1.json`.
+  - `docs/quant/CONTEXT_ENGINE.md` (nouveau, ~340 lignes) — source canonique : rôle, philosophie, univers, inputs V1, outputs V1, limites, non-consommation runtime, relation REGIME_RULES.md, relation future PR-CTX-3, tests, ce que le module ne fait pas, règles d'évolution.
+  - `tools/quant/output/context-engine-smoke-v1.json` — sortie smoke générée (snapshot reproductible).
+- **Fichiers modifiés** :
+  - `SESSION.md` — cette mise à jour.
+  - `docs/monitoring/KNOWN_ISSUES.md` — ajout issue #15 : dette qualité données (splits non ajustés détectés sur certains ETF sectoriels via smoke run).
+- **Smoke run réel sur datasets 2021-2025** (asOf = 2025-12-31) : régime `RISK_ON` (confidence 100), rvol SPY 20j = 0.0861 (état `LOW`), breadth 7/14 (50 % riskOn), leaders {XLV, XLF, XLC}, laggards {XLU, XLE, XLY} (NB: laggards reflètent en partie des splits non ajustés cf. KNOWN_ISSUES #15), défensifs TLT=NEUTRAL GLD=NEUTRAL, 0 warning.
+- **Validation tests** : `node --test tools/quant/test/context-engine-v1.test.mjs` → 6/6 pass, 121 ms.
+- **Impact runtime** : **aucun**. `cloudflare-worker/worker.js` non touché. `assets/app.js` non touché. Aucun setup activé. Aucun statut setup modifié. Aucune `validateConfiguration` modifiée. Aucun appel runtime.
+- **Impact quant (fond)** : aucun. Aucune formule régime modifiée. Aucun paramètre tuné. Aucun setup validé / promu / dégradé. Aucun verdict touché. Module analytique pur préparatoire.
+- **Impact documentation** : oui. `docs/quant/CONTEXT_ENGINE.md` devient la source canonique du Context Engine V1. `KNOWN_ISSUES.md` reflète la dette qualité données détectée.
+- **Interdictions respectées** : pas de VIX externe, pas de prédiction, pas de scoring opaque, pas d'IA, pas de branchement runtime, pas de touch worker.js, pas de touch frontend, pas de modification SETUPS_REGISTRY / ASSET_REGISTRY / authorization matrix, pas de feature flag.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 ## Décisions actives
 
@@ -116,8 +129,8 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 11. ✅ **PR-DOC-AUDIT-V1 documentation consistency audit** mergée (PR #242, commit `d93a6ed`) — plan CLEAN-1 à CLEAN-10.
 12. ✅ **PR CLEAN-1 canonisation friction V1** mergée (PR #243, commit `700ecc2`).
 13. ✅ **PR-GOV-AGENTS** mergée (PR #244, commit `8b3ccc0`) — règle "ChatGPT recommande agents Claude" dans GOVERNANCE.md § Format obligatoire.
-14. 🟡 **PR CLEAN-2 canonisation régimes 4 états** (en cours) — `REGIME_RULES.md` canonique + lib partagée `tools/quant/lib/regime-rules-v1.mjs` + migration 3 scripts actifs. Validation byte-à-byte 3/3 IDENTICAL. 8 scripts historiques en dette CLEAN-2b. Prerequisite PR-CTX-2.
-15. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO CLEAN-2) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
+14. ✅ **PR CLEAN-2 canonisation régimes 4 états** mergée (PR #245, commit `cac413c`) — `REGIME_RULES.md` canonique + lib partagée `tools/quant/lib/regime-rules-v1.mjs` + migration 3 scripts actifs. Validation byte-à-byte 3/3 IDENTICAL. 8 scripts historiques en dette CLEAN-2b. Prerequisite PR-CTX-2.
+15. 🟡 **PR-CTX-2 Context Engine V1 analytical module** (en cours, branche `claude/context-engine-v1-bY95Y`) — module analytique pur lisant 16 ETF, classification régime 4-état via lib CLEAN-2, breadth, leadership 20j/63j vs SPY, VIX-proxy via realized vol SPY 20j, défensifs TLT/GLD. 5 tests node:test obligatoires (pass) + smoke réel. Read-only, aucun runtime, aucun setup activé. Prerequisite PR-CTX-3.
 24. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
 25. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
 22. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
