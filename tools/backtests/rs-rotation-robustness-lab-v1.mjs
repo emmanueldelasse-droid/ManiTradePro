@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { UNIVERSE } from "./universe-v2.mjs";
+import { computeFrictionV1, computeFrictionPctV1, FRICTION_V1_METADATA } from "./lib/friction-v1.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -139,9 +140,10 @@ const UNIVERSE_PRESETS = {
 // Conversion en R : on utilise 5 % = 1R (convention RS Rotation v1).
 // Donc friction par trade en R = (0.30 + 0.02 * holdDays) / 5
 
+// Source canonique : `docs/quant/FRICTION_MODEL.md` + `lib/friction-v1.mjs`
+// (CLEAN-1 PR-FRICTION-CANON).
 function frictionRPerTrade(holdDays) {
-  const pct = 0.30 + 0.02 * holdDays;
-  return pct / 5;
+  return computeFrictionV1({ holdDays });
 }
 
 // === Loaders ================================================================
@@ -736,8 +738,8 @@ function buildMarkdown(r) {
   L.push("| Horizon | Friction (% total) | Friction (R) |");
   L.push("|---|---:|---:|");
   for (const h of [10, 20, 40, 60, 120]) {
-    const pct = 0.30 + 0.02 * h;
-    const R = pct / 5;
+    const pct = computeFrictionPctV1({ holdDays: h });
+    const R = computeFrictionV1({ holdDays: h });
     L.push(`| ${h}j | ${pct.toFixed(2)} % | ${R.toFixed(3)} R |`);
   }
   L.push("");

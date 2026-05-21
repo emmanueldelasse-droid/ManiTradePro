@@ -42,6 +42,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { UNIVERSE } from "./universe-v2.mjs";
+import { computeFrictionV1, computeFrictionPctV1, FRICTION_V1_METADATA } from "./lib/friction-v1.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -76,19 +77,13 @@ const UNIVERSE_MIXED = [...new Set(Object.values(UNIVERSE).flat())];
 
 // === Friction model =========================================================
 //
-// Formule canonique (cf. `rs-rotation-robustness-lab-v1.mjs` § Friction) :
-//   spread one-way     0.05 %
-//   slippage one-way   0.05 %
-//   commission one-way 0.05 %
-//   total round-trip   0.30 %
-//   overnight gap pen. 0.02 % par jour de hold
-//   conversion         5 % = 1R (convention RS Rotation v1)
-//
-// frictionR = (0.30 + 0.02 × holdDays) / 5
+// Formule canonique : voir `docs/quant/FRICTION_MODEL.md` + module
+// `tools/backtests/lib/friction-v1.mjs` (source technique unique depuis
+// CLEAN-1 PR-FRICTION-CANON). Métadonnées exposées via
+// `FRICTION_V1_METADATA`.
 
 function frictionRPerTrade(holdDays) {
-  const pct = 0.30 + 0.02 * holdDays;
-  return pct / 5;
+  return computeFrictionV1({ holdDays });
 }
 
 // === Helpers ================================================================

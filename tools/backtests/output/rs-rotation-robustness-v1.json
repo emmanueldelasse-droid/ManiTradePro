@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-20T06:54:09.811Z",
+  "generatedAt": "2026-05-21T13:34:41.300Z",
   "scope": "RS Rotation robustness hardening — focused depth analysis on the frozen baseline (complementary to rs-rotation-robustness-lab-v1.mjs which sweeps breadth).",
   "baseline": {
     "lookback": 90,
@@ -34,32 +34,32 @@
   "universe": {
     "name": "mixed",
     "description": "Tous les groupes UNIVERSE de universe-v2.mjs flat.",
-    "loadedSymbols": 158,
+    "loadedSymbols": 169,
     "totalRequested": 191,
     "survivorshipBias": "Univers ex-post (survivants 2021-2025). Pas de delistés. Limitation documentée — cf. RESEARCH_FRAMEWORK_FREEZE_V1.md § 10."
   },
   "baseline_NO_RISK_OFF": {
     "summary": {
-      "trades": 929,
+      "trades": 930,
       "wins": 506,
-      "losses": 423,
-      "winrate": 54.47,
-      "expectancyR": 0.7427,
+      "losses": 424,
+      "winrate": 54.41,
+      "expectancyR": 0.741,
       "profitFactor": 1.532,
-      "totalR": 689.94,
-      "maxDrawdownR": 226.21,
+      "totalR": 689.1,
+      "maxDrawdownR": 222.82,
       "longestLossStreak": 19
     },
     "yearly": {
       "2021": {
         "trades": 170,
-        "pf": 1.537,
-        "totalR": 146.28
+        "pf": 1.526,
+        "totalR": 143.94
       },
       "2022": {
-        "trades": 59,
-        "pf": 0.144,
-        "totalR": -92.97
+        "trades": 60,
+        "pf": 0.146,
+        "totalR": -91.24
       },
       "2023": {
         "trades": 250,
@@ -68,8 +68,8 @@
       },
       "2024": {
         "trades": 250,
-        "pf": 1.685,
-        "totalR": 240.09
+        "pf": 1.684,
+        "totalR": 239.87
       },
       "2025": {
         "trades": 200,
@@ -80,28 +80,28 @@
   },
   "regimes": {
     "ALL_REGIMES": {
-      "trades": 1091,
+      "trades": 1097,
       "summary": {
-        "trades": 1091,
-        "wins": 577,
-        "losses": 514,
-        "winrate": 52.89,
-        "expectancyR": 0.5963,
-        "profitFactor": 1.426,
-        "totalR": 650.6,
-        "maxDrawdownR": 311.66,
+        "trades": 1097,
+        "wins": 579,
+        "losses": 518,
+        "winrate": 52.78,
+        "expectancyR": 0.5927,
+        "profitFactor": 1.424,
+        "totalR": 650.21,
+        "maxDrawdownR": 305.38,
         "longestLossStreak": 19
       },
       "yearly": {
         "2021": {
           "trades": 170,
-          "pf": 1.537,
-          "totalR": 146.28
+          "pf": 1.526,
+          "totalR": 143.94
         },
         "2022": {
-          "trades": 197,
-          "pf": 0.549,
-          "totalR": -138.42
+          "trades": 203,
+          "pf": 0.562,
+          "totalR": -136.24
         },
         "2023": {
           "trades": 250,
@@ -110,8 +110,8 @@
         },
         "2024": {
           "trades": 250,
-          "pf": 1.685,
-          "totalR": 240.09
+          "pf": 1.684,
+          "totalR": 239.87
         },
         "2025": {
           "trades": 224,
@@ -121,28 +121,28 @@
       }
     },
     "NO_RISK_OFF": {
-      "trades": 929,
+      "trades": 930,
       "summary": {
-        "trades": 929,
+        "trades": 930,
         "wins": 506,
-        "losses": 423,
-        "winrate": 54.47,
-        "expectancyR": 0.7427,
+        "losses": 424,
+        "winrate": 54.41,
+        "expectancyR": 0.741,
         "profitFactor": 1.532,
-        "totalR": 689.94,
-        "maxDrawdownR": 226.21,
+        "totalR": 689.1,
+        "maxDrawdownR": 222.82,
         "longestLossStreak": 19
       },
       "yearly": {
         "2021": {
           "trades": 170,
-          "pf": 1.537,
-          "totalR": 146.28
+          "pf": 1.526,
+          "totalR": 143.94
         },
         "2022": {
-          "trades": 59,
-          "pf": 0.144,
-          "totalR": -92.97
+          "trades": 60,
+          "pf": 0.146,
+          "totalR": -91.24
         },
         "2023": {
           "trades": 250,
@@ -151,8 +151,8 @@
         },
         "2024": {
           "trades": 250,
-          "pf": 1.685,
-          "totalR": 240.09
+          "pf": 1.684,
+          "totalR": 239.87
         },
         "2025": {
           "trades": 200,
@@ -165,12 +165,12 @@
       "trades": 290,
       "summary": {
         "trades": 290,
-        "wins": 172,
-        "losses": 118,
-        "winrate": 59.31,
-        "expectancyR": 0.7749,
-        "profitFactor": 1.701,
-        "totalR": 224.71,
+        "wins": 173,
+        "losses": 117,
+        "winrate": 59.66,
+        "expectancyR": 0.7813,
+        "profitFactor": 1.711,
+        "totalR": 226.57,
         "maxDrawdownR": 81.91,
         "longestLossStreak": 10
       },
@@ -178,8 +178,8 @@
         "2021": null,
         "2022": {
           "trades": 40,
-          "pf": 0.257,
-          "totalR": -38.95
+          "pf": 0.268,
+          "totalR": -36.86
         },
         "2023": {
           "trades": 200,
@@ -189,7 +189,7 @@
         "2024": {
           "trades": 10,
           "pf": 999,
-          "totalR": 22.31
+          "totalR": 22.08
         },
         "2025": {
           "trades": 40,
@@ -199,16 +199,16 @@
       }
     },
     "RISK_ON_ONLY": {
-      "trades": 529,
+      "trades": 530,
       "summary": {
-        "trades": 529,
+        "trades": 530,
         "wins": 254,
-        "losses": 275,
-        "winrate": 48.02,
-        "expectancyR": 0.4653,
+        "losses": 276,
+        "winrate": 47.92,
+        "expectancyR": 0.4638,
         "profitFactor": 1.28,
-        "totalR": 246.15,
-        "maxDrawdownR": 222.1,
+        "totalR": 245.79,
+        "maxDrawdownR": 222.46,
         "longestLossStreak": 19
       },
       "yearly": {
@@ -218,9 +218,9 @@
           "totalR": -72.8
         },
         "2022": {
-          "trades": 19,
+          "trades": 20,
           "pf": 0.038,
-          "totalR": -54.02
+          "totalR": -54.38
         },
         "2023": {
           "trades": 50,
@@ -257,14 +257,14 @@
           "2023"
         ],
         "train": {
-          "trades": 229,
+          "trades": 230,
           "wins": 114,
-          "losses": 115,
-          "winrate": 49.78,
-          "expectancyR": 0.2328,
-          "profitFactor": 1.14,
-          "totalR": 53.32,
-          "maxDrawdownR": 226.21,
+          "losses": 116,
+          "winrate": 49.57,
+          "expectancyR": 0.2291,
+          "profitFactor": 1.139,
+          "totalR": 52.7,
+          "maxDrawdownR": 222.82,
           "longestLossStreak": 19
         },
         "test": {
@@ -292,14 +292,14 @@
           "2024"
         ],
         "train": {
-          "trades": 479,
+          "trades": 480,
           "wins": 266,
-          "losses": 213,
-          "winrate": 55.53,
-          "expectancyR": 0.6979,
+          "losses": 214,
+          "winrate": 55.42,
+          "expectancyR": 0.6951,
           "profitFactor": 1.516,
-          "totalR": 334.28,
-          "maxDrawdownR": 226.21,
+          "totalR": 333.66,
+          "maxDrawdownR": 222.82,
           "longestLossStreak": 19
         },
         "test": {
@@ -307,9 +307,9 @@
           "wins": 133,
           "losses": 117,
           "winrate": 53.2,
-          "expectancyR": 0.9604,
-          "profitFactor": 1.685,
-          "totalR": 240.09,
+          "expectancyR": 0.9595,
+          "profitFactor": 1.684,
+          "totalR": 239.87,
           "maxDrawdownR": 139.59,
           "longestLossStreak": 14
         },
@@ -328,14 +328,14 @@
           "2025"
         ],
         "train": {
-          "trades": 729,
+          "trades": 730,
           "wins": 399,
-          "losses": 330,
-          "winrate": 54.73,
-          "expectancyR": 0.7879,
-          "profitFactor": 1.576,
-          "totalR": 574.37,
-          "maxDrawdownR": 226.21,
+          "losses": 331,
+          "winrate": 54.66,
+          "expectancyR": 0.7857,
+          "profitFactor": 1.575,
+          "totalR": 573.53,
+          "maxDrawdownR": 222.82,
           "longestLossStreak": 19
         },
         "test": {
@@ -357,33 +357,33 @@
     "passRobust": 3
   },
   "concentration": {
-    "universeSize": 96,
-    "positiveContributors": 60,
-    "sumPositiveR": 927.34,
+    "universeSize": 97,
+    "positiveContributors": 59,
+    "sumPositiveR": 926.48,
     "top5": [
       {
         "symbol": "SOL",
         "trades": 29,
         "totalR": 107.608,
-        "sharePctOfPositive": 11.6
+        "sharePctOfPositive": 11.61
       },
       {
         "symbol": "APLD",
         "trades": 49,
         "totalR": 94.184,
-        "sharePctOfPositive": 10.16
+        "sharePctOfPositive": 10.17
       },
       {
         "symbol": "AVAX",
         "trades": 21,
         "totalR": 90.947,
-        "sharePctOfPositive": 9.81
+        "sharePctOfPositive": 9.82
       },
       {
         "symbol": "APP",
         "trades": 41,
         "totalR": 86.687,
-        "sharePctOfPositive": 9.35
+        "sharePctOfPositive": 9.36
       },
       {
         "symbol": "PLTR",
@@ -393,29 +393,29 @@
       }
     ],
     "top5SumPositiveR": 451.25,
-    "top5SharePctOfPositive": 48.66,
-    "top5SharePctOfAbs": 38.74,
-    "singleMaxSharePctOfPositive": 11.6,
-    "pfWithoutTop5": 1.22,
-    "totalRWithoutTop5": 238.69,
-    "tradesWithoutTop5": 758
+    "top5SharePctOfPositive": 48.71,
+    "top5SharePctOfAbs": 38.77,
+    "singleMaxSharePctOfPositive": 11.61,
+    "pfWithoutTop5": 1.219,
+    "totalRWithoutTop5": 237.85,
+    "tradesWithoutTop5": 759
   },
   "drawdown": {
-    "maxDrawdownR": 226.21,
+    "maxDrawdownR": 222.82,
     "longestLossStreak": 19,
     "worstDD": {
-      "magnitudeR": 226.21,
+      "magnitudeR": 222.82,
       "startDate": "2021-11-03",
       "endDate": "2022-12-14",
-      "durationTrades": 105
+      "durationTrades": 106
     }
   },
   "worst": {
     "worstYear": {
       "year": "2022",
-      "pf": 0.144,
-      "trades": 59,
-      "totalR": -92.97
+      "pf": 0.146,
+      "trades": 60,
+      "totalR": -91.24
     },
     "worstSplit": {
       "name": "S3",
@@ -426,7 +426,7 @@
   "verdict": {
     "status": "KEEP_RESEARCH_CANDIDATE",
     "reasons": [
-      "Pire année (2022) PF = 0.144 < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés."
+      "Pire année (2022) PF = 0.146 < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés."
     ],
     "vocabulary": "Freeze v1 + truth-sync 2026-05-19. Interdit ici : VALIDATED_RESEARCH_CORE, LIVE_READY.",
     "note": "Statut proposé par ce script. La promotion finale reste subordonnée à validation ChatGPT (gouvernance projet)."
