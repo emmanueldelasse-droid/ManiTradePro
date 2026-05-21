@@ -376,6 +376,29 @@ Réponse : `{ generatedAt, windowHours, cutoffAt, totals:{openBlocked, closeBloc
 
 `analysis_snapshot` contient désormais `strategicAnalysis` et `liveContext` (additif, ne casse pas l'existant).
 
+### Live Paper Analytics V1 (PR-LIVE-PAPER-ANALYTICS-1, mai 2026)
+
+Depuis PR-LIVE-PAPER-ANALYTICS-1, deux sous-clés JSONB additives sont peuplées dans `analysis_snapshot` pour chaque trade paper :
+
+- **À l'ouverture** — `mtp_positions.analysis_snapshot.livePaperAnalytics` :
+  - `setupId` (mapping engine → matrice CTX-3), `setupStatusRef`, `engineSetupType`
+  - `regime`, `regimeConfidence`
+  - `scores` (strategicScore, decisionScore, safetyScore, exploitabilityScore)
+  - `plan` (entry, stopLoss, takeProfit, rr, horizon)
+  - `setupAuthorization` — résultat **observé** de la matrice CTX-3 (jamais bloquant — cf. § *Innocuité* dans `docs/quant/LIVE_PAPER_ANALYTICS.md`)
+  - `quoteQuality` (miroir de `liveContext.quoteQuality`)
+  - `warnings` (incluant `sector_leadership_untrusted` si jamais `sectorLeadership` capturé — cf. `KNOWN_ISSUES.md` #15)
+
+- **À la clôture** — `mtp_trades.analysis_snapshot.livePaperOutcome` :
+  - `exitReason`, `entryPrice`, `exitPrice`, `pnl`, `pnlPct`, `durationDays`
+  - `hitStop`, `hitTakeProfit`, `intradayDetected`
+  - `maxFavorableExcursion`, `maxAdverseExcursion` (calculés depuis `position.live.highSinceOpen` / `lowSinceOpen`)
+  - `signalQuality` ∈ `{GOOD, NOISY, BAD, UNKNOWN}` (heuristique déterministe — détails dans `docs/quant/LIVE_PAPER_ANALYTICS.md` § 2.3)
+  - `validationStatus` ∈ `{OK, SUSPECT, INVALID, UNKNOWN}` (normalisation de `tradeValidationEngine.quality`)
+  - `quoteQualityAtClose`, `qualityFlags`, `warnings`
+
+Aucune migration SQL — les deux sous-clés rejoignent les colonnes JSONB existantes. **L'instrumentation n'influence aucune décision côté worker** (ouverture, fermeture, sizing, learning filters tous préservés). Source canonique : `docs/quant/LIVE_PAPER_ANALYTICS.md`.
+
 ### Affichage front
 
 - Carte opportunités : ring = `safetyScoreFrom(item)` → `plan.safetyScore` brut (composite, inchangé)

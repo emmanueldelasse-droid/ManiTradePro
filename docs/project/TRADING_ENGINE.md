@@ -139,9 +139,10 @@ Chaque blocage écrit un événement `auto_open_blocked_unsafe` dans `mtp_traini
 
 1. `chooseTrainingExecution` → calcul de la quantité (sizing)
 2. `buildTrainingPositionRowFromSignal` → construction de la ligne `mtp_positions` incluant snapshot complet (`analysis_snapshot`)
-3. Anti-race : vérification qu'aucune position ouverte n'existe déjà sur ce symbol+side
-4. INSERT dans `mtp_positions`
-5. Log `trade_opened` dans `mtp_training_events`
+3. **PR-LIVE-PAPER-ANALYTICS-1** : ajoute `analysis_snapshot.livePaperAnalytics` (try/catch silencieux, n'influence aucune décision — cf. `docs/quant/LIVE_PAPER_ANALYTICS.md`)
+4. Anti-race : vérification qu'aucune position ouverte n'existe déjà sur ce symbol+side
+5. INSERT dans `mtp_positions`
+6. Log `trade_opened` dans `mtp_training_events`
 
 ### Sizing du trade
 
@@ -253,6 +254,7 @@ Cas réel évité : position ASML ouverte à 1531 $US Nasdaq, live arrivé à 13
 
 - **`snapshotId` sur les payloads** : livré en vague B.4. La cohérence carte ↔ fiche est désormais garantie analytiquement (cf. `PROJECT_RULES.md` R4 et `docs/project/DATA_PIPELINE.md`).
 - **`tradeValidationEngine` étendu** : actuellement 5 règles (`invalid_price`, `extreme_move`, `stale_quote`, `partial_data`, `instant_close`). Pas de règle pour `currency_unknown`, `provider_divergence` ou `news_window_breach`. À étendre selon les besoins observés.
+- **Live Paper Analytics V1** : livré (PR-LIVE-PAPER-ANALYTICS-1). Chaque close ajoute `analysis_snapshot.livePaperOutcome` (signalQuality / validationStatus / MAE / MFE / etc.) via try/catch silencieux. Aucune décision modifiée. Cf. `docs/quant/LIVE_PAPER_ANALYTICS.md` § 3.2.
 - **Slippage et exécution réaliste** : aucun modèle de slippage en paper. Le prix d'exécution = entry/exit théorique. Hors périmètre actuel.
 - **Préparation broker réel** : pas d'`execution-engine` adapter pour Interactive Brokers / Alpaca / autre. Tout le code paper trade actuel devra être doublé d'un mode "real" quand on basculera. Conditions de passage : cf. `BOT_OBJECTIVE.md` § *Conditions avant passage en bot réel*.
 
