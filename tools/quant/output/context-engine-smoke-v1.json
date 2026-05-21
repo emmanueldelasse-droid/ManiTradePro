@@ -1,0 +1,123 @@
+{
+  "smokeMeta": {
+    "script": "tools/quant/context-engine-smoke-v1.mjs",
+    "universeLoaded": [
+      "SPY",
+      "QQQ",
+      "SMH",
+      "XLK",
+      "XLF",
+      "XLE",
+      "XLV",
+      "XLI",
+      "XLY",
+      "XLP",
+      "XLU",
+      "XLB",
+      "XLRE",
+      "XLC",
+      "TLT",
+      "GLD"
+    ],
+    "universeMissingOnDisk": [],
+    "asOfRequested": null
+  },
+  "snapshot": {
+    "version": "context-engine-v1",
+    "asOf": "2025-12-31",
+    "regime": "RISK_ON",
+    "regimeConfidence": 100,
+    "regimeSource": {
+      "primary": "SPY",
+      "rulesVersion": "regime-rules-v1"
+    },
+    "breadth": {
+      "riskOnCount": 7,
+      "riskOffCount": 7,
+      "neutralCount": 0,
+      "totalEvaluated": 14,
+      "pctRiskOn": 50,
+      "pctRiskOff": 50
+    },
+    "sectorLeadership": {
+      "leaders": [
+        {
+          "symbol": "XLV",
+          "score": 0.0305,
+          "trendState": "ABOVE_EMA200",
+          "relStrength20d": 0.0023,
+          "relStrength63d": 0.0588
+        },
+        {
+          "symbol": "XLF",
+          "score": 0.0208,
+          "trendState": "ABOVE_EMA200",
+          "relStrength20d": 0.036,
+          "relStrength63d": 0.0057
+        },
+        {
+          "symbol": "XLC",
+          "score": 0.0048,
+          "trendState": "ABOVE_EMA200",
+          "relStrength20d": 0.021,
+          "relStrength63d": -0.0115
+        }
+      ],
+      "laggards": [
+        {
+          "symbol": "XLU",
+          "score": -0.5251,
+          "trendState": "BELOW_EMA200",
+          "relStrength20d": -0.5148,
+          "relStrength63d": -0.5353
+        },
+        {
+          "symbol": "XLE",
+          "score": -0.5121,
+          "trendState": "BELOW_EMA200",
+          "relStrength20d": -0.5046,
+          "relStrength63d": -0.5197
+        },
+        {
+          "symbol": "XLY",
+          "score": -0.5103,
+          "trendState": "BELOW_EMA200",
+          "relStrength20d": -0.4955,
+          "relStrength63d": -0.525
+        }
+      ]
+    },
+    "vol": {
+      "proxy": "SPY_REALIZED_VOL_20D",
+      "value": 0.0861,
+      "state": "LOW"
+    },
+    "defensiveConfirmation": {
+      "tltState": "NEUTRAL",
+      "gldState": "NEUTRAL"
+    },
+    "warnings": [],
+    "dataQuality": {
+      "missingSymbols": [],
+      "insufficientHistory": [],
+      "evaluatedSymbols": [
+        "SPY",
+        "QQQ",
+        "SMH",
+        "XLK",
+        "XLF",
+        "XLE",
+        "XLV",
+        "XLI",
+        "XLY",
+        "XLP",
+        "XLU",
+        "XLB",
+        "XLRE",
+        "XLC",
+        "TLT",
+        "GLD"
+      ]
+    }
+  }
+}

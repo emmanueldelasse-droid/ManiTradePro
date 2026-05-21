@@ -241,6 +241,34 @@ Avant B.10, ce trou existait pour Yahoo (le provider posait `quotedAt = nowIso()
 
 ---
 
+### #15 🟡 Données 2025 : splits / dividendes non ajustés sur certains ETF sectoriels SPDR
+
+**Description**
+Le smoke run de `tools/quant/context-engine-smoke-v1.mjs` sur `data/{SYMBOL}_2025.json` (PR-CTX-2, asOf 2025-12-31) révèle des retours 20j et 63j incohérents sur certains ETF sectoriels SPDR :
+- XLY : `pctChange20d ≈ −49,5 %`, `pctChange63d ≈ −50,5 %`
+- XLE : `pctChange20d ≈ −50,4 %`, `pctChange63d ≈ −50,0 %`
+- XLU : `pctChange20d ≈ −51,4 %`, `pctChange63d ≈ −51,5 %`
+
+Ces magnitudes (≈ ×0,5 sur 20 sessions) sont structurellement impossibles en réel sur des ETF sectoriels diversifiés. Le pattern (~−50 %) suggère un **split 2:1 non ajusté** dans le dataset historique. Les autres symboles (SPY, QQQ, XLV, XLF, etc.) ne présentent pas ce pattern.
+
+**Impact réel**
+- Faux laggards dans le `sectorLeadership` du Context Engine V1 : XLU/XLE/XLY apparaissent en bottom 3 sur des écarts artificiels.
+- Aucun impact runtime (le module n'est pas branché).
+- Risque latent si un futur consommateur (PR-CTX-3, backtest sectoriel, etc.) traite ces datasets sans ajustement.
+
+**Cause probable**
+Datasets `data/{SYMBOL}_2025.json` non ajustés des corporate actions (splits, dividendes spéciaux) pour au moins ces 3 symboles. À vérifier vs la source originale (EODHD / Yahoo / autre).
+
+**Mitigation actuelle**
+Le Context Engine V1 ne corrige pas — par construction, il consomme les bougies telles quelles. Documenté explicitement dans `docs/quant/CONTEXT_ENGINE.md` § 5.2.
+
+**Solution prévue**
+PR dédiée qualité données : ré-ingestion ajustée (`adjusted close`) de l'univers contexte V1 + audit étendu aux autres symboles `data/*_2025.json`. Hors scope PR-CTX-2.
+
+**État** : OPEN. Détecté 2026-05-21 par PR-CTX-2.
+
+---
+
 ### #14 🟡 SESSION.md oversized
 
 **Status**
