@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-RS-HARDENING Phase 1 : nouveau script `tools/backtests/rs-rotation-hardening-v1.mjs`. 8 stress tests A.1-A.8 + matrice 4 régimes officiels v1 (RISK_ON, RANGE, RISK_OFF, HIGH_VOL). Findings : friction résistante jusqu'à ×3 (PF 1.30), RANGE = régime optimal (PF 2.04), HIGH_VOL très positif petit sample (PF 5.64 n=10), 2022 PF 0.146 catastrophique. Survival 21/25 SURVIVES, 2 MARGINAL, 2 KILLED. Verdict `HARDENED_FRAGILE` (un seul critère fail : bear 2022). Statut Setup 3 inchangé `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`).
-- **Dernier merge connu** : PR #239 `research(meanrev): PR-R3B-v3 strict rerun on completed 15 ETF dataset` (commit `c91a23a` sur `main`). Précédents : `cdbc1cb` (créateur ETF SPDR), PR #238 (`f826acc`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-CTX-1 documentation Univers Core officiel V1 : création `docs/quant/UNIVERSE_CORE_V1.md` qui fige 78 actifs (27 ETF + 35 leaders US + 10 Europe + 6 crypto) comme liste opérationnelle pour Phase 2 Context Engine. PR strictement documentaire. Aucun script. Aucun runtime. Aucun changement de statut setup).
+- **Dernier merge connu** : PR #240 `research(rs-rotation): PR-RS-HARDENING Phase 1 — 8 stress tests + 4-state regime matrix` (commit `17113b6` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,43 +52,28 @@
 
 ## PR en cours
 
-- **PR** : PR-RS-HARDENING Phase 1 — stress tests + regime validation — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Mission créateur** : phase "RS Rotation Hardening" — robustesse, survivabilité, stabilité multi-régime, résistance friction, contrôle concentration, gestion exposition. Cette PR couvre la **Phase 1** (A stress tests + B regime validation). Les phases C (exposure control) et D (quality metrics) sont des designs d'architecture qui méritent des PR séparées (`une PR = un objectif`).
-- **Scope Phase 1** :
-  - A. 8 stress tests : A.1 friction ×1/×2/×3, A.2 slippage 0.05/0.10/0.20 %, A.3 délai +1d/+2d/+5d, A.4 sans top 5/10 symboles + sans top 3 dates + combinés, A.5 stress sectoriel (sans secteur dominant), A.6 bear 2022 isolé, A.7 concentration sweep topN 5/10/20, A.8 volatility expansion (rvol SPY > 25 % annualisée).
-  - B. Matrice par régime 4 états officiels v1 (RISK_ON, RANGE, RISK_OFF, HIGH_VOL).
-- **Paramètres baseline gelés** ex-ante (identiques `rs-rotation-robustness-v1.mjs` PR #234).
+- **PR** : PR-CTX-1 documentation Univers Core officiel V1 — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Objectif unique** : figer la liste opérationnelle des 78 actifs de l'Univers Core V1 (sous-ensemble curé des 181 classifiés `ASSET_REGISTRY`, conforme à la fourchette 40-120 de `TRADING_PHILOSOPHY` § 5). Prerequisite documentaire pour la Phase 2 Context Engine. PR strictement documentaire.
 - **Fichiers créés** :
-  - `tools/backtests/rs-rotation-hardening-v1.mjs` (~780 lignes, focal sur Phase 1).
-  - `tools/backtests/output/rs-rotation-hardening-v1.json` (~25 KB).
-  - `tools/backtests/output/rs-rotation-hardening-v1.md` (~18 sections, survival map + verdict).
+  - `docs/quant/UNIVERSE_CORE_V1.md` (~310 lignes, 12 sections) — liste exacte par catégorie, exclusions explicites, règle d'évolution, articulation avec autres docs canoniques, stats couverture dataset.
 - **Fichiers modifiés** :
-  - `docs/quant/SETUPS_REGISTRY.md` — Setup 3 enrichi d'une note PR-RS-HARDENING Phase 1 (résultats stress + matrice régime + findings + implications produit). **Statut officiel Setup 3 inchangé** : `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`.
+  - `docs/quant/ASSET_REGISTRY.md` — section "Univers cible stratégique" enrichie d'un pointeur vers `UNIVERSE_CORE_V1.md` (liste opérationnelle figée). Pas de modification de la classification ELITE/CORE/TACTICAL/BLACKLIST.
   - `SESSION.md` — branche/PR active, dernier merge, PR en cours, priorités.
-- **Résultat synthétique** :
-  - **Friction stress** : PF ×1=**1.53**, ×2=**1.41**, ×3=**1.30** → RS Rotation résiste à friction extrême (critères Freeze § 4 I2 ≥ 1.10 et I3 ≥ 1.00 passés).
-  - **Matrice régime** :
-    - RANGE : 390 trades, PF **2.04** — **régime optimal** confirmé.
-    - RISK_ON : 530 trades, PF 1.28 (marginal positif).
-    - RISK_OFF : 0 trades (filtré baseline NO_RISK_OFF).
-    - HIGH_VOL : 10 trades, PF 5.64 (sample faible).
-  - **Survival map** : **21/25 SURVIVES**, 2 MARGINAL, 2 KILLED (8 % killed).
-  - **Caveat unique structurel** : 2022 PF **0.146** (catastrophique) — confirme le seul point fragile déjà identifié PR #234.
-  - **Verdict** : `HARDENED_FRAGILE` — un seul critère structurel critique fail (2022).
-- **Findings majeurs** :
-  1. Friction n'est **pas** le problème de RS Rotation. Hypothèse historique "friction tue l'edge" invalidée.
-  2. RANGE est le **régime optimal** (PF 2.04), pas RISK_ON. Confirme la conclusion historique de SETUPS_REGISTRY Setup 3.
-  3. HIGH_VOL minoritaire mais positif (à confirmer en condition de moindre exclusion baseline).
-  4. 2022 reste le seul point structurel catastrophique. Le filtre NO_RISK_OFF n'immunise pas — c'est l'année entière qui est fragile.
-- **Implications produit** (à confirmer dans PR séparée Context Engine) :
-  - Context Engine devrait **autoriser RS Rotation prioritairement en RANGE**, secondairement en RISK_ON, **désactiver** en RISK_OFF.
-  - Filtre HIGH_VOL à étudier séparément (sample faible actuel à cause de NO_RISK_OFF override).
-  - Mécanisme "protection bear" explicite (kill switch / exposure scaling) reste à concevoir — couche C "exposure control" du brief, hors scope Phase 1.
+- **Composition figée Univers Core V1** :
+  - ETF macro / sectoriels / thématiques : **27** (5 indices US + 11 SPDR sectoriels + 11 thématiques tech/IA/cyber/cloud).
+  - Leaders US large cap : **35** (10 mega tech + 8 semi structurels + 10 software/cyber/cloud + 5 quality/defensive + 2 financial).
+  - Europe limitée et contrôlée : **10** (LVMH, AIR, ASML, SAP, SIE, NESN, RMS, TTE, CAP, DSY).
+  - Crypto majeures uniquement : **6** (BTC, ETH, SOL, BNB, LINK, AVAX).
+  - **Total : 78 actifs** (sous le plafond 80 du brief).
+- **Couverture dataset** : 78/78 actifs présents dans `data/*_2025.json` avec 1255 candles 2021-01-04 → 2025-12-31. Vérifié 2026-05-19.
+- **Exclusions explicites documentées** : ETF leveraged (SOXL, TQQQ, USD, ROM), penny stocks, small caps spéculatives (AEHR, ACLS, BBAI, SOUN, WOLF, APLD, NBIS, etc.), AI hypergrowth single-name volatile (SMCI, AI, UPST), crypto altcoins illiquides, FX exotiques (EURUSD/GBPUSD/USDJPY = BLACKLIST), 54 actifs `BLACKLIST` de `ASSET_REGISTRY.md`.
+- **Articulation** : `BOT_OBJECTIVE` → `PROJECT_VISION` → `TRADING_PHILOSOPHY` § 5 (fourchette 40-120) → `ASSET_REGISTRY` § univers cible (règle stratégique) → `UNIVERSE_CORE_V1.md` (liste figée). `universe-v2.mjs` reste l'univers technique large 181 actifs pour backtests historiques recherche — **inchangé** par cette PR.
+- **Règle d'évolution** : ajout/retrait d'actif = PR documentaire dédiée. Aucune modification silencieuse.
 - **Impact runtime** : aucun.
-- **Impact quant (fond)** : aucun. Aucun paramètre setup modifié. Aucun nouveau setup. Aucune promotion.
-- **Impact documentation** : oui. Setup 3 enrichi note Phase 1 + findings + implications produit. Statut officiel inchangé.
-- **Non inclus** : Phases C (exposure control : max positions secteur, max concentration, volatility scaling, risk budget, correlation caps, allocation dynamique) et D (quality metrics : confiance statistique, sample confidence, regime confidence, edge durability, fragility score, concentration risk score) — réservées à PR séparées avec design d'architecture dédié.
-- **Conformité brief créateur + Research Framework Freeze v1** : OUI. Stress tests systématiques, aucune optimisation, aucun cherry-picking, paramètres baseline gelés, vocabulaire ne permet pas de promotion (`CONDITIONAL_EDGE`/`VALIDATED_RESEARCH_CORE`/`LIVE_READY` interdits en sortie).
+- **Impact quant (fond)** : aucun. Aucun setup modifié. Aucune promotion. Aucun verdict quantitatif touché. PR-RS-HARDENING Phase 1, MR R3B v3, etc. tous inchangés.
+- **Impact documentation** : oui. Liste opérationnelle figée pour Phase 2+.
+- **Non inclus** : Phase 2 Context Engine analytical module (réservé PR-CTX-2), Phase 2 Setup Authorization Matrix (PR-CTX-3), Phase 2 Architecture diagram (PR-CTX-4), Phase 5 Runtime Authorization Layer (PR-CTX-5 — nécessite escalade créateur pour décision worker vs pure-recherche).
+- **Conformité brief créateur + Freeze v1** : OUI. Approche progressive et contrôlée, refus scanner géant, exclusions explicites, articulation claire avec docs canoniques existantes, vocabulaire strictement documentaire.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` (et/ou créateur).
 
 ## Décisions actives
@@ -125,16 +110,19 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 6. ✅ **PR-R3B-v2 dataset integrity fix** mergée (PR #238, commit `f826acc`) — cause racine identifiée, SYMBOL_MAP fixé.
 7. ✅ **Dataset SPDR complété** (commit `cdbc1cb` créateur) — 11 ETF SPDR ajoutés (DIA + 10 sectoriels).
 8. ✅ **PR-R3B-v3 rerun strict 15 ETF** mergée (PR #239, commit `c91a23a`) — verdict NEEDS_MORE_DATA + indicateurs qualitatifs catastrophiques. Décision A/B/C Mean Reversion en attente.
-9. 🟡 **PR-RS-HARDENING Phase 1** (en cours) — stress tests A.1-A.8 + matrice 4 régimes. Verdict `HARDENED_FRAGILE`. Findings : friction résistante ×3, RANGE régime optimal (PF 2.04), 2022 PF 0.146 caveat unique.
-10. **PR-RS-HARDENING Phase 2** (subordonnée GO Phase 1) — design Context Engine couche 2.1.
-11. **PR-RS-HARDENING Phase 3** (subordonnée Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
-12. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
-13. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
-14. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
-15. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
-16. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md`.
-17. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
-11. **RS Rotation hardening complement** (uniquement après PR-R3A/B/C/D décidée) : exécuter au moins 1-2 des 10 items listés dans `SETUPS_REGISTRY.md` Setup 3 § PR-R1 update (stress friction ×2/×3 prioritaire — plus rapide à exécuter et critère Freeze § 4 I2/I3 explicite).
+9. ✅ **PR-RS-HARDENING Phase 1** mergée (PR #240, commit `17113b6`) — stress tests A.1-A.8 + matrice 4 régimes. Verdict `HARDENED_FRAGILE`. Findings : friction ×3 OK (PF 1.30), RANGE régime optimal (PF 2.04), 2022 PF 0.146 caveat unique.
+10. 🟡 **PR-CTX-1 documentation Univers Core officiel V1** (en cours) — 78 actifs figés (27 ETF + 35 leaders US + 10 Europe + 6 crypto). Prerequisite Phase 2.
+11. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO PR-CTX-1) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
+12. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
+13. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
+14. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
+15. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
+16. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
+17. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
+18. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
+19. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
+20. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md`.
+21. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
 
 Autres :
 

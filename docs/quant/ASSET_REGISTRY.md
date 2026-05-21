@@ -264,6 +264,16 @@ Trade paper
 
 **Conséquence** : la classification automatique ci-dessus opère actuellement sur **181 actifs** (l'univers `universe-v2.mjs`). L'univers cible produit (40-120) est un **sous-ensemble** de cet univers, à formaliser dans une PR future (sélection explicite des symboles, exclusions documentées par actif). Cette PR-VISION pose la **règle stratégique** ; la **liste opérationnelle exacte** sera produite séparément (futur `docs/quant/UNIVERSE_TARGET_V1.md` ou équivalent).
 
+### Univers Core V1 — liste opérationnelle figée (PR-CTX-1, 2026-05-19)
+
+La **liste exacte** de l'univers Core V1 (78 actifs : 27 ETF + 35 leaders US + 10 Europe + 6 crypto) est figée dans le document canonique dédié :
+
+> **`docs/quant/UNIVERSE_CORE_V1.md`** — source canonique de la liste opérationnelle.
+
+Cette section `ASSET_REGISTRY.md` § *Univers cible stratégique* reste la **règle stratégique** (fourchette 40-120, principes d'exclusion, articulation avec la classification ELITE/CORE/TACTICAL/BLACKLIST). `UNIVERSE_CORE_V1.md` est la **liste opérationnelle figée** consommée par les futurs scripts Phase 2 (Context Engine), Phase 3 (Exposure Control), Phase 4 (Quality Metrics).
+
+Toute évolution de la liste opérationnelle = PR documentaire dédiée (`docs(universe-core): add/remove <symbol> to/from V1`).
+
 ## Refus explicites (rappel)
 
 - Pas de scalping → univers ne comprend pas les tickers ultra-volatils utilisés pour ça (penny stocks, altcoins illiquides).
