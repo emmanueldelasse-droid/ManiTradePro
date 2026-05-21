@@ -10,8 +10,9 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/live-paper-exec-1b` (en cours — PR #250 / PR-LIVE-PAPER-EXEC-1b : micro-PR par-dessus PR #249 mergée — ajout `riskContext` + `contextCaptureStatus` + 7 tests non-régression + preuve no decision drift).
-- **Dernier merge connu** : PR #249 `quant(analytics): add Live Paper Analytics V1 (PR-LIVE-PAPER-ANALYTICS-1)` (commit `f2c427c` sur `main`).
+- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #250 sur `claude/session-md-post-1b-merge`.
+- **Dernier merge connu** : PR #250 `quant(analytics): riskContext + contextCaptureStatus + no-decision-drift proof (PR-LIVE-PAPER-EXEC-1b)` (commit `aa91eca` sur `main`).
+- **Phase projet** : **VÉRITÉ MARCHÉ** (validation ChatGPT 2026-05-21 post-merge #249/#250). Le bot paper continue à fonctionner comme avant ; chaque trade est désormais entièrement contextualisé (setup, régime, risk engine, qualité données, autorisation CTX-3 observée, MAE/MFE). Mission suivante : laisser tourner plusieurs semaines/mois, accumuler la vérité marché, observer les setups en conditions réelles AVANT toute nouvelle sophistication runtime.
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -86,7 +87,32 @@
 - **Impact runtime / quant** : aucun. La matrice **reflète** les statuts, ne les modifie pas.
 - **Statut merge** : `GO MERGE` reçu (ChatGPT) avec recommandation explicite : ne PAS lancer PR-CTX-5 avant décision architecture complète. Priorité réelle suivante = validation empirique des setups, pas multiplication des couches système.
 
+## Dernière session / dernière PR mergée (septies)
+
+- **Date** : 2026-05-21.
+- **PR** : #249 — `quant(analytics): add Live Paper Analytics V1 (PR-LIVE-PAPER-ANALYTICS-1)`.
+- **Objectif** : instrumentation analytique pure des trades paper existants. Capture `livePaperAnalytics` à l'ouverture et `livePaperOutcome` à la clôture dans le JSONB `analysis_snapshot`. AUCUNE décision modifiée. CTX-2/CTX-3 observés, jamais bloquants.
+- **Résultat** : merge squash sur `main` (commit `f2c427c`). 11/11 tests pass. 3 bug-hunters OK. 0 ligne supprimée dans worker.js. Issue qualité données #15 toujours OPEN (tagué automatiquement par `sector_leadership_untrusted`).
+- **Impact runtime / quant** : aucun.
+- **Statut merge** : `GO MERGE` reçu (ChatGPT).
+
+## Dernière session / dernière PR mergée (octies)
+
+- **Date** : 2026-05-21.
+- **PR** : #250 — `quant(analytics): riskContext + contextCaptureStatus + no-decision-drift proof (PR-LIVE-PAPER-EXEC-1b)`.
+- **Objectif** : micro-PR par-dessus PR #249. Ajout `riskContext` (lecture seule), `contextCaptureStatus` sentinelle, 7 tests EXEC-1b (5 obligatoires A-E + 2 bonus), preuve structurelle « no decision drift ».
+- **Résultat** : merge squash sur `main` (commit `aa91eca`). 18/18 tests pass. 4 bug-hunters OK. Preuve no-decision-drift : 2 nouveaux `if` (helpers analytics uniquement) ; 0 mutation de seuil ; 0 modification de fonction décisionnelle.
+- **Impact runtime / quant** : aucun.
+- **Statut merge** : `GO MERGE` reçu (ChatGPT) avec recommandation explicite : **« Le projet vient de franchir une étape majeure »** (première vraie base sérieuse du futur moteur d'apprentissage). Priorité maintenant = laisser tourner plusieurs semaines/mois de vérité marché paper live. **Ne PAS accélérer vers broker réel / IA complexe / RL / auto-learning agressif.**
+
 ## PR en cours
+
+- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #250 uniquement (`claude/session-md-post-1b-merge`).
+- **Phase actuelle** : *« vérité marché »*. Chaque trade paper est désormais entièrement contextualisé (setup, régime, risk engine, qualité données, qualité quote, autorisation CTX-3 observée, MAE/MFE, signalQuality post-mortem). Le bot continue à fonctionner comme avant. Mission suivante = observer.
+
+## Mission précédente (PR-LIVE-PAPER-EXEC-1b, livrée 2026-05-21)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (octies)* ci-dessus + PR #250.
 
 - **PR** : PR-LIVE-PAPER-ANALYTICS-1 — Live Paper Analytics V1 — branche `claude/live-paper-analytics-v1`.
 - **Mission créateur** (2026-05-21, post-CTX-3) : instrumenter le paper trading **existant** pour mesurer les setups en conditions réelles, **sans** activer d'argent réel, **sans** broker, **sans** changer la logique de décision principale. Réponse directe à la directive « validation empirique des setups » (priorité 18 SESSION.md post-CTX-3).
@@ -154,7 +180,9 @@
 - **Interdictions respectées** : pas de runtime, pas de modification SETUPS_REGISTRY, pas de promotion LIVE_READY, pas de consommation de sectorLeadership tant que #15 OPEN, pas de feature flag, pas de touch worker.js / frontend, pas de modification de l'authorization matrix worker existante.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 
-## PR complémentaire en cours — PR-LIVE-PAPER-EXEC-1b
+## Mission complémentaire (PR-LIVE-PAPER-EXEC-1b, livrée 2026-05-21)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (octies)* + PR #250.
 
 - **PR** : PR-LIVE-PAPER-EXEC-1b — micro-PR par-dessus PR #249 — branche `claude/live-paper-exec-1b` (base = `claude/live-paper-analytics-v1`, pas main).
 - **Décision ChatGPT 2026-05-21 (Option 2)** : garder PR #249 ouverte ; créer une PR complémentaire scope minimal pour finaliser le passage `analytics observables → paper live execution contextualisée complète`.
@@ -218,7 +246,9 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 16. ✅ **PR-CTX-3 Setup Authorization Matrix V1** mergée (PR #247, commit `93851a2`) — matrice DÉCLARATIVE pure pour 5 setups × 4 régimes officiels V1, alignée sur les statuts SETUPS_REGISTRY. Aucun statut modifié. Aucun branchement runtime. Invariants vérifiés par tests (aucune consommation `sectorLeadership` / XLY/XLE/XLU tant que #15 OPEN). 12/12 tests + sanity check intégration avec snapshot CTX-2 réel.
 17. ⏸ **PR-CTX-5 Runtime authorization layer** : **EN PAUSE par décision ChatGPT 2026-05-21**. Motif : brancher la matrice côté runtime maintenant = sur-ingénierie prématurée tant qu'aucun setup ne possède une preuve robuste d'edge stable multi-régime/multi-période. À reprendre **uniquement après décision architecture complète** et seulement si l'étape (18) ci-dessous produit au moins un setup stabilisé.
 18. 🟢 **Priorité réelle suivante (directive ChatGPT 2026-05-21)** : **validation empirique des setups**, pas multiplication des couches système. Pistes concrètes (à arbitrer par créateur + ChatGPT) : (a) walk-forward conditionnel régime sur RS Rotation simple ; (b) friction ×2/×3 hardening complémentaire sur RS Rotation, GLD Breakout isolé ; (c) décision A/B/C Mean Reversion V1 ; (d) audit anti-look-ahead spécifique `sectorMomentum` (préalable à toute reprise de SECTOR_RS) ; (e) re-ingestion ajustée des datasets `data/{SYMBOL}_2025.json` pour fermer KNOWN_ISSUES #15.
-19. 🟡 **PR-LIVE-PAPER-ANALYTICS-1 Live Paper Analytics V1** (en cours, branche `claude/live-paper-analytics-v1`) — instrumentation analytique pure des trades paper existants. Aucune décision modifiée. `analysis_snapshot.livePaperAnalytics` à l'ouverture + `analysis_snapshot.livePaperOutcome` à la clôture. Réponse concrète à la priorité (18) — produit les données empiriques nécessaires pour évaluer les setups en marché vivant sans risquer d'illusion LIVE_READY.
+19. ✅ **PR-LIVE-PAPER-ANALYTICS-1 Live Paper Analytics V1** mergée (PR #249, commit `f2c427c`) — instrumentation analytique pure des trades paper. `analysis_snapshot.livePaperAnalytics` à l'ouverture + `analysis_snapshot.livePaperOutcome` à la clôture. 11/11 tests + 3 bug-hunters OK.
+19a. ✅ **PR-LIVE-PAPER-EXEC-1b Live Paper Execution complémentaire** mergée (PR #250, commit `aa91eca`) — ajout `riskContext` (lecture seule), `contextCaptureStatus` sentinelle, 7 tests non-régression EXEC-1b, preuve structurelle « no decision drift ». 18/18 tests + 4 bug-hunters OK. ChatGPT : *« Le projet vient de franchir une étape majeure — première vraie base sérieuse du futur moteur d'apprentissage »*.
+19b. 🟢 **Phase actuelle : « VÉRITÉ MARCHÉ »** (directive ChatGPT 2026-05-21 post-merge #249/#250) : laisser tourner le paper live, accumuler plusieurs semaines/mois de données réelles contextualisées (setup × régime × risk × qualité données × qualité quote × MAE/MFE × signalQuality). Mission = OBSERVER. **Ne PAS accélérer** vers broker réel, IA complexe, RL, auto-learning agressif. Objectif factuel à mesurer ensuite : quels setups survivent réellement, dans quels régimes, avec quelle stabilité, dégradation, qualité signal, robustesse.
 20. ⏸ **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée décision créateur) — initialement prévue comme synthèse Phase 2 ; reportée tant que la directive ChatGPT du 2026-05-21 (priorité = validation empirique) n'est pas levée.
 21. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
 22. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
