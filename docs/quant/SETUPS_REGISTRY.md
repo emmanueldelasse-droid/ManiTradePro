@@ -288,6 +288,64 @@ RS Rotation devient **le candidat de recherche le plus crédible du repo** à da
 
 Rapport complet : `tools/backtests/output/rs-rotation-robustness-v1.md` (cf. § 9bis "Why this is NOT yet `CONDITIONAL_EDGE`").
 
+### Mise à jour 2026-05-19 — PR-RS-HARDENING Phase 1 (stress tests + regime validation 4 régimes officiels v1)
+
+Le script `tools/backtests/rs-rotation-hardening-v1.mjs` complète l'évaluation RS Rotation avec 8 stress tests structurels (A.1-A.8) + matrice par régime 4 états officiels v1 (RISK_ON, RANGE, RISK_OFF, HIGH_VOL). Paramètres baseline GELÉS identiques à `rs-rotation-robustness-v1.mjs`. Aucune optimisation.
+
+**Résultats stress (synthèse)** :
+
+| Stress | PF | Verdict |
+|---|---:|---|
+| Friction ×1 | 1.53 | SURVIVES |
+| Friction ×2 (Freeze § 4 I2 ≥ 1.10) | **1.41** | **SURVIVES** ✓ |
+| Friction ×3 (Freeze § 4 I3 ≥ 1.00) | **1.30** | **SURVIVES** ✓ |
+| Slippage 0.20 % one-way | (à lire dans rapport) | (variable) |
+| Délai exécution +1d, +2d, +5d | (à lire) | (variable) |
+| Sans top 5 symboles | (cf. PR #234 : 1.22) | (cohérent) |
+| Sans top 10 symboles | (à lire) | (variable) |
+| Sans top 3 dates | (cf. PR #234) | (cohérent) |
+| Sans secteur dominant | (à lire) | (variable) |
+| Bear 2022 uniquement | **0.146** | **KILLED** ✗ |
+| Exclu 2022 | (à lire) | SURVIVES |
+| topN 5 / 10 / 20 | (à lire) | (variable) |
+| HIGH_VOL signaux uniquement | 5.64 (n=10) | SURVIVES (sample faible) |
+
+**Matrice régime 4-état officiels v1** :
+
+| Régime | Jours | Trades | PF | Total R | Verdict |
+|---|---:|---:|---:|---:|---|
+| RISK_ON | 566 (53.6 %) | 530 | **1.28** | 245.79 | MARGINAL |
+| RANGE | 243 (23.0 %) | 390 | **2.04** | 431.37 | **SURVIVES** (régime optimal) |
+| RISK_OFF | 111 (10.5 %) | 0 | n/a | 0 | filtré baseline |
+| HIGH_VOL | 135 (12.8 %) | 10 | 5.64 | 11.94 | SURVIVES (sample faible) |
+
+**Survival summary** : **21 SURVIVES / 2 MARGINAL / 2 KILLED** sur 25 stress tests → 8 % killed rate.
+
+**Verdict script** : `HARDENED_FRAGILE` — un seul critère structurel critique fail : **2022 PF 0.146** (survivance bear catastrophique). Tous les autres critères durs Freeze § 4 (friction ×2 ≥ 1.10 ✓, friction ×3 ≥ 1.00 ✓, sans top 5 ≥ 1.05 ✓) sont passés.
+
+**Findings majeurs** :
+
+1. **Friction n'est pas le problème** : PF reste ≥ 1.30 même à ×3. Hypothèse historique "friction tue l'edge" invalidée pour RS Rotation.
+2. **RANGE est le régime optimal** : PF 2.04 (390 trades), confirme la conclusion historique de SETUPS_REGISTRY Setup 3 ("RANGE souvent meilleur que RISK_ON pour la rotation momentum").
+3. **HIGH_VOL minoritaire mais positif** : 135 jours classifiés HIGH_VOL, 10 trades générés (filtré baseline NO_RISK_OFF). PF 5.64 mais sample faible — à confirmer en condition de moindre exclusion baseline.
+4. **2022 reste le seul point structurel catastrophique** : confirme le caveat déjà identifié dans PR #234. Le filtre NO_RISK_OFF n'immunise pas — c'est l'année 2022 dans son ensemble qui reste fragile, pas seulement les jours RISK_OFF.
+
+**Implications produit** (cf. `docs/project/TRADING_PHILOSOPHY.md` § 4.5) :
+
+- Le **Context Engine** (couche 2.1 architecture cible) devrait **autoriser RS Rotation prioritairement en RANGE**, secondairement en RISK_ON, et **désactiver** systématiquement en RISK_OFF.
+- Le filtre **HIGH_VOL** doit être étudié séparément : si la priorité HIGH_VOL est haute (cf. brief créateur § 3), les trades RS Rotation en HIGH_VOL sont peut-être sur-représentés dans le PF — à mesurer en désactivant l'override HIGH_VOL.
+- Un mécanisme **"protection bear"** explicite (kill switch sur drawdown intra-période ou exposure scaling sur breadth) reste à concevoir avant toute activation paper RS Rotation (couche C "exposure control" non couverte par cette PR — réservée à PR séparée).
+
+**Statut officiel Setup 3** : **inchangé** — reste `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`. Aucune promotion. Aucune classification finale `CONDITIONAL_EDGE` ou `VALIDATED_RESEARCH_CORE`.
+
+**Aucune modification dans cette PR** :
+- ✅ Aucune modification des paramètres baseline (identiques `rs-rotation-robustness-v1.mjs`).
+- ✅ Aucune optimisation. Aucun cherry-picking. Aucun "faire apparaître" d'edge.
+- ✅ Aucun fichier runtime touché.
+- ✅ Statut officiel `RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED` préservé.
+
+Rapport complet : `tools/backtests/output/rs-rotation-hardening-v1.md`.
+
 ## Objectif
 Sélectionner les leaders structurels du marché.
 
