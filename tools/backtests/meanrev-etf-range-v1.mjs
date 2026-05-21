@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { UNIVERSE } from "./universe-v2.mjs";
+import { computeFrictionV1, FRICTION_V1_METADATA } from "./lib/friction-v1.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -288,10 +289,10 @@ console.log(`[meanrev-etf-range-v1] jours RANGE / total : ${rangeDaysCount} / ${
 //            (c) sinon, exit forcé à open[i+11] (horizon 10j atteint).
 //   - friction appliquée à la sortie selon multiplier.
 
+// Source canonique : `docs/quant/FRICTION_MODEL.md` + `lib/friction-v1.mjs`
+// (CLEAN-1 PR-FRICTION-CANON).
 function frictionRPerTrade(holdDays, multiplier = 1) {
-  // formule projet : (0.30 + 0.02 × holdDays) / 5
-  const pct = (0.30 + 0.02 * holdDays) * multiplier;
-  return pct / 5;
+  return computeFrictionV1({ holdDays, multiplier });
 }
 
 function simulateAll() {

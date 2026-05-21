@@ -1,6 +1,6 @@
 # RS Rotation Robustness Lab v1 — ManiTradePro
 
-> Généré le 2026-05-18T14:58:14.184Z par `tools/backtests/rs-rotation-robustness-lab-v1.mjs`.
+> Généré le 2026-05-21T13:34:40.639Z par `tools/backtests/rs-rotation-robustness-lab-v1.mjs`.
 
 **⚠ Laboratoire offline.** Aucun ordre, aucun broker, aucun endpoint live. Aucun moteur modifié. Modèles d'exécution UNIQUEMENT réalistes (NEXT_OPEN + friction obligatoire).
 
@@ -93,48 +93,48 @@ Friction par trade selon horizon :
 
 | horizon | Trades | Winrate | Expectancy (R) | PF | Max DD (R) | Sharpe | Turnover/an | Years positive | Decay | Classification |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 10 | 939 | 52.08 % | 0.272 | 1.25 | 144.9 | 0.54 | 187.8 | 4/5 | 0.81 | **CONDITIONAL_EDGE** |
-| 20 | 929 | 54.36 % | 0.743 | 1.53 | 226.2 | 1.00 | 185.8 | 4/5 | 0.74 | **ROBUST_EDGE** |
-| 40 | 909 | 51.93 % | 1.352 | 1.72 | 366.6 | 1.27 | 181.8 | 4/5 | 0.70 | **ROBUST_EDGE** |
-| 60 | 889 | 54.11 % | 1.773 | 1.83 | 456.5 | 1.42 | 177.8 | 4/5 | 0.82 | **ROBUST_EDGE** |
-| 120 | 829 | 53.80 % | 2.776 | 1.91 | 746.7 | 1.48 | 165.8 | 4/5 | 0.72 | **ROBUST_EDGE** |
+| 10 | 940 | 52.02 % | 0.275 | 1.26 | 140.9 | 0.55 | 188.0 | 4/5 | 0.82 | **CONDITIONAL_EDGE** |
+| 20 | 930 | 54.30 % | 0.741 | 1.53 | 222.8 | 1.00 | 186.0 | 4/5 | 0.74 | **ROBUST_EDGE** |
+| 40 | 910 | 51.98 % | 1.353 | 1.72 | 360.4 | 1.27 | 182.0 | 4/5 | 0.70 | **ROBUST_EDGE** |
+| 60 | 890 | 54.16 % | 1.772 | 1.83 | 447.5 | 1.42 | 178.0 | 4/5 | 0.82 | **ROBUST_EDGE** |
+| 120 | 830 | 53.98 % | 2.775 | 1.91 | 742.3 | 1.48 | 166.0 | 4/5 | 0.71 | **ROBUST_EDGE** |
 
 ## 7. Concentration sweep (topN)
 
 | topN | Trades | Winrate | Expectancy (R) | PF | Max DD (R) | Sharpe | Turnover/an | Years positive | Decay | Classification |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | 93 | 47.31 % | 0.129 | 1.05 | 65.8 | 0.14 | 18.6 | 3/5 | 1.07 | **FRAGILE** |
-| 3 | 279 | 53.76 % | 0.929 | 1.52 | 72.4 | 1.05 | 55.8 | 4/5 | 1.16 | **ROBUST_EDGE** |
-| 5 | 465 | 54.41 % | 0.884 | 1.53 | 121.8 | 1.08 | 93.0 | 4/5 | 0.98 | **ROBUST_EDGE** |
-| 10 | 929 | 54.36 % | 0.743 | 1.53 | 226.2 | 1.00 | 185.8 | 4/5 | 0.74 | **ROBUST_EDGE** |
-| 20 | 1814 | 53.20 % | 0.435 | 1.36 | 361.8 | 0.71 | 362.8 | 4/5 | 0.83 | **ROBUST_EDGE** |
+| 1 | 93 | 48.39 % | 0.159 | 1.07 | 63.1 | 0.18 | 18.6 | 3/5 | 1.11 | **FRAGILE** |
+| 3 | 279 | 53.76 % | 0.958 | 1.54 | 72.3 | 1.09 | 55.8 | 4/5 | 1.22 | **ROBUST_EDGE** |
+| 5 | 465 | 54.62 % | 0.892 | 1.54 | 118.2 | 1.09 | 93.0 | 4/5 | 1.00 | **ROBUST_EDGE** |
+| 10 | 930 | 54.30 % | 0.741 | 1.53 | 222.8 | 1.00 | 186.0 | 4/5 | 0.74 | **ROBUST_EDGE** |
+| 20 | 1818 | 53.19 % | 0.434 | 1.36 | 355.4 | 0.71 | 363.6 | 4/5 | 0.83 | **ROBUST_EDGE** |
 
 ## 8. Rebalance sweep
 
 | rebalance | Trades | Winrate | Expectancy (R) | PF | Max DD (R) | Sharpe | Turnover/an | Years positive | Decay | Classification |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| 1 | 9061 | 52.14 % | 0.611 | 1.43 | 2364.8 | 0.84 | 1812.2 | 4/5 | 0.72 | **ROBUST_EDGE** |
-| 5 | 1821 | 53.43 % | 0.665 | 1.47 | 485.0 | 0.92 | 364.2 | 4/5 | 0.68 | **ROBUST_EDGE** |
-| 10 | 929 | 54.36 % | 0.743 | 1.53 | 226.2 | 1.00 | 185.8 | 4/5 | 0.74 | **ROBUST_EDGE** |
-| 20 | 479 | 54.07 % | 0.801 | 1.57 | 112.6 | 1.05 | 95.8 | 4/5 | 0.60 | **ROBUST_EDGE** |
+| 1 | 9080 | 52.27 % | 0.615 | 1.43 | 2309.9 | 0.85 | 1816.0 | 4/5 | 0.73 | **ROBUST_EDGE** |
+| 5 | 1824 | 53.56 % | 0.669 | 1.47 | 471.6 | 0.93 | 364.8 | 4/5 | 0.68 | **ROBUST_EDGE** |
+| 10 | 930 | 54.30 % | 0.741 | 1.53 | 222.8 | 1.00 | 186.0 | 4/5 | 0.74 | **ROBUST_EDGE** |
+| 20 | 480 | 53.75 % | 0.793 | 1.56 | 111.6 | 1.04 | 96.0 | 4/5 | 0.59 | **ROBUST_EDGE** |
 
 ## 9. Regime analysis
 
 | regime | Trades | Winrate | Expectancy (R) | PF | Max DD (R) | Sharpe | Turnover/an | Years positive | Decay | Classification |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| ALL | 1091 | 52.80 % | 0.596 | 1.43 | 311.7 | 0.84 | 218.2 | 4/5 | 0.66 | **ROBUST_EDGE** |
-| NO_RISK_OFF | 929 | 54.36 % | 0.743 | 1.53 | 226.2 | 1.00 | 185.8 | 4/5 | 0.74 | **ROBUST_EDGE** |
-| RISK_ON_ONLY | 529 | 47.83 % | 0.465 | 1.28 | 222.1 | 0.59 | 105.8 | 2/5 | 0.27 | **FRAGILE** |
-| SPY_EMA200 | 759 | 49.41 % | 0.437 | 1.28 | 261.1 | 0.59 | 151.8 | 3/5 | 0.27 | **CONDITIONAL_EDGE** |
-| QQQ_EMA200 | 749 | 51.40 % | 0.592 | 1.39 | 220.3 | 0.79 | 149.8 | 3/5 | 0.29 | **CONDITIONAL_EDGE** |
-| BREADTH_50 | 775 | 53.81 % | 0.663 | 1.46 | 191.7 | 0.91 | 155.0 | 4/5 | 0.72 | **ROBUST_EDGE** |
+| ALL | 1097 | 52.69 % | 0.593 | 1.42 | 305.4 | 0.83 | 219.4 | 4/5 | 0.66 | **ROBUST_EDGE** |
+| NO_RISK_OFF | 930 | 54.30 % | 0.741 | 1.53 | 222.8 | 1.00 | 186.0 | 4/5 | 0.74 | **ROBUST_EDGE** |
+| RISK_ON_ONLY | 530 | 47.74 % | 0.464 | 1.28 | 222.5 | 0.59 | 106.0 | 2/5 | 0.27 | **FRAGILE** |
+| SPY_EMA200 | 760 | 49.47 % | 0.438 | 1.28 | 259.3 | 0.59 | 152.0 | 3/5 | 0.27 | **CONDITIONAL_EDGE** |
+| QQQ_EMA200 | 750 | 51.33 % | 0.590 | 1.39 | 220.7 | 0.79 | 150.0 | 3/5 | 0.29 | **CONDITIONAL_EDGE** |
+| BREADTH_50 | 776 | 52.71 % | 0.607 | 1.42 | 192.7 | 0.83 | 155.2 | 4/5 | 0.74 | **ROBUST_EDGE** |
 
 ## 10. Universe analysis
 
 | universe | Trades | Winrate | Expectancy (R) | PF | Max DD (R) | Sharpe | Turnover/an | Years positive | Decay | Classification |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| mixed | 929 | 54.36 % | 0.743 | 1.53 | 226.2 | 1.00 | 185.8 | 4/5 | 0.74 | **ROBUST_EDGE** |
-| etfs | 542 | 57.75 % | -0.102 | 0.84 | 120.5 | -0.38 | 135.5 | 2/4 | 0.76 | **DEAD** |
+| mixed | 930 | 54.30 % | 0.741 | 1.53 | 222.8 | 1.00 | 186.0 | 4/5 | 0.74 | **ROBUST_EDGE** |
+| etfs | 614 | 55.21 % | -0.110 | 0.82 | 127.1 | -0.43 | 122.8 | 3/5 | 0.94 | **DEAD** |
 | semis | 751 | 51.80 % | 0.263 | 1.27 | 163.1 | 0.63 | 150.2 | 3/5 | 0.98 | **CONDITIONAL_EDGE** |
 | ai_software | 827 | 54.29 % | 0.642 | 1.52 | 194.9 | 0.96 | 165.4 | 4/5 | 0.68 | **ROBUST_EDGE** |
 | megacaps | 809 | 54.02 % | 0.126 | 1.20 | 97.1 | 0.39 | 161.8 | 3/5 | 0.75 | **CONDITIONAL_EDGE** |
@@ -144,11 +144,11 @@ Friction par trade selon horizon :
 
 | exit | Trades | Winrate | Expectancy (R) | PF | Max DD (R) | Sharpe | Turnover/an | Years positive | Decay | Classification |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
-| fixed_hold | 929 | 54.36 % | 0.743 | 1.53 | 226.2 | 1.00 | 185.8 | 4/5 | 0.74 | **ROBUST_EDGE** |
-| atr_trailing | 929 | 41.33 % | 0.036 | 1.04 | 109.9 | 0.10 | 185.8 | 3/5 | 1.00 | **FRAGILE** |
-| ema_trailing | 929 | 37.03 % | 0.376 | 1.44 | 80.9 | 0.70 | 185.8 | 4/5 | 1.15 | **ROBUST_EDGE** |
-| momentum_decay | 929 | 43.81 % | 0.401 | 1.46 | 85.6 | 0.77 | 185.8 | 4/5 | 1.03 | **ROBUST_EDGE** |
-| time_stop | 929 | 44.03 % | 0.680 | 1.63 | 143.8 | 1.11 | 185.8 | 4/5 | 0.81 | **ROBUST_EDGE** |
+| fixed_hold | 930 | 54.30 % | 0.741 | 1.53 | 222.8 | 1.00 | 186.0 | 4/5 | 0.74 | **ROBUST_EDGE** |
+| atr_trailing | 930 | 41.40 % | 0.034 | 1.04 | 109.4 | 0.10 | 186.0 | 3/5 | 1.00 | **FRAGILE** |
+| ema_trailing | 930 | 37.10 % | 0.376 | 1.44 | 80.2 | 0.70 | 186.0 | 4/5 | 1.15 | **ROBUST_EDGE** |
+| momentum_decay | 930 | 43.76 % | 0.400 | 1.46 | 85.7 | 0.77 | 186.0 | 4/5 | 1.02 | **ROBUST_EDGE** |
+| time_stop | 930 | 44.09 % | 0.683 | 1.64 | 137.8 | 1.12 | 186.0 | 4/5 | 0.82 | **ROBUST_EDGE** |
 
 ## 12. Rolling robustness — yearly PF par config testée
 
@@ -156,18 +156,18 @@ Pour chaque config, PF mesuré par année (2021-2025) :
 
 | Config | 2021 | 2022 | 2023 | 2024 | 2025 | Classification |
 |---|---:|---:|---:|---:|---:|---|
-| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.54 | 0.14 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
-| h10/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.46 | 0.13 | 1.69 | 1.33 | 1.12 | **CONDITIONAL_EDGE** |
-| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.54 | 0.14 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
-| h40/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.55 | 0.36 | 2.30 | 2.12 | 1.39 | **ROBUST_EDGE** |
-| h20/top10/reb10/ALL/mixed/fixed_hold | 1.54 | 0.55 | 2.05 | 1.68 | 1.37 | **ROBUST_EDGE** |
-| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.54 | 0.14 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
+| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.53 | 0.15 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
+| h10/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.46 | 0.15 | 1.69 | 1.33 | 1.12 | **CONDITIONAL_EDGE** |
+| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.53 | 0.15 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
+| h40/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.53 | 0.41 | 2.30 | 2.12 | 1.39 | **ROBUST_EDGE** |
+| h20/top10/reb10/ALL/mixed/fixed_hold | 1.53 | 0.56 | 2.05 | 1.68 | 1.37 | **ROBUST_EDGE** |
+| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.53 | 0.15 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
 | h20/top10/reb10/RISK_ON_ONLY/mixed/fixed_hold | 0.59 | 0.04 | 0.90 | 1.62 | 1.76 | **FRAGILE** |
-| h20/top10/reb10/SPY_EMA200/mixed/fixed_hold | 0.59 | 0.14 | 1.64 | 1.68 | 1.35 | **CONDITIONAL_EDGE** |
+| h20/top10/reb10/SPY_EMA200/mixed/fixed_hold | 0.59 | 0.15 | 1.64 | 1.68 | 1.35 | **CONDITIONAL_EDGE** |
 | h20/top10/reb10/QQQ_EMA200/mixed/fixed_hold | 0.59 | 0.04 | 1.85 | 1.68 | 1.39 | **CONDITIONAL_EDGE** |
-| h20/top10/reb10/BREADTH_50/mixed/fixed_hold | 1.28 | 0.54 | 1.90 | 1.69 | 1.29 | **ROBUST_EDGE** |
-| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.54 | 0.14 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
-| h20/top10/reb10/NO_RISK_OFF/etfs/fixed_hold | 0.58 | n/a | 1.36 | 0.47 | 1.45 | **DEAD** |
+| h20/top10/reb10/BREADTH_50/mixed/fixed_hold | 1.27 | 0.51 | 1.84 | 1.58 | 1.29 | **ROBUST_EDGE** |
+| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 1.53 | 0.15 | 2.05 | 1.68 | 1.39 | **ROBUST_EDGE** |
+| h20/top10/reb10/NO_RISK_OFF/etfs/fixed_hold | 0.65 | 12.39 | 1.17 | 0.49 | 1.35 | **DEAD** |
 | h20/top10/reb10/NO_RISK_OFF/semis/fixed_hold | 1.85 | 0.15 | 1.33 | 0.95 | 1.71 | **CONDITIONAL_EDGE** |
 | h20/top10/reb10/NO_RISK_OFF/ai_software/fixed_hold | 1.26 | 0.02 | 1.99 | 1.72 | 1.36 | **ROBUST_EDGE** |
 | h20/top10/reb10/NO_RISK_OFF/megacaps/fixed_hold | 0.91 | 0.27 | 2.16 | 1.06 | 1.13 | **CONDITIONAL_EDGE** |
@@ -187,40 +187,40 @@ Pour chaque config, PF mesuré par année (2021-2025) :
 
 | Config | Trades | PF | Expectancy R | Max DD R | Sharpe | Years+ | Decay |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| h120/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 829 | 1.91 | 2.776 | 746.7 | 1.48 | 4/5 | 0.72 |
-| h60/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 889 | 1.83 | 1.773 | 456.5 | 1.42 | 4/5 | 0.82 |
-| h40/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 909 | 1.72 | 1.352 | 366.6 | 1.27 | 4/5 | 0.70 |
-| h20/top10/reb10/NO_RISK_OFF/mixed/time_stop | 929 | 1.63 | 0.680 | 143.8 | 1.11 | 4/5 | 0.81 |
-| h20/top10/reb20/NO_RISK_OFF/mixed/fixed_hold | 479 | 1.57 | 0.801 | 112.6 | 1.05 | 4/5 | 0.60 |
-| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 929 | 1.53 | 0.743 | 226.2 | 1.00 | 4/5 | 0.74 |
-| h20/top5/reb10/NO_RISK_OFF/mixed/fixed_hold | 465 | 1.53 | 0.884 | 121.8 | 1.08 | 4/5 | 0.98 |
-| h20/top10/reb10/NO_RISK_OFF/ai_software/fixed_hold | 827 | 1.52 | 0.642 | 194.9 | 0.96 | 4/5 | 0.68 |
+| h120/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 830 | 1.91 | 2.775 | 742.3 | 1.48 | 4/5 | 0.71 |
+| h60/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 890 | 1.83 | 1.772 | 447.5 | 1.42 | 4/5 | 0.82 |
+| h40/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 910 | 1.72 | 1.353 | 360.4 | 1.27 | 4/5 | 0.70 |
+| h20/top10/reb10/NO_RISK_OFF/mixed/time_stop | 930 | 1.64 | 0.683 | 137.8 | 1.12 | 4/5 | 0.82 |
+| h20/top10/reb20/NO_RISK_OFF/mixed/fixed_hold | 480 | 1.56 | 0.793 | 111.6 | 1.04 | 4/5 | 0.59 |
+| h20/top3/reb10/NO_RISK_OFF/mixed/fixed_hold | 279 | 1.54 | 0.958 | 72.3 | 1.09 | 4/5 | 1.22 |
+| h20/top5/reb10/NO_RISK_OFF/mixed/fixed_hold | 465 | 1.54 | 0.892 | 118.2 | 1.09 | 4/5 | 1.00 |
+| h20/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 930 | 1.53 | 0.741 | 222.8 | 1.00 | 4/5 | 0.74 |
 _8 configs supplémentaires non affichées_
 
 ### CONDITIONAL_EDGE (5)
 
 | Config | Trades | PF | Expectancy R | Max DD R | Sharpe | Years+ | Decay |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| h20/top10/reb10/QQQ_EMA200/mixed/fixed_hold | 749 | 1.39 | 0.592 | 220.3 | 0.79 | 3/5 | 0.29 |
-| h20/top10/reb10/SPY_EMA200/mixed/fixed_hold | 759 | 1.28 | 0.437 | 261.1 | 0.59 | 3/5 | 0.27 |
+| h20/top10/reb10/QQQ_EMA200/mixed/fixed_hold | 750 | 1.39 | 0.590 | 220.7 | 0.79 | 3/5 | 0.29 |
+| h20/top10/reb10/SPY_EMA200/mixed/fixed_hold | 760 | 1.28 | 0.438 | 259.3 | 0.59 | 3/5 | 0.27 |
 | h20/top10/reb10/NO_RISK_OFF/semis/fixed_hold | 751 | 1.27 | 0.263 | 163.1 | 0.63 | 3/5 | 0.98 |
-| h10/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 939 | 1.25 | 0.272 | 144.9 | 0.54 | 4/5 | 0.81 |
+| h10/top10/reb10/NO_RISK_OFF/mixed/fixed_hold | 940 | 1.26 | 0.275 | 140.9 | 0.55 | 4/5 | 0.82 |
 | h20/top10/reb10/NO_RISK_OFF/megacaps/fixed_hold | 809 | 1.20 | 0.126 | 97.1 | 0.39 | 3/5 | 0.75 |
 
 ### FRAGILE (3)
 
 | Config | Trades | PF | Expectancy R | Max DD R | Sharpe | Years+ | Decay |
 |---|---:|---:|---:|---:|---:|---:|---:|
-| h20/top10/reb10/RISK_ON_ONLY/mixed/fixed_hold | 529 | 1.28 | 0.465 | 222.1 | 0.59 | 2/5 | 0.27 |
-| h20/top1/reb10/NO_RISK_OFF/mixed/fixed_hold | 93 | 1.05 | 0.129 | 65.8 | 0.14 | 3/5 | 1.07 |
-| h20/top10/reb10/NO_RISK_OFF/mixed/atr_trailing | 929 | 1.04 | 0.036 | 109.9 | 0.10 | 3/5 | 1.00 |
+| h20/top10/reb10/RISK_ON_ONLY/mixed/fixed_hold | 530 | 1.28 | 0.464 | 222.5 | 0.59 | 2/5 | 0.27 |
+| h20/top1/reb10/NO_RISK_OFF/mixed/fixed_hold | 93 | 1.07 | 0.159 | 63.1 | 0.18 | 3/5 | 1.11 |
+| h20/top10/reb10/NO_RISK_OFF/mixed/atr_trailing | 930 | 1.04 | 0.034 | 109.4 | 0.10 | 3/5 | 1.00 |
 
 ### DEAD (2)
 
 | Config | Trades | PF | Expectancy R | Max DD R | Sharpe | Years+ | Decay |
 |---|---:|---:|---:|---:|---:|---:|---:|
 | h20/top10/reb10/NO_RISK_OFF/commodities/fixed_hold | 26 | 1.12 | 0.033 | 3.0 | 0.31 | 1/3 | n/a |
-| h20/top10/reb10/NO_RISK_OFF/etfs/fixed_hold | 542 | 0.84 | -0.102 | 120.5 | -0.38 | 2/4 | 0.76 |
+| h20/top10/reb10/NO_RISK_OFF/etfs/fixed_hold | 614 | 0.82 | -0.110 | 127.1 | -0.43 | 3/5 | 0.94 |
 
 ## 14. Final verdict
 
@@ -230,15 +230,15 @@ Réponses aux 7 questions du brief :
 
 1. **Quand RS Rotation fonctionne réellement ?** Selon les sweeps : meilleur univers = **mixed** (PF 1.53), meilleur régime = **NO_RISK_OFF** (PF 1.53).
 
-2. **Quand il échoue ?** Pire univers = **etfs** (PF 0.84), pire régime = **RISK_ON_ONLY** (PF 1.28).
+2. **Quand il échoue ?** Pire univers = **etfs** (PF 0.82), pire régime = **RISK_ON_ONLY** (PF 1.28).
 
-3. **Quel régime détruit le setup ?** RISK_OFF (cf. backtest source : PF 0.96 dans ce régime). En filtrant ALL_REGIMES (incluant RISK_OFF), la baseline donne PF 1.43 avec 1091 trades.
+3. **Quel régime détruit le setup ?** RISK_OFF (cf. backtest source : PF 0.96 dans ce régime). En filtrant ALL_REGIMES (incluant RISK_OFF), la baseline donne PF 1.42 avec 1097 trades.
 
 4. **Quel univers est le plus robuste ?** mixed (PF 1.53, 4/5 années positives, decay ×0.74).
 
-5. **Quel horizon est le plus stable ?** 10j (PF 1.25, 4/5 années positives).
+5. **Quel horizon est le plus stable ?** 10j (PF 1.26, 4/5 années positives).
 
-6. **Quel niveau de friction tue l'edge ?** Friction par trade pour horizon 20j = 0.140R, horizon 120j = 0.540R. Si l'expectancy brute est < 0.140R sur horizon 20j, l'edge est consommé. Comparaison aux résultats : baseline expectancy = 0.743R (après friction), soit POSITIF.
+6. **Quel niveau de friction tue l'edge ?** Friction par trade pour horizon 20j = 0.140R, horizon 120j = 0.540R. Si l'expectancy brute est < 0.140R sur horizon 20j, l'edge est consommé. Comparaison aux résultats : baseline expectancy = 0.741R (après friction), soit POSITIF.
 
 7. **Existe-t-il un noyau réellement exploitable ?** OUI. 16 configurations ROBUST_EDGE identifiées. Meilleure : {"horizon":120,"topN":10,"rebalance":10,"regime":"NO_RISK_OFF","universe":"mixed","exit":"fixed_hold","lookback":90,"minMomentum":12} (PF 1.91). Voir section 13.
 

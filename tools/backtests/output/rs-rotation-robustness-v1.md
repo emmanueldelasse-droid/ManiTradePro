@@ -1,6 +1,6 @@
 # RS Rotation Robustness Hardening v1 — ManiTradePro
 
-> Généré le 2026-05-20T06:54:09.811Z par `tools/backtests/rs-rotation-robustness-v1.mjs`.
+> Généré le 2026-05-21T13:34:41.300Z par `tools/backtests/rs-rotation-robustness-v1.mjs`.
 
 **⚠ Analyse strictement offline.** Aucun ordre, aucun broker, aucun endpoint live. Aucun fichier runtime modifié. Modèle d'exécution réaliste (NEXT_OPEN + friction obligatoire). Paramètres gelés ex-ante (aucune ré-optimisation entre les splits).
 
@@ -64,7 +64,7 @@ Pour le baseline horizon=20 : friction par trade = (0.30 + 0.02 × 20) / 5 = **0
 ## 3. Univers
 
 - Univers : **mixed** (tous les groupes UNIVERSE flat de `universe-v2.mjs`).
-- Symboles avec OHLC chargés : **158** sur 191 demandés.
+- Symboles avec OHLC chargés : **169** sur 191 demandés.
 - Période : 2021-2025 (5 ans).
 - Limitation : Univers ex-post (survivants 2021-2025). Pas de delistés. Limitation documentée — cf. RESEARCH_FRAMEWORK_FREEZE_V1.md § 10.
 
@@ -72,42 +72,42 @@ Pour le baseline horizon=20 : friction par trade = (0.30 + 0.02 × 20) / 5 = **0
 
 | Métrique | Valeur |
 |---|---:|
-| Trades | 929 |
+| Trades | 930 |
 | Wins | 506 |
-| Losses | 423 |
-| Winrate | 54.47 % |
-| Expectancy (R) | 0.7427 |
+| Losses | 424 |
+| Winrate | 54.41 % |
+| Expectancy (R) | 0.7410 |
 | Profit factor (frictionné) | **1.53** |
-| Total R | 689.94 |
-| Max drawdown (R) | 226.21 |
+| Total R | 689.10 |
+| Max drawdown (R) | 222.82 |
 | Longest loss streak | 19 |
 
 PF par année :
 
 | Année | Trades | PF | Total R |
 |---|---:|---:|---:|
-| 2021 | 170 | 1.54 | 146.28 |
-| 2022 | 59 | 0.14 | -92.97 |
+| 2021 | 170 | 1.53 | 143.94 |
+| 2022 | 60 | 0.15 | -91.24 |
 | 2023 | 250 | 2.05 | 280.96 |
-| 2024 | 250 | 1.69 | 240.09 |
+| 2024 | 250 | 1.68 | 239.87 |
 | 2025 | 200 | 1.39 | 115.57 |
 
 ## 5. Analyse par régime
 
 | Régime | Trades | Winrate | Expectancy R | PF | Total R | Max DD |
 |---|---:|---:|---:|---:|---:|---:|
-| ALL_REGIMES | 1091 | 52.89 % | 0.5963 | 1.43 | 650.60 | 311.66 |
-| NO_RISK_OFF | 929 | 54.47 % | 0.7427 | 1.53 | 689.94 | 226.21 |
-| RANGE_ONLY | 290 | 59.31 % | 0.7749 | 1.70 | 224.71 | 81.91 |
-| RISK_ON_ONLY | 529 | 48.02 % | 0.4653 | 1.28 | 246.15 | 222.10 |
+| ALL_REGIMES | 1097 | 52.78 % | 0.5927 | 1.42 | 650.21 | 305.38 |
+| NO_RISK_OFF | 930 | 54.41 % | 0.7410 | 1.53 | 689.10 | 222.82 |
+| RANGE_ONLY | 290 | 59.66 % | 0.7813 | 1.71 | 226.57 | 81.91 |
+| RISK_ON_ONLY | 530 | 47.92 % | 0.4638 | 1.28 | 245.79 | 222.46 |
 
 PF par année et par régime :
 
 | Régime | 2021 | 2022 | 2023 | 2024 | 2025 |
 |---|---:|---:|---:|---:|---:|
-| ALL_REGIMES | 1.54 | 0.55 | 2.05 | 1.69 | 1.37 |
-| NO_RISK_OFF | 1.54 | 0.14 | 2.05 | 1.69 | 1.39 |
-| RANGE_ONLY | n/a | 0.26 | 2.55 | 999.00 | 0.42 |
+| ALL_REGIMES | 1.53 | 0.56 | 2.05 | 1.68 | 1.37 |
+| NO_RISK_OFF | 1.53 | 0.15 | 2.05 | 1.68 | 1.39 |
+| RANGE_ONLY | n/a | 0.27 | 2.55 | 999.00 | 0.42 |
 | RISK_ON_ONLY | 0.58 | 0.04 | 0.90 | 1.62 | 1.76 |
 
 ## 6. Walk-forward STRICT (3 splits, paramètres gelés)
@@ -120,9 +120,9 @@ Seuil **passRobust** = PF test ≥ 1.3 ET trades test ≥ 20.
 
 | Split | Train years | Test years | Train trades | Train PF | Test trades | Test PF | Test totalR | Pass live | Pass robust |
 |---|---|---|---:|---:|---:|---:|---:|---|---|
-| S1 | 2021-2022 | 2023 | 229 | 1.14 | 250 | **2.05** | 280.96 | ✓ | ✓ |
-| S2 | 2021-2022-2023 | 2024 | 479 | 1.52 | 250 | **1.69** | 240.09 | ✓ | ✓ |
-| S3 | 2021-2022-2023-2024 | 2025 | 729 | 1.58 | 200 | **1.39** | 115.57 | ✓ | ✓ |
+| S1 | 2021-2022 | 2023 | 230 | 1.14 | 250 | **2.05** | 280.96 | ✓ | ✓ |
+| S2 | 2021-2022-2023 | 2024 | 480 | 1.52 | 250 | **1.68** | 239.87 | ✓ | ✓ |
+| S3 | 2021-2022-2023-2024 | 2025 | 730 | 1.57 | 200 | **1.39** | 115.57 | ✓ | ✓ |
 
 **Splits passant live (PF ≥ 1.0)** : 3 / 3 — seuil Freeze § 3.5 = ≥ 2/3.
 
@@ -130,36 +130,36 @@ Seuil **passRobust** = PF test ≥ 1.3 ET trades test ≥ 20.
 
 ## 7. Analyse concentration (top 5 contributeurs)
 
-- Symboles ayant tradé : **96**
-- Symboles avec contribution positive : **60**
-- Somme positive (R) : **927.34**
+- Symboles ayant tradé : **97**
+- Symboles avec contribution positive : **59**
+- Somme positive (R) : **926.48**
 - Top 5 somme positive (R) : **451.25**
-- **Top 5 share** (% du PnL positif) : **48.66 %**
-- Top 5 share (% du |R| total) : 38.74 %
-- Single max share (% du PnL positif) : 11.60 %
+- **Top 5 share** (% du PnL positif) : **48.71 %**
+- Top 5 share (% du |R| total) : 38.77 %
+- Single max share (% du PnL positif) : 11.61 %
 - **PF sans top 5** : **1.22**
-- Total R sans top 5 : 238.69 (sur 758 trades)
+- Total R sans top 5 : 237.85 (sur 759 trades)
 
 Top 5 contributeurs positifs :
 
 | Rang | Symbole | Trades | Total R | Share % du PnL positif |
 |---:|---|---:|---:|---:|
-| 1 | SOL | 29 | 107.61 | 11.60 % |
-| 2 | APLD | 49 | 94.18 | 10.16 % |
-| 3 | AVAX | 21 | 90.95 | 9.81 % |
-| 4 | APP | 41 | 86.69 | 9.35 % |
+| 1 | SOL | 29 | 107.61 | 11.61 % |
+| 2 | APLD | 49 | 94.18 | 10.17 % |
+| 3 | AVAX | 21 | 90.95 | 9.82 % |
+| 4 | APP | 41 | 86.69 | 9.36 % |
 | 5 | PLTR | 31 | 71.82 | 7.75 % |
 
 **Lecture** : un top 5 share > **60 %** est le seuil dur du Freeze § 4 (critère G "concentration"). Un PF sans top 5 < 1.05 signifie que l'edge dépend entièrement de 5 tickers — c'est exactement le piège qui a fait dégrader SECTOR_RS v1 en `FRAGILE / CONCENTRATION_EXCESSIVE` lors de la PR truth-sync #233.
 
 ## 8. Analyse drawdown
 
-- Max drawdown : **226.21 R**
+- Max drawdown : **222.82 R**
 - Longest loss streak : **19** trades consécutifs perdants
-- Worst drawdown magnitude : 226.21 R sur 105 trades
+- Worst drawdown magnitude : 222.82 R sur 106 trades
 - Worst drawdown période : 2021-11-03 → 2022-12-14
 
-- **Pire année** : 2022 (PF 0.14, 59 trades, total R -92.97)
+- **Pire année** : 2022 (PF 0.15, 60 trades, total R -91.24)
 - **Pire split test** : S3 (PF test 1.39, 200 trades)
 
 ## 9. Verdict conservateur
@@ -168,7 +168,7 @@ Top 5 contributeurs positifs :
 
 Raisons :
 
-- Pire année (2022) PF = 0.144 < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés.
+- Pire année (2022) PF = 0.146 < 0.9 → robustesse bear/transitions insuffisante. Promotion CONDITIONAL_EDGE bloquée tant que stress tests friction ×2/×3 + analyse transitions régime + rolling walk-forward glissant n'ont pas été exécutés.
 
 Vocabulaire : Freeze v1 + truth-sync 2026-05-19. Interdit ici : VALIDATED_RESEARCH_CORE, LIVE_READY.
 

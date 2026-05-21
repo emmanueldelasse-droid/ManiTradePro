@@ -37,6 +37,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join, relative, resolve } from "node:path";
 
 import { UNIVERSE } from "./universe-v2.mjs";
+import { computeFrictionV1, FRICTION_V1_METADATA } from "./lib/friction-v1.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -311,10 +312,10 @@ function runBaseline() {
 
 // === Modèles de coûts ======================================================
 
-// Friction projet canonique
+// Friction projet canonique — source : `docs/quant/FRICTION_MODEL.md` +
+// `lib/friction-v1.mjs` (CLEAN-1 PR-FRICTION-CANON).
 function frictionR(holdDays, multiplier = 1) {
-  const pct = (0.30 + 0.02 * holdDays) * multiplier;
-  return pct / 5;
+  return computeFrictionV1({ holdDays, multiplier });
 }
 
 // Slippage one-way : appliqué entry + exit. 0.05 % one-way = 0.10 % round-trip.

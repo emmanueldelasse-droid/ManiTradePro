@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-18T14:58:14.184Z",
+  "generatedAt": "2026-05-21T13:34:40.639Z",
   "scope": "Laboratoire de robustesse pour RELATIVE_STRENGTH_ROTATION — recherche d'un noyau exploitable avec exécution réaliste + friction",
   "baseline": {
     "horizon": 20,
@@ -23,21 +23,21 @@
       "minMomentum": 12
     },
     "summary": {
-      "trades": 929,
+      "trades": 930,
       "wins": 505,
-      "losses": 423,
-      "winrate": 54.36,
-      "expectancyR": 0.743,
+      "losses": 424,
+      "winrate": 54.3,
+      "expectancyR": 0.741,
       "profitFactor": 1.532,
-      "maxDrawdownR": 226.21,
-      "totalR": 689.96,
+      "maxDrawdownR": 222.81,
+      "totalR": 689.12,
       "sharpeApprox": 1,
-      "turnoverPerYear": 185.8
+      "turnoverPerYear": 186
     },
     "stability": {
       "yearlyPf": {
-        "2021": 1.54,
-        "2022": 0.14,
+        "2021": 1.53,
+        "2022": 0.15,
         "2023": 2.05,
         "2024": 1.68,
         "2025": 1.39
@@ -47,7 +47,7 @@
       "robustYears": 4
     },
     "decay": {
-      "earlyTrades": 229,
+      "earlyTrades": 230,
       "lateTrades": 450,
       "earlyPf": 1.14,
       "latePf": 1.55,
@@ -82,21 +82,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 939,
+          "trades": 940,
           "wins": 489,
-          "losses": 449,
-          "winrate": 52.08,
-          "expectancyR": 0.272,
-          "profitFactor": 1.254,
-          "maxDrawdownR": 144.86,
-          "totalR": 255.17,
-          "sharpeApprox": 0.54,
-          "turnoverPerYear": 187.8
+          "losses": 450,
+          "winrate": 52.02,
+          "expectancyR": 0.275,
+          "profitFactor": 1.258,
+          "maxDrawdownR": 140.88,
+          "totalR": 258.82,
+          "sharpeApprox": 0.55,
+          "turnoverPerYear": 188
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.46,
-            "2022": 0.13,
+            "2022": 0.15,
             "2023": 1.69,
             "2024": 1.33,
             "2025": 1.12
@@ -106,11 +106,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 460,
-          "earlyPf": 1,
+          "earlyPf": 1.01,
           "latePf": 1.23,
-          "decayRatio": 0.81
+          "decayRatio": 0.82
         },
         "classification": "CONDITIONAL_EDGE"
       },
@@ -126,21 +126,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 505,
-          "losses": 423,
-          "winrate": 54.36,
-          "expectancyR": 0.743,
+          "losses": 424,
+          "winrate": 54.3,
+          "expectancyR": 0.741,
           "profitFactor": 1.532,
-          "maxDrawdownR": 226.21,
-          "totalR": 689.96,
+          "maxDrawdownR": 222.81,
+          "totalR": 689.12,
           "sharpeApprox": 1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.14,
+            "2021": 1.53,
+            "2022": 0.15,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.39
@@ -150,7 +150,7 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.14,
           "latePf": 1.55,
@@ -170,21 +170,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 909,
-          "wins": 472,
+          "trades": 910,
+          "wins": 473,
           "losses": 437,
-          "winrate": 51.93,
-          "expectancyR": 1.352,
+          "winrate": 51.98,
+          "expectancyR": 1.353,
           "profitFactor": 1.717,
-          "maxDrawdownR": 366.58,
-          "totalR": 1228.92,
+          "maxDrawdownR": 360.37,
+          "totalR": 1230.87,
           "sharpeApprox": 1.27,
-          "turnoverPerYear": 181.8
+          "turnoverPerYear": 182
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.55,
-            "2022": 0.36,
+            "2021": 1.53,
+            "2022": 0.41,
             "2023": 2.3,
             "2024": 2.12,
             "2025": 1.39
@@ -194,10 +194,10 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 430,
           "earlyPf": 1.24,
-          "latePf": 1.78,
+          "latePf": 1.79,
           "decayRatio": 0.7
         },
         "classification": "ROBUST_EDGE"
@@ -214,23 +214,23 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 889,
-          "wins": 481,
+          "trades": 890,
+          "wins": 482,
           "losses": 408,
-          "winrate": 54.11,
-          "expectancyR": 1.773,
-          "profitFactor": 1.829,
-          "maxDrawdownR": 456.47,
-          "totalR": 1575.89,
+          "winrate": 54.16,
+          "expectancyR": 1.772,
+          "profitFactor": 1.83,
+          "maxDrawdownR": 447.53,
+          "totalR": 1576.81,
           "sharpeApprox": 1.42,
-          "turnoverPerYear": 177.8
+          "turnoverPerYear": 178
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.77,
-            "2022": 0.38,
+            "2021": 1.75,
+            "2022": 0.42,
             "2023": 2.63,
-            "2024": 1.68,
+            "2024": 1.69,
             "2025": 1.92
           },
           "validYears": 5,
@@ -238,10 +238,10 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 410,
           "earlyPf": 1.45,
-          "latePf": 1.76,
+          "latePf": 1.77,
           "decayRatio": 0.82
         },
         "classification": "ROBUST_EDGE"
@@ -258,21 +258,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 829,
-          "wins": 446,
-          "losses": 383,
-          "winrate": 53.8,
-          "expectancyR": 2.776,
-          "profitFactor": 1.908,
-          "maxDrawdownR": 746.67,
-          "totalR": 2301.05,
+          "trades": 830,
+          "wins": 448,
+          "losses": 382,
+          "winrate": 53.98,
+          "expectancyR": 2.775,
+          "profitFactor": 1.911,
+          "maxDrawdownR": 742.27,
+          "totalR": 2303.18,
           "sharpeApprox": 1.48,
-          "turnoverPerYear": 165.8
+          "turnoverPerYear": 166
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.11,
-            "2022": 0.96,
+            "2021": 1.1,
+            "2022": 0.99,
             "2023": 5.52,
             "2024": 1.33,
             "2025": 2.36
@@ -282,11 +282,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 350,
           "earlyPf": 1.08,
-          "latePf": 1.51,
-          "decayRatio": 0.72
+          "latePf": 1.52,
+          "decayRatio": 0.71
         },
         "classification": "ROBUST_EDGE"
       }
@@ -305,20 +305,20 @@
         },
         "summary": {
           "trades": 93,
-          "wins": 44,
-          "losses": 49,
-          "winrate": 47.31,
-          "expectancyR": 0.129,
-          "profitFactor": 1.054,
-          "maxDrawdownR": 65.85,
-          "totalR": 12.02,
-          "sharpeApprox": 0.14,
+          "wins": 45,
+          "losses": 48,
+          "winrate": 48.39,
+          "expectancyR": 0.159,
+          "profitFactor": 1.066,
+          "maxDrawdownR": 63.13,
+          "totalR": 14.74,
+          "sharpeApprox": 0.18,
           "turnoverPerYear": 18.6
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.52,
-            "2022": 0.11,
+            "2022": 0.22,
             "2023": 0.86,
             "2024": 1.11,
             "2025": 1.07
@@ -330,9 +330,9 @@
         "decay": {
           "earlyTrades": 23,
           "lateTrades": 45,
-          "earlyPf": 1.17,
+          "earlyPf": 1.21,
           "latePf": 1.09,
-          "decayRatio": 1.07
+          "decayRatio": 1.11
         },
         "classification": "FRAGILE"
       },
@@ -352,17 +352,17 @@
           "wins": 150,
           "losses": 129,
           "winrate": 53.76,
-          "expectancyR": 0.929,
-          "profitFactor": 1.516,
-          "maxDrawdownR": 72.37,
-          "totalR": 259.29,
-          "sharpeApprox": 1.05,
+          "expectancyR": 0.958,
+          "profitFactor": 1.539,
+          "maxDrawdownR": 72.31,
+          "totalR": 267.21,
+          "sharpeApprox": 1.09,
           "turnoverPerYear": 55.8
         },
         "stability": {
           "yearlyPf": {
             "2021": 2.24,
-            "2022": 0.13,
+            "2022": 0.19,
             "2023": 1.58,
             "2024": 1.81,
             "2025": 1.06
@@ -374,9 +374,9 @@
         "decay": {
           "earlyTrades": 69,
           "lateTrades": 135,
-          "earlyPf": 1.63,
+          "earlyPf": 1.72,
           "latePf": 1.41,
-          "decayRatio": 1.16
+          "decayRatio": 1.22
         },
         "classification": "ROBUST_EDGE"
       },
@@ -393,20 +393,20 @@
         },
         "summary": {
           "trades": 465,
-          "wins": 253,
-          "losses": 212,
-          "winrate": 54.41,
-          "expectancyR": 0.884,
-          "profitFactor": 1.532,
-          "maxDrawdownR": 121.76,
-          "totalR": 411.21,
-          "sharpeApprox": 1.08,
+          "wins": 254,
+          "losses": 211,
+          "winrate": 54.62,
+          "expectancyR": 0.892,
+          "profitFactor": 1.538,
+          "maxDrawdownR": 118.16,
+          "totalR": 414.81,
+          "sharpeApprox": 1.09,
           "turnoverPerYear": 93
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.92,
-            "2022": 0.15,
+            "2022": 0.18,
             "2023": 1.87,
             "2024": 1.61,
             "2025": 1.28
@@ -418,9 +418,9 @@
         "decay": {
           "earlyTrades": 115,
           "lateTrades": 225,
-          "earlyPf": 1.42,
+          "earlyPf": 1.44,
           "latePf": 1.45,
-          "decayRatio": 0.98
+          "decayRatio": 1
         },
         "classification": "ROBUST_EDGE"
       },
@@ -436,21 +436,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 505,
-          "losses": 423,
-          "winrate": 54.36,
-          "expectancyR": 0.743,
+          "losses": 424,
+          "winrate": 54.3,
+          "expectancyR": 0.741,
           "profitFactor": 1.532,
-          "maxDrawdownR": 226.21,
-          "totalR": 689.96,
+          "maxDrawdownR": 222.81,
+          "totalR": 689.12,
           "sharpeApprox": 1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.14,
+            "2021": 1.53,
+            "2022": 0.15,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.39
@@ -460,7 +460,7 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.14,
           "latePf": 1.55,
@@ -480,23 +480,23 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 1814,
-          "wins": 965,
-          "losses": 848,
-          "winrate": 53.2,
-          "expectancyR": 0.435,
-          "profitFactor": 1.36,
-          "maxDrawdownR": 361.84,
-          "totalR": 789.81,
+          "trades": 1818,
+          "wins": 967,
+          "losses": 850,
+          "winrate": 53.19,
+          "expectancyR": 0.434,
+          "profitFactor": 1.359,
+          "maxDrawdownR": 355.38,
+          "totalR": 788.2,
           "sharpeApprox": 0.71,
-          "turnoverPerYear": 362.8
+          "turnoverPerYear": 363.6
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.44,
-            "2022": 0.13,
+            "2021": 1.43,
+            "2022": 0.15,
             "2023": 1.98,
-            "2024": 1.33,
+            "2024": 1.32,
             "2025": 1.22
           },
           "validYears": 5,
@@ -504,9 +504,9 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 433,
-          "lateTrades": 887,
-          "earlyPf": 1.06,
+          "earlyTrades": 436,
+          "lateTrades": 888,
+          "earlyPf": 1.07,
           "latePf": 1.28,
           "decayRatio": 0.83
         },
@@ -526,21 +526,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 9061,
-          "wins": 4724,
-          "losses": 4336,
-          "winrate": 52.14,
-          "expectancyR": 0.611,
-          "profitFactor": 1.429,
-          "maxDrawdownR": 2364.85,
-          "totalR": 5533.59,
-          "sharpeApprox": 0.84,
-          "turnoverPerYear": 1812.2
+          "trades": 9080,
+          "wins": 4746,
+          "losses": 4333,
+          "winrate": 52.27,
+          "expectancyR": 0.615,
+          "profitFactor": 1.433,
+          "maxDrawdownR": 2309.87,
+          "totalR": 5580.91,
+          "sharpeApprox": 0.85,
+          "turnoverPerYear": 1816
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.61,
-            "2022": 0.09,
+            "2021": 1.6,
+            "2022": 0.11,
             "2023": 1.97,
             "2024": 1.71,
             "2025": 1.16
@@ -550,11 +550,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 2223,
-          "lateTrades": 4428,
-          "earlyPf": 1.04,
+          "earlyTrades": 2241,
+          "lateTrades": 4429,
+          "earlyPf": 1.05,
           "latePf": 1.44,
-          "decayRatio": 0.72
+          "decayRatio": 0.73
         },
         "classification": "ROBUST_EDGE"
       },
@@ -570,21 +570,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 1821,
-          "wins": 973,
-          "losses": 847,
-          "winrate": 53.43,
-          "expectancyR": 0.665,
-          "profitFactor": 1.468,
-          "maxDrawdownR": 484.97,
-          "totalR": 1210.24,
-          "sharpeApprox": 0.92,
-          "turnoverPerYear": 364.2
+          "trades": 1824,
+          "wins": 977,
+          "losses": 846,
+          "winrate": 53.56,
+          "expectancyR": 0.669,
+          "profitFactor": 1.473,
+          "maxDrawdownR": 471.56,
+          "totalR": 1219.58,
+          "sharpeApprox": 0.93,
+          "turnoverPerYear": 364.8
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.48,
-            "2022": 0.08,
+            "2022": 0.1,
             "2023": 2.07,
             "2024": 1.71,
             "2025": 1.27
@@ -594,9 +594,9 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 441,
+          "earlyTrades": 444,
           "lateTrades": 890,
-          "earlyPf": 1.01,
+          "earlyPf": 1.02,
           "latePf": 1.5,
           "decayRatio": 0.68
         },
@@ -614,21 +614,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 505,
-          "losses": 423,
-          "winrate": 54.36,
-          "expectancyR": 0.743,
+          "losses": 424,
+          "winrate": 54.3,
+          "expectancyR": 0.741,
           "profitFactor": 1.532,
-          "maxDrawdownR": 226.21,
-          "totalR": 689.96,
+          "maxDrawdownR": 222.81,
+          "totalR": 689.12,
           "sharpeApprox": 1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.14,
+            "2021": 1.53,
+            "2022": 0.15,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.39
@@ -638,7 +638,7 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.14,
           "latePf": 1.55,
@@ -658,21 +658,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 479,
-          "wins": 259,
-          "losses": 220,
-          "winrate": 54.07,
-          "expectancyR": 0.801,
-          "profitFactor": 1.566,
-          "maxDrawdownR": 112.56,
-          "totalR": 383.7,
-          "sharpeApprox": 1.05,
-          "turnoverPerYear": 95.8
+          "trades": 480,
+          "wins": 258,
+          "losses": 222,
+          "winrate": 53.75,
+          "expectancyR": 0.793,
+          "profitFactor": 1.561,
+          "maxDrawdownR": 111.61,
+          "totalR": 380.64,
+          "sharpeApprox": 1.04,
+          "turnoverPerYear": 96
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.35,
-            "2022": 0.25,
+            "2021": 1.34,
+            "2022": 0.24,
             "2023": 1.8,
             "2024": 1.96,
             "2025": 1.62
@@ -682,11 +682,11 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 129,
+          "earlyTrades": 130,
           "lateTrades": 220,
-          "earlyPf": 1.07,
+          "earlyPf": 1.06,
           "latePf": 1.79,
-          "decayRatio": 0.6
+          "decayRatio": 0.59
         },
         "classification": "ROBUST_EDGE"
       }
@@ -704,21 +704,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 1091,
-          "wins": 576,
-          "losses": 514,
-          "winrate": 52.8,
-          "expectancyR": 0.596,
-          "profitFactor": 1.426,
-          "maxDrawdownR": 311.66,
-          "totalR": 650.63,
-          "sharpeApprox": 0.84,
-          "turnoverPerYear": 218.2
+          "trades": 1097,
+          "wins": 578,
+          "losses": 518,
+          "winrate": 52.69,
+          "expectancyR": 0.593,
+          "profitFactor": 1.424,
+          "maxDrawdownR": 305.38,
+          "totalR": 650.24,
+          "sharpeApprox": 0.83,
+          "turnoverPerYear": 219.4
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.55,
+            "2021": 1.53,
+            "2022": 0.56,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.37
@@ -728,7 +728,7 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 367,
+          "earlyTrades": 373,
           "lateTrades": 474,
           "earlyPf": 1.01,
           "latePf": 1.53,
@@ -748,21 +748,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 505,
-          "losses": 423,
-          "winrate": 54.36,
-          "expectancyR": 0.743,
+          "losses": 424,
+          "winrate": 54.3,
+          "expectancyR": 0.741,
           "profitFactor": 1.532,
-          "maxDrawdownR": 226.21,
-          "totalR": 689.96,
+          "maxDrawdownR": 222.81,
+          "totalR": 689.12,
           "sharpeApprox": 1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.14,
+            "2021": 1.53,
+            "2022": 0.15,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.39
@@ -772,7 +772,7 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.14,
           "latePf": 1.55,
@@ -792,16 +792,16 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 529,
+          "trades": 530,
           "wins": 253,
-          "losses": 275,
-          "winrate": 47.83,
-          "expectancyR": 0.465,
+          "losses": 276,
+          "winrate": 47.74,
+          "expectancyR": 0.464,
           "profitFactor": 1.28,
-          "maxDrawdownR": 222.1,
-          "totalR": 246.16,
+          "maxDrawdownR": 222.46,
+          "totalR": 245.8,
           "sharpeApprox": 0.59,
-          "turnoverPerYear": 105.8
+          "turnoverPerYear": 106
         },
         "stability": {
           "yearlyPf": {
@@ -816,7 +816,7 @@
           "robustYears": 2
         },
         "decay": {
-          "earlyTrades": 79,
+          "earlyTrades": 80,
           "lateTrades": 400,
           "earlyPf": 0.45,
           "latePf": 1.67,
@@ -836,21 +836,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 759,
-          "wins": 375,
+          "trades": 760,
+          "wins": 376,
           "losses": 383,
-          "winrate": 49.41,
-          "expectancyR": 0.437,
-          "profitFactor": 1.283,
-          "maxDrawdownR": 261.05,
-          "totalR": 331.5,
+          "winrate": 49.47,
+          "expectancyR": 0.438,
+          "profitFactor": 1.285,
+          "maxDrawdownR": 259.33,
+          "totalR": 333,
           "sharpeApprox": 0.59,
-          "turnoverPerYear": 151.8
+          "turnoverPerYear": 152
         },
         "stability": {
           "yearlyPf": {
             "2021": 0.59,
-            "2022": 0.14,
+            "2022": 0.15,
             "2023": 1.64,
             "2024": 1.68,
             "2025": 1.35
@@ -860,7 +860,7 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 119,
+          "earlyTrades": 120,
           "lateTrades": 440,
           "earlyPf": 0.42,
           "latePf": 1.53,
@@ -880,16 +880,16 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 749,
+          "trades": 750,
           "wins": 385,
-          "losses": 363,
-          "winrate": 51.4,
-          "expectancyR": 0.592,
-          "profitFactor": 1.391,
-          "maxDrawdownR": 220.28,
-          "totalR": 443.13,
+          "losses": 364,
+          "winrate": 51.33,
+          "expectancyR": 0.59,
+          "profitFactor": 1.39,
+          "maxDrawdownR": 220.65,
+          "totalR": 442.55,
           "sharpeApprox": 0.79,
-          "turnoverPerYear": 149.8
+          "turnoverPerYear": 150
         },
         "stability": {
           "yearlyPf": {
@@ -904,7 +904,7 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 79,
+          "earlyTrades": 80,
           "lateTrades": 450,
           "earlyPf": 0.45,
           "latePf": 1.55,
@@ -924,23 +924,23 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 775,
-          "wins": 417,
-          "losses": 357,
-          "winrate": 53.81,
-          "expectancyR": 0.663,
-          "profitFactor": 1.463,
-          "maxDrawdownR": 191.69,
-          "totalR": 513.71,
-          "sharpeApprox": 0.91,
-          "turnoverPerYear": 155
+          "trades": 776,
+          "wins": 409,
+          "losses": 366,
+          "winrate": 52.71,
+          "expectancyR": 0.607,
+          "profitFactor": 1.416,
+          "maxDrawdownR": 192.7,
+          "totalR": 470.96,
+          "sharpeApprox": 0.83,
+          "turnoverPerYear": 155.2
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.28,
-            "2022": 0.54,
-            "2023": 1.9,
-            "2024": 1.69,
+            "2021": 1.27,
+            "2022": 0.51,
+            "2023": 1.84,
+            "2024": 1.58,
             "2025": 1.29
           },
           "validYears": 5,
@@ -948,11 +948,11 @@
           "robustYears": 2
         },
         "decay": {
-          "earlyTrades": 205,
-          "lateTrades": 380,
-          "earlyPf": 1.09,
-          "latePf": 1.52,
-          "decayRatio": 0.72
+          "earlyTrades": 206,
+          "lateTrades": 390,
+          "earlyPf": 1.07,
+          "latePf": 1.46,
+          "decayRatio": 0.74
         },
         "classification": "ROBUST_EDGE"
       }
@@ -970,21 +970,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 505,
-          "losses": 423,
-          "winrate": 54.36,
-          "expectancyR": 0.743,
+          "losses": 424,
+          "winrate": 54.3,
+          "expectancyR": 0.741,
           "profitFactor": 1.532,
-          "maxDrawdownR": 226.21,
-          "totalR": 689.96,
+          "maxDrawdownR": 222.81,
+          "totalR": 689.12,
           "sharpeApprox": 1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.14,
+            "2021": 1.53,
+            "2022": 0.15,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.39
@@ -994,7 +994,7 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.14,
           "latePf": 1.55,
@@ -1014,35 +1014,35 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 542,
-          "wins": 313,
-          "losses": 228,
-          "winrate": 57.75,
-          "expectancyR": -0.102,
-          "profitFactor": 0.837,
-          "maxDrawdownR": 120.45,
-          "totalR": -55.13,
-          "sharpeApprox": -0.38,
-          "turnoverPerYear": 135.5
+          "trades": 614,
+          "wins": 339,
+          "losses": 274,
+          "winrate": 55.21,
+          "expectancyR": -0.11,
+          "profitFactor": 0.817,
+          "maxDrawdownR": 127.09,
+          "totalR": -67.55,
+          "sharpeApprox": -0.43,
+          "turnoverPerYear": 122.8
         },
         "stability": {
           "yearlyPf": {
-            "2021": 0.58,
-            "2022": null,
-            "2023": 1.36,
-            "2024": 0.47,
-            "2025": 1.45
+            "2021": 0.65,
+            "2022": 12.39,
+            "2023": 1.17,
+            "2024": 0.49,
+            "2025": 1.35
           },
-          "validYears": 4,
-          "positiveYears": 2,
+          "validYears": 5,
+          "positiveYears": 3,
           "robustYears": 2
         },
         "decay": {
-          "earlyTrades": 96,
-          "lateTrades": 284,
-          "earlyPf": 0.58,
-          "latePf": 0.76,
-          "decayRatio": 0.76
+          "earlyTrades": 131,
+          "lateTrades": 315,
+          "earlyPf": 0.7,
+          "latePf": 0.75,
+          "decayRatio": 0.94
         },
         "classification": "DEAD"
       },
@@ -1236,21 +1236,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 505,
-          "losses": 423,
-          "winrate": 54.36,
-          "expectancyR": 0.743,
+          "losses": 424,
+          "winrate": 54.3,
+          "expectancyR": 0.741,
           "profitFactor": 1.532,
-          "maxDrawdownR": 226.21,
-          "totalR": 689.96,
+          "maxDrawdownR": 222.81,
+          "totalR": 689.12,
           "sharpeApprox": 1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.14,
+            "2021": 1.53,
+            "2022": 0.15,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.39
@@ -1260,7 +1260,7 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.14,
           "latePf": 1.55,
@@ -1280,21 +1280,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
-          "wins": 384,
+          "trades": 930,
+          "wins": 385,
           "losses": 545,
-          "winrate": 41.33,
-          "expectancyR": 0.036,
-          "profitFactor": 1.04,
-          "maxDrawdownR": 109.89,
-          "totalR": 33.19,
+          "winrate": 41.4,
+          "expectancyR": 0.034,
+          "profitFactor": 1.038,
+          "maxDrawdownR": 109.37,
+          "totalR": 31.98,
           "sharpeApprox": 0.1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.26,
-            "2022": 0.14,
+            "2021": 1.25,
+            "2022": 0.15,
             "2023": 1.3,
             "2024": 0.92,
             "2025": 1.03
@@ -1304,9 +1304,9 @@
           "robustYears": 1
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
-          "earlyPf": 0.97,
+          "earlyPf": 0.96,
           "latePf": 0.97,
           "decayRatio": 1
         },
@@ -1324,23 +1324,23 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
-          "wins": 344,
+          "trades": 930,
+          "wins": 345,
           "losses": 585,
-          "winrate": 37.03,
+          "winrate": 37.1,
           "expectancyR": 0.376,
-          "profitFactor": 1.435,
-          "maxDrawdownR": 80.93,
-          "totalR": 349.15,
+          "profitFactor": 1.436,
+          "maxDrawdownR": 80.23,
+          "totalR": 349.6,
           "sharpeApprox": 0.7,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.8,
-            "2022": 0.32,
+            "2021": 1.81,
+            "2022": 0.3,
             "2023": 1.56,
-            "2024": 1.53,
+            "2024": 1.54,
             "2025": 1.06
           },
           "validYears": 5,
@@ -1348,7 +1348,7 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.54,
           "latePf": 1.34,
@@ -1368,21 +1368,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 407,
-          "losses": 520,
-          "winrate": 43.81,
-          "expectancyR": 0.401,
+          "losses": 521,
+          "winrate": 43.76,
+          "expectancyR": 0.4,
           "profitFactor": 1.461,
-          "maxDrawdownR": 85.58,
-          "totalR": 372.26,
+          "maxDrawdownR": 85.67,
+          "totalR": 372.27,
           "sharpeApprox": 0.77,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.69,
-            "2022": 0.21,
+            "2022": 0.2,
             "2023": 2.11,
             "2024": 1.19,
             "2025": 1.39
@@ -1392,11 +1392,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.31,
           "latePf": 1.27,
-          "decayRatio": 1.03
+          "decayRatio": 1.02
         },
         "classification": "ROBUST_EDGE"
       },
@@ -1412,21 +1412,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
-          "wins": 409,
+          "trades": 930,
+          "wins": 410,
           "losses": 520,
-          "winrate": 44.03,
-          "expectancyR": 0.68,
-          "profitFactor": 1.63,
-          "maxDrawdownR": 143.83,
-          "totalR": 631.55,
-          "sharpeApprox": 1.11,
-          "turnoverPerYear": 185.8
+          "winrate": 44.09,
+          "expectancyR": 0.683,
+          "profitFactor": 1.635,
+          "maxDrawdownR": 137.85,
+          "totalR": 634.96,
+          "sharpeApprox": 1.12,
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.96,
-            "2022": 0.1,
+            "2021": 1.94,
+            "2022": 0.13,
             "2023": 1.93,
             "2024": 1.8,
             "2025": 1.45
@@ -1436,11 +1436,11 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
-          "earlyPf": 1.33,
+          "earlyPf": 1.35,
           "latePf": 1.64,
-          "decayRatio": 0.81
+          "decayRatio": 0.82
         },
         "classification": "ROBUST_EDGE"
       }
@@ -1460,21 +1460,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 829,
-          "wins": 446,
-          "losses": 383,
-          "winrate": 53.8,
-          "expectancyR": 2.776,
-          "profitFactor": 1.908,
-          "maxDrawdownR": 746.67,
-          "totalR": 2301.05,
+          "trades": 830,
+          "wins": 448,
+          "losses": 382,
+          "winrate": 53.98,
+          "expectancyR": 2.775,
+          "profitFactor": 1.911,
+          "maxDrawdownR": 742.27,
+          "totalR": 2303.18,
           "sharpeApprox": 1.48,
-          "turnoverPerYear": 165.8
+          "turnoverPerYear": 166
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.11,
-            "2022": 0.96,
+            "2021": 1.1,
+            "2022": 0.99,
             "2023": 5.52,
             "2024": 1.33,
             "2025": 2.36
@@ -1484,11 +1484,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 350,
           "earlyPf": 1.08,
-          "latePf": 1.51,
-          "decayRatio": 0.72
+          "latePf": 1.52,
+          "decayRatio": 0.71
         },
         "classification": "ROBUST_EDGE"
       },
@@ -1504,23 +1504,23 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 889,
-          "wins": 481,
+          "trades": 890,
+          "wins": 482,
           "losses": 408,
-          "winrate": 54.11,
-          "expectancyR": 1.773,
-          "profitFactor": 1.829,
-          "maxDrawdownR": 456.47,
-          "totalR": 1575.89,
+          "winrate": 54.16,
+          "expectancyR": 1.772,
+          "profitFactor": 1.83,
+          "maxDrawdownR": 447.53,
+          "totalR": 1576.81,
           "sharpeApprox": 1.42,
-          "turnoverPerYear": 177.8
+          "turnoverPerYear": 178
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.77,
-            "2022": 0.38,
+            "2021": 1.75,
+            "2022": 0.42,
             "2023": 2.63,
-            "2024": 1.68,
+            "2024": 1.69,
             "2025": 1.92
           },
           "validYears": 5,
@@ -1528,10 +1528,10 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 410,
           "earlyPf": 1.45,
-          "latePf": 1.76,
+          "latePf": 1.77,
           "decayRatio": 0.82
         },
         "classification": "ROBUST_EDGE"
@@ -1548,21 +1548,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 909,
-          "wins": 472,
+          "trades": 910,
+          "wins": 473,
           "losses": 437,
-          "winrate": 51.93,
-          "expectancyR": 1.352,
+          "winrate": 51.98,
+          "expectancyR": 1.353,
           "profitFactor": 1.717,
-          "maxDrawdownR": 366.58,
-          "totalR": 1228.92,
+          "maxDrawdownR": 360.37,
+          "totalR": 1230.87,
           "sharpeApprox": 1.27,
-          "turnoverPerYear": 181.8
+          "turnoverPerYear": 182
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.55,
-            "2022": 0.36,
+            "2021": 1.53,
+            "2022": 0.41,
             "2023": 2.3,
             "2024": 2.12,
             "2025": 1.39
@@ -1572,10 +1572,10 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 430,
           "earlyPf": 1.24,
-          "latePf": 1.78,
+          "latePf": 1.79,
           "decayRatio": 0.7
         },
         "classification": "ROBUST_EDGE"
@@ -1592,21 +1592,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
-          "wins": 409,
+          "trades": 930,
+          "wins": 410,
           "losses": 520,
-          "winrate": 44.03,
-          "expectancyR": 0.68,
-          "profitFactor": 1.63,
-          "maxDrawdownR": 143.83,
-          "totalR": 631.55,
-          "sharpeApprox": 1.11,
-          "turnoverPerYear": 185.8
+          "winrate": 44.09,
+          "expectancyR": 0.683,
+          "profitFactor": 1.635,
+          "maxDrawdownR": 137.85,
+          "totalR": 634.96,
+          "sharpeApprox": 1.12,
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.96,
-            "2022": 0.1,
+            "2021": 1.94,
+            "2022": 0.13,
             "2023": 1.93,
             "2024": 1.8,
             "2025": 1.45
@@ -1616,11 +1616,11 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
-          "earlyPf": 1.33,
+          "earlyPf": 1.35,
           "latePf": 1.64,
-          "decayRatio": 0.81
+          "decayRatio": 0.82
         },
         "classification": "ROBUST_EDGE"
       },
@@ -1636,21 +1636,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 479,
-          "wins": 259,
-          "losses": 220,
-          "winrate": 54.07,
-          "expectancyR": 0.801,
-          "profitFactor": 1.566,
-          "maxDrawdownR": 112.56,
-          "totalR": 383.7,
-          "sharpeApprox": 1.05,
-          "turnoverPerYear": 95.8
+          "trades": 480,
+          "wins": 258,
+          "losses": 222,
+          "winrate": 53.75,
+          "expectancyR": 0.793,
+          "profitFactor": 1.561,
+          "maxDrawdownR": 111.61,
+          "totalR": 380.64,
+          "sharpeApprox": 1.04,
+          "turnoverPerYear": 96
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.35,
-            "2022": 0.25,
+            "2021": 1.34,
+            "2022": 0.24,
             "2023": 1.8,
             "2024": 1.96,
             "2025": 1.62
@@ -1660,18 +1660,18 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 129,
+          "earlyTrades": 130,
           "lateTrades": 220,
-          "earlyPf": 1.07,
+          "earlyPf": 1.06,
           "latePf": 1.79,
-          "decayRatio": 0.6
+          "decayRatio": 0.59
         },
         "classification": "ROBUST_EDGE"
       },
       {
         "cfg": {
           "horizon": 20,
-          "topN": 10,
+          "topN": 3,
           "rebalance": 10,
           "regime": "NO_RISK_OFF",
           "universe": "mixed",
@@ -1680,35 +1680,35 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
-          "wins": 505,
-          "losses": 423,
-          "winrate": 54.36,
-          "expectancyR": 0.743,
-          "profitFactor": 1.532,
-          "maxDrawdownR": 226.21,
-          "totalR": 689.96,
-          "sharpeApprox": 1,
-          "turnoverPerYear": 185.8
+          "trades": 279,
+          "wins": 150,
+          "losses": 129,
+          "winrate": 53.76,
+          "expectancyR": 0.958,
+          "profitFactor": 1.539,
+          "maxDrawdownR": 72.31,
+          "totalR": 267.21,
+          "sharpeApprox": 1.09,
+          "turnoverPerYear": 55.8
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.14,
-            "2023": 2.05,
-            "2024": 1.68,
-            "2025": 1.39
+            "2021": 2.24,
+            "2022": 0.19,
+            "2023": 1.58,
+            "2024": 1.81,
+            "2025": 1.06
           },
           "validYears": 5,
           "positiveYears": 4,
-          "robustYears": 4
+          "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
-          "lateTrades": 450,
-          "earlyPf": 1.14,
-          "latePf": 1.55,
-          "decayRatio": 0.74
+          "earlyTrades": 69,
+          "lateTrades": 135,
+          "earlyPf": 1.72,
+          "latePf": 1.41,
+          "decayRatio": 1.22
         },
         "classification": "ROBUST_EDGE"
       },
@@ -1725,20 +1725,20 @@
         },
         "summary": {
           "trades": 465,
-          "wins": 253,
-          "losses": 212,
-          "winrate": 54.41,
-          "expectancyR": 0.884,
-          "profitFactor": 1.532,
-          "maxDrawdownR": 121.76,
-          "totalR": 411.21,
-          "sharpeApprox": 1.08,
+          "wins": 254,
+          "losses": 211,
+          "winrate": 54.62,
+          "expectancyR": 0.892,
+          "profitFactor": 1.538,
+          "maxDrawdownR": 118.16,
+          "totalR": 414.81,
+          "sharpeApprox": 1.09,
           "turnoverPerYear": 93
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.92,
-            "2022": 0.15,
+            "2022": 0.18,
             "2023": 1.87,
             "2024": 1.61,
             "2025": 1.28
@@ -1750,9 +1750,53 @@
         "decay": {
           "earlyTrades": 115,
           "lateTrades": 225,
-          "earlyPf": 1.42,
+          "earlyPf": 1.44,
           "latePf": 1.45,
-          "decayRatio": 0.98
+          "decayRatio": 1
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "cfg": {
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "regime": "NO_RISK_OFF",
+          "universe": "mixed",
+          "exit": "fixed_hold",
+          "lookback": 90,
+          "minMomentum": 12
+        },
+        "summary": {
+          "trades": 930,
+          "wins": 505,
+          "losses": 424,
+          "winrate": 54.3,
+          "expectancyR": 0.741,
+          "profitFactor": 1.532,
+          "maxDrawdownR": 222.81,
+          "totalR": 689.12,
+          "sharpeApprox": 1,
+          "turnoverPerYear": 186
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.53,
+            "2022": 0.15,
+            "2023": 2.05,
+            "2024": 1.68,
+            "2025": 1.39
+          },
+          "validYears": 5,
+          "positiveYears": 4,
+          "robustYears": 4
+        },
+        "decay": {
+          "earlyTrades": 230,
+          "lateTrades": 450,
+          "earlyPf": 1.14,
+          "latePf": 1.55,
+          "decayRatio": 0.74
         },
         "classification": "ROBUST_EDGE"
       },
@@ -1803,50 +1847,6 @@
       {
         "cfg": {
           "horizon": 20,
-          "topN": 3,
-          "rebalance": 10,
-          "regime": "NO_RISK_OFF",
-          "universe": "mixed",
-          "exit": "fixed_hold",
-          "lookback": 90,
-          "minMomentum": 12
-        },
-        "summary": {
-          "trades": 279,
-          "wins": 150,
-          "losses": 129,
-          "winrate": 53.76,
-          "expectancyR": 0.929,
-          "profitFactor": 1.516,
-          "maxDrawdownR": 72.37,
-          "totalR": 259.29,
-          "sharpeApprox": 1.05,
-          "turnoverPerYear": 55.8
-        },
-        "stability": {
-          "yearlyPf": {
-            "2021": 2.24,
-            "2022": 0.13,
-            "2023": 1.58,
-            "2024": 1.81,
-            "2025": 1.06
-          },
-          "validYears": 5,
-          "positiveYears": 4,
-          "robustYears": 3
-        },
-        "decay": {
-          "earlyTrades": 69,
-          "lateTrades": 135,
-          "earlyPf": 1.63,
-          "latePf": 1.41,
-          "decayRatio": 1.16
-        },
-        "classification": "ROBUST_EDGE"
-      },
-      {
-        "cfg": {
-          "horizon": 20,
           "topN": 10,
           "rebalance": 5,
           "regime": "NO_RISK_OFF",
@@ -1856,21 +1856,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 1821,
-          "wins": 973,
-          "losses": 847,
-          "winrate": 53.43,
-          "expectancyR": 0.665,
-          "profitFactor": 1.468,
-          "maxDrawdownR": 484.97,
-          "totalR": 1210.24,
-          "sharpeApprox": 0.92,
-          "turnoverPerYear": 364.2
+          "trades": 1824,
+          "wins": 977,
+          "losses": 846,
+          "winrate": 53.56,
+          "expectancyR": 0.669,
+          "profitFactor": 1.473,
+          "maxDrawdownR": 471.56,
+          "totalR": 1219.58,
+          "sharpeApprox": 0.93,
+          "turnoverPerYear": 364.8
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.48,
-            "2022": 0.08,
+            "2022": 0.1,
             "2023": 2.07,
             "2024": 1.71,
             "2025": 1.27
@@ -1880,55 +1880,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 441,
+          "earlyTrades": 444,
           "lateTrades": 890,
-          "earlyPf": 1.01,
+          "earlyPf": 1.02,
           "latePf": 1.5,
           "decayRatio": 0.68
-        },
-        "classification": "ROBUST_EDGE"
-      },
-      {
-        "cfg": {
-          "horizon": 20,
-          "topN": 10,
-          "rebalance": 10,
-          "regime": "BREADTH_50",
-          "universe": "mixed",
-          "exit": "fixed_hold",
-          "lookback": 90,
-          "minMomentum": 12
-        },
-        "summary": {
-          "trades": 775,
-          "wins": 417,
-          "losses": 357,
-          "winrate": 53.81,
-          "expectancyR": 0.663,
-          "profitFactor": 1.463,
-          "maxDrawdownR": 191.69,
-          "totalR": 513.71,
-          "sharpeApprox": 0.91,
-          "turnoverPerYear": 155
-        },
-        "stability": {
-          "yearlyPf": {
-            "2021": 1.28,
-            "2022": 0.54,
-            "2023": 1.9,
-            "2024": 1.69,
-            "2025": 1.29
-          },
-          "validYears": 5,
-          "positiveYears": 4,
-          "robustYears": 2
-        },
-        "decay": {
-          "earlyTrades": 205,
-          "lateTrades": 380,
-          "earlyPf": 1.09,
-          "latePf": 1.52,
-          "decayRatio": 0.72
         },
         "classification": "ROBUST_EDGE"
       },
@@ -1944,21 +1900,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
+          "trades": 930,
           "wins": 407,
-          "losses": 520,
-          "winrate": 43.81,
-          "expectancyR": 0.401,
+          "losses": 521,
+          "winrate": 43.76,
+          "expectancyR": 0.4,
           "profitFactor": 1.461,
-          "maxDrawdownR": 85.58,
-          "totalR": 372.26,
+          "maxDrawdownR": 85.67,
+          "totalR": 372.27,
           "sharpeApprox": 0.77,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.69,
-            "2022": 0.21,
+            "2022": 0.2,
             "2023": 2.11,
             "2024": 1.19,
             "2025": 1.39
@@ -1968,11 +1924,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.31,
           "latePf": 1.27,
-          "decayRatio": 1.03
+          "decayRatio": 1.02
         },
         "classification": "ROBUST_EDGE"
       },
@@ -1988,23 +1944,23 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
-          "wins": 344,
+          "trades": 930,
+          "wins": 345,
           "losses": 585,
-          "winrate": 37.03,
+          "winrate": 37.1,
           "expectancyR": 0.376,
-          "profitFactor": 1.435,
-          "maxDrawdownR": 80.93,
-          "totalR": 349.15,
+          "profitFactor": 1.436,
+          "maxDrawdownR": 80.23,
+          "totalR": 349.6,
           "sharpeApprox": 0.7,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.8,
-            "2022": 0.32,
+            "2021": 1.81,
+            "2022": 0.3,
             "2023": 1.56,
-            "2024": 1.53,
+            "2024": 1.54,
             "2025": 1.06
           },
           "validYears": 5,
@@ -2012,7 +1968,7 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
           "earlyPf": 1.54,
           "latePf": 1.34,
@@ -2032,21 +1988,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 9061,
-          "wins": 4724,
-          "losses": 4336,
-          "winrate": 52.14,
-          "expectancyR": 0.611,
-          "profitFactor": 1.429,
-          "maxDrawdownR": 2364.85,
-          "totalR": 5533.59,
-          "sharpeApprox": 0.84,
-          "turnoverPerYear": 1812.2
+          "trades": 9080,
+          "wins": 4746,
+          "losses": 4333,
+          "winrate": 52.27,
+          "expectancyR": 0.615,
+          "profitFactor": 1.433,
+          "maxDrawdownR": 2309.87,
+          "totalR": 5580.91,
+          "sharpeApprox": 0.85,
+          "turnoverPerYear": 1816
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.61,
-            "2022": 0.09,
+            "2021": 1.6,
+            "2022": 0.11,
             "2023": 1.97,
             "2024": 1.71,
             "2025": 1.16
@@ -2056,11 +2012,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 2223,
-          "lateTrades": 4428,
-          "earlyPf": 1.04,
+          "earlyTrades": 2241,
+          "lateTrades": 4429,
+          "earlyPf": 1.05,
           "latePf": 1.44,
-          "decayRatio": 0.72
+          "decayRatio": 0.73
         },
         "classification": "ROBUST_EDGE"
       },
@@ -2076,21 +2032,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 1091,
-          "wins": 576,
-          "losses": 514,
-          "winrate": 52.8,
-          "expectancyR": 0.596,
-          "profitFactor": 1.426,
-          "maxDrawdownR": 311.66,
-          "totalR": 650.63,
-          "sharpeApprox": 0.84,
-          "turnoverPerYear": 218.2
+          "trades": 1097,
+          "wins": 578,
+          "losses": 518,
+          "winrate": 52.69,
+          "expectancyR": 0.593,
+          "profitFactor": 1.424,
+          "maxDrawdownR": 305.38,
+          "totalR": 650.24,
+          "sharpeApprox": 0.83,
+          "turnoverPerYear": 219.4
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.54,
-            "2022": 0.55,
+            "2021": 1.53,
+            "2022": 0.56,
             "2023": 2.05,
             "2024": 1.68,
             "2025": 1.37
@@ -2100,11 +2056,55 @@
           "robustYears": 4
         },
         "decay": {
-          "earlyTrades": 367,
+          "earlyTrades": 373,
           "lateTrades": 474,
           "earlyPf": 1.01,
           "latePf": 1.53,
           "decayRatio": 0.66
+        },
+        "classification": "ROBUST_EDGE"
+      },
+      {
+        "cfg": {
+          "horizon": 20,
+          "topN": 10,
+          "rebalance": 10,
+          "regime": "BREADTH_50",
+          "universe": "mixed",
+          "exit": "fixed_hold",
+          "lookback": 90,
+          "minMomentum": 12
+        },
+        "summary": {
+          "trades": 776,
+          "wins": 409,
+          "losses": 366,
+          "winrate": 52.71,
+          "expectancyR": 0.607,
+          "profitFactor": 1.416,
+          "maxDrawdownR": 192.7,
+          "totalR": 470.96,
+          "sharpeApprox": 0.83,
+          "turnoverPerYear": 155.2
+        },
+        "stability": {
+          "yearlyPf": {
+            "2021": 1.27,
+            "2022": 0.51,
+            "2023": 1.84,
+            "2024": 1.58,
+            "2025": 1.29
+          },
+          "validYears": 5,
+          "positiveYears": 4,
+          "robustYears": 2
+        },
+        "decay": {
+          "earlyTrades": 206,
+          "lateTrades": 390,
+          "earlyPf": 1.07,
+          "latePf": 1.46,
+          "decayRatio": 0.74
         },
         "classification": "ROBUST_EDGE"
       },
@@ -2120,23 +2120,23 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 1814,
-          "wins": 965,
-          "losses": 848,
-          "winrate": 53.2,
-          "expectancyR": 0.435,
-          "profitFactor": 1.36,
-          "maxDrawdownR": 361.84,
-          "totalR": 789.81,
+          "trades": 1818,
+          "wins": 967,
+          "losses": 850,
+          "winrate": 53.19,
+          "expectancyR": 0.434,
+          "profitFactor": 1.359,
+          "maxDrawdownR": 355.38,
+          "totalR": 788.2,
           "sharpeApprox": 0.71,
-          "turnoverPerYear": 362.8
+          "turnoverPerYear": 363.6
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.44,
-            "2022": 0.13,
+            "2021": 1.43,
+            "2022": 0.15,
             "2023": 1.98,
-            "2024": 1.33,
+            "2024": 1.32,
             "2025": 1.22
           },
           "validYears": 5,
@@ -2144,9 +2144,9 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 433,
-          "lateTrades": 887,
-          "earlyPf": 1.06,
+          "earlyTrades": 436,
+          "lateTrades": 888,
+          "earlyPf": 1.07,
           "latePf": 1.28,
           "decayRatio": 0.83
         },
@@ -2166,16 +2166,16 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 749,
+          "trades": 750,
           "wins": 385,
-          "losses": 363,
-          "winrate": 51.4,
-          "expectancyR": 0.592,
-          "profitFactor": 1.391,
-          "maxDrawdownR": 220.28,
-          "totalR": 443.13,
+          "losses": 364,
+          "winrate": 51.33,
+          "expectancyR": 0.59,
+          "profitFactor": 1.39,
+          "maxDrawdownR": 220.65,
+          "totalR": 442.55,
           "sharpeApprox": 0.79,
-          "turnoverPerYear": 149.8
+          "turnoverPerYear": 150
         },
         "stability": {
           "yearlyPf": {
@@ -2190,7 +2190,7 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 79,
+          "earlyTrades": 80,
           "lateTrades": 450,
           "earlyPf": 0.45,
           "latePf": 1.55,
@@ -2210,21 +2210,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 759,
-          "wins": 375,
+          "trades": 760,
+          "wins": 376,
           "losses": 383,
-          "winrate": 49.41,
-          "expectancyR": 0.437,
-          "profitFactor": 1.283,
-          "maxDrawdownR": 261.05,
-          "totalR": 331.5,
+          "winrate": 49.47,
+          "expectancyR": 0.438,
+          "profitFactor": 1.285,
+          "maxDrawdownR": 259.33,
+          "totalR": 333,
           "sharpeApprox": 0.59,
-          "turnoverPerYear": 151.8
+          "turnoverPerYear": 152
         },
         "stability": {
           "yearlyPf": {
             "2021": 0.59,
-            "2022": 0.14,
+            "2022": 0.15,
             "2023": 1.64,
             "2024": 1.68,
             "2025": 1.35
@@ -2234,7 +2234,7 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 119,
+          "earlyTrades": 120,
           "lateTrades": 440,
           "earlyPf": 0.42,
           "latePf": 1.53,
@@ -2298,21 +2298,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 939,
+          "trades": 940,
           "wins": 489,
-          "losses": 449,
-          "winrate": 52.08,
-          "expectancyR": 0.272,
-          "profitFactor": 1.254,
-          "maxDrawdownR": 144.86,
-          "totalR": 255.17,
-          "sharpeApprox": 0.54,
-          "turnoverPerYear": 187.8
+          "losses": 450,
+          "winrate": 52.02,
+          "expectancyR": 0.275,
+          "profitFactor": 1.258,
+          "maxDrawdownR": 140.88,
+          "totalR": 258.82,
+          "sharpeApprox": 0.55,
+          "turnoverPerYear": 188
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.46,
-            "2022": 0.13,
+            "2022": 0.15,
             "2023": 1.69,
             "2024": 1.33,
             "2025": 1.12
@@ -2322,11 +2322,11 @@
           "robustYears": 3
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 460,
-          "earlyPf": 1,
+          "earlyPf": 1.01,
           "latePf": 1.23,
-          "decayRatio": 0.81
+          "decayRatio": 0.82
         },
         "classification": "CONDITIONAL_EDGE"
       },
@@ -2388,16 +2388,16 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 529,
+          "trades": 530,
           "wins": 253,
-          "losses": 275,
-          "winrate": 47.83,
-          "expectancyR": 0.465,
+          "losses": 276,
+          "winrate": 47.74,
+          "expectancyR": 0.464,
           "profitFactor": 1.28,
-          "maxDrawdownR": 222.1,
-          "totalR": 246.16,
+          "maxDrawdownR": 222.46,
+          "totalR": 245.8,
           "sharpeApprox": 0.59,
-          "turnoverPerYear": 105.8
+          "turnoverPerYear": 106
         },
         "stability": {
           "yearlyPf": {
@@ -2412,7 +2412,7 @@
           "robustYears": 2
         },
         "decay": {
-          "earlyTrades": 79,
+          "earlyTrades": 80,
           "lateTrades": 400,
           "earlyPf": 0.45,
           "latePf": 1.67,
@@ -2433,20 +2433,20 @@
         },
         "summary": {
           "trades": 93,
-          "wins": 44,
-          "losses": 49,
-          "winrate": 47.31,
-          "expectancyR": 0.129,
-          "profitFactor": 1.054,
-          "maxDrawdownR": 65.85,
-          "totalR": 12.02,
-          "sharpeApprox": 0.14,
+          "wins": 45,
+          "losses": 48,
+          "winrate": 48.39,
+          "expectancyR": 0.159,
+          "profitFactor": 1.066,
+          "maxDrawdownR": 63.13,
+          "totalR": 14.74,
+          "sharpeApprox": 0.18,
           "turnoverPerYear": 18.6
         },
         "stability": {
           "yearlyPf": {
             "2021": 1.52,
-            "2022": 0.11,
+            "2022": 0.22,
             "2023": 0.86,
             "2024": 1.11,
             "2025": 1.07
@@ -2458,9 +2458,9 @@
         "decay": {
           "earlyTrades": 23,
           "lateTrades": 45,
-          "earlyPf": 1.17,
+          "earlyPf": 1.21,
           "latePf": 1.09,
-          "decayRatio": 1.07
+          "decayRatio": 1.11
         },
         "classification": "FRAGILE"
       },
@@ -2476,21 +2476,21 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 929,
-          "wins": 384,
+          "trades": 930,
+          "wins": 385,
           "losses": 545,
-          "winrate": 41.33,
-          "expectancyR": 0.036,
-          "profitFactor": 1.04,
-          "maxDrawdownR": 109.89,
-          "totalR": 33.19,
+          "winrate": 41.4,
+          "expectancyR": 0.034,
+          "profitFactor": 1.038,
+          "maxDrawdownR": 109.37,
+          "totalR": 31.98,
           "sharpeApprox": 0.1,
-          "turnoverPerYear": 185.8
+          "turnoverPerYear": 186
         },
         "stability": {
           "yearlyPf": {
-            "2021": 1.26,
-            "2022": 0.14,
+            "2021": 1.25,
+            "2022": 0.15,
             "2023": 1.3,
             "2024": 0.92,
             "2025": 1.03
@@ -2500,9 +2500,9 @@
           "robustYears": 1
         },
         "decay": {
-          "earlyTrades": 229,
+          "earlyTrades": 230,
           "lateTrades": 450,
-          "earlyPf": 0.97,
+          "earlyPf": 0.96,
           "latePf": 0.97,
           "decayRatio": 1
         },
@@ -2566,35 +2566,35 @@
           "minMomentum": 12
         },
         "summary": {
-          "trades": 542,
-          "wins": 313,
-          "losses": 228,
-          "winrate": 57.75,
-          "expectancyR": -0.102,
-          "profitFactor": 0.837,
-          "maxDrawdownR": 120.45,
-          "totalR": -55.13,
-          "sharpeApprox": -0.38,
-          "turnoverPerYear": 135.5
+          "trades": 614,
+          "wins": 339,
+          "losses": 274,
+          "winrate": 55.21,
+          "expectancyR": -0.11,
+          "profitFactor": 0.817,
+          "maxDrawdownR": 127.09,
+          "totalR": -67.55,
+          "sharpeApprox": -0.43,
+          "turnoverPerYear": 122.8
         },
         "stability": {
           "yearlyPf": {
-            "2021": 0.58,
-            "2022": null,
-            "2023": 1.36,
-            "2024": 0.47,
-            "2025": 1.45
+            "2021": 0.65,
+            "2022": 12.39,
+            "2023": 1.17,
+            "2024": 0.49,
+            "2025": 1.35
           },
-          "validYears": 4,
-          "positiveYears": 2,
+          "validYears": 5,
+          "positiveYears": 3,
           "robustYears": 2
         },
         "decay": {
-          "earlyTrades": 96,
-          "lateTrades": 284,
-          "earlyPf": 0.58,
-          "latePf": 0.76,
-          "decayRatio": 0.76
+          "earlyTrades": 131,
+          "lateTrades": 315,
+          "earlyPf": 0.7,
+          "latePf": 0.75,
+          "decayRatio": 0.94
         },
         "classification": "DEAD"
       }
@@ -2619,21 +2619,21 @@
         "minMomentum": 12
       },
       "summary": {
-        "trades": 829,
-        "wins": 446,
-        "losses": 383,
-        "winrate": 53.8,
-        "expectancyR": 2.776,
-        "profitFactor": 1.908,
-        "maxDrawdownR": 746.67,
-        "totalR": 2301.05,
+        "trades": 830,
+        "wins": 448,
+        "losses": 382,
+        "winrate": 53.98,
+        "expectancyR": 2.775,
+        "profitFactor": 1.911,
+        "maxDrawdownR": 742.27,
+        "totalR": 2303.18,
         "sharpeApprox": 1.48,
-        "turnoverPerYear": 165.8
+        "turnoverPerYear": 166
       },
       "stability": {
         "yearlyPf": {
-          "2021": 1.11,
-          "2022": 0.96,
+          "2021": 1.1,
+          "2022": 0.99,
           "2023": 5.52,
           "2024": 1.33,
           "2025": 2.36
@@ -2643,11 +2643,11 @@
         "robustYears": 3
       },
       "decay": {
-        "earlyTrades": 229,
+        "earlyTrades": 230,
         "lateTrades": 350,
         "earlyPf": 1.08,
-        "latePf": 1.51,
-        "decayRatio": 0.72
+        "latePf": 1.52,
+        "decayRatio": 0.71
       },
       "classification": "ROBUST_EDGE"
     },
@@ -2663,16 +2663,16 @@
         "minMomentum": 12
       },
       "summary": {
-        "trades": 749,
+        "trades": 750,
         "wins": 385,
-        "losses": 363,
-        "winrate": 51.4,
-        "expectancyR": 0.592,
-        "profitFactor": 1.391,
-        "maxDrawdownR": 220.28,
-        "totalR": 443.13,
+        "losses": 364,
+        "winrate": 51.33,
+        "expectancyR": 0.59,
+        "profitFactor": 1.39,
+        "maxDrawdownR": 220.65,
+        "totalR": 442.55,
         "sharpeApprox": 0.79,
-        "turnoverPerYear": 149.8
+        "turnoverPerYear": 150
       },
       "stability": {
         "yearlyPf": {
@@ -2687,7 +2687,7 @@
         "robustYears": 3
       },
       "decay": {
-        "earlyTrades": 79,
+        "earlyTrades": 80,
         "lateTrades": 450,
         "earlyPf": 0.45,
         "latePf": 1.55,

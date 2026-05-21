@@ -1,6 +1,6 @@
 # RS Rotation Hardening Phase 1 — stress tests + regime validation
 
-> Généré le 2026-05-20T18:28:43.065Z par `tools/backtests/rs-rotation-hardening-v1.mjs`.
+> Généré le 2026-05-21T13:34:42.052Z par `tools/backtests/rs-rotation-hardening-v1.mjs`.
 
 **⚠ Analyse strictement offline.** Aucun ordre, aucun broker. Aucun fichier runtime modifié. Paramètres BASELINE GELÉS ex-ante (identiques `rs-rotation-robustness-v1.mjs`). Aucune optimisation post-hoc.
 

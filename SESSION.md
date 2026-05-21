@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-DOC-AUDIT-V1 documentation consistency audit : création `docs/project/DOC_CONSISTENCY_AUDIT_V1.md`. Inventaire des 44 .md du repo, table des contradictions (10 items mineurs), table des obsolescences (10 items mineurs), table des redondances (8 items dont 2 prioritaires), plan de nettoyage 10 actions CLEAN-1 à CLEAN-10. AUDIT + PLAN uniquement, pas de nettoyage massif).
-- **Dernier merge connu** : PR #241 `docs(universe-core): formalise Universe Core V1 — 78 frozen liquid assets` (commit `314182f` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR CLEAN-1 canonisation friction : enrichissement `docs/quant/FRICTION_MODEL.md` (stub → ~330 lignes canonique) + création module `tools/backtests/lib/friction-v1.mjs` (source technique unique) + migration des 4 scripts consommateurs. Validation : 4/4 outputs identiques byte-à-byte avant/après sur dataset constant. Pure factorisation, zéro impact métier).
+- **Dernier merge connu** : PR #242 `docs(audit): documentation consistency audit V1 — inventory + tables + cleanup plan` (commit `d93a6ed` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,34 +52,35 @@
 
 ## PR en cours
 
-- **PR** : PR-DOC-AUDIT-V1 documentation consistency audit — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Mission créateur** : auditer tous les .md du projet pour identifier obsolescences, contradictions, doublons, règles mortes, références invalidées, docs inutiles, statuts setups incohérents, mauvaise séparation recherche/runtime. AUDIT + PLAN uniquement. Pas de nettoyage massif.
-- **Objectif unique** : produire un rapport de diagnostic structuré (inventaire 44 fichiers + tables contradictions/obsolescences/redondances + plan CLEAN-1 à CLEAN-10). PR strictement documentaire.
+- **PR** : PR CLEAN-1 canonisation officielle du modèle friction V1 — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Mission créateur** : CLEAN-1 issue plan PR-DOC-AUDIT-V1 (PR #242). Strictement structurelle : enrichir `FRICTION_MODEL.md` (canonique doc) + créer `lib/friction-v1.mjs` (canonique technique) + migrer les 4 scripts consommateurs. Interdit : modifier formule/paramètres/résultats/verdicts/logique métier.
+- **Objectif unique** : éliminer la duplication inline de la formule friction `(0.30 + 0.02 × holdDays) / 5` qui vivait dans 4 scripts (rs-rotation-robustness-lab-v1, rs-rotation-robustness-v1, meanrev-etf-range-v1, rs-rotation-hardening-v1).
 - **Fichiers créés** :
-  - `docs/project/DOC_CONSISTENCY_AUDIT_V1.md` (~590 lignes, 10 sections).
-- **Fichiers modifiés** :
-  - `SESSION.md` — branche/PR active, dernier merge (PR #241), PR en cours, priorités.
-- **Méthodologie** : 21 fichiers déjà lus en session courante + inventaire ciblé via Explore agent pour les 23 fichiers restants. Vérifications croisées des statuts setups, univers, paramètres baselines entre tous les fichiers canoniques.
-- **Résultats synthétiques** :
-  - **44 .md totaux** : 25 canoniques propres + 9 stubs vides + 2 à réduire + 13 spécialisés.
-  - **Aucune contradiction CRITIQUE** détectée. 10 items mineurs (stubs redondants, historique dépassé, duplication formule entre scripts).
-  - **10 obsolescences mineures** : sections SESSION.md historiques, KNOWN_ISSUES issue #14 résolue, MARKDOWN_CONSOLIDATION_PLAN étapes exécutées, etc.
-  - **8 redondances** dont 2 prioritaires à canoniser : R4 formule friction (4 scripts dupliquent) → enrichir `FRICTION_MODEL.md`. R5 définition régimes 4 états → enrichir `REGIME_RULES.md`.
-  - **Séparation recherche/runtime** : globalement respectée. Note PR #233 truth-sync "détecteur runtime ≠ setup validé" efficace.
-- **Plan de nettoyage proposé** :
-  - **CRITIQUE** : aucune action critique.
-  - **IMPORTANTE** : CLEAN-1 (canoniser friction), CLEAN-2 (canoniser régimes), CLEAN-3 (réduire SESSION.md priorité ChatGPT post-#233 non exécutée).
-  - **MINEURE** : CLEAN-4 (4 stubs redondants en pointeurs), CLEAN-5 (refresh roadmap TRADING_PHILOSOPHY § 8), CLEAN-6 (restructurer Setup 3/4 SETUPS_REGISTRY), CLEAN-7 (marquer issue #14 résolue), CLEAN-8 (notes statut PEAD), CLEAN-9 (archive étapes MARKDOWN_CONSOLIDATION_PLAN), CLEAN-10 (grep mentions stubs racine).
-- **Stubs vides à conserver vides** (par décision assumée) : PROD_SAFETY_RULES, CALIBRATION_RULES, ALLOCATION_RULES, RISK_ENGINE_RULES, EXPERIMENTAL_FEATURES, DATA_QUALITY — utiles pour future PR de remplissage (broker réel, Phase 3+4 hardening, quoteQualityEngine observation).
-- **Conclusion** : documentation ManiTradePro **globalement saine** post-PR #233 truth-sync. Le projet n'a **plus** "plusieurs vérités documentaires" sur les sujets centraux. Discipline acquise.
+  - `docs/quant/FRICTION_MODEL.md` (stub vide → ~330 lignes canoniques) — philosophie friction, formule officielle, composantes, interdictions, limites, position projet, règle d'évolution.
+  - `tools/backtests/lib/friction-v1.mjs` (~80 lignes) — module canonique exportant `computeFrictionV1`, `computeFrictionPctV1`, constantes `FRICTION_V1_*`, métadonnées `FRICTION_V1_METADATA`.
+- **Fichiers modifiés (factorisation pure)** :
+  - `tools/backtests/rs-rotation-robustness-lab-v1.mjs` — fonction `frictionRPerTrade` devient wrapper appelant `computeFrictionV1`. Table d'affichage MD ligne 741 utilise désormais le module.
+  - `tools/backtests/rs-rotation-robustness-v1.mjs` — fonction `frictionRPerTrade` devient wrapper.
+  - `tools/backtests/meanrev-etf-range-v1.mjs` — fonction `frictionRPerTrade(holdDays, multiplier)` devient wrapper avec passage du multiplier.
+  - `tools/backtests/rs-rotation-hardening-v1.mjs` — fonction `frictionR(holdDays, multiplier)` devient wrapper.
+  - `SESSION.md` — branche/PR active, dernier merge, PR en cours, priorités.
+- **Outputs régénérés** : 4 fichiers `tools/backtests/output/*.{json,md}` re-exécutés post-migration.
+- **Validation anti-régression rigoureuse** :
+  1. Sauvegarde outputs `with migration` sur dataset actuel.
+  2. `git checkout HEAD -- 4 scripts` (revert temporaire).
+  3. Re-run scripts inline pre-migration sur dataset actuel.
+  4. Sauvegarde outputs `without migration` sur dataset actuel.
+  5. Restoration scripts migrés.
+  6. Re-run scripts post-migration.
+  7. Comparaison `with` vs `without` byte-à-byte (hors `generatedAt`).
+  - **Résultat : 4/4 outputs IDENTIQUES byte-à-byte.** Migration **purement structurelle** prouvée.
 - **Impact runtime** : aucun.
-- **Impact quant (fond)** : aucun. Aucun setup modifié. Aucune promotion. Aucun verdict quantitatif touché. Aucun fichier .md existant modifié (audit + plan uniquement).
-- **Impact documentation** : oui. Rapport d'audit canonique produit. **Pas de modification** des autres .md.
-- **Conformité brief créateur + Freeze v1** : OUI. NE RIEN INVENTER respecté. NE PAS réécrire respecté. NE PAS supprimer respecté. Séparation recherche/runtime/vision/historique/expérimental maintenue.
-- **Risques résiduels** : R-DESYNC-FORMULE-FRICTION (4 scripts dupliquent — CLEAN-1 à exécuter), R-SESSION-DRIFT (SESSION.md continue d'accumuler — CLEAN-3), R-PHASE-2-CONTEXT-ENGINE-DUPLICATIONS (Phase 2 va dupliquer définition régimes si CLEAN-2 pas fait avant PR-CTX-2).
+- **Impact quant (fond)** : **aucun**. Validation byte-à-byte 4/4. Aucun PF modifié. Aucun verdict changé. Aucun statut setup touché. Aucun paramètre métier modifié.
+- **Impact documentation** : oui. `FRICTION_MODEL.md` devient source canonique unique (était stub vide). Toute discussion friction doit maintenant pointer ici.
+- **Bénéfices** : (i) duplication éliminée (1 source au lieu de 4) ; (ii) règle d'évolution claire (modification = PR documentaire dédiée + audit régression) ; (iii) prerequisite CLEAN-2 (régimes canonisés) et PR-CTX-2 (Phase 2 Context Engine) débloqué — le code futur consommera la lib au lieu de re-inliner.
+- **Conformité brief créateur** : OUI. Pure factorisation. Aucune modification de formule. Aucune modification de paramètres. Aucune recalibration. Aucun changement de résultat. Validation byte-à-byte fournie.
+- **Risques résiduels** : aucun (validation byte-à-byte = zéro drift quantitatif).
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` (et/ou créateur).
-- **Agent utilisé** : Explore (inventaire ciblé 23 fichiers .md restants). Limites de l'Explore : extraits seulement, pas lecture complète. Tous les drapeaux détectés ont été vérifiés par Claude en lecture/cross-check.
-
 ## Décisions actives
 
 - **Gouvernance** : `GOVERNANCE.md` = source canonique unique (IA, projet, validation, merge, agents/skills, gouvernance quant). `GPT_ROLE.md` a été supprimé après période de transition ; l'historique de sa fusion dans `GOVERNANCE.md` est conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. `CLAUDE.md` = manuel opérationnel Claude Code.
@@ -116,8 +117,11 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 8. ✅ **PR-R3B-v3 rerun strict 15 ETF** mergée (PR #239, commit `c91a23a`) — verdict NEEDS_MORE_DATA + indicateurs qualitatifs catastrophiques. Décision A/B/C Mean Reversion en attente.
 9. ✅ **PR-RS-HARDENING Phase 1** mergée (PR #240, commit `17113b6`) — stress tests A.1-A.8 + matrice 4 régimes. Verdict `HARDENED_FRAGILE`. Findings : friction ×3 OK (PF 1.30), RANGE régime optimal (PF 2.04), 2022 PF 0.146 caveat unique.
 10. ✅ **PR-CTX-1 documentation Univers Core officiel V1** mergée (PR #241, commit `314182f`) — 78 actifs figés (27 ETF + 35 leaders US + 10 Europe + 6 crypto). Prerequisite Phase 2.
-11. 🟡 **PR-DOC-AUDIT-V1 documentation consistency audit** (en cours) — rapport `DOC_CONSISTENCY_AUDIT_V1.md` : inventaire 44 .md + 10 contradictions mineures + 10 obsolescences mineures + 8 redondances dont 2 prioritaires + plan CLEAN-1 à CLEAN-10.
-12. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO PR-DOC-AUDIT-V1 + CLEAN-2 si fait) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
+11. ✅ **PR-DOC-AUDIT-V1 documentation consistency audit** mergée (PR #242, commit `d93a6ed`) — plan CLEAN-1 à CLEAN-10.
+12. 🟡 **PR CLEAN-1 canonisation friction V1** (en cours) — `FRICTION_MODEL.md` + `lib/friction-v1.mjs` + migration 4 scripts. Validation byte-à-byte 4/4 outputs identiques.
+13. **PR CLEAN-2 canonisation régimes 4 états** (subordonnée GO CLEAN-1) — enrichir `REGIME_RULES.md` + factoriser définition régimes dans lib partagée. Prerequisite PR-CTX-2.
+14. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO CLEAN-1 + CLEAN-2) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
+15. **PR-GOV-AGENTS** (planifiée séparément — brief créateur 2026-05-19 secondaire) — ajouter dans `GOVERNANCE.md` § *Agents et skills Claude Code* la règle : ChatGPT doit explicitement suggérer/recommander l'usage d'agents Claude disponibles (Explore, general-purpose, Plan, bug-hunter, etc.) dans les prompts qu'il rédige pour Claude, quand pertinent.
 12. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
 13. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
 14. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
