@@ -10,10 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branches / PRs actives** :
-  - PR #249 `claude/live-paper-analytics-v1` — PR-LIVE-PAPER-ANALYTICS-1, attente GO MERGE ChatGPT.
-  - **NOUVELLE** : `claude/live-paper-exec-1b` — PR-LIVE-PAPER-EXEC-1b en cours, micro-PR par-dessus PR #249 (ajout `riskContext` + `contextCaptureStatus` + 7 tests non-régression + preuve no decision drift).
-- **Dernier merge connu** : PR #248 `docs(session): SESSION.md post-merge PR-CTX-3 + acter directive ChatGPT 2026-05-21` (commit `5ad4709` sur `main`).
+- **Branche / PR active** : `claude/live-paper-exec-1b` (en cours — PR #250 / PR-LIVE-PAPER-EXEC-1b : micro-PR par-dessus PR #249 mergée — ajout `riskContext` + `contextCaptureStatus` + 7 tests non-régression + preuve no decision drift).
+- **Dernier merge connu** : PR #249 `quant(analytics): add Live Paper Analytics V1 (PR-LIVE-PAPER-ANALYTICS-1)` (commit `f2c427c` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
