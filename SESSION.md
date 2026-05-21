@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR-CTX-3 sur `claude/session-md-post-ctx3-merge`.
-- **Dernier merge connu** : PR #247 `quant(authorization): add Setup Authorization Matrix V1 (PR-CTX-3)` (commit `93851a2` sur `main`).
+- **Branche / PR active** : `claude/live-paper-analytics-v1` (en cours — PR-LIVE-PAPER-ANALYTICS-1 : instrumentation analytique pure des trades paper existants. Aucune décision modifiée. `analysis_snapshot.livePaperAnalytics` à l'ouverture + `analysis_snapshot.livePaperOutcome` à la clôture).
+- **Dernier merge connu** : PR #248 `docs(session): SESSION.md post-merge PR-CTX-3 + acter directive ChatGPT 2026-05-21` (commit `5ad4709` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -88,9 +88,34 @@
 
 ## PR en cours
 
-- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR-CTX-3 uniquement (`claude/session-md-post-ctx3-merge`).
-- **Directive ChatGPT 2026-05-21 post-CTX-3** : pause PR-CTX-5. L'architecture quant est désormais cohérente (taxonomie officielle, séparation analytique/runtime, régimes centralisés, contexte structuré, couche d'autorisation explicite) — mais aucune preuve robuste qu'un setup possède un edge stable multi-régime/multi-période n'a encore été produite. **Brancher la matrice côté runtime maintenant = sur-ingénierie prématurée sur des setups encore fragiles.**
-- **Mission suivante** : à définir par le créateur. Recommandation ChatGPT explicite : **validation empirique des setups, pas nouvelle couche système.**
+- **PR** : PR-LIVE-PAPER-ANALYTICS-1 — Live Paper Analytics V1 — branche `claude/live-paper-analytics-v1`.
+- **Mission créateur** (2026-05-21, post-CTX-3) : instrumenter le paper trading **existant** pour mesurer les setups en conditions réelles, **sans** activer d'argent réel, **sans** broker, **sans** changer la logique de décision principale. Réponse directe à la directive « validation empirique des setups » (priorité 18 SESSION.md post-CTX-3).
+- **Décision produit assumée** : Live Paper Analytics — paper live OUI, suivi réel OUI, apprentissage empirique OUI, argent réel NON, broker NON, auto-trading réel NON, LIVE_READY NON.
+- **Objectif unique** : enrichir chaque trade paper de metadata analytique structurée (setup utilisé, régime à l'entrée, autorisation CTX-3 *observée* mais non bloquante, scores, plan, qualité signal, MAE/MFE, raison sortie). Persisté dans le JSONB `analysis_snapshot` déjà existant — **aucune migration SQL**.
+- **Fichiers créés** :
+  - `tools/quant/lib/live-paper-analytics-v1.mjs` (~290 lignes) — module pur testable. Exports : `buildLivePaperAnalyticsV1`, `buildLivePaperOutcomeV1`, `assessSignalQualityV1`, `markSectorLeadershipUntrusted`, `normalizeValidationStatus`, `LIVE_PAPER_ENGINE_SETUP_MAP_V1`.
+  - `tools/quant/test/live-paper-analytics-v1.test.mjs` — 11 tests `node:test` (7 obligatoires brief + 4 bonus). Tous pass.
+  - `docs/quant/LIVE_PAPER_ANALYTICS.md` (~310 lignes) — source canonique.
+- **Fichiers modifiés** :
+  - `cloudflare-worker/worker.js` — bloc inline `LIVE PAPER ANALYTICS V1` (~200 lignes) inséré ENTRE `computePnlForClose` et `buildTrainingPositionRowFromSignal` + 2 try/catch additifs dans `buildTrainingPositionRowFromSignal` (point d'ouverture) et `closeTrainingPosition` (point de clôture, après `tradeValidationEngine`). **Strictement additif** — aucune ligne supprimée, aucun seuil modifié.
+  - `docs/project/DATA_PIPELINE.md` — section "Live Paper Analytics V1" ajoutée sous "Stockage".
+  - `docs/project/TRADING_ENGINE.md` — étape additive référencée dans pipeline d'ouverture + entrée dans "Non encore fait" basculée vers livré.
+  - `SESSION.md` — cette mise à jour.
+- **Bug-hunters lancés sur worker.js** (3 scans monolithique-file hook) :
+  - Scan #1 (bloc inline) : VERDICT OK. Aucune collision de noms, aucun effet de bord.
+  - Scan #2 (ouverture) : VERDICT OK. Try/catch silencieux conforme, scope correct.
+  - Scan #3 (clôture) : VERDICT OK. Le spread `{ ...existingSnapshot, livePaperOutcome }` préserve correctement le bloc `intraday` éventuel.
+- **Innocuité garantie** (cf. brief créateur § *Règle majeure*) :
+  - Aucune modification des seuils d'entrée, sizing, allocation, safety gate, learning filters, provider routing.
+  - 2 points d'instrumentation wrappés dans `try/catch` silencieux : si l'instrumentation plante, l'ouverture/clôture continuent normalement.
+  - CTX-2/CTX-3 sont **observés** dans les metadata, **ne décident pas**. `setupAuthorization.allowed === false` produit un warning observable mais n'empêche jamais l'ouverture.
+  - `sectorLeadership` automatiquement tagué `sector_leadership_untrusted` si capturé (KNOWN_ISSUES #15).
+  - Aucun champ `LIVE_READY` ni `broker` n'est produit (vérifié par test obligatoire #6).
+- **Validation tests** : `node --test tools/quant/test/live-paper-analytics-v1.test.mjs` → 11/11 pass, 153 ms. `node --input-type=module --check < cloudflare-worker/worker.js` → OK.
+- **Impact runtime** : **strictement additif**. Aucune décision modifiée. Aucun trade qui ne s'ouvrait pas avant ne s'ouvre maintenant.
+- **Impact quant (fond)** : aucun. Aucune formule, aucun paramètre, aucun statut setup, aucun verdict touché.
+- **Impact documentation** : oui. `docs/quant/LIVE_PAPER_ANALYTICS.md` devient la source canonique du dispositif. `DATA_PIPELINE.md` et `TRADING_ENGINE.md` reflètent les nouveaux champs JSONB.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 
 ## Mission précédente (PR-CTX-3, livrée 2026-05-21)
 
@@ -172,14 +197,15 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 16. ✅ **PR-CTX-3 Setup Authorization Matrix V1** mergée (PR #247, commit `93851a2`) — matrice DÉCLARATIVE pure pour 5 setups × 4 régimes officiels V1, alignée sur les statuts SETUPS_REGISTRY. Aucun statut modifié. Aucun branchement runtime. Invariants vérifiés par tests (aucune consommation `sectorLeadership` / XLY/XLE/XLU tant que #15 OPEN). 12/12 tests + sanity check intégration avec snapshot CTX-2 réel.
 17. ⏸ **PR-CTX-5 Runtime authorization layer** : **EN PAUSE par décision ChatGPT 2026-05-21**. Motif : brancher la matrice côté runtime maintenant = sur-ingénierie prématurée tant qu'aucun setup ne possède une preuve robuste d'edge stable multi-régime/multi-période. À reprendre **uniquement après décision architecture complète** et seulement si l'étape (18) ci-dessous produit au moins un setup stabilisé.
 18. 🟢 **Priorité réelle suivante (directive ChatGPT 2026-05-21)** : **validation empirique des setups**, pas multiplication des couches système. Pistes concrètes (à arbitrer par créateur + ChatGPT) : (a) walk-forward conditionnel régime sur RS Rotation simple ; (b) friction ×2/×3 hardening complémentaire sur RS Rotation, GLD Breakout isolé ; (c) décision A/B/C Mean Reversion V1 ; (d) audit anti-look-ahead spécifique `sectorMomentum` (préalable à toute reprise de SECTOR_RS) ; (e) re-ingestion ajustée des datasets `data/{SYMBOL}_2025.json` pour fermer KNOWN_ISSUES #15.
-19. ⏸ **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée décision créateur) — initialement prévue comme synthèse Phase 2 ; reportée tant que la directive ChatGPT du 2026-05-21 (priorité = validation empirique) n'est pas levée.
-20. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
-21. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
-22. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
-23. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
-24. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
-25. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `BACKTEST_RULES.md` (FRICTION_MODEL.md ✅ fait par CLEAN-1).
-26. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
+19. 🟡 **PR-LIVE-PAPER-ANALYTICS-1 Live Paper Analytics V1** (en cours, branche `claude/live-paper-analytics-v1`) — instrumentation analytique pure des trades paper existants. Aucune décision modifiée. `analysis_snapshot.livePaperAnalytics` à l'ouverture + `analysis_snapshot.livePaperOutcome` à la clôture. Réponse concrète à la priorité (18) — produit les données empiriques nécessaires pour évaluer les setups en marché vivant sans risquer d'illusion LIVE_READY.
+20. ⏸ **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée décision créateur) — initialement prévue comme synthèse Phase 2 ; reportée tant que la directive ChatGPT du 2026-05-21 (priorité = validation empirique) n'est pas levée.
+21. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
+22. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
+23. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
+24. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
+25. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
+26. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `BACKTEST_RULES.md` (FRICTION_MODEL.md ✅ fait par CLEAN-1).
+27. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
 
 Autres :
 

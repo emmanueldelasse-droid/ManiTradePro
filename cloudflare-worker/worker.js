@@ -5840,6 +5840,211 @@ function computePnlForClose(position, exitPrice) {
   return { pnl, pnlPct };
 }
 
+// ============================================================
+// LIVE PAPER ANALYTICS V1 (PR-LIVE-PAPER-ANALYTICS-1)
+// ============================================================
+// Instrumentation ANALYTIQUE PURE des trades paper.
+//
+// - N'influence AUCUNE décision (ouverture, fermeture, sizing, safety).
+// - Ne modifie AUCUN seuil ni filtre existant.
+// - Ne consomme PAS sectorLeadership (KNOWN_ISSUES #15 OPEN).
+// - Ne crée AUCUNE notion LIVE_READY ni broker.
+//
+// Source canonique : tools/quant/lib/live-paper-analytics-v1.mjs
+// Documentation    : docs/quant/LIVE_PAPER_ANALYTICS.md
+// Maintenir les deux miroirs synchrones.
+
+const LIVE_PAPER_ANALYTICS_V1_VERSION = "live-paper-analytics-v1";
+
+// Miroir figé de tools/quant/lib/setup-authorization-matrix-v1.mjs.
+// Lecture-seule. Sert uniquement à enrichir les metadata des trades —
+// ne bloque jamais une décision côté worker.
+const LPA_SETUP_AUTH_V1 = Object.freeze({
+  RS_ROTATION_SIMPLE: { statusRef: "RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED", allowedRegimes: ["RANGE", "RISK_ON"], blockedRegimes: ["RISK_OFF", "HIGH_VOL"], blockedByStatus: false, symbolWhitelist: null },
+  MEAN_REVERSION: { statusRef: "EXPERIMENTAL_ONLY / FRICTION_REQUIRED", allowedRegimes: ["RANGE"], blockedRegimes: ["RISK_ON", "RISK_OFF", "HIGH_VOL"], blockedByStatus: false, symbolWhitelist: null },
+  SECTOR_RELATIVE_STRENGTH: { statusRef: "FRAGILE / CONCENTRATION_EXCESSIVE", allowedRegimes: [], blockedRegimes: ["RISK_ON", "RANGE", "RISK_OFF", "HIGH_VOL"], blockedByStatus: true, symbolWhitelist: null },
+  TREND_PULLBACK_DYNAMIC_SUPPORT: { statusRef: "FRAGILE", allowedRegimes: [], blockedRegimes: ["RISK_ON", "RANGE", "RISK_OFF", "HIGH_VOL"], blockedByStatus: true, symbolWhitelist: null },
+  GLD_BREAKOUT_ISOLATED: { statusRef: "CONDITIONAL_RESEARCH_CANDIDATE", allowedRegimes: ["RISK_ON", "RANGE"], blockedRegimes: ["RISK_OFF", "HIGH_VOL"], blockedByStatus: false, symbolWhitelist: ["GLD"] },
+});
+
+// engine setupType → setupId matrice. Setups DEAD omis volontairement.
+const LPA_ENGINE_SETUP_MAP_V1 = Object.freeze({
+  pullback: "TREND_PULLBACK_DYNAMIC_SUPPORT",
+  mean_reversion: "MEAN_REVERSION",
+});
+
+function lpaResolveSetupId(engineSetupType, symbol) {
+  const t = typeof engineSetupType === "string" ? engineSetupType : null;
+  const s = typeof symbol === "string" ? symbol : "";
+  if (t === "breakout" && s === "GLD") return "GLD_BREAKOUT_ISOLATED";
+  if (t && LPA_ENGINE_SETUP_MAP_V1[t]) return LPA_ENGINE_SETUP_MAP_V1[t];
+  return null;
+}
+
+function lpaResolveAuthorization(setupId, regime, symbol) {
+  if (!setupId || !LPA_SETUP_AUTH_V1[setupId]) {
+    return { version: "setup-authorization-matrix-v1", setupId: null, allowed: null, blockedBy: ["unknown_setup_in_matrix"], statusRef: null };
+  }
+  const entry = LPA_SETUP_AUTH_V1[setupId];
+  const blockedBy = [];
+  if (entry.blockedByStatus) blockedBy.push(`status:${entry.statusRef}`);
+  if (entry.symbolWhitelist && Array.isArray(entry.symbolWhitelist) && !entry.symbolWhitelist.includes(String(symbol))) {
+    blockedBy.push(`symbol_not_in_whitelist:${symbol}`);
+  }
+  if (typeof regime === "string" && regime.length > 0) {
+    if (entry.blockedRegimes.includes(regime)) blockedBy.push(`regime_blocked:${regime}`);
+    else if (entry.allowedRegimes.length > 0 && !entry.allowedRegimes.includes(regime)) {
+      blockedBy.push(`regime_not_allowed:${regime}`);
+    }
+  }
+  return {
+    version: "setup-authorization-matrix-v1",
+    setupId,
+    allowed: blockedBy.length === 0,
+    blockedBy,
+    statusRef: entry.statusRef,
+  };
+}
+
+function lpaSafeNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+function lpaAssessSignalQuality({ validationStatus, quoteQualityUnsafeAtClose, durationDays, hitStop }) {
+  const v = typeof validationStatus === "string" ? validationStatus.toUpperCase() : "UNKNOWN";
+  if (v === "INVALID") return "BAD";
+  if (quoteQualityUnsafeAtClose === true) return "BAD";
+  if (v === "SUSPECT") return "NOISY";
+  const d = lpaSafeNum(durationDays);
+  if (d !== null && d < (1 / 24) && hitStop === true) return "NOISY";
+  if (v === "UNKNOWN" && d === null) return "UNKNOWN";
+  return "GOOD";
+}
+
+function lpaBuildAnalyticsAtOpen({ capturedAt, engineSetupType, symbol, regime, regimeConfidence, scores, plan, quoteQuality }) {
+  const warnings = [];
+  const setupId = lpaResolveSetupId(engineSetupType, symbol);
+  const setupAuthorization = setupId ? lpaResolveAuthorization(setupId, regime, symbol) : null;
+  if (setupAuthorization && setupAuthorization.allowed === false) {
+    warnings.push(`ctx3_would_block:${setupAuthorization.blockedBy.join("|")}`);
+  }
+
+  let quoteQualityBlob = null;
+  if (quoteQuality && typeof quoteQuality === "object") {
+    quoteQualityBlob = {
+      executionSafe: typeof quoteQuality.executionSafe === "boolean" ? quoteQuality.executionSafe : null,
+      trustScore: lpaSafeNum(quoteQuality.trustScore),
+      validationStatus: quoteQuality.validationStatus ?? null,
+      reasons: Array.isArray(quoteQuality.reasons) ? [...quoteQuality.reasons] : [],
+    };
+    if (quoteQualityBlob.executionSafe === false) {
+      warnings.push("quote_quality_unsafe_at_open");
+    }
+  }
+
+  return {
+    version: LIVE_PAPER_ANALYTICS_V1_VERSION,
+    capturedAt: typeof capturedAt === "string" ? capturedAt : null,
+    setupId,
+    engineSetupType: typeof engineSetupType === "string" ? engineSetupType : null,
+    setupStatusRef: setupAuthorization ? setupAuthorization.statusRef : null,
+    regime: typeof regime === "string" ? regime : null,
+    regimeConfidence: lpaSafeNum(regimeConfidence),
+    contextSnapshot: null,
+    setupAuthorization,
+    scores: scores ? {
+      strategicScore: lpaSafeNum(scores.strategicScore),
+      decisionScore: lpaSafeNum(scores.decisionScore),
+      safetyScore: lpaSafeNum(scores.safetyScore),
+      exploitabilityScore: lpaSafeNum(scores.exploitabilityScore),
+    } : null,
+    plan: plan ? {
+      entry: lpaSafeNum(plan.entry),
+      stopLoss: lpaSafeNum(plan.stopLoss),
+      takeProfit: lpaSafeNum(plan.takeProfit),
+      rr: lpaSafeNum(plan.rr),
+      horizon: plan.horizon ?? null,
+    } : null,
+    dataQuality: null,
+    quoteQuality: quoteQualityBlob,
+    warnings,
+  };
+}
+
+function lpaComputeMaeMfe(position) {
+  const side = String(position?.side || "").toLowerCase();
+  const entry = lpaSafeNum(position?.entry_price ?? position?.entryPrice ?? position?.execution?.entryPrice);
+  const high = lpaSafeNum(position?.live?.highSinceOpen);
+  const low = lpaSafeNum(position?.live?.lowSinceOpen);
+  if (entry === null || entry <= 0) return { mae: null, mfe: null };
+  let mfe = null;
+  let mae = null;
+  if (side === "short") {
+    if (low !== null) mfe = (entry - low) / entry;
+    if (high !== null) mae = -(high - entry) / entry;
+  } else {
+    if (high !== null) mfe = (high - entry) / entry;
+    if (low !== null) mae = (low - entry) / entry;
+  }
+  return { mae, mfe };
+}
+
+function lpaBuildOutcomeAtClose({ closedAt, exitReason, position, closedRow, validationStatusRaw, qualityFlags, quoteQualityAtClose, intradayDetected }) {
+  const v = typeof validationStatusRaw === "string" ? validationStatusRaw.toLowerCase() : null;
+  const validationStatus = v === "ok" ? "OK" : v === "suspect" ? "SUSPECT" : v === "invalid" ? "INVALID" : "UNKNOWN";
+  const warnings = [];
+  if (validationStatus === "SUSPECT" || validationStatus === "INVALID") {
+    warnings.push(`validation_status:${validationStatus.toLowerCase()}`);
+  }
+
+  const exitReasonStr = typeof exitReason === "string" ? exitReason : null;
+  const hitStop = exitReasonStr === "stop_loss";
+  const hitTakeProfit = exitReasonStr === "take_profit";
+  const durationDays = lpaSafeNum(closedRow?.duration_days);
+  const { mae, mfe } = lpaComputeMaeMfe(position);
+
+  const unsafeAtClose = quoteQualityAtClose && quoteQualityAtClose.executionSafe === false;
+  const signalQuality = lpaAssessSignalQuality({
+    validationStatus,
+    quoteQualityUnsafeAtClose: !!unsafeAtClose,
+    durationDays,
+    hitStop,
+  });
+
+  let quoteQualityBlob = null;
+  if (quoteQualityAtClose && typeof quoteQualityAtClose === "object") {
+    quoteQualityBlob = {
+      executionSafe: typeof quoteQualityAtClose.executionSafe === "boolean" ? quoteQualityAtClose.executionSafe : null,
+      trustScore: lpaSafeNum(quoteQualityAtClose.trustScore),
+      validationStatus: quoteQualityAtClose.validationStatus ?? null,
+      reasons: Array.isArray(quoteQualityAtClose.reasons) ? [...quoteQualityAtClose.reasons] : [],
+    };
+  }
+
+  return {
+    version: LIVE_PAPER_ANALYTICS_V1_VERSION,
+    closedAt: typeof closedAt === "string" ? closedAt : null,
+    exitReason: exitReasonStr,
+    entryPrice: lpaSafeNum(closedRow?.entry_price),
+    exitPrice: lpaSafeNum(closedRow?.exit_price),
+    pnl: lpaSafeNum(closedRow?.pnl),
+    pnlPct: lpaSafeNum(closedRow?.pnl_pct),
+    durationDays,
+    hitStop,
+    hitTakeProfit,
+    maxFavorableExcursion: mfe,
+    maxAdverseExcursion: mae,
+    signalQuality,
+    validationStatus,
+    qualityFlags: Array.isArray(qualityFlags) ? [...qualityFlags] : [],
+    quoteQualityAtClose: quoteQualityBlob,
+    intradayDetected: !!intradayDetected,
+    notes: null,
+    warnings,
+  };
+}
+
 function buildTrainingPositionRowFromSignal(payload, execution, settings) {
   const botMode = coerceBotMode(settings?.bot_mode, "exploration");
   const analysisSnapshot = buildTrainingAnalysisSnapshotFromPayload(payload, {
@@ -5848,6 +6053,42 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings) {
   });
   const id = `${parseSymbol(payload?.symbol)}:${botMode}:${Date.now()}`;
   const cleanSymbol = parseSymbol(payload?.symbol);
+
+  // PR-LIVE-PAPER-ANALYTICS-1 : metadata observable, n'influence aucune
+  // décision. Échec d'instrumentation ne doit jamais bloquer l'ouverture.
+  try {
+    const regimeRaw = payload?.regime || payload?.regimeContext || analysisSnapshot?.regimeAtOpen || null;
+    const regimeStr = typeof regimeRaw === "string"
+      ? regimeRaw
+      : (regimeRaw && typeof regimeRaw === "object" ? (regimeRaw.regime || regimeRaw.state || null) : null);
+    const lpaMeta = lpaBuildAnalyticsAtOpen({
+      capturedAt: nowIso(),
+      engineSetupType: payload?.plan?.setupType || analysisSnapshot?.setupType || null,
+      symbol: cleanSymbol,
+      regime: regimeStr,
+      regimeConfidence: payload?.regime?.confidence ?? null,
+      scores: {
+        strategicScore: analysisSnapshot?.strategicScore ?? payload?.strategicAnalysis?.score ?? null,
+        decisionScore: analysisSnapshot?.decisionScore ?? payload?.plan?.decisionScore ?? null,
+        safetyScore: analysisSnapshot?.safetyScore ?? payload?.plan?.safetyScore ?? null,
+        exploitabilityScore: analysisSnapshot?.exploitabilityScore ?? payload?.plan?.exploitabilityScore ?? null,
+      },
+      plan: {
+        entry: execution?.entryPrice ?? payload?.plan?.entry ?? null,
+        stopLoss: execution?.stopLoss ?? payload?.plan?.stopLoss ?? null,
+        takeProfit: execution?.takeProfit ?? payload?.plan?.takeProfit ?? null,
+        rr: payload?.plan?.rr ?? payload?.plan?.ratio ?? null,
+        horizon: payload?.plan?.horizon || null,
+      },
+      quoteQuality: payload?.liveContext?.quoteQuality || null,
+    });
+    analysisSnapshot.livePaperAnalytics = lpaMeta;
+  } catch (e) {
+    // Silencieux par construction : l'instrumentation ne doit jamais
+    // empêcher une ouverture qui aurait abouti sans elle.
+  }
+
+
   // Devise de cotation à l'ouverture. Sans ce champ, on ne peut pas
   // détecter si un live quote ultérieur vient d'un provider qui retourne
   // dans une autre devise (cas ASML : entry Nasdaq USD, live update
@@ -6049,6 +6290,28 @@ async function closeTrainingPosition(env, position, exitPrice, closeType, detail
   const validation = tradeValidationEngine(closedRow, position, closeType, triggerMeta);
   closedRow.quality = validation.quality;
   closedRow.quality_flags = validation.flags.length ? validation.flags : null;
+
+  // PR-LIVE-PAPER-ANALYTICS-1 : metadata observable post-clôture.
+  // N'influence AUCUNE décision. Échec d'instrumentation ne doit jamais
+  // bloquer la persistance du trade.
+  try {
+    const lpaOutcome = lpaBuildOutcomeAtClose({
+      closedAt: closedRow.closed_at || nowIso(),
+      exitReason: closeType,
+      position,
+      closedRow,
+      validationStatusRaw: validation.quality,
+      qualityFlags: validation.flags,
+      quoteQualityAtClose: detailPayload?.liveContext?.quoteQuality || null,
+      intradayDetected: !!triggerMeta?.intradayDetected,
+    });
+    const existingSnapshot = closedRow.analysis_snapshot && typeof closedRow.analysis_snapshot === "object"
+      ? closedRow.analysis_snapshot
+      : {};
+    closedRow.analysis_snapshot = { ...existingSnapshot, livePaperOutcome: lpaOutcome };
+  } catch (e) {
+    // Silencieux par construction — observabilité best-effort.
+  }
 
   await supabaseFetch(env, `${TRADE_TABLES.trades}?on_conflict=id`, {
     method: "POST",
