@@ -43,6 +43,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { UNIVERSE } from "./universe-v2.mjs";
 import { computeFrictionV1, computeFrictionPctV1, FRICTION_V1_METADATA } from "./lib/friction-v1.mjs";
+import { classifyMarketRegimeV1, REGIME_V1_EMA_PERIOD } from "../quant/lib/regime-rules-v1.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -170,26 +171,28 @@ function buildDateIndex() {
 }
 
 function buildRegimes(dates) {
+  // Classification 3-état canonique via `tools/quant/lib/regime-rules-v1.mjs`
+  // (CLEAN-2 PR-REGIME-CANON). EMA200 calculée localement (period figée par
+  // REGIME_V1_EMA_PERIOD).
   const need = ["SPY", "QQQ", "SMH"];
   const market = {};
   for (const s of need) {
     const c = candlesBySymbol.get(s);
     if (!c) throw new Error(`Missing ${s}`);
-    market[s] = { c, ema200: ema(c.map((x) => x.close), 200) };
+    market[s] = { c, ema200: ema(c.map((x) => x.close), REGIME_V1_EMA_PERIOD) };
   }
   const regimeByDate = new Map();
   for (const date of dates) {
     const sIdx = findCandleIndex(market.SPY.c, date);
     const qIdx = findCandleIndex(market.QQQ.c, date);
     const mIdx = findCandleIndex(market.SMH.c, date);
-    if (sIdx < 200 || qIdx < 200 || mIdx < 200) continue;
-    const sb = market.SPY.c[sIdx].close > market.SPY.ema200[sIdx];
-    const qb = market.QQQ.c[qIdx].close > market.QQQ.ema200[qIdx];
-    const mb = market.SMH.c[mIdx].close > market.SMH.ema200[mIdx];
-    let r = "RANGE";
-    if (sb && qb && mb) r = "RISK_ON";
-    if (!sb && !qb && !mb) r = "RISK_OFF";
-    regimeByDate.set(date, r);
+    if (sIdx < REGIME_V1_EMA_PERIOD || qIdx < REGIME_V1_EMA_PERIOD || mIdx < REGIME_V1_EMA_PERIOD) continue;
+    const r = classifyMarketRegimeV1({
+      spyAboveEma200: market.SPY.c[sIdx].close > market.SPY.ema200[sIdx],
+      qqqAboveEma200: market.QQQ.c[qIdx].close > market.QQQ.ema200[qIdx],
+      smhAboveEma200: market.SMH.c[mIdx].close > market.SMH.ema200[mIdx],
+    });
+    if (r !== null) regimeByDate.set(date, r);
   }
   return { regimeByDate };
 }

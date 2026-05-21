@@ -36,6 +36,7 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { UNIVERSE } from "./universe-v2.mjs";
 import { computeFrictionV1, computeFrictionPctV1, FRICTION_V1_METADATA } from "./lib/friction-v1.mjs";
+import { classifyMarketRegimeV1, REGIME_V1_EMA_PERIOD } from "../quant/lib/regime-rules-v1.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -176,29 +177,33 @@ function buildDateIndex() {
 }
 
 function buildRegimes(dates) {
+  // Classification 3-état canonique via `tools/quant/lib/regime-rules-v1.mjs`
+  // (CLEAN-2 PR-REGIME-CANON). spyOver200 / qqqOver200 conservés localement
+  // pour les filtres breadth additionnels (BREADTH_50, SPY_EMA200, etc.).
   const need = ["SPY", "QQQ", "SMH"];
   const market = {};
   for (const s of need) {
     const c = candlesBySymbol.get(s);
     if (!c) throw new Error(`Missing ${s}`);
-    market[s] = { c, ema200: ema(c.map((x) => x.close), 200) };
+    market[s] = { c, ema200: ema(c.map((x) => x.close), REGIME_V1_EMA_PERIOD) };
   }
-  // Régimes par date
-  const regimeByDate = new Map();   // RISK_ON / RANGE / RISK_OFF
+  const regimeByDate = new Map();
   const spyOver200 = new Map();
   const qqqOver200 = new Map();
   for (const date of dates) {
     const sIdx = findCandleIndex(market.SPY.c, date);
     const qIdx = findCandleIndex(market.QQQ.c, date);
     const mIdx = findCandleIndex(market.SMH.c, date);
-    if (sIdx < 200 || qIdx < 200 || mIdx < 200) continue;
+    if (sIdx < REGIME_V1_EMA_PERIOD || qIdx < REGIME_V1_EMA_PERIOD || mIdx < REGIME_V1_EMA_PERIOD) continue;
     const sb = market.SPY.c[sIdx].close > market.SPY.ema200[sIdx];
     const qb = market.QQQ.c[qIdx].close > market.QQQ.ema200[qIdx];
     const mb = market.SMH.c[mIdx].close > market.SMH.ema200[mIdx];
-    let r = "RANGE";
-    if (sb && qb && mb) r = "RISK_ON";
-    if (!sb && !qb && !mb) r = "RISK_OFF";
-    regimeByDate.set(date, r);
+    const r = classifyMarketRegimeV1({
+      spyAboveEma200: sb,
+      qqqAboveEma200: qb,
+      smhAboveEma200: mb,
+    });
+    if (r !== null) regimeByDate.set(date, r);
     spyOver200.set(date, sb);
     qqqOver200.set(date, qb);
   }

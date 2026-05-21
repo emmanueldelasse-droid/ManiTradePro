@@ -38,6 +38,13 @@ import { dirname, join, relative, resolve } from "node:path";
 
 import { UNIVERSE } from "./universe-v2.mjs";
 import { computeFrictionV1, FRICTION_V1_METADATA } from "./lib/friction-v1.mjs";
+import {
+  classifyMarketRegimeV1,
+  classifyFourStateRegimeV1,
+  REGIME_V1_EMA_PERIOD,
+  REGIME_V1_HIGH_VOL_RVOL_THRESHOLD,
+  REGIME_V1_HIGH_VOL_RVOL_WINDOW_DAYS,
+} from "../quant/lib/regime-rules-v1.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
@@ -67,7 +74,10 @@ const BASELINE = Object.freeze({
 // Cf. brief créateur § 3 "RÉGIMES OFFICIELS V1" : RISK_ON, RANGE, RISK_OFF,
 // HIGH_VOL. Limitation volontaire à 4 régimes pour rester lisible.
 
-const HIGH_VOL_REALIZED_PCT_THRESHOLD = 0.25; // realized vol annualisée 20j SPY > 25 %
+// Seuil HIGH_VOL canonique : source unique `tools/quant/lib/regime-rules-v1.mjs`
+// (CLEAN-2 PR-REGIME-CANON). Alias local conservé pour minimiser le diff
+// des appelants (filtre A.8 volatility expansion ligne ~618).
+const HIGH_VOL_REALIZED_PCT_THRESHOLD = REGIME_V1_HIGH_VOL_RVOL_THRESHOLD;
 
 // === Univers (mixed flat) ==================================================
 
@@ -179,7 +189,7 @@ function buildSpyRealizedVol() {
   for (let i = 1; i < spy.length; i++) {
     returns.push(Math.log(spy[i].close / spy[i - 1].close));
   }
-  const window = 20;
+  const window = REGIME_V1_HIGH_VOL_RVOL_WINDOW_DAYS;
   const rvol = new Map();
   for (let i = window; i < spy.length; i++) {
     const slice = returns.slice(i - window, i);
@@ -190,39 +200,43 @@ function buildSpyRealizedVol() {
 }
 
 function buildRegimes(dates) {
+  // Classification 3-état + 4-état canonique via
+  // `tools/quant/lib/regime-rules-v1.mjs` (CLEAN-2 PR-REGIME-CANON).
+  // HIGH_VOL = priority override sur rvol SPY 20j > 25 % annualisée.
   const need = ["SPY", "QQQ", "SMH"];
   const market = {};
   for (const s of need) {
     const c = candlesBySymbol.get(s);
     if (!c) throw new Error(`Missing ${s}`);
-    market[s] = { c, ema200: ema(c.map((x) => x.close), 200) };
+    market[s] = { c, ema200: ema(c.map((x) => x.close), REGIME_V1_EMA_PERIOD) };
   }
   const rvol = buildSpyRealizedVol();
 
-  // Régime 3 états (RISK_ON / RANGE / RISK_OFF)
   const baseRegimeByDate = new Map();
-  // Régime 4 états avec HIGH_VOL prioritaire si rvol au-dessus du seuil
   const fourStateByDate = new Map();
   for (const date of dates) {
     const sIdx = findCandleIndex(market.SPY.c, date);
     const qIdx = findCandleIndex(market.QQQ.c, date);
     const mIdx = findCandleIndex(market.SMH.c, date);
-    if (sIdx < 200 || qIdx < 200 || mIdx < 200) continue;
-    const sb = market.SPY.c[sIdx].close > market.SPY.ema200[sIdx];
-    const qb = market.QQQ.c[qIdx].close > market.QQQ.ema200[qIdx];
-    const mb = market.SMH.c[mIdx].close > market.SMH.ema200[mIdx];
-    let r = "RANGE";
-    if (sb && qb && mb) r = "RISK_ON";
-    if (!sb && !qb && !mb) r = "RISK_OFF";
-    baseRegimeByDate.set(date, r);
+    if (sIdx < REGIME_V1_EMA_PERIOD || qIdx < REGIME_V1_EMA_PERIOD || mIdx < REGIME_V1_EMA_PERIOD) continue;
+    const spyAboveEma200 = market.SPY.c[sIdx].close > market.SPY.ema200[sIdx];
+    const qqqAboveEma200 = market.QQQ.c[qIdx].close > market.QQQ.ema200[qIdx];
+    const smhAboveEma200 = market.SMH.c[mIdx].close > market.SMH.ema200[mIdx];
+    const baseRegime = classifyMarketRegimeV1({ spyAboveEma200, qqqAboveEma200, smhAboveEma200 });
+    if (baseRegime === null) continue;
+    baseRegimeByDate.set(date, baseRegime);
 
-    // 4-state : HIGH_VOL prioritaire si rvol > seuil
     const rv = rvol.get(date);
-    if (rv !== undefined && rv > HIGH_VOL_REALIZED_PCT_THRESHOLD) {
-      fourStateByDate.set(date, "HIGH_VOL");
-    } else {
-      fourStateByDate.set(date, r);
-    }
+    const fourState = rv === undefined
+      ? baseRegime
+      : classifyFourStateRegimeV1({
+          spyAboveEma200,
+          qqqAboveEma200,
+          smhAboveEma200,
+          realizedVolAnnualised: rv,
+          highVolThreshold: REGIME_V1_HIGH_VOL_RVOL_THRESHOLD,
+        });
+    fourStateByDate.set(date, fourState ?? baseRegime);
   }
   return { baseRegimeByDate, fourStateByDate, rvol };
 }

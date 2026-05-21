@@ -1,6 +1,6 @@
 # RS Rotation Robustness Lab v1 — ManiTradePro
 
-> Généré le 2026-05-21T13:34:40.639Z par `tools/backtests/rs-rotation-robustness-lab-v1.mjs`.
+> Généré le 2026-05-21T14:57:11.228Z par `tools/backtests/rs-rotation-robustness-lab-v1.mjs`.
 
 **⚠ Laboratoire offline.** Aucun ordre, aucun broker, aucun endpoint live. Aucun moteur modifié. Modèles d'exécution UNIQUEMENT réalistes (NEXT_OPEN + friction obligatoire).
 
