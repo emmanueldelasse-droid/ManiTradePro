@@ -274,6 +274,26 @@ Cette section `ASSET_REGISTRY.md` § *Univers cible stratégique* reste la **rè
 
 Toute évolution de la liste opérationnelle = PR documentaire dédiée (`docs(universe-core): add/remove <symbol> to/from V1`).
 
+### Asset Universe staged V1 — taxonomie runtime (PR-ASSET-UNIVERSE-170-STAGED-V1, 2026-05-21)
+
+Au-dessus de `ASSET_REGISTRY` (règle stratégique) et `UNIVERSE_CORE_V1` (liste figée), une **taxonomie staged** RUNTIME a été ajoutée pour séparer EXPLICITEMENT l'univers d'analyse de l'univers d'exécution paper :
+
+> **`docs/quant/ASSET_UNIVERSE_V1.md`** — source canonique de la taxonomie staged.
+> **`tools/quant/lib/asset-universe-v1.mjs`** — implémentation pure testable.
+
+4 buckets :
+
+| Tier | Cardinalité | Visible UI | Auto-open paper |
+|---|---:|:---:|:---:|
+| `LIVE_PAPER_CORE` | 42 | ✓ | ✓ |
+| `ANALYSIS_ONLY` (analysisUniverse \ livePaperCore) | ~126 | ✓ | ✗ |
+| `EXPERIMENTAL` (data/ ∩ ¬universe-v2) | 19 | ✓ | ✗ |
+| `BLOCKED` | 6 (XLY, XLE, XLU + 3 FX) | ✗ | ✗ |
+
+Le filtre `auvIsLivePaperCore(symbol)` est appelé dans `isTrainingCandidateAllowed` côté worker comme garde-fou RESTRICTIF — il ne peut JAMAIS élargir les ouvertures (au pire identique au pré-PR, au mieux concentré sur core). Phase officielle : **« scaler l'observation avant de scaler l'exécution »**.
+
+Évolution : toute modification du `livePaperCore` ou `blockedUniverse` doit MAJ simultanément le module pur ET le miroir inline dans `cloudflare-worker/worker.js` (cf. `ASSET_UNIVERSE_V1.md` § 8).
+
 ## Refus explicites (rappel)
 
 - Pas de scalping → univers ne comprend pas les tickers ultra-volatils utilisés pour ça (penny stocks, altcoins illiquides).

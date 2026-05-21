@@ -10,9 +10,9 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #250 sur `claude/session-md-post-1b-merge`.
-- **Dernier merge connu** : PR #250 `quant(analytics): riskContext + contextCaptureStatus + no-decision-drift proof (PR-LIVE-PAPER-EXEC-1b)` (commit `aa91eca` sur `main`).
-- **Phase projet** : **VÉRITÉ MARCHÉ** (validation ChatGPT 2026-05-21 post-merge #249/#250). Le bot paper continue à fonctionner comme avant ; chaque trade est désormais entièrement contextualisé (setup, régime, risk engine, qualité données, autorisation CTX-3 observée, MAE/MFE). Mission suivante : laisser tourner plusieurs semaines/mois, accumuler la vérité marché, observer les setups en conditions réelles AVANT toute nouvelle sophistication runtime.
+- **Branche / PR active** : `claude/asset-universe-staged-v1` (en cours — PR-ASSET-UNIVERSE-170-STAGED-V1 : taxonomie staged ~170 actifs analyse / 42 actifs livePaperCore / 19 experimental / 6 blocked. Filtre RESTRICTIF dans `isTrainingCandidateAllowed` — ne peut JAMAIS élargir les ouvertures).
+- **Dernier merge connu** : PR #251 `docs(session): SESSION.md post-merge PR #249 + PR #250 + acter phase VÉRITÉ MARCHÉ` (commit `531576f` sur `main`).
+- **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. PR-ASSET-UNIVERSE-170-STAGED-V1 élargit la capacité d'analyse (~170 actifs) tout en gardant un livePaperCore discipliné (42 actifs auto-open).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -107,8 +107,36 @@
 
 ## PR en cours
 
-- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #250 uniquement (`claude/session-md-post-1b-merge`).
-- **Phase actuelle** : *« vérité marché »*. Chaque trade paper est désormais entièrement contextualisé (setup, régime, risk engine, qualité données, qualité quote, autorisation CTX-3 observée, MAE/MFE, signalQuality post-mortem). Le bot continue à fonctionner comme avant. Mission suivante = observer.
+- **PR** : PR-ASSET-UNIVERSE-170-STAGED-V1 — Asset Universe staged V1 — branche `claude/asset-universe-staged-v1`.
+- **Mission créateur** (2026-05-21, post-VÉRITÉ MARCHÉ) : étendre ManiTradePro vers ~170 actifs analysables, **SANS** transformer ces 170 actifs en univers d'exécution paper live automatique. Séparation explicite analyse vs live execution. Filtre worker RESTRICTIF uniquement.
+- **Objectif unique** : nouveau module `tools/quant/lib/asset-universe-v1.mjs` exportant `ASSET_UNIVERSE_V1` (4 buckets : livePaperCore 42, analysisUniverse 168, experimentalUniverse 19, blockedUniverse 6) + helpers `getAssetTierV1`, `isLivePaperCoreV1`, `isAnalysisAllowedV1`, `isBlockedV1`, `validateAssetUniverseInvariantsV1`. Filtre worker : `if (!auvIsLivePaperCore(row.symbol)) return false;` ajouté dans `isTrainingCandidateAllowed` (RESTRICTIF additif).
+- **Buckets V1** :
+  - `livePaperCore` (42) : SPY, QQQ, GLD, TLT, XLK, XLF, XLV, SMH, IWM, NVDA, AAPL, MSFT, META, GOOGL, AMZN, TSLA, NFLX, AVGO, ORCL, AMD, ASML, TSM, ARM, PLTR, CRWD, PANW, NOW, SHOP, CRM, COST, LLY, JPM, V, MA, AXP, LVMH, SAP, AIR, BTC, ETH, SOL, COIN.
+  - `analysisUniverse` (168) : universe-v2 ∩ data/*.json moins blockedUniverse.
+  - `experimentalUniverse` (19) : ANET, CDNS, CFLT, DELL, GEN, HCP, IGM, INTC, PATH, PAYX, RBRK, SENT, SIE, SNPS, SPLK, SPYG, VUG, XSW, ZEN.
+  - `blockedUniverse` (6) : XLY, XLE, XLU (#15) + EURUSD, GBPUSD, USDJPY (FX BLACKLIST).
+- **Fichiers créés** :
+  - `tools/quant/lib/asset-universe-v1.mjs` (~280 lignes) — module pur testable.
+  - `tools/quant/test/asset-universe-v1.test.mjs` — 14 tests `node:test` (10 obligatoires brief + 4 bonus). Tous pass.
+  - `docs/quant/ASSET_UNIVERSE_V1.md` (~315 lignes) — source canonique.
+- **Fichiers modifiés** (strictement additifs) :
+  - `cloudflare-worker/worker.js` — bloc inline `ASSET UNIVERSE V1` (miroir figé) + filtre `!auvIsLivePaperCore(row.symbol)` dans `isTrainingCandidateAllowed`. **RESTRICTIF** par construction.
+  - `docs/quant/ASSET_REGISTRY.md` — section pointeur vers `ASSET_UNIVERSE_V1.md`.
+  - `docs/project/TRADING_ENGINE.md` — filtre 4-bis ajouté à la liste des filtres `isTrainingCandidateAllowed`.
+  - `SESSION.md` — cette mise à jour.
+- **Bug-hunters** (2 scans monolithic-file hook) :
+  - Scan #1 (filtre avant définition helper) : BLOQUANT détecté → corrigé immédiatement (ajout bloc inline AVANT `isTrainingCandidateAllowed`).
+  - Scan #2 (bloc inline) : VERDICT VERT. Ordre OK, pas de TDZ, pas de collision, pattern cohérent avec LIVE PAPER ANALYTICS V1.
+- **Innocuité garantie** :
+  - Filtre RESTRICTIF par construction. Symbole inconnu / null / blocked → `false` → trade rejeté.
+  - Au pire identique au pré-PR, au mieux concentre les ouvertures sur le core.
+  - Aucune modification de seuils, sizing, allocation, safety gate, learning filters.
+  - KNOWN_ISSUES #15 explicitement protégée (XLY/XLE/XLU dans blockedUniverse).
+  - Aucun broker, aucun argent réel, aucun LIVE_READY, aucun apprentissage automatique.
+- **Validation tests** : `node --test tools/quant/test/asset-universe-v1.test.mjs` → 14/14 pass. `node --input-type=module --check < worker.js` → OK.
+- **Impact runtime** : RESTRICTIF (peut diminuer les ouvertures, jamais les augmenter). Conforme directive ChatGPT « ne pas multiplier agressivement les ouvertures paper ».
+- **Impact quant (fond)** : aucun. Aucun statut setup touché, aucun verdict modifié.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 
 ## Mission précédente (PR-LIVE-PAPER-EXEC-1b, livrée 2026-05-21)
 

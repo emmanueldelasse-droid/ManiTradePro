@@ -4812,11 +4812,89 @@ async function lookupRecentStopsForSymbol(env, hours) {
   }
 }
 
+// ============================================================
+// ASSET UNIVERSE V1 (PR-ASSET-UNIVERSE-170-STAGED-V1)
+// ============================================================
+// Taxonomie staged READ-ONLY. Source canonique :
+//   tools/quant/lib/asset-universe-v1.mjs
+// Doc :
+//   docs/quant/ASSET_UNIVERSE_V1.md
+//
+// Miroir inline figé. À maintenir synchrone avec le module pur :
+//   - changement de livePaperCore     → mettre à jour les 2.
+//   - changement de blockedUniverse   → idem.
+//
+// Helper `auvIsLivePaperCore(symbol)` utilisé par isTrainingCandidateAllowed
+// comme filtre RESTRICTIF. Ne peut JAMAIS élargir les ouvertures.
+
+const AUV_LIVE_PAPER_CORE_V1 = Object.freeze(new Set([
+  // Indices US
+  "SPY", "QQQ",
+  // Macro defensive
+  "GLD", "TLT",
+  // ETF secteurs PROPRES (XLE/XLU/XLY exclus KNOWN_ISSUES #15)
+  "XLK", "XLF", "XLV",
+  // ETF semis + small cap
+  "SMH", "IWM",
+  // Mega Tech US
+  "NVDA", "AAPL", "MSFT", "META", "GOOGL", "AMZN", "TSLA", "NFLX", "AVGO", "ORCL",
+  // Semis liquides
+  "AMD", "ASML", "TSM", "ARM",
+  // Software / cyber leaders
+  "PLTR", "CRWD", "PANW", "NOW", "SHOP", "CRM",
+  // Quality defensive
+  "COST", "LLY",
+  // Finance US
+  "JPM", "V", "MA", "AXP",
+  // Europe
+  "LVMH", "SAP", "AIR",
+  // Crypto majeures
+  "BTC", "ETH", "SOL",
+  // Complément stratégique
+  "COIN",
+]));
+
+const AUV_BLOCKED_V1 = Object.freeze(new Set([
+  "XLY", "XLE", "XLU",       // KNOWN_ISSUES #15
+  "EURUSD", "GBPUSD", "USDJPY", // FX BLACKLIST
+]));
+
+function auvNormalizeSymbol(s) {
+  if (typeof s !== "string") return null;
+  const t = s.trim().toUpperCase();
+  return t.length === 0 ? null : t;
+}
+
+// RESTRICTIF par construction. Symbole inconnu / null / blocked → false.
+function auvIsLivePaperCore(symbol) {
+  const s = auvNormalizeSymbol(symbol);
+  if (!s) return false;
+  if (AUV_BLOCKED_V1.has(s)) return false;
+  return AUV_LIVE_PAPER_CORE_V1.has(s);
+}
+
 function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, newsWindow = null, activeAdjustments = null, cooldownSet = null) {
   if (!row || row.status !== "ok") return false;
   if (row.decision !== "Trade propose") return false;
   if (!row.plan?.tradeNow) return false;
   if (riskState && riskState.tradingEnabled === false) return false;
+
+  // PR-ASSET-UNIVERSE-170-STAGED-V1 — Filtre univers staged (RESTRICTIF).
+  //
+  // Seuls les actifs du livePaperCore (~42 symboles liquides / stables /
+  // datasets propres) peuvent ouvrir automatiquement en paper. Les autres
+  // (analysisUniverse, experimentalUniverse) restent visibles et analysables
+  // côté UI mais l'auto-open est interdit. Les blockedUniverse (XLY/XLE/XLU
+  // pour KNOWN_ISSUES #15, FX BLACKLIST) sont rejetés ici aussi.
+  //
+  // Filtre additif STRICTEMENT RESTRICTIF : ne peut JAMAIS élargir les
+  // ouvertures par rapport au comportement pré-PR (au pire identique, au
+  // mieux concentré sur le core).
+  //
+  // Source canonique : tools/quant/lib/asset-universe-v1.mjs.
+  // Doc : docs/quant/ASSET_UNIVERSE_V1.md.
+  // Miroir inline figé ci-dessous — maintenir synchrones.
+  if (!auvIsLivePaperCore(row.symbol)) return false;
 
   // Garde-fou jour férié : on n'ouvre pas une nouvelle position si la
   // bourse de cotation du symbole est officiellement fermée. Crypto et
