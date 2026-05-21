@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/setup-authorization-matrix-v1` (en cours — PR-CTX-3 : matrice déclarative pure d'autorisation par setup, alignée sur les statuts officiels `SETUPS_REGISTRY.md`. 5 setups × 4 régimes officiels V1. Aucun branchement runtime. Aucune consommation de `sectorLeadership` tant que KNOWN_ISSUES #15 OPEN).
-- **Dernier merge connu** : PR #246 `quant(context): add Context Engine V1 analytical module (PR-CTX-2)` (commit `31c9a6b` sur `main`).
+- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR-CTX-3 sur `claude/session-md-post-ctx3-merge`.
+- **Dernier merge connu** : PR #247 `quant(authorization): add Setup Authorization Matrix V1 (PR-CTX-3)` (commit `93851a2` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -77,10 +77,26 @@
 - **Impact runtime / quant** : aucun. Module read-only.
 - **Statut merge** : `GO MERGE` reçu (ChatGPT).
 
+## Dernière session / dernière PR mergée (sexies)
+
+- **Date** : 2026-05-21.
+- **PR** : #247 — `quant(authorization): add Setup Authorization Matrix V1 (PR-CTX-3)`.
+- **Objectif** : matrice DÉCLARATIVE pure d'autorisation par setup (5 setups × 4 régimes officiels V1), alignée sur les statuts `SETUPS_REGISTRY.md`. Aucun statut modifié. Aucun branchement runtime. Aucun setup activé.
+- **Résultat** : merge squash sur `main` (commit `93851a2`). 12/12 tests pass. Invariants explicites contre consommation prématurée de `sectorLeadership` / XLY / XLE / XLU (KNOWN_ISSUES #15 OPEN). Sanity check intégration PR-CTX-2 → PR-CTX-3 sur snapshot smoke réel cohérent.
+- **Impact runtime / quant** : aucun. La matrice **reflète** les statuts, ne les modifie pas.
+- **Statut merge** : `GO MERGE` reçu (ChatGPT) avec recommandation explicite : ne PAS lancer PR-CTX-5 avant décision architecture complète. Priorité réelle suivante = validation empirique des setups, pas multiplication des couches système.
+
 ## PR en cours
 
-- **PR** : PR-CTX-3 — Setup Authorization Matrix V1 — branche `claude/setup-authorization-matrix-v1`.
-- **Mission créateur** (2026-05-21, mission PR-CTX-3 post-CTX-2 mergée) : créer une matrice DÉCLARATIVE pure qui décrit, par setup, dans quels régimes il est autorisé, bloqué ou préféré. La matrice ne décide pas encore — elle décrit. PR-CTX-5 décidera du branchement runtime.
+- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR-CTX-3 uniquement (`claude/session-md-post-ctx3-merge`).
+- **Directive ChatGPT 2026-05-21 post-CTX-3** : pause PR-CTX-5. L'architecture quant est désormais cohérente (taxonomie officielle, séparation analytique/runtime, régimes centralisés, contexte structuré, couche d'autorisation explicite) — mais aucune preuve robuste qu'un setup possède un edge stable multi-régime/multi-période n'a encore été produite. **Brancher la matrice côté runtime maintenant = sur-ingénierie prématurée sur des setups encore fragiles.**
+- **Mission suivante** : à définir par le créateur. Recommandation ChatGPT explicite : **validation empirique des setups, pas nouvelle couche système.**
+
+## Mission précédente (PR-CTX-3, livrée 2026-05-21)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (sexies)* ci-dessus + PR #247.
+
+- **Objectif unique** : nouveau module `tools/quant/lib/setup-authorization-matrix-v1.mjs` exportant `SETUP_AUTHORIZATION_MATRIX_V1` (5 setups × 4 régimes officiels V1) + helpers `getSetupAuthorizationV1`, `isSetupAllowedInRegimeV1`, `explainSetupAuthorizationV1(setupId, contextSnapshot)`. La matrice reflète strictement les statuts officiels `SETUPS_REGISTRY.md` (truth-sync 2026-05-19), elle ne les modifie pas.
 - **Objectif unique** : nouveau module `tools/quant/lib/setup-authorization-matrix-v1.mjs` exportant `SETUP_AUTHORIZATION_MATRIX_V1` (5 setups × 4 régimes officiels V1) + helpers `getSetupAuthorizationV1`, `isSetupAllowedInRegimeV1`, `explainSetupAuthorizationV1(setupId, contextSnapshot)`. La matrice reflète strictement les statuts officiels `SETUPS_REGISTRY.md` (truth-sync 2026-05-19), elle ne les modifie pas.
 - **Setups couverts** (5, conformes au brief) :
   - `RS_ROTATION_SIMPLE` (`RESEARCH_CANDIDATE / ROBUSTNESS_REQUIRED`) : autorisé `RANGE`, `RISK_ON` ; bloqué `RISK_OFF`, `HIGH_VOL`.
@@ -153,16 +169,17 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 13. ✅ **PR-GOV-AGENTS** mergée (PR #244, commit `8b3ccc0`) — règle "ChatGPT recommande agents Claude" dans GOVERNANCE.md § Format obligatoire.
 14. ✅ **PR CLEAN-2 canonisation régimes 4 états** mergée (PR #245, commit `cac413c`) — `REGIME_RULES.md` canonique + lib partagée `tools/quant/lib/regime-rules-v1.mjs` + migration 3 scripts actifs. Validation byte-à-byte 3/3 IDENTICAL. 8 scripts historiques en dette CLEAN-2b. Prerequisite PR-CTX-2.
 15. ✅ **PR-CTX-2 Context Engine V1 analytical module** mergée (PR #246, commit `31c9a6b`) — module analytique pur lisant 16 ETF, classification régime 4-état via lib CLEAN-2, breadth, leadership 20j/63j vs SPY, VIX-proxy via realized vol SPY 20j, défensifs TLT/GLD. 6 tests node:test (pass) + smoke réel. Read-only, aucun runtime. Issue qualité données #15 ouverte (splits non ajustés XLY/XLE/XLU).
-16. 🟡 **PR-CTX-3 Setup Authorization Matrix V1** (en cours, branche `claude/setup-authorization-matrix-v1`) — matrice DÉCLARATIVE pure pour 5 setups × 4 régimes officiels V1, alignée sur les statuts SETUPS_REGISTRY. Aucun statut modifié. Aucun branchement runtime. Invariants vérifiés par tests (aucune consommation `sectorLeadership` / XLY/XLE/XLU tant que #15 OPEN). 12 tests node:test (pass) + sanity check intégration avec snapshot CTX-2 réel.
-25. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
-22. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
-23. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
-24. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
-25. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
-22. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
-23. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
-24. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `BACKTEST_RULES.md` (FRICTION_MODEL.md ✅ fait par CLEAN-1).
-25. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
+16. ✅ **PR-CTX-3 Setup Authorization Matrix V1** mergée (PR #247, commit `93851a2`) — matrice DÉCLARATIVE pure pour 5 setups × 4 régimes officiels V1, alignée sur les statuts SETUPS_REGISTRY. Aucun statut modifié. Aucun branchement runtime. Invariants vérifiés par tests (aucune consommation `sectorLeadership` / XLY/XLE/XLU tant que #15 OPEN). 12/12 tests + sanity check intégration avec snapshot CTX-2 réel.
+17. ⏸ **PR-CTX-5 Runtime authorization layer** : **EN PAUSE par décision ChatGPT 2026-05-21**. Motif : brancher la matrice côté runtime maintenant = sur-ingénierie prématurée tant qu'aucun setup ne possède une preuve robuste d'edge stable multi-régime/multi-période. À reprendre **uniquement après décision architecture complète** et seulement si l'étape (18) ci-dessous produit au moins un setup stabilisé.
+18. 🟢 **Priorité réelle suivante (directive ChatGPT 2026-05-21)** : **validation empirique des setups**, pas multiplication des couches système. Pistes concrètes (à arbitrer par créateur + ChatGPT) : (a) walk-forward conditionnel régime sur RS Rotation simple ; (b) friction ×2/×3 hardening complémentaire sur RS Rotation, GLD Breakout isolé ; (c) décision A/B/C Mean Reversion V1 ; (d) audit anti-look-ahead spécifique `sectorMomentum` (préalable à toute reprise de SECTOR_RS) ; (e) re-ingestion ajustée des datasets `data/{SYMBOL}_2025.json` pour fermer KNOWN_ISSUES #15.
+19. ⏸ **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée décision créateur) — initialement prévue comme synthèse Phase 2 ; reportée tant que la directive ChatGPT du 2026-05-21 (priorité = validation empirique) n'est pas levée.
+20. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
+21. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
+22. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
+23. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
+24. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
+25. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `BACKTEST_RULES.md` (FRICTION_MODEL.md ✅ fait par CLEAN-1).
+26. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
 
 Autres :
 
