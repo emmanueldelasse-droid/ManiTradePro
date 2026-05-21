@@ -9,9 +9,9 @@
 ## État actuel
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
-- **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-GOV-AGENTS : ajout règle officielle dans `GOVERNANCE.md` § *Format obligatoire ChatGPT ↔ Claude* — ChatGPT doit explicitement suggérer/recommander l'usage d'agents Claude Code disponibles dans les prompts qu'il rédige pour Claude, quand pertinent. Mission créateur secondaire 2026-05-19. PR documentaire pure).
-- **Dernier merge connu** : PR #243 `docs(friction): canonise friction model V1 + factor into shared lib` (commit `700ecc2` sur `main`).
+- **Date dernière mise à jour** : 2026-05-21.
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR CLEAN-2 : canonisation officielle des Market Regimes V1 — création doc canonique `docs/quant/REGIME_RULES.md`, création module technique `tools/quant/lib/regime-rules-v1.mjs`, migration 3 scripts actifs avec validation anti-régression byte-à-byte 3/3 IDENTICAL).
+- **Dernier merge connu** : PR #244 `docs(governance): require ChatGPT to suggest Claude Code agents in prompts` (commit `8b3ccc0` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -50,22 +50,33 @@
 - **Impact runtime / quant** : aucun.
 - **Statut merge** : `GO MERGE` reçu (créateur).
 
+## Dernière session / dernière PR mergée (ter)
+
+- **Date** : 2026-05-19.
+- **PR** : #244 — `docs(governance): require ChatGPT to suggest Claude Code agents in prompts`.
+- **Objectif** : codifier officiellement dans `GOVERNANCE.md` la règle que ChatGPT doit suggérer les agents Claude Code disponibles dans les prompts qu'il rédige pour Claude, quand pertinent.
+- **Résultat** : merge squash sur `main` (commit `8b3ccc0`). Bullet ajouté dans § *Format obligatoire ChatGPT ↔ Claude*, nouvelle sous-section § *Délégation d'agents par ChatGPT* (~50 lignes) avec table des cas, format de recommandation, justifications, limites.
+- **Impact runtime / quant** : aucun.
+- **Statut merge** : `GO MERGE` reçu (créateur).
+
 ## PR en cours
 
-- **PR** : PR-GOV-AGENTS — règle "ChatGPT recommande agents Claude dans ses prompts" — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Mission créateur** (secondaire 2026-05-19, reçue pendant CLEAN-1) : ajouter dans `GOVERNANCE.md` (ou le fichier le plus cohérent) la règle que GPT doit faire appel aux agents Claude disponibles quand pertinent lorsqu'il crée les prompts pour Claude.
-- **Objectif unique** : codifier officiellement la suggestion d'agents par ChatGPT dans la chaîne `ChatGPT → Claude`. PR strictement documentaire.
-- **Fichier ciblé** : `GOVERNANCE.md` — section `Format obligatoire ChatGPT ↔ Claude` § *Sens ChatGPT → Claude : prompt unique*. Le plus cohérent : cette section codifie déjà ce que le prompt doit contenir, et il existe une section sœur § *Agents et skills Claude Code* qui liste les agents disponibles. La nouvelle règle s'inscrit en amont du workflow déjà codifié.
-- **Modifications appliquées** :
-  - Ajout d'un bullet dans la liste "Le prompt ChatGPT → Claude doit contenir, quand pertinent" : `agents / skills Claude Code à utiliser` (pointeur vers nouvelle sous-section).
-  - Nouvelle sous-section § *Délégation d'agents par ChatGPT* (~50 lignes) avec : table des cas où agent recommandé (Explore, general-purpose, Plan, bug-hunter, claude-code-guide, statusline-setup), format de recommandation dans le prompt (exemple structuré), 4 justifications (économie contexte, spécialisation, auditabilité, anti-oubli), limites de la règle (ChatGPT suggère / Claude décide, agents ne valident jamais quant, "aucun agent" doit être explicite, agents ne court-circuitent pas la chaîne validation merge), cohérence avec § *Agents et skills Claude Code* existante.
-- **Articulation** : la règle s'inscrit **en amont** du workflow déjà codifié dans § *Agents et skills Claude Code* (qui exige déclaration explicite dans body PR). ChatGPT suggère → Claude décide → Claude déclare dans body → ChatGPT challenge / GO MERGE.
-- **Impact runtime** : aucun.
-- **Impact quant (fond)** : aucun. Aucun setup modifié. Aucun verdict touché.
-- **Impact documentation** : oui. Règle gouvernance officialisée.
-- **Impact workflow** : oui — ChatGPT devra désormais inclure une section `AGENTS RECOMMANDÉS` dans chaque prompt (ou "aucun" explicite).
-- **Conformité brief créateur secondaire** : OUI. Règle ajoutée dans `GOVERNANCE.md` (fichier le plus cohérent). Articulation claire avec sections existantes. Limites de la règle explicites pour éviter le bypass des règles de validation quant.
-- **Statut merge** : attente `GO MERGE explicite de ChatGPT` (et/ou créateur).
+- **PR** : PR CLEAN-2 — canonisation officielle Market Regimes V1 — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Mission créateur** (2026-05-19, mission CLEAN-2 post-CLEAN-1) : éliminer les définitions dupliquées du régime marché (4 états officiels : RISK_ON / RANGE / RISK_OFF / HIGH_VOL priority override) en créant 1. une définition documentaire canonique unique 2. une définition technique déterministe unique 3. en empêchant toute future duplication. Refactor strictement structurel.
+- **Objectif unique** : factoriser la définition des régimes marché V1 dans `docs/quant/REGIME_RULES.md` (doc) + `tools/quant/lib/regime-rules-v1.mjs` (module pur déterministe). Pattern identique à CLEAN-1 (friction).
+- **Fichiers créés / modifiés** :
+  - `docs/quant/REGIME_RULES.md` (stub vide → ~330 lignes canoniques) : 10 sections — philosophie, limitations volontaires (pas de 15 sous-régimes, pas d'IA, pas de probas pseudo-scientifiques), 4 régimes détaillés (3.2-3.5), distribution 2021-2025 observée, implémentation technique, dette technique CLEAN-2b (8 scripts historiques non migrés), interdictions, articulation avec autres docs, vérification anti-régression, règles d'évolution.
+  - `tools/quant/lib/regime-rules-v1.mjs` (nouveau, ~170 lignes) : module pur déterministe — 4 fonctions exportées (`classifyMarketRegimeV1`, `isHighVolOverride`, `classifyFourStateRegimeV1`, `normalizeRegimeState`), constantes (`REGIME_V1_EMA_PERIOD=200`, `REGIME_V1_HIGH_VOL_RVOL_THRESHOLD=0.25`, `REGIME_V1_HIGH_VOL_RVOL_WINDOW_DAYS=20`), metadata `REGIME_V1_METADATA` figée. Aucune logique nouvelle. Pure factorisation des définitions inline existantes.
+  - `tools/backtests/rs-rotation-robustness-v1.mjs` migré : import du module canonique + remplacement classification inline par `classifyMarketRegimeV1()`.
+  - `tools/backtests/rs-rotation-robustness-lab-v1.mjs` migré : même pattern.
+  - `tools/backtests/rs-rotation-hardening-v1.mjs` migré : import 3-state + 4-state + constantes HIGH_VOL aliasées sur la lib canonique.
+- **Validation anti-régression** : 3/3 outputs JSON byte-à-byte IDENTICAL (avec/sans migration sur dataset constant). Méthodologie : run with-migration → save outputs → `git checkout HEAD --` sur scripts → run pre-migration sur même dataset → diff outputs → 0 différence.
+- **Dette technique assumée** (CLEAN-2b documentée dans REGIME_RULES.md § *Dette technique*) : 8 scripts historiques conservent leur définition inline pour préserver leurs outputs ancrant PR #207, #208, #210, #211 — `tools/backtests/market-regime-v1.mjs`, `backtest-pullback-yearly-walkforward.mjs`, `backtest-multi-setup-grid.mjs`, `backtest-relative-strength-rotation-regime-v1.mjs`, `new-setup-discovery-lab-v1.mjs`, `sector-rs-destruction-tests-v1.mjs`, `sector-rs-concentration-control-v1.mjs`, `trend-pullback-dynamic-support-v1.mjs`. Migration possible en CLEAN-2b après re-validation byte-à-byte.
+- **Impact runtime** : aucun. Worker.js non touché. Aucun setup runtime modifié.
+- **Impact quant (fond)** : aucun. Aucune formule modifiée. Aucun paramètre modifié. Aucun verdict setup touché. Aucun PF / WR changé.
+- **Impact documentation** : oui. `docs/quant/REGIME_RULES.md` devient la source canonique unique. Dette CLEAN-2b documentée explicitement.
+- **Conformité brief créateur CLEAN-2** : OUI. Aucune formule modifiée. Aucun paramètre modifié. Aucun résultat modifié. Aucun statut setup touché. Validation byte-à-byte explicite.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 ## Décisions actives
 
 - **Gouvernance** : `GOVERNANCE.md` = source canonique unique (IA, projet, validation, merge, agents/skills, gouvernance quant). `GPT_ROLE.md` a été supprimé après période de transition ; l'historique de sa fusion dans `GOVERNANCE.md` est conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. `CLAUDE.md` = manuel opérationnel Claude Code.
@@ -104,9 +115,9 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 10. ✅ **PR-CTX-1 documentation Univers Core officiel V1** mergée (PR #241, commit `314182f`) — 78 actifs figés (27 ETF + 35 leaders US + 10 Europe + 6 crypto). Prerequisite Phase 2.
 11. ✅ **PR-DOC-AUDIT-V1 documentation consistency audit** mergée (PR #242, commit `d93a6ed`) — plan CLEAN-1 à CLEAN-10.
 12. ✅ **PR CLEAN-1 canonisation friction V1** mergée (PR #243, commit `700ecc2`).
-13. 🟡 **PR-GOV-AGENTS** (en cours) — règle "ChatGPT recommande agents Claude" dans GOVERNANCE.md § Format obligatoire.
-14. **PR CLEAN-2 canonisation régimes 4 états** (subordonnée GO CLEAN-1) — enrichir `REGIME_RULES.md` + factoriser définition régimes dans lib partagée. Prerequisite PR-CTX-2.
-15. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO CLEAN-1 + CLEAN-2) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
+13. ✅ **PR-GOV-AGENTS** mergée (PR #244, commit `8b3ccc0`) — règle "ChatGPT recommande agents Claude" dans GOVERNANCE.md § Format obligatoire.
+14. 🟡 **PR CLEAN-2 canonisation régimes 4 états** (en cours) — `REGIME_RULES.md` canonique + lib partagée `tools/quant/lib/regime-rules-v1.mjs` + migration 3 scripts actifs. Validation byte-à-byte 3/3 IDENTICAL. 8 scripts historiques en dette CLEAN-2b. Prerequisite PR-CTX-2.
+15. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO CLEAN-2) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
 24. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
 25. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
 22. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.

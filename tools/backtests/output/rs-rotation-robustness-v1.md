@@ -1,6 +1,6 @@
 # RS Rotation Robustness Hardening v1 — ManiTradePro
 
-> Généré le 2026-05-21T13:34:41.300Z par `tools/backtests/rs-rotation-robustness-v1.mjs`.
+> Généré le 2026-05-21T14:57:11.756Z par `tools/backtests/rs-rotation-robustness-v1.mjs`.
 
 **⚠ Analyse strictement offline.** Aucun ordre, aucun broker, aucun endpoint live. Aucun fichier runtime modifié. Modèle d'exécution réaliste (NEXT_OPEN + friction obligatoire). Paramètres gelés ex-ante (aucune ré-optimisation entre les splits).
 
