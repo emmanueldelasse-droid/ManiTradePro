@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR CLEAN-1 canonisation friction : enrichissement `docs/quant/FRICTION_MODEL.md` (stub → ~330 lignes canonique) + création module `tools/backtests/lib/friction-v1.mjs` (source technique unique) + migration des 4 scripts consommateurs. Validation : 4/4 outputs identiques byte-à-byte avant/après sur dataset constant. Pure factorisation, zéro impact métier).
-- **Dernier merge connu** : PR #242 `docs(audit): documentation consistency audit V1 — inventory + tables + cleanup plan` (commit `d93a6ed` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-GOV-AGENTS : ajout règle officielle dans `GOVERNANCE.md` § *Format obligatoire ChatGPT ↔ Claude* — ChatGPT doit explicitement suggérer/recommander l'usage d'agents Claude Code disponibles dans les prompts qu'il rédige pour Claude, quand pertinent. Mission créateur secondaire 2026-05-19. PR documentaire pure).
+- **Dernier merge connu** : PR #243 `docs(friction): canonise friction model V1 + factor into shared lib` (commit `700ecc2` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,34 +52,19 @@
 
 ## PR en cours
 
-- **PR** : PR CLEAN-1 canonisation officielle du modèle friction V1 — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Mission créateur** : CLEAN-1 issue plan PR-DOC-AUDIT-V1 (PR #242). Strictement structurelle : enrichir `FRICTION_MODEL.md` (canonique doc) + créer `lib/friction-v1.mjs` (canonique technique) + migrer les 4 scripts consommateurs. Interdit : modifier formule/paramètres/résultats/verdicts/logique métier.
-- **Objectif unique** : éliminer la duplication inline de la formule friction `(0.30 + 0.02 × holdDays) / 5` qui vivait dans 4 scripts (rs-rotation-robustness-lab-v1, rs-rotation-robustness-v1, meanrev-etf-range-v1, rs-rotation-hardening-v1).
-- **Fichiers créés** :
-  - `docs/quant/FRICTION_MODEL.md` (stub vide → ~330 lignes canoniques) — philosophie friction, formule officielle, composantes, interdictions, limites, position projet, règle d'évolution.
-  - `tools/backtests/lib/friction-v1.mjs` (~80 lignes) — module canonique exportant `computeFrictionV1`, `computeFrictionPctV1`, constantes `FRICTION_V1_*`, métadonnées `FRICTION_V1_METADATA`.
-- **Fichiers modifiés (factorisation pure)** :
-  - `tools/backtests/rs-rotation-robustness-lab-v1.mjs` — fonction `frictionRPerTrade` devient wrapper appelant `computeFrictionV1`. Table d'affichage MD ligne 741 utilise désormais le module.
-  - `tools/backtests/rs-rotation-robustness-v1.mjs` — fonction `frictionRPerTrade` devient wrapper.
-  - `tools/backtests/meanrev-etf-range-v1.mjs` — fonction `frictionRPerTrade(holdDays, multiplier)` devient wrapper avec passage du multiplier.
-  - `tools/backtests/rs-rotation-hardening-v1.mjs` — fonction `frictionR(holdDays, multiplier)` devient wrapper.
-  - `SESSION.md` — branche/PR active, dernier merge, PR en cours, priorités.
-- **Outputs régénérés** : 4 fichiers `tools/backtests/output/*.{json,md}` re-exécutés post-migration.
-- **Validation anti-régression rigoureuse** :
-  1. Sauvegarde outputs `with migration` sur dataset actuel.
-  2. `git checkout HEAD -- 4 scripts` (revert temporaire).
-  3. Re-run scripts inline pre-migration sur dataset actuel.
-  4. Sauvegarde outputs `without migration` sur dataset actuel.
-  5. Restoration scripts migrés.
-  6. Re-run scripts post-migration.
-  7. Comparaison `with` vs `without` byte-à-byte (hors `generatedAt`).
-  - **Résultat : 4/4 outputs IDENTIQUES byte-à-byte.** Migration **purement structurelle** prouvée.
+- **PR** : PR-GOV-AGENTS — règle "ChatGPT recommande agents Claude dans ses prompts" — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Mission créateur** (secondaire 2026-05-19, reçue pendant CLEAN-1) : ajouter dans `GOVERNANCE.md` (ou le fichier le plus cohérent) la règle que GPT doit faire appel aux agents Claude disponibles quand pertinent lorsqu'il crée les prompts pour Claude.
+- **Objectif unique** : codifier officiellement la suggestion d'agents par ChatGPT dans la chaîne `ChatGPT → Claude`. PR strictement documentaire.
+- **Fichier ciblé** : `GOVERNANCE.md` — section `Format obligatoire ChatGPT ↔ Claude` § *Sens ChatGPT → Claude : prompt unique*. Le plus cohérent : cette section codifie déjà ce que le prompt doit contenir, et il existe une section sœur § *Agents et skills Claude Code* qui liste les agents disponibles. La nouvelle règle s'inscrit en amont du workflow déjà codifié.
+- **Modifications appliquées** :
+  - Ajout d'un bullet dans la liste "Le prompt ChatGPT → Claude doit contenir, quand pertinent" : `agents / skills Claude Code à utiliser` (pointeur vers nouvelle sous-section).
+  - Nouvelle sous-section § *Délégation d'agents par ChatGPT* (~50 lignes) avec : table des cas où agent recommandé (Explore, general-purpose, Plan, bug-hunter, claude-code-guide, statusline-setup), format de recommandation dans le prompt (exemple structuré), 4 justifications (économie contexte, spécialisation, auditabilité, anti-oubli), limites de la règle (ChatGPT suggère / Claude décide, agents ne valident jamais quant, "aucun agent" doit être explicite, agents ne court-circuitent pas la chaîne validation merge), cohérence avec § *Agents et skills Claude Code* existante.
+- **Articulation** : la règle s'inscrit **en amont** du workflow déjà codifié dans § *Agents et skills Claude Code* (qui exige déclaration explicite dans body PR). ChatGPT suggère → Claude décide → Claude déclare dans body → ChatGPT challenge / GO MERGE.
 - **Impact runtime** : aucun.
-- **Impact quant (fond)** : **aucun**. Validation byte-à-byte 4/4. Aucun PF modifié. Aucun verdict changé. Aucun statut setup touché. Aucun paramètre métier modifié.
-- **Impact documentation** : oui. `FRICTION_MODEL.md` devient source canonique unique (était stub vide). Toute discussion friction doit maintenant pointer ici.
-- **Bénéfices** : (i) duplication éliminée (1 source au lieu de 4) ; (ii) règle d'évolution claire (modification = PR documentaire dédiée + audit régression) ; (iii) prerequisite CLEAN-2 (régimes canonisés) et PR-CTX-2 (Phase 2 Context Engine) débloqué — le code futur consommera la lib au lieu de re-inliner.
-- **Conformité brief créateur** : OUI. Pure factorisation. Aucune modification de formule. Aucune modification de paramètres. Aucune recalibration. Aucun changement de résultat. Validation byte-à-byte fournie.
-- **Risques résiduels** : aucun (validation byte-à-byte = zéro drift quantitatif).
+- **Impact quant (fond)** : aucun. Aucun setup modifié. Aucun verdict touché.
+- **Impact documentation** : oui. Règle gouvernance officialisée.
+- **Impact workflow** : oui — ChatGPT devra désormais inclure une section `AGENTS RECOMMANDÉS` dans chaque prompt (ou "aucun" explicite).
+- **Conformité brief créateur secondaire** : OUI. Règle ajoutée dans `GOVERNANCE.md` (fichier le plus cohérent). Articulation claire avec sections existantes. Limites de la règle explicites pour éviter le bypass des règles de validation quant.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` (et/ou créateur).
 ## Décisions actives
 
@@ -118,20 +103,20 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 9. ✅ **PR-RS-HARDENING Phase 1** mergée (PR #240, commit `17113b6`) — stress tests A.1-A.8 + matrice 4 régimes. Verdict `HARDENED_FRAGILE`. Findings : friction ×3 OK (PF 1.30), RANGE régime optimal (PF 2.04), 2022 PF 0.146 caveat unique.
 10. ✅ **PR-CTX-1 documentation Univers Core officiel V1** mergée (PR #241, commit `314182f`) — 78 actifs figés (27 ETF + 35 leaders US + 10 Europe + 6 crypto). Prerequisite Phase 2.
 11. ✅ **PR-DOC-AUDIT-V1 documentation consistency audit** mergée (PR #242, commit `d93a6ed`) — plan CLEAN-1 à CLEAN-10.
-12. 🟡 **PR CLEAN-1 canonisation friction V1** (en cours) — `FRICTION_MODEL.md` + `lib/friction-v1.mjs` + migration 4 scripts. Validation byte-à-byte 4/4 outputs identiques.
-13. **PR CLEAN-2 canonisation régimes 4 états** (subordonnée GO CLEAN-1) — enrichir `REGIME_RULES.md` + factoriser définition régimes dans lib partagée. Prerequisite PR-CTX-2.
-14. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO CLEAN-1 + CLEAN-2) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
-15. **PR-GOV-AGENTS** (planifiée séparément — brief créateur 2026-05-19 secondaire) — ajouter dans `GOVERNANCE.md` § *Agents et skills Claude Code* la règle : ChatGPT doit explicitement suggérer/recommander l'usage d'agents Claude disponibles (Explore, general-purpose, Plan, bug-hunter, etc.) dans les prompts qu'il rédige pour Claude, quand pertinent.
-12. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
-13. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
-14. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
-15. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
-16. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
-17. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
-18. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
-19. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
-20. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `FRICTION_MODEL.md`, `BACKTEST_RULES.md`.
-21. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
+12. ✅ **PR CLEAN-1 canonisation friction V1** mergée (PR #243, commit `700ecc2`).
+13. 🟡 **PR-GOV-AGENTS** (en cours) — règle "ChatGPT recommande agents Claude" dans GOVERNANCE.md § Format obligatoire.
+14. **PR CLEAN-2 canonisation régimes 4 états** (subordonnée GO CLEAN-1) — enrichir `REGIME_RULES.md` + factoriser définition régimes dans lib partagée. Prerequisite PR-CTX-2.
+15. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO CLEAN-1 + CLEAN-2) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
+24. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
+25. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
+22. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
+23. **PR-RS-HARDENING Phase 3** (subordonnée GO Phase 2) — design Exposure Control couche C du brief (max positions secteur, vol scaling, risk budget, correlation caps).
+24. **PR-RS-HARDENING Phase 4** (subordonnée Phase 3) — Quality Metrics couche D (sample confidence, regime confidence, edge durability, fragility score, concentration risk score).
+25. **Décision A/B/C Mean Reversion** : en attente ChatGPT/créateur (classement V1 DATA_INSUFFICIENT_BUT_STRUCTURALLY_WEAK / DEAD_AGGREGATED / PR-R3A bis V1bis).
+22. **GLD Breakout isolated validation** : audit anti-look-ahead spécifique, friction ×1/×2/×3, walk-forward 3 splits sur la variante unique. n=47 plafonne le statut maximal à `EXPERIMENTAL_ONLY`.
+23. **Pullback reconstruction** : **uniquement si** hypothèse économique nouvelle documentée. Sinon, ne pas lancer.
+24. **Documentaire** : enrichir les stubs `docs/quant/WALK_FORWARD_RULES.md`, `BACKTEST_RULES.md` (FRICTION_MODEL.md ✅ fait par CLEAN-1).
+25. **Décomposition `SESSION.md`** : extraction blocs vers `docs/project/`, `docs/quant/`, `docs/decisions/`, retour à un carnet de bord court.
 
 Autres :
 
