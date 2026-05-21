@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-19.
-- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-CTX-1 documentation Univers Core officiel V1 : création `docs/quant/UNIVERSE_CORE_V1.md` qui fige 78 actifs (27 ETF + 35 leaders US + 10 Europe + 6 crypto) comme liste opérationnelle pour Phase 2 Context Engine. PR strictement documentaire. Aucun script. Aucun runtime. Aucun changement de statut setup).
-- **Dernier merge connu** : PR #240 `research(rs-rotation): PR-RS-HARDENING Phase 1 — 8 stress tests + 4-state regime matrix` (commit `17113b6` sur `main`).
+- **Branche / PR active** : `claude/setup-manitradepro-docs-gUwP1` (en cours — PR-DOC-AUDIT-V1 documentation consistency audit : création `docs/project/DOC_CONSISTENCY_AUDIT_V1.md`. Inventaire des 44 .md du repo, table des contradictions (10 items mineurs), table des obsolescences (10 items mineurs), table des redondances (8 items dont 2 prioritaires), plan de nettoyage 10 actions CLEAN-1 à CLEAN-10. AUDIT + PLAN uniquement, pas de nettoyage massif).
+- **Dernier merge connu** : PR #241 `docs(universe-core): formalise Universe Core V1 — 78 frozen liquid assets` (commit `314182f` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -52,29 +52,33 @@
 
 ## PR en cours
 
-- **PR** : PR-CTX-1 documentation Univers Core officiel V1 — branche `claude/setup-manitradepro-docs-gUwP1`.
-- **Objectif unique** : figer la liste opérationnelle des 78 actifs de l'Univers Core V1 (sous-ensemble curé des 181 classifiés `ASSET_REGISTRY`, conforme à la fourchette 40-120 de `TRADING_PHILOSOPHY` § 5). Prerequisite documentaire pour la Phase 2 Context Engine. PR strictement documentaire.
+- **PR** : PR-DOC-AUDIT-V1 documentation consistency audit — branche `claude/setup-manitradepro-docs-gUwP1`.
+- **Mission créateur** : auditer tous les .md du projet pour identifier obsolescences, contradictions, doublons, règles mortes, références invalidées, docs inutiles, statuts setups incohérents, mauvaise séparation recherche/runtime. AUDIT + PLAN uniquement. Pas de nettoyage massif.
+- **Objectif unique** : produire un rapport de diagnostic structuré (inventaire 44 fichiers + tables contradictions/obsolescences/redondances + plan CLEAN-1 à CLEAN-10). PR strictement documentaire.
 - **Fichiers créés** :
-  - `docs/quant/UNIVERSE_CORE_V1.md` (~310 lignes, 12 sections) — liste exacte par catégorie, exclusions explicites, règle d'évolution, articulation avec autres docs canoniques, stats couverture dataset.
+  - `docs/project/DOC_CONSISTENCY_AUDIT_V1.md` (~590 lignes, 10 sections).
 - **Fichiers modifiés** :
-  - `docs/quant/ASSET_REGISTRY.md` — section "Univers cible stratégique" enrichie d'un pointeur vers `UNIVERSE_CORE_V1.md` (liste opérationnelle figée). Pas de modification de la classification ELITE/CORE/TACTICAL/BLACKLIST.
-  - `SESSION.md` — branche/PR active, dernier merge, PR en cours, priorités.
-- **Composition figée Univers Core V1** :
-  - ETF macro / sectoriels / thématiques : **27** (5 indices US + 11 SPDR sectoriels + 11 thématiques tech/IA/cyber/cloud).
-  - Leaders US large cap : **35** (10 mega tech + 8 semi structurels + 10 software/cyber/cloud + 5 quality/defensive + 2 financial).
-  - Europe limitée et contrôlée : **10** (LVMH, AIR, ASML, SAP, SIE, NESN, RMS, TTE, CAP, DSY).
-  - Crypto majeures uniquement : **6** (BTC, ETH, SOL, BNB, LINK, AVAX).
-  - **Total : 78 actifs** (sous le plafond 80 du brief).
-- **Couverture dataset** : 78/78 actifs présents dans `data/*_2025.json` avec 1255 candles 2021-01-04 → 2025-12-31. Vérifié 2026-05-19.
-- **Exclusions explicites documentées** : ETF leveraged (SOXL, TQQQ, USD, ROM), penny stocks, small caps spéculatives (AEHR, ACLS, BBAI, SOUN, WOLF, APLD, NBIS, etc.), AI hypergrowth single-name volatile (SMCI, AI, UPST), crypto altcoins illiquides, FX exotiques (EURUSD/GBPUSD/USDJPY = BLACKLIST), 54 actifs `BLACKLIST` de `ASSET_REGISTRY.md`.
-- **Articulation** : `BOT_OBJECTIVE` → `PROJECT_VISION` → `TRADING_PHILOSOPHY` § 5 (fourchette 40-120) → `ASSET_REGISTRY` § univers cible (règle stratégique) → `UNIVERSE_CORE_V1.md` (liste figée). `universe-v2.mjs` reste l'univers technique large 181 actifs pour backtests historiques recherche — **inchangé** par cette PR.
-- **Règle d'évolution** : ajout/retrait d'actif = PR documentaire dédiée. Aucune modification silencieuse.
+  - `SESSION.md` — branche/PR active, dernier merge (PR #241), PR en cours, priorités.
+- **Méthodologie** : 21 fichiers déjà lus en session courante + inventaire ciblé via Explore agent pour les 23 fichiers restants. Vérifications croisées des statuts setups, univers, paramètres baselines entre tous les fichiers canoniques.
+- **Résultats synthétiques** :
+  - **44 .md totaux** : 25 canoniques propres + 9 stubs vides + 2 à réduire + 13 spécialisés.
+  - **Aucune contradiction CRITIQUE** détectée. 10 items mineurs (stubs redondants, historique dépassé, duplication formule entre scripts).
+  - **10 obsolescences mineures** : sections SESSION.md historiques, KNOWN_ISSUES issue #14 résolue, MARKDOWN_CONSOLIDATION_PLAN étapes exécutées, etc.
+  - **8 redondances** dont 2 prioritaires à canoniser : R4 formule friction (4 scripts dupliquent) → enrichir `FRICTION_MODEL.md`. R5 définition régimes 4 états → enrichir `REGIME_RULES.md`.
+  - **Séparation recherche/runtime** : globalement respectée. Note PR #233 truth-sync "détecteur runtime ≠ setup validé" efficace.
+- **Plan de nettoyage proposé** :
+  - **CRITIQUE** : aucune action critique.
+  - **IMPORTANTE** : CLEAN-1 (canoniser friction), CLEAN-2 (canoniser régimes), CLEAN-3 (réduire SESSION.md priorité ChatGPT post-#233 non exécutée).
+  - **MINEURE** : CLEAN-4 (4 stubs redondants en pointeurs), CLEAN-5 (refresh roadmap TRADING_PHILOSOPHY § 8), CLEAN-6 (restructurer Setup 3/4 SETUPS_REGISTRY), CLEAN-7 (marquer issue #14 résolue), CLEAN-8 (notes statut PEAD), CLEAN-9 (archive étapes MARKDOWN_CONSOLIDATION_PLAN), CLEAN-10 (grep mentions stubs racine).
+- **Stubs vides à conserver vides** (par décision assumée) : PROD_SAFETY_RULES, CALIBRATION_RULES, ALLOCATION_RULES, RISK_ENGINE_RULES, EXPERIMENTAL_FEATURES, DATA_QUALITY — utiles pour future PR de remplissage (broker réel, Phase 3+4 hardening, quoteQualityEngine observation).
+- **Conclusion** : documentation ManiTradePro **globalement saine** post-PR #233 truth-sync. Le projet n'a **plus** "plusieurs vérités documentaires" sur les sujets centraux. Discipline acquise.
 - **Impact runtime** : aucun.
-- **Impact quant (fond)** : aucun. Aucun setup modifié. Aucune promotion. Aucun verdict quantitatif touché. PR-RS-HARDENING Phase 1, MR R3B v3, etc. tous inchangés.
-- **Impact documentation** : oui. Liste opérationnelle figée pour Phase 2+.
-- **Non inclus** : Phase 2 Context Engine analytical module (réservé PR-CTX-2), Phase 2 Setup Authorization Matrix (PR-CTX-3), Phase 2 Architecture diagram (PR-CTX-4), Phase 5 Runtime Authorization Layer (PR-CTX-5 — nécessite escalade créateur pour décision worker vs pure-recherche).
-- **Conformité brief créateur + Freeze v1** : OUI. Approche progressive et contrôlée, refus scanner géant, exclusions explicites, articulation claire avec docs canoniques existantes, vocabulaire strictement documentaire.
+- **Impact quant (fond)** : aucun. Aucun setup modifié. Aucune promotion. Aucun verdict quantitatif touché. Aucun fichier .md existant modifié (audit + plan uniquement).
+- **Impact documentation** : oui. Rapport d'audit canonique produit. **Pas de modification** des autres .md.
+- **Conformité brief créateur + Freeze v1** : OUI. NE RIEN INVENTER respecté. NE PAS réécrire respecté. NE PAS supprimer respecté. Séparation recherche/runtime/vision/historique/expérimental maintenue.
+- **Risques résiduels** : R-DESYNC-FORMULE-FRICTION (4 scripts dupliquent — CLEAN-1 à exécuter), R-SESSION-DRIFT (SESSION.md continue d'accumuler — CLEAN-3), R-PHASE-2-CONTEXT-ENGINE-DUPLICATIONS (Phase 2 va dupliquer définition régimes si CLEAN-2 pas fait avant PR-CTX-2).
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT` (et/ou créateur).
+- **Agent utilisé** : Explore (inventaire ciblé 23 fichiers .md restants). Limites de l'Explore : extraits seulement, pas lecture complète. Tous les drapeaux détectés ont été vérifiés par Claude en lecture/cross-check.
 
 ## Décisions actives
 
@@ -111,8 +115,9 @@ Plan PR par PR validé par ChatGPT (réponse Q3 message 2026-05-19, ordre ajust�
 7. ✅ **Dataset SPDR complété** (commit `cdbc1cb` créateur) — 11 ETF SPDR ajoutés (DIA + 10 sectoriels).
 8. ✅ **PR-R3B-v3 rerun strict 15 ETF** mergée (PR #239, commit `c91a23a`) — verdict NEEDS_MORE_DATA + indicateurs qualitatifs catastrophiques. Décision A/B/C Mean Reversion en attente.
 9. ✅ **PR-RS-HARDENING Phase 1** mergée (PR #240, commit `17113b6`) — stress tests A.1-A.8 + matrice 4 régimes. Verdict `HARDENED_FRAGILE`. Findings : friction ×3 OK (PF 1.30), RANGE régime optimal (PF 2.04), 2022 PF 0.146 caveat unique.
-10. 🟡 **PR-CTX-1 documentation Univers Core officiel V1** (en cours) — 78 actifs figés (27 ETF + 35 leaders US + 10 Europe + 6 crypto). Prerequisite Phase 2.
-11. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO PR-CTX-1) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
+10. ✅ **PR-CTX-1 documentation Univers Core officiel V1** mergée (PR #241, commit `314182f`) — 78 actifs figés (27 ETF + 35 leaders US + 10 Europe + 6 crypto). Prerequisite Phase 2.
+11. 🟡 **PR-DOC-AUDIT-V1 documentation consistency audit** (en cours) — rapport `DOC_CONSISTENCY_AUDIT_V1.md` : inventaire 44 .md + 10 contradictions mineures + 10 obsolescences mineures + 8 redondances dont 2 prioritaires + plan CLEAN-1 à CLEAN-10.
+12. **PR-CTX-2 Context Engine V1 analytical module** (subordonnée GO PR-DOC-AUDIT-V1 + CLEAN-2 si fait) — analyse SPY/QQQ/secteurs/VIX-proxy/TLT/GLD, classification régime 4 états officiels, tests cohérence régimes.
 12. **PR-CTX-3 Setup authorization matrix** (subordonnée PR-CTX-2) — déclarations `{allowedMarkets, allowedRegimes, blockedRegimes, preferredConditions}` par setup.
 13. **PR-CTX-4 Architecture diagram + doc flux décisionnel** (subordonnée PR-CTX-3) — synthèse Phase 2.
 14. **PR-CTX-5 Runtime authorization layer** (subordonnée escalade créateur) — décision worker.js vs pure-recherche.
