@@ -10,7 +10,9 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/live-paper-analytics-v1` (en cours — PR-LIVE-PAPER-ANALYTICS-1 : instrumentation analytique pure des trades paper existants. Aucune décision modifiée. `analysis_snapshot.livePaperAnalytics` à l'ouverture + `analysis_snapshot.livePaperOutcome` à la clôture).
+- **Branches / PRs actives** :
+  - PR #249 `claude/live-paper-analytics-v1` — PR-LIVE-PAPER-ANALYTICS-1, attente GO MERGE ChatGPT.
+  - **NOUVELLE** : `claude/live-paper-exec-1b` — PR-LIVE-PAPER-EXEC-1b en cours, micro-PR par-dessus PR #249 (ajout `riskContext` + `contextCaptureStatus` + 7 tests non-régression + preuve no decision drift).
 - **Dernier merge connu** : PR #248 `docs(session): SESSION.md post-merge PR-CTX-3 + acter directive ChatGPT 2026-05-21` (commit `5ad4709` sur `main`).
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
@@ -153,6 +155,27 @@
 - **Impact documentation** : oui. `docs/quant/SETUP_AUTHORIZATION_MATRIX.md` devient la source canonique de la matrice d'autorisation.
 - **Interdictions respectées** : pas de runtime, pas de modification SETUPS_REGISTRY, pas de promotion LIVE_READY, pas de consommation de sectorLeadership tant que #15 OPEN, pas de feature flag, pas de touch worker.js / frontend, pas de modification de l'authorization matrix worker existante.
 - **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
+
+## PR complémentaire en cours — PR-LIVE-PAPER-EXEC-1b
+
+- **PR** : PR-LIVE-PAPER-EXEC-1b — micro-PR par-dessus PR #249 — branche `claude/live-paper-exec-1b` (base = `claude/live-paper-analytics-v1`, pas main).
+- **Décision ChatGPT 2026-05-21 (Option 2)** : garder PR #249 ouverte ; créer une PR complémentaire scope minimal pour finaliser le passage `analytics observables → paper live execution contextualisée complète`.
+- **Objectif unique** : ajouter 4 éléments par-dessus PR #249 :
+  1. **`riskContext`** dans `livePaperAnalytics` (allocationPct, riskPerTradePct, maxOpenPositions, maxPositionsPerSymbol, currentOpenPositions, symbolExposurePct, portfolioExposurePct, postStopCooldownActive, executionSafety, quoteValidationStatus). Lecture seule, aucun impact décisionnel.
+  2. **5 tests non-régression explicites (A-E + 2 bonus F/G)** : immutabilité des inputs, déterminisme sizing, CTX-3 blocked → metadata uniquement, riskContext absent → no crash, instrumentation failure → ouverture continue.
+  3. **Preuve no decision drift** : 0 `if` décisionnel ajouté, 0 score muté, 0 seuil muté, 0 nouveau path auto-open (vérifiable par grep ciblé sur le diff worker.js).
+  4. **`contextCaptureStatus: "NOT_CAPTURED_RUNTIME_SAFE"`** ajouté explicitement (sentinelle pour éviter ambiguïté future côté consommateurs offline).
+- **Fichiers modifiés** :
+  - `tools/quant/lib/live-paper-analytics-v1.mjs` — ajout `buildRiskContextV1`, sentinelle `CONTEXT_CAPTURE_STATUS`, champs `riskContext` et `contextCaptureStatus` dans `buildLivePaperAnalyticsV1`.
+  - `tools/quant/test/live-paper-analytics-v1.test.mjs` — 7 tests ajoutés (EXEC-1b A-G) ; 2 tests anciens ajustés pour refléter le nouveau warning `risk_context_not_provided` par défaut.
+  - `cloudflare-worker/worker.js` — ajout `LPA_CONTEXT_CAPTURE_STATUS` sentinelle + helper `lpaBuildRiskContext({...})` + extension du call site dans `buildTrainingPositionRowFromSignal` pour passer `riskContext` calculé depuis `settings` + `payload.liveContext.quoteQuality`. Strictement additif, dans le `try/catch` silencieux existant.
+  - `docs/quant/LIVE_PAPER_ANALYTICS.md` — nouvelles sections `contextCaptureStatus`, `riskContext`, tests EXEC-1b.
+- **Validation tests** : `node --test tools/quant/test/live-paper-analytics-v1.test.mjs` → 18/18 pass, 107 ms.
+- **Bug-hunters lancés** (4 scans monolithic-file hook) : VERDICT OK x4.
+- **Impact runtime** : strictement additif. Aucun `if` décisionnel ajouté. Aucun seuil modifié. Aucun nouveau path d'auto-open. La fonction `isTrainingCandidateAllowed`, le sizing `chooseTrainingExecution`, le safety gate `evaluateExecutionSafety` sont tous intacts.
+- **Impact quant (fond)** : aucun.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT` après merge préalable de PR #249.
+
 ## Décisions actives
 
 - **Gouvernance** : `GOVERNANCE.md` = source canonique unique (IA, projet, validation, merge, agents/skills, gouvernance quant). `GPT_ROLE.md` a été supprimé après période de transition ; l'historique de sa fusion dans `GOVERNANCE.md` est conservé dans `docs/decisions/DECISION-001-gpt-role-merged-into-governance.md`. `CLAUDE.md` = manuel opérationnel Claude Code.

@@ -28,6 +28,27 @@
 
 export const LIVE_PAPER_ANALYTICS_V1_VERSION = "live-paper-analytics-v1";
 
+// === Sentinelle contextCaptureStatus =======================================
+//
+// PR-LIVE-PAPER-EXEC-1b : indicateur explicite de la nature de capture de
+// `contextSnapshot`. Évite toute ambiguïté côté consommateurs offline
+// (rapports, analyses, futurs scripts de replay).
+//
+// - "CAPTURED"                 : contextSnapshot rempli avec données réelles.
+// - "NOT_CAPTURED_RUNTIME_SAFE": contextSnapshot omis volontairement côté
+//                                worker pour ne pas introduire de dépendance
+//                                forte sur les 16 ETF candles au runtime.
+//                                Pas un bug — choix d'architecture documenté
+//                                dans docs/quant/LIVE_PAPER_ANALYTICS.md § 4.
+// - "NOT_CAPTURED_NO_INPUT"    : contextSnapshot non fourni en input et pas
+//                                de raison runtime documentée.
+
+export const CONTEXT_CAPTURE_STATUS = Object.freeze({
+  CAPTURED: "CAPTURED",
+  NOT_CAPTURED_RUNTIME_SAFE: "NOT_CAPTURED_RUNTIME_SAFE",
+  NOT_CAPTURED_NO_INPUT: "NOT_CAPTURED_NO_INPUT",
+});
+
 // === Mapping engine setup → setupId matrice CTX-3 ==========================
 //
 // Le worker stocke `setupType` ∈ {"pullback", "mean_reversion", "breakout",
@@ -102,6 +123,50 @@ export function markSectorLeadershipUntrusted(contextSnapshot) {
   return copy;
 }
 
+// === Risk context (PR-LIVE-PAPER-EXEC-1b) ==================================
+//
+// Capture l'état du risk engine au moment exact du trade. LECTURE UNIQUEMENT.
+// Aucune influence décisionnelle, aucune modification sizing/allocation.
+//
+// Champs runtime non disponibles à un point d'appel donné → null + warning
+// "field_not_available_at_capture_site:X". Le caller décide quoi capturer.
+
+/**
+ * @param {object|null} input
+ * @param {number|null} input.allocationPct           settings.allocation_per_trade_pct
+ * @param {number|null} input.riskPerTradePct         settings.risk_per_trade_pct
+ * @param {number|null} input.maxOpenPositions        settings.max_open_positions
+ * @param {number|null} input.maxPositionsPerSymbol   settings.max_positions_per_symbol
+ * @param {number|null} input.currentOpenPositions    runtime counter (peut être null)
+ * @param {number|null} input.symbolExposurePct       runtime % invested sur ce symbole
+ * @param {number|null} input.portfolioExposurePct    runtime % capital engagé global
+ * @param {boolean|null} input.postStopCooldownActive runtime flag cooldown post-stop
+ * @param {boolean|null} input.executionSafety        evaluateExecutionSafety().safe
+ * @param {string|null} input.quoteValidationStatus   quoteQuality.validationStatus
+ * @returns {object} riskContext blob (champs null si absents)
+ */
+export function buildRiskContextV1(input = null) {
+  const safe = input && typeof input === "object" ? input : {};
+  const safeNum = (v) => {
+    if (v === null || v === undefined) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const safeBool = (v) => (typeof v === "boolean" ? v : null);
+  return {
+    allocationPct: safeNum(safe.allocationPct),
+    riskPerTradePct: safeNum(safe.riskPerTradePct),
+    maxOpenPositions: safeNum(safe.maxOpenPositions),
+    maxPositionsPerSymbol: safeNum(safe.maxPositionsPerSymbol),
+    currentOpenPositions: safeNum(safe.currentOpenPositions),
+    symbolExposurePct: safeNum(safe.symbolExposurePct),
+    portfolioExposurePct: safeNum(safe.portfolioExposurePct),
+    postStopCooldownActive: safeBool(safe.postStopCooldownActive),
+    executionSafety: safeBool(safe.executionSafety),
+    quoteValidationStatus: typeof safe.quoteValidationStatus === "string" ? safe.quoteValidationStatus : null,
+  };
+}
+
 // === Construction analytics à l'ouverture ==================================
 
 /**
@@ -129,10 +194,35 @@ export function buildLivePaperAnalyticsV1(input = {}) {
 
   // Tag automatique #15 si sectorLeadership capturé.
   let contextSnapshot = null;
+  let contextCaptureStatus;
   if (input.contextSnapshot && typeof input.contextSnapshot === "object") {
     contextSnapshot = markSectorLeadershipUntrusted(input.contextSnapshot);
     if (contextSnapshot && contextSnapshot.sectorLeadership && contextSnapshot.sectorLeadership.untrusted === true) {
       uniquePush(warnings, "sector_leadership_untrusted");
+    }
+    contextCaptureStatus = CONTEXT_CAPTURE_STATUS.CAPTURED;
+  } else {
+    // Si le caller indique explicitement "runtime safe omission", honorer.
+    // Sinon, marquer NOT_CAPTURED_NO_INPUT pour distinguer une absence
+    // accidentelle d'une décision d'architecture.
+    contextCaptureStatus = typeof input.contextCaptureStatus === "string"
+      && (input.contextCaptureStatus === CONTEXT_CAPTURE_STATUS.NOT_CAPTURED_RUNTIME_SAFE
+          || input.contextCaptureStatus === CONTEXT_CAPTURE_STATUS.NOT_CAPTURED_NO_INPUT)
+      ? input.contextCaptureStatus
+      : CONTEXT_CAPTURE_STATUS.NOT_CAPTURED_NO_INPUT;
+  }
+
+  // Risk context — capture LECTURE SEULE de l'état du risk engine.
+  let riskContext = null;
+  if (input.riskContext === null || input.riskContext === undefined) {
+    uniquePush(warnings, "risk_context_not_provided");
+    riskContext = null;
+  } else {
+    riskContext = buildRiskContextV1(input.riskContext);
+    // Si tous les champs sont null après normalisation → warning explicite.
+    const anyDefined = Object.values(riskContext).some((v) => v !== null);
+    if (!anyDefined) {
+      uniquePush(warnings, "risk_context_all_fields_null");
     }
   }
 
@@ -193,9 +283,11 @@ export function buildLivePaperAnalyticsV1(input = {}) {
     regime: safeString(input.regime),
     regimeConfidence: safeNumber(input.regimeConfidence),
     contextSnapshot,
+    contextCaptureStatus,
     setupAuthorization,
     scores,
     plan,
+    riskContext,
     dataQuality: input.dataQuality && typeof input.dataQuality === "object" ? input.dataQuality : null,
     quoteQuality,
     warnings,

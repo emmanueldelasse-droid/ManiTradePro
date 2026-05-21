@@ -5922,7 +5922,33 @@ function lpaAssessSignalQuality({ validationStatus, quoteQualityUnsafeAtClose, d
   return "GOOD";
 }
 
-function lpaBuildAnalyticsAtOpen({ capturedAt, engineSetupType, symbol, regime, regimeConfidence, scores, plan, quoteQuality }) {
+// PR-LIVE-PAPER-EXEC-1b : sentinelle contextCaptureStatus pour éviter
+// toute ambiguïté côté consommateurs offline / rapports.
+const LPA_CONTEXT_CAPTURE_STATUS = Object.freeze({
+  CAPTURED: "CAPTURED",
+  NOT_CAPTURED_RUNTIME_SAFE: "NOT_CAPTURED_RUNTIME_SAFE",
+  NOT_CAPTURED_NO_INPUT: "NOT_CAPTURED_NO_INPUT",
+});
+
+// PR-LIVE-PAPER-EXEC-1b : construction du blob riskContext depuis settings
+// et stats runtime disponibles au point d'appel. LECTURE SEULE.
+function lpaBuildRiskContext({ settings, openPositionsCount, symbolExposurePct, portfolioExposurePct, postStopCooldownActive, executionSafety, quoteValidationStatus }) {
+  const s = settings && typeof settings === "object" ? settings : {};
+  return {
+    allocationPct: lpaSafeNum(s.allocation_per_trade_pct),
+    riskPerTradePct: lpaSafeNum(s.risk_per_trade_pct),
+    maxOpenPositions: lpaSafeNum(s.max_open_positions),
+    maxPositionsPerSymbol: lpaSafeNum(s.max_positions_per_symbol),
+    currentOpenPositions: lpaSafeNum(openPositionsCount),
+    symbolExposurePct: lpaSafeNum(symbolExposurePct),
+    portfolioExposurePct: lpaSafeNum(portfolioExposurePct),
+    postStopCooldownActive: typeof postStopCooldownActive === "boolean" ? postStopCooldownActive : null,
+    executionSafety: typeof executionSafety === "boolean" ? executionSafety : null,
+    quoteValidationStatus: typeof quoteValidationStatus === "string" ? quoteValidationStatus : null,
+  };
+}
+
+function lpaBuildAnalyticsAtOpen({ capturedAt, engineSetupType, symbol, regime, regimeConfidence, scores, plan, quoteQuality, riskContext }) {
   const warnings = [];
   const setupId = lpaResolveSetupId(engineSetupType, symbol);
   const setupAuthorization = setupId ? lpaResolveAuthorization(setupId, regime, symbol) : null;
@@ -5943,6 +5969,17 @@ function lpaBuildAnalyticsAtOpen({ capturedAt, engineSetupType, symbol, regime, 
     }
   }
 
+  // PR-LIVE-PAPER-EXEC-1b : riskContext (optional). Si fourni, c'est déjà
+  // un blob normalisé par lpaBuildRiskContext ; sinon, null + warning.
+  let riskContextBlob = null;
+  if (riskContext && typeof riskContext === "object") {
+    riskContextBlob = riskContext;
+    const anyDefined = Object.values(riskContextBlob).some((v) => v !== null);
+    if (!anyDefined) warnings.push("risk_context_all_fields_null");
+  } else {
+    warnings.push("risk_context_not_provided");
+  }
+
   return {
     version: LIVE_PAPER_ANALYTICS_V1_VERSION,
     capturedAt: typeof capturedAt === "string" ? capturedAt : null,
@@ -5952,6 +5989,7 @@ function lpaBuildAnalyticsAtOpen({ capturedAt, engineSetupType, symbol, regime, 
     regime: typeof regime === "string" ? regime : null,
     regimeConfidence: lpaSafeNum(regimeConfidence),
     contextSnapshot: null,
+    contextCaptureStatus: LPA_CONTEXT_CAPTURE_STATUS.NOT_CAPTURED_RUNTIME_SAFE,
     setupAuthorization,
     scores: scores ? {
       strategicScore: lpaSafeNum(scores.strategicScore),
@@ -5966,6 +6004,7 @@ function lpaBuildAnalyticsAtOpen({ capturedAt, engineSetupType, symbol, regime, 
       rr: lpaSafeNum(plan.rr),
       horizon: plan.horizon ?? null,
     } : null,
+    riskContext: riskContextBlob,
     dataQuality: null,
     quoteQuality: quoteQualityBlob,
     warnings,
@@ -6054,13 +6093,31 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings) {
   const id = `${parseSymbol(payload?.symbol)}:${botMode}:${Date.now()}`;
   const cleanSymbol = parseSymbol(payload?.symbol);
 
-  // PR-LIVE-PAPER-ANALYTICS-1 : metadata observable, n'influence aucune
-  // décision. Échec d'instrumentation ne doit jamais bloquer l'ouverture.
+  // PR-LIVE-PAPER-ANALYTICS-1 + PR-LIVE-PAPER-EXEC-1b : metadata observable,
+  // n'influence aucune décision. Échec d'instrumentation ne doit jamais
+  // bloquer l'ouverture.
   try {
     const regimeRaw = payload?.regime || payload?.regimeContext || analysisSnapshot?.regimeAtOpen || null;
     const regimeStr = typeof regimeRaw === "string"
       ? regimeRaw
       : (regimeRaw && typeof regimeRaw === "object" ? (regimeRaw.regime || regimeRaw.state || null) : null);
+    const quoteQuality = payload?.liveContext?.quoteQuality || null;
+    // riskContext : capture lecture-seule de l'état du risk engine.
+    // Champs disponibles depuis `settings` ici (paramètres). Les stats
+    // runtime (currentOpenPositions, symbolExposurePct,
+    // portfolioExposurePct, postStopCooldownActive) ne sont PAS
+    // accessibles à ce point d'appel — laissées à null avec warning
+    // automatique côté lpaBuildAnalyticsAtOpen. Future PR pourra étendre
+    // si les call sites amont propagent ces stats.
+    const lpaRiskContext = lpaBuildRiskContext({
+      settings,
+      openPositionsCount: null,
+      symbolExposurePct: null,
+      portfolioExposurePct: null,
+      postStopCooldownActive: null,
+      executionSafety: typeof quoteQuality?.executionSafe === "boolean" ? quoteQuality.executionSafe : null,
+      quoteValidationStatus: typeof quoteQuality?.validationStatus === "string" ? quoteQuality.validationStatus : null,
+    });
     const lpaMeta = lpaBuildAnalyticsAtOpen({
       capturedAt: nowIso(),
       engineSetupType: payload?.plan?.setupType || analysisSnapshot?.setupType || null,
@@ -6080,7 +6137,8 @@ function buildTrainingPositionRowFromSignal(payload, execution, settings) {
         rr: payload?.plan?.rr ?? payload?.plan?.ratio ?? null,
         horizon: payload?.plan?.horizon || null,
       },
-      quoteQuality: payload?.liveContext?.quoteQuality || null,
+      quoteQuality,
+      riskContext: lpaRiskContext,
     });
     analysisSnapshot.livePaperAnalytics = lpaMeta;
   } catch (e) {
