@@ -2035,10 +2035,10 @@ button:focus-visible,a:focus-visible,.btn:focus-visible,.nav-item:focus-visible,
 }
 .lpi-table-compact thead th,
 .lpi-table-compact tbody td{padding:5px 8px}
-.lpi-empty-row{
+.lpi-table tbody td.lpi-empty-row{
   text-align:center;
   color:var(--text-secondary);
-  padding:12px !important;
+  padding:12px;
   font-size:.8rem;
 }
 
@@ -2111,7 +2111,7 @@ button:focus-visible,a:focus-visible,.btn:focus-visible,.nav-item:focus-visible,
 .app-shell.theme-light .lpi-badge-range{color:#1f5fbf;background:rgba(31,95,191,.12);border-color:rgba(31,95,191,.25)}
 .app-shell.theme-light .lpi-badge-risk-off{color:#a83030;background:rgba(168,48,48,.12);border-color:rgba(168,48,48,.25)}
 .app-shell.theme-light .lpi-badge-high-vol{color:#6b3aa0;background:rgba(107,58,160,.12);border-color:rgba(107,58,160,.25)}
-.app-shell.theme-light .lpi-warning-item,
-.app-shell.theme-light .lpi-warning-pill{color:#8a5a10;background:rgba(190,135,10,.1);border-color:rgba(190,135,10,.25)}
+.app-shell.theme-light .lpi-warning-item{color:#8a5a10;background:rgba(190,135,10,.1);border-color:rgba(190,135,10,.25)}
+.app-shell.theme-light .lpi-warning-pill{color:#8a5a10;background:rgba(190,135,10,.1)}
 .app-shell.theme-light .lpi-profit{color:#0c8456}
 .app-shell.theme-light .lpi-loss{color:#a83030}
