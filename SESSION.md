@@ -10,8 +10,10 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/trades-tombstone-server-v2` (en cours — PR-TRADES-TOMBSTONE-SERVER-V2 : tombstone SERVEUR multi-device par-dessus le tombstone local PR #254. Table Supabase `mtp_trades_meta` + filtre worker `handleTradesState/Sync/Wipe` + merge front).
-- **Dernier merge connu** : PR #255 `docs(session): SESSION.md post-merge PR #254 + checklist vérifications manuelles` (commit `820f1be` sur `main`).
+- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #256 sur `claude/session-md-post-tombstone-v2-merge`.
+- **Dernier merge connu** : PR #256 `fix(trades): tombstone serveur multi-device (PR-TRADES-TOMBSTONE-SERVER-V2)` (commit `e450c8c` sur `main`).
+- **⚠ ACTION CRÉATEUR OBLIGATOIRE** : appliquer la migration SQL `cloudflare-worker/migrations/017_trades_meta.sql` dans Supabase Studio (SQL Editor) pour activer le tombstone serveur multi-device. Sans cette étape, V2 reste inactif et seul le V1 local (PR #254) protège — les bugs multi-device PC↔iPhone réapparaissent.
+- **À VÉRIFIER MANUELLEMENT après migration** : suppression PC → refresh iPhone → vide ; suppression iPhone → refresh PC → vide ; vieux localStorage ne réinjecte pas l'historique.
 - **À VÉRIFIER MANUELLEMENT (créateur)** : supprimer historique dans l'app → refresh → fermer/réouvrir app → confirmer que l'historique ne revient pas. Vérifier Supabase si possible (`mtp_trades` doit rester vide après wipe).
 - **Prochaine étape après vérification** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief ChatGPT.
 - **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. ManiTradePro analyse désormais ~170 actifs (analysisUniverse + experimental visibles côté UI) MAIS limite les ouvertures paper auto à 42 actifs livePaperCore (filtre RESTRICTIF `auvIsLivePaperCore` dans `isTrainingCandidateAllowed`). Architecture cohérente : **on n'a pas scalé l'exécution avant de scaler la compréhension**.
@@ -128,7 +130,26 @@
 - **Impact learning** : positif indirect — les anciens trades supprimés ne peuvent plus alimenter Live Paper Analytics ni learning.
 - **Statut merge** : `GO MERGE` reçu (ChatGPT). Bug prioritaire corrigé avant dashboard Analytics.
 
+## Dernière session / dernière PR mergée (undecies)
+
+- **Date** : 2026-05-22.
+- **PR** : #256 — `fix(trades): tombstone serveur multi-device (PR-TRADES-TOMBSTONE-SERVER-V2)`.
+- **Objectif** : tombstone SERVEUR multi-device par-dessus V1 local (PR #254). Vérité centrale Supabase via table `mtp_trades_meta`. PC↔iPhone synchronisés au prochain refresh / sync.
+- **Résultat** : merge squash sur `main` (commit `e450c8c`). 24/24 tests pass (15 V1 + 9 V2). 9 bug-hunters OK. Migration 017 idempotente livrée (à appliquer manuellement). Worker (3 handlers étendus) + front (4 zones) + module pur étendu.
+- **Impact runtime** : worker `handleTradesState` / `handleTradesSync` / `handleTradesWipe` enrichis. Front `loadTradesState` / `syncTradesToSupabase` / `wipeTradesOnServer` enrichis. 0 fonction décisionnelle modifiée.
+- **Impact quant** : aucun.
+- **⚠ Action créateur post-merge** : appliquer la migration `017_trades_meta.sql` dans Supabase Studio. Sinon V2 reste inactif (comportement gracieux V1 fallback).
+- **Statut merge** : `GO MERGE` reçu (ChatGPT) après resync (PR initialement behind_by=2 — corrigé via merge main, head e903c4c).
+
 ## PR en cours
+
+- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #256 uniquement (`claude/session-md-post-tombstone-v2-merge`).
+- **Action utilisateur en attente** : (1) appliquer migration 017_trades_meta.sql via Supabase Studio, (2) attendre déploiement Worker (~30-60s post-merge), (3) tester PC↔iPhone : suppression sur un device → vide sur l'autre au refresh.
+- **Prochaine étape produit** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief, une fois la migration appliquée et les tests multi-device validés.
+
+## Mission précédente (PR-TRADES-TOMBSTONE-SERVER-V2, livrée 2026-05-22)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (undecies)* + PR #256 + KNOWN_ISSUES #16 V2.
 
 - **PR** : PR-TRADES-TOMBSTONE-SERVER-V2 — tombstone serveur multi-device — branche `claude/trades-tombstone-server-v2`.
 - **Mission créateur** (2026-05-21, priorité ABSOLUE) : le tombstone local PR #254 ne suffit pas multi-device. Si je supprime sur PC, doit disparaître sur iPhone. Si je supprime sur iPhone, doit disparaître sur PC. Vérité centrale côté serveur.
