@@ -122,74 +122,20 @@
     ]
   },
   "stats7d": {
-    "totalCount": 3,
+    "totalCount": 0,
     "winCount": 0,
-    "lossCount": 3,
-    "winRate": 0,
-    "totalPnl": -80.57507065924672,
+    "lossCount": 0,
+    "winRate": null,
+    "totalPnl": 0,
     "avgWin": 0,
-    "avgLoss": 26.858356886415574,
-    "expectancy": -26.858356886415574,
-    "rrActual": 0,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
     "openCount": 0,
-    "bySetup": [
-      {
-        "setup": "continuation",
-        "count": 3,
-        "wins": 0,
-        "pnl": -80.57507065924672,
-        "winRate": 0
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 3,
-        "wins": 0,
-        "pnl": -80.57507065924672,
-        "winRate": 0
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -13.437795323598431,
-        "wins": 0
-      },
-      {
-        "symbol": "MSFT",
-        "count": 1,
-        "pnl": -26.176526176526114,
-        "wins": 0
-      },
-      {
-        "symbol": "META",
-        "count": 1,
-        "pnl": -40.96074915912217,
-        "wins": 0
-      }
-    ],
-    "bottomSymbols": [
-      {
-        "symbol": "META",
-        "count": 1,
-        "pnl": -40.96074915912217,
-        "wins": 0
-      },
-      {
-        "symbol": "MSFT",
-        "count": 1,
-        "pnl": -26.176526176526114,
-        "wins": 0
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -13.437795323598431,
-        "wins": 0
-      }
-    ]
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
+    "bottomSymbols": []
   },
   "stats30d": {
     "totalCount": 30,
