@@ -173,7 +173,23 @@
 - **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #261 uniquement (`claude/session-md-post-analytics-merge`).
 - **Phase actuelle** : *VÉRITÉ MARCHÉ VISIBLE* — observabilité analytique livrée. Stack suppression historique trades validée (V1+V2+V3 + migration 017).
 - **À vérifier manuellement (créateur)** : ouvrir l'app après déploiement Pages, aller dans Trades, scroller en bas → vérifier que la section "📊 Analytics — Live Paper Insights" s'affiche (avec état vide si aucun trade instrumenté, ou les 5 sections si trades présents). Tester iPhone + dark/light.
-- **Prochaine étape produit** : à définir par le créateur. Suggestions natuelles selon directive ChatGPT post-CTX-3 (priorité = validation empirique des setups) : (a) walk-forward conditionnel régime sur RS Rotation, (b) friction ×2/×3 hardening complémentaire, (c) décision A/B/C Mean Reversion V1, (d) audit anti-look-ahead sectorMomentum (préalable à toute reprise SECTOR_RS), (e) re-ingestion ajustée datasets pour fermer KNOWN_ISSUES #15.
+- **Philosophie projet officiellement validée (ChatGPT 2026-05-22 post-#261)** : *« ManiTradePro n'est plus seulement un bot qui ouvre des trades, mais devient un système observable qui apprend du marché vivant. »*
+- **Directive ChatGPT post-#261 — interdictions immédiates** :
+  - ❌ Pas de RL.
+  - ❌ Pas d'IA opaque.
+  - ❌ Pas de broker réel.
+  - ❌ Pas d'auto-learning agressif.
+  - ❌ Pas de sur-ingénierie graphique.
+- **Priorité réelle suivante (ChatGPT)** : laisser tourner le moteur paper live plusieurs **semaines** pour accumuler vérité marché. Observer : dégradation, stabilité, survie setups, comportement multi-régime.
+- **Prochaines grandes étapes possibles** (à activer SEULEMENT après accumulation suffisante de données live) :
+  1. Cohort analysis V1.
+  2. Timeline dégradation setups.
+  3. Drill-down trade detail.
+  4. Export analytics CSV/JSON.
+  5. MAE/MFE visualization.
+  6. Setup stability monitor.
+  7. Training dataset extraction V1.
+- **Pistes quant en parallèle** (directive ChatGPT post-CTX-3, validation empirique des setups) : (a) walk-forward conditionnel régime sur RS Rotation, (b) friction ×2/×3 hardening complémentaire, (c) décision A/B/C Mean Reversion V1, (d) audit anti-look-ahead sectorMomentum (préalable à toute reprise SECTOR_RS), (e) re-ingestion ajustée datasets pour fermer KNOWN_ISSUES #15.
 
 ## Mission précédente (PR-UI-LIVE-PAPER-INSIGHTS-1, livrée 2026-05-22)
 
