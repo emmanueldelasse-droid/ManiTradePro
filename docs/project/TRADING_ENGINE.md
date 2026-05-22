@@ -102,6 +102,7 @@ Cf. `docs/project/DATA_PIPELINE.md` pour la structure complète et les règles d
 | 2 | `row.decision === "Trade propose"` | Pas un trade proposé |
 | 3 | `row.plan.tradeNow === true` | Engine ne dit pas "now" |
 | 4 | `riskState.tradingEnabled` | Daily / weekly / consecutive losses dépassés |
+| **4-bis** | **`auvIsLivePaperCore(row.symbol)`** (PR-ASSET-UNIVERSE-170-STAGED-V1) | **Symbole hors livePaperCore staged — analyse autorisée mais pas auto-open paper** |
 | 5 | **`!isMarketHoliday(row.symbol)`** | Jour férié |
 | 6 | `newsWindow.blocked === false` | Event macro high-impact ±30 min |
 | 7 | `require_structural_setup` + setup détecté | Setup obligatoire et aucun reconnu |
