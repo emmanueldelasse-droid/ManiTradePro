@@ -10,8 +10,10 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/trades-history-delete-fix` (en cours — PR-TRADES-HISTORY-DELETE-FIX : bugfix prioritaire « historique supprimé qui réapparaît ». Tombstone permanent côté front + filtre remote/sync + guard backup).
-- **Dernier merge connu** : PR #253 `docs(session): SESSION.md post-merge PR #252 + acter philosophie "compréhension avant exécution"` (commit `5e8845e` sur `main`).
+- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #254 sur `claude/session-md-post-trades-fix-merge`.
+- **Dernier merge connu** : PR #254 `fix(trades): historique supprimé qui réapparaît — tombstone permanent (PR-TRADES-HISTORY-DELETE-FIX)` (commit `c50cdfe` sur `main`).
+- **À VÉRIFIER MANUELLEMENT (créateur)** : supprimer historique dans l'app → refresh → fermer/réouvrir app → confirmer que l'historique ne revient pas. Vérifier Supabase si possible (`mtp_trades` doit rester vide après wipe).
+- **Prochaine étape après vérification** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief ChatGPT.
 - **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. ManiTradePro analyse désormais ~170 actifs (analysisUniverse + experimental visibles côté UI) MAIS limite les ouvertures paper auto à 42 actifs livePaperCore (filtre RESTRICTIF `auvIsLivePaperCore` dans `isTrainingCandidateAllowed`). Architecture cohérente : **on n'a pas scalé l'exécution avant de scaler la compréhension**.
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
@@ -115,7 +117,26 @@
 - **Impact quant (fond)** : aucun.
 - **Statut merge** : `GO MERGE` reçu (ChatGPT) avec point pédagogique explicite : *« vous avez évité une erreur très fréquente : scaler l'exécution avant de scaler la compréhension »*.
 
+## Dernière session / dernière PR mergée (decies)
+
+- **Date** : 2026-05-21.
+- **PR** : #254 — `fix(trades): historique supprimé qui réapparaît — tombstone permanent (PR-TRADES-HISTORY-DELETE-FIX)`.
+- **Objectif** : bugfix prioritaire « historique supprimé qui réapparaît ». Cause racine identifiée (4 vecteurs front : TTL tombstone 5 min, absence de filtre remote, restore backup, sync sans filtre). Fix : tombstone PERMANENT côté front + filtres aux 3 vecteurs critiques.
+- **Résultat** : merge squash sur `main` (commit `c50cdfe`). 15/15 tests pass. 4 bug-hunters OK (scan #1 a remonté un crash critique, corrigé immédiatement). Worker non touché, Supabase non touché.
+- **Impact runtime** : front uniquement. Le `wipeTradesOnServer` existant vide déjà la base ; cette PR empêche juste la réapparition côté UI.
+- **Impact quant** : aucun.
+- **Impact learning** : positif indirect — les anciens trades supprimés ne peuvent plus alimenter Live Paper Analytics ni learning.
+- **Statut merge** : `GO MERGE` reçu (ChatGPT). Bug prioritaire corrigé avant dashboard Analytics.
+
 ## PR en cours
+
+- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #254 uniquement (`claude/session-md-post-trades-fix-merge`).
+- **Phase actuelle** : *VÉRITÉ MARCHÉ* — observation paper live concentrée sur 42 actifs livePaperCore. Confiance dans le paper trading rétablie post-fix #254.
+- **Action utilisateur en attente** : tester manuellement dans l'app que le tombstone fonctionne (supprimer historique → refresh → close/reopen → vide). Puis lancer PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief.
+
+## Mission précédente (PR-TRADES-HISTORY-DELETE-FIX, livrée 2026-05-21)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (decies)* + PR #254 + KNOWN_ISSUES #16.
 
 - **PR** : PR-TRADES-HISTORY-DELETE-FIX — bugfix prioritaire « historique supprimé qui réapparaît » — branche `claude/trades-history-delete-fix`.
 - **Mission créateur** (2026-05-21, priorité ABSOLUE, AVANT le dashboard Analytics) : auditer et corriger définitivement le bug où l'historique supprimé dans l'onglet Trades réapparaît ensuite. Confiance dans le paper trading en jeu.
