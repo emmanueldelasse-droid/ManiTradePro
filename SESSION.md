@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #254 sur `claude/session-md-post-trades-fix-merge`.
-- **Dernier merge connu** : PR #254 `fix(trades): historique supprimé qui réapparaît — tombstone permanent (PR-TRADES-HISTORY-DELETE-FIX)` (commit `c50cdfe` sur `main`).
+- **Branche / PR active** : `claude/trades-tombstone-server-v2` (en cours — PR-TRADES-TOMBSTONE-SERVER-V2 : tombstone SERVEUR multi-device par-dessus le tombstone local PR #254. Table Supabase `mtp_trades_meta` + filtre worker `handleTradesState/Sync/Wipe` + merge front).
+- **Dernier merge connu** : PR #255 `docs(session): SESSION.md post-merge PR #254 + checklist vérifications manuelles` (commit `820f1be` sur `main`).
 - **À VÉRIFIER MANUELLEMENT (créateur)** : supprimer historique dans l'app → refresh → fermer/réouvrir app → confirmer que l'historique ne revient pas. Vérifier Supabase si possible (`mtp_trades` doit rester vide après wipe).
 - **Prochaine étape après vérification** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief ChatGPT.
 - **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. ManiTradePro analyse désormais ~170 actifs (analysisUniverse + experimental visibles côté UI) MAIS limite les ouvertures paper auto à 42 actifs livePaperCore (filtre RESTRICTIF `auvIsLivePaperCore` dans `isTrainingCandidateAllowed`). Architecture cohérente : **on n'a pas scalé l'exécution avant de scaler la compréhension**.
@@ -130,9 +130,27 @@
 
 ## PR en cours
 
-- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #254 uniquement (`claude/session-md-post-trades-fix-merge`).
-- **Phase actuelle** : *VÉRITÉ MARCHÉ* — observation paper live concentrée sur 42 actifs livePaperCore. Confiance dans le paper trading rétablie post-fix #254.
-- **Action utilisateur en attente** : tester manuellement dans l'app que le tombstone fonctionne (supprimer historique → refresh → close/reopen → vide). Puis lancer PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief.
+- **PR** : PR-TRADES-TOMBSTONE-SERVER-V2 — tombstone serveur multi-device — branche `claude/trades-tombstone-server-v2`.
+- **Mission créateur** (2026-05-21, priorité ABSOLUE) : le tombstone local PR #254 ne suffit pas multi-device. Si je supprime sur PC, doit disparaître sur iPhone. Si je supprime sur iPhone, doit disparaître sur PC. Vérité centrale côté serveur.
+- **Cause racine V1 → V2** : V1 (PR #254) = tombstone localStorage uniquement. Limite : pas de communication entre devices. Un iPhone avec localStorage obsolète peut réinjecter ses anciens trades via sync UPSERT `Prefer=resolution=merge-duplicates`, et PC peut voir réapparaître l'historique au prochain refresh.
+- **Solution V2** : nouvelle table Supabase `mtp_trades_meta` (key='global', last_wiped_at, wipe_version, updated_at) — vérité centrale.
+- **Fichiers créés** :
+  - `cloudflare-worker/migrations/017_trades_meta.sql` (idempotent : `CREATE TABLE IF NOT EXISTS` + `INSERT ... ON CONFLICT DO NOTHING`).
+- **Fichiers modifiés** :
+  - `cloudflare-worker/worker.js` — 4 helpers ajoutés (`TRADES_META_TABLE`, `readTradesGlobalMeta`, `bumpTradesGlobalMeta`, `isTradeOlderThanServerTombstone`) + modification de 3 handlers : `handleTradesState` (lit + filtre + renvoie meta), `handleTradesSync` (filtre input antérieur au tombstone + retourne meta + `rejectedAsObsolete[]`), `handleTradesWipe` branche `wipeAll=true` (bump le marker après DELETE).
+  - `assets/app.js` — `loadTradesFromWorker` récupère `serverMeta` ; `loadTradesState` merge local/server (le max gagne, adoption locale si server > local, flag `pendingRemoteWipe` si local > server) ; `syncTradesToSupabase` adopte aussi le marker server au passage ; `wipeTradesOnServer` adopte serverMeta sur succès, set `pendingRemoteWipe` sur échec wipeAll.
+  - `tools/quant/lib/trades-history-tombstone-v1.mjs` — extension V2 : helpers `parseIsoToMsSafeV1`, `mergeTombstonesV1`, `shouldPushPendingWipeV1`.
+  - `tools/quant/test/trades-history-tombstone-v1.test.mjs` — 9 nouveaux tests V2 (merge server/local, pendingRemoteWipe, flux multi-device PC↔iPhone, device offline qui revient).
+  - `docs/monitoring/KNOWN_ISSUES.md` — issue #16 étendue avec section V2 + table de comportement + tests obligatoires couverts.
+  - `docs/project/DATA_PIPELINE.md` — section V2 multi-device server tombstone + flux.
+  - `SESSION.md` — cette mise à jour.
+- **Bug-hunters lancés** (7 scans monolithic-file hook) : tous OK.
+- **Comportement gracieux si migration 017 non appliquée** : `readTradesGlobalMeta` / `bumpTradesGlobalMeta` retournent `null` silencieusement. Le wipe DELETE Supabase fonctionne quand même. V1 tombstone local reste actif comme pré-V2.
+- **Validation tests** : `node --test tools/quant/test/trades-history-tombstone-v1.test.mjs` → 24/24 pass (15 V1 + 9 V2). `node --input-type=module --check < worker.js` → OK. `node --check assets/app.js` → OK.
+- **Migration SQL à appliquer manuellement** : ouvrir Supabase Studio → SQL Editor → exécuter le contenu de `cloudflare-worker/migrations/017_trades_meta.sql`. Idempotent, aucune action destructive.
+- **Impact runtime** : worker + front. Aucun changement de logique de scoring / sizing / safety gate. Le wipe existant fonctionne identique côté DELETE Supabase, plus le bump du marker.
+- **Impact quant** : aucun.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`. Priorité ABSOLUE avant interface Analytics.
 
 ## Mission précédente (PR-TRADES-HISTORY-DELETE-FIX, livrée 2026-05-21)
 

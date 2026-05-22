@@ -392,7 +392,40 @@ L'utilisateur peut vider l'historique paper depuis l'onglet Trades (bouton "Vide
 
 Source canonique testable : `tools/quant/lib/trades-history-tombstone-v1.mjs`. Miroir inline dans `assets/app.js`.
 
-Doc complète + cause racine : `docs/monitoring/KNOWN_ISSUES.md` issue #16 (résolue).
+Doc complète + cause racine : `docs/monitoring/KNOWN_ISSUES.md` issue #16 (résolue V1 + V2).
+
+#### V2 multi-device server tombstone (PR-TRADES-TOMBSTONE-SERVER-V2, mai 2026)
+
+Le tombstone V1 vit uniquement en localStorage côté front, ce qui ne suffit pas pour la cohérence multi-device (PC ↔ iPhone). V2 ajoute une vérité centrale côté Supabase via la table `mtp_trades_meta` (créée par migration `017_trades_meta.sql`).
+
+Schéma `mtp_trades_meta` :
+
+```sql
+CREATE TABLE mtp_trades_meta (
+  key TEXT PRIMARY KEY,                          -- 'global' pour le marker unique
+  last_wiped_at TIMESTAMPTZ,                     -- ISO timestamp du dernier wipe global
+  wipe_version BIGINT NOT NULL DEFAULT 0,        -- incrémenté à chaque wipeAll
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  meta JSONB                                      -- extensible
+);
+```
+
+Flux multi-device :
+
+1. **wipe sur Device A** → `wipeTradesOnServer({ wipeAll: true })` → worker DELETE Supabase + `bumpTradesGlobalMeta` → `mtp_trades_meta.global.last_wiped_at = NOW()`, `wipe_version += 1`.
+2. **Device B refresh** → `GET /api/trades/state` → worker lit `mtp_trades_meta`, filtre les trades remote dont `opened_at < last_wiped_at`, retourne `data.meta = { lastWipedAt, wipeVersion, updatedAt }`.
+3. **Device B front** → `loadTradesState` détecte `server.lastWipedAt > local.lastWipedAt` → adopte le marker via `saveTradesMeta({ lastWipedAt: serverMs, serverWipeAdoptedAt, pendingRemoteWipe: false })`. Le tombstone local s'aligne automatiquement.
+4. **POST /api/trades/sync** → worker filtre l'input avec le marker server : tout trade antérieur est REJETÉ silencieusement (`rejectedAsObsolete[]` retourné pour traçabilité).
+
+Cas "device offline / Safari Load failed" :
+- Local wipe applique le tombstone local immédiatement.
+- `pendingRemoteWipe = true` posé dans `mtp_trades_meta` localStorage.
+- Au retour online, prochain sync ou wipe pushe le tombstone au serveur.
+
+Comportement gracieux si migration 017 absente :
+- `readTradesGlobalMeta` / `bumpTradesGlobalMeta` retournent `null` silencieusement.
+- Le wipe DELETE Supabase fonctionne quand même.
+- V1 tombstone local reste actif côté front comme avant PR-TRADES-TOMBSTONE-SERVER-V2.
 
 ### Live Paper Analytics V1 (PR-LIVE-PAPER-ANALYTICS-1, mai 2026)
 

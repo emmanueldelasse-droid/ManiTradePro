@@ -7244,14 +7244,112 @@ function tradesPayload(configured, positions = [], history = [], message = null,
   return ok({ configured, positions, history, ...extra }, configured ? "worker_supabase" : "worker_local_only", nowIso(), "live", message);
 }
 
+// ============================================================
+// TRADES TOMBSTONE SERVER V2 (PR-TRADES-TOMBSTONE-SERVER-V2)
+// ============================================================
+// Tombstone serveur de suppression historique trades. Vérité centrale
+// multi-device : si l'utilisateur wipe sur PC, l'iPhone récupère le
+// marker et applique la suppression locale au prochain refresh, et
+// inversement.
+//
+// Source SQL : cloudflare-worker/migrations/017_trades_meta.sql.
+// Doc : docs/monitoring/KNOWN_ISSUES.md #16 (résolu V2).
+//
+// Comportement :
+//   - wipeTradesOnServer({ wipeAll: true }) → bumpTradesGlobalMeta()
+//     INSERT/UPDATE la row 'global' avec last_wiped_at=NOW(),
+//     wipe_version+=1.
+//   - GET /api/trades/state lit le marker + filtre les trades remote
+//     antérieurs au last_wiped_at + retourne le marker.
+//   - POST /api/trades/sync filtre l'input : tout trade antérieur au
+//     marker est REJETÉ (anti-réinjection multi-device).
+
+const TRADES_META_TABLE = "mtp_trades_meta";
+
+async function readTradesGlobalMeta(env) {
+  if (!supabaseConfigured(env)) return null;
+  try {
+    const rows = await supabaseFetch(env, `${TRADES_META_TABLE}?key=eq.global&select=last_wiped_at,wipe_version,updated_at&limit=1`);
+    if (Array.isArray(rows) && rows.length > 0) {
+      const row = rows[0];
+      return {
+        lastWipedAt: row.last_wiped_at || null,
+        wipeVersion: Number(row.wipe_version || 0),
+        updatedAt: row.updated_at || null,
+      };
+    }
+  } catch (e) {
+    // Cas migration 017 non appliquée : la table n'existe pas. Comportement
+    // dégradé gracieux — on retourne null, pas de filtre tombstone server.
+    // Tombstone local PR #254 reste actif côté front.
+    console.error("readTradesGlobalMeta failed:", e?.message || e);
+  }
+  return null;
+}
+
+async function bumpTradesGlobalMeta(env) {
+  if (!supabaseConfigured(env)) return null;
+  try {
+    const current = await readTradesGlobalMeta(env);
+    const nextVersion = (current?.wipeVersion || 0) + 1;
+    const now = nowIso();
+    await supabaseFetch(env, `${TRADES_META_TABLE}?on_conflict=key`, {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+      body: JSON.stringify([{
+        key: "global",
+        last_wiped_at: now,
+        wipe_version: nextVersion,
+        updated_at: now,
+      }]),
+    });
+    return { lastWipedAt: now, wipeVersion: nextVersion, updatedAt: now };
+  } catch (e) {
+    console.error("bumpTradesGlobalMeta failed:", e?.message || e);
+    return null;
+  }
+}
+
+// Helper miroir de assets/app.js isTradeOlderThanTombstone (tombstone local).
+// Compare opened_at / created_at / closed_at au marker ISO. Pas de date dispo
+// → false (on garde par prudence).
+function isTradeOlderThanServerTombstone(row, tombstoneIso) {
+  if (!tombstoneIso || typeof tombstoneIso !== "string") return false;
+  const tsMs = Date.parse(tombstoneIso);
+  if (!Number.isFinite(tsMs)) return false;
+  if (!row || typeof row !== "object") return false;
+  const refDate = row.opened_at || row.openedAt
+    || row.created_at || row.createdAt
+    || row.closed_at || row.closedAt;
+  if (!refDate) return false;
+  const ms = Date.parse(String(refDate));
+  if (!Number.isFinite(ms)) return false;
+  return ms < tsMs;
+}
+
 async function handleTradesState(env) {
   if (!supabaseConfigured(env)) return tradesPayload(false, [], [], "Secrets Supabase absents");
+  // PR-TRADES-TOMBSTONE-SERVER-V2 : lit le marker global AVANT les requêtes
+  // trades. Sert au filtre tombstone et au retour client (alignement
+  // multi-device).
+  const meta = await readTradesGlobalMeta(env);
   const positionsRaw = await supabaseFetch(env, `${TRADE_TABLES.positions}?mode=in.(training,exploration,core)&status=eq.open&order=opened_at.desc`);
   const historyRaw = await supabaseFetch(env, `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed&order=closed_at.desc`);
-  const history = normalizeTrainingTrades(Array.isArray(historyRaw) ? historyRaw : []);
+  let history = normalizeTrainingTrades(Array.isArray(historyRaw) ? historyRaw : []);
   const closedIds = new Set(history.map(row => String(row.id || "")).filter(Boolean));
-  const positions = normalizeTrainingPositions(Array.isArray(positionsRaw) ? positionsRaw : []).filter(row => !closedIds.has(String(row.id || "")));
-  return tradesPayload(true, positions, history);
+  let positions = normalizeTrainingPositions(Array.isArray(positionsRaw) ? positionsRaw : []).filter(row => !closedIds.has(String(row.id || "")));
+
+  // PR-TRADES-TOMBSTONE-SERVER-V2 : filtre tombstone serveur. Garde-fou
+  // ultime — même si un client buggy avait persisté de vieux trades,
+  // ils sont filtrés ici à la lecture. Aucun client ne verra de trades
+  // antérieurs au last_wiped_at global.
+  const serverTombstone = meta?.lastWipedAt || null;
+  if (serverTombstone) {
+    positions = positions.filter((p) => !isTradeOlderThanServerTombstone(p, serverTombstone));
+    history = history.filter((t) => !isTradeOlderThanServerTombstone(t, serverTombstone));
+  }
+
+  return tradesPayload(true, positions, history, null, { meta });
 }
 
 function pickSupabaseCols(row, keys) {
@@ -7308,8 +7406,34 @@ function mapTradeForSupabase(t) {
 async function handleTradesSync(request, env) {
   if (!supabaseConfigured(env)) return tradesPayload(false, [], [], "Secrets Supabase absents");
   const body = await request.json().catch(() => ({}));
-  const inputPositions = Array.isArray(body?.positions) ? body.positions : [];
-  const inputHistory = Array.isArray(body?.history) ? body.history : [];
+  let inputPositions = Array.isArray(body?.positions) ? body.positions : [];
+  let inputHistory = Array.isArray(body?.history) ? body.history : [];
+
+  // PR-TRADES-TOMBSTONE-SERVER-V2 : filtre tombstone serveur AVANT tout
+  // traitement. Tout trade dont opened_at < server.last_wiped_at est
+  // REJETÉ silencieusement — empêche un device offline avec localStorage
+  // obsolète de réinjecter d'anciens trades via UPSERT
+  // resolution=merge-duplicates.
+  const meta = await readTradesGlobalMeta(env);
+  const serverTombstone = meta?.lastWipedAt || null;
+  const rejectedAsObsolete = [];
+  if (serverTombstone) {
+    inputPositions = inputPositions.filter((p) => {
+      if (isTradeOlderThanServerTombstone(p, serverTombstone)) {
+        rejectedAsObsolete.push({ type: "position", id: p?.id ?? null, symbol: p?.symbol ?? null });
+        return false;
+      }
+      return true;
+    });
+    inputHistory = inputHistory.filter((t) => {
+      if (isTradeOlderThanServerTombstone(t, serverTombstone)) {
+        rejectedAsObsolete.push({ type: "history", id: t?.id ?? null, symbol: t?.symbol ?? null });
+        return false;
+      }
+      return true;
+    });
+  }
+
   const positions = normalizeTrainingPositions(inputPositions);
   const history = normalizeTrainingTrades(inputHistory);
 
@@ -7429,9 +7553,9 @@ async function handleTradesSync(request, env) {
   // bloquée, on signale "sync_partial" + blockedManualOpens dans
   // l'extra pour que l'UI affiche le motif par symbole.
   if (blockedManualOpens.length) {
-    return tradesPayload(true, positions, history, "sync_partial", { blockedManualOpens });
+    return tradesPayload(true, positions, history, "sync_partial", { blockedManualOpens, meta, rejectedAsObsolete });
   }
-  return tradesPayload(true, positions, history, "sync_ok");
+  return tradesPayload(true, positions, history, "sync_ok", { meta, rejectedAsObsolete });
 }
 
 // Miroir serveur de tradeSource() côté front (assets/app.js).
@@ -7532,7 +7656,15 @@ async function handleTradesWipe(request, env) {
           });
         } catch (e) { console.error("wipe settings reset failed:", e.message); }
       }
-      return ok({ deletedTrades, deletedPositions, deletedFeedback, deletedEvents, deletedAdjustments, mode: "wipe_all" });
+      // PR-TRADES-TOMBSTONE-SERVER-V2 : bump le marker global APRÈS le DELETE.
+      // Synchronise tous les autres devices via /api/trades/state (last_wiped_at
+      // serveur). Comportement gracieux si la migration 017 n'est pas appliquée :
+      // readTradesGlobalMeta retourne null silencieusement, bumpTradesGlobalMeta
+      // logue et retourne null — le wipe reste effectif côté trades mais le
+      // tombstone serveur ne se met pas à jour. Tombstone local PR #254 reste
+      // alors la seule garantie côté front.
+      const newMeta = await bumpTradesGlobalMeta(env);
+      return ok({ deletedTrades, deletedPositions, deletedFeedback, deletedEvents, deletedAdjustments, mode: "wipe_all", meta: newMeta });
     }
 
     // Cas 2 — par source (manual/algo) : SELECT minimal + DELETE chunked.
