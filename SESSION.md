@@ -10,9 +10,9 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/asset-universe-staged-v1` (en cours — PR-ASSET-UNIVERSE-170-STAGED-V1 : taxonomie staged ~170 actifs analyse / 42 actifs livePaperCore / 19 experimental / 6 blocked. Filtre RESTRICTIF dans `isTrainingCandidateAllowed` — ne peut JAMAIS élargir les ouvertures).
-- **Dernier merge connu** : PR #251 `docs(session): SESSION.md post-merge PR #249 + PR #250 + acter phase VÉRITÉ MARCHÉ` (commit `531576f` sur `main`).
-- **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. PR-ASSET-UNIVERSE-170-STAGED-V1 élargit la capacité d'analyse (~170 actifs) tout en gardant un livePaperCore discipliné (42 actifs auto-open).
+- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #252 sur `claude/session-md-post-staged-merge`.
+- **Dernier merge connu** : PR #252 `quant(universe): add Asset Universe staged V1 (PR-ASSET-UNIVERSE-170-STAGED-V1)` (commit `c76dc4d` sur `main`).
+- **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. ManiTradePro analyse désormais ~170 actifs (analysisUniverse + experimental visibles côté UI) MAIS limite les ouvertures paper auto à 42 actifs livePaperCore (filtre RESTRICTIF `auvIsLivePaperCore` dans `isTrainingCandidateAllowed`). Architecture cohérente : **on n'a pas scalé l'exécution avant de scaler la compréhension**.
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
 - **Ce qui est réel** : aucun trading capital réel. Rien.
@@ -105,7 +105,24 @@
 - **Impact runtime / quant** : aucun.
 - **Statut merge** : `GO MERGE` reçu (ChatGPT) avec recommandation explicite : **« Le projet vient de franchir une étape majeure »** (première vraie base sérieuse du futur moteur d'apprentissage). Priorité maintenant = laisser tourner plusieurs semaines/mois de vérité marché paper live. **Ne PAS accélérer vers broker réel / IA complexe / RL / auto-learning agressif.**
 
+## Dernière session / dernière PR mergée (novies)
+
+- **Date** : 2026-05-21.
+- **PR** : #252 — `quant(universe): add Asset Universe staged V1 (PR-ASSET-UNIVERSE-170-STAGED-V1)`.
+- **Objectif** : taxonomie staged 4 buckets (livePaperCore 42, analysisUniverse 168, experimentalUniverse 19, blockedUniverse 6) + filtre worker RESTRICTIF dans `isTrainingCandidateAllowed`. Analyse élargie à ~170 actifs sans élargir l'exécution.
+- **Résultat** : merge squash sur `main` (commit `c76dc4d`). 14/14 tests pass. 2 bug-hunters OK (scan #1 a remonté un ReferenceError critique, corrigé immédiatement). 0 ligne supprimée dans worker.js, 0 mutation de seuil décisionnel.
+- **Impact runtime** : filtre RESTRICTIF par construction. Aucun nouvel actif ne s'ouvre en auto-open vs pré-PR. KNOWN_ISSUES #15 explicitement protégée.
+- **Impact quant (fond)** : aucun.
+- **Statut merge** : `GO MERGE` reçu (ChatGPT) avec point pédagogique explicite : *« vous avez évité une erreur très fréquente : scaler l'exécution avant de scaler la compréhension »*.
+
 ## PR en cours
+
+- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #252 uniquement (`claude/session-md-post-staged-merge`).
+- **Phase actuelle** : *« VÉRITÉ MARCHÉ »* — observation paper live concentrée sur 42 actifs livePaperCore. Mission = OBSERVER. Ne PAS accélérer vers broker / IA complexe / RL / auto-learning ni ouvrir l'auto-open au-delà du core sans nouveau brief.
+
+## Mission précédente (PR-ASSET-UNIVERSE-170-STAGED-V1, livrée 2026-05-21)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (novies)* + PR #252.
 
 - **PR** : PR-ASSET-UNIVERSE-170-STAGED-V1 — Asset Universe staged V1 — branche `claude/asset-universe-staged-v1`.
 - **Mission créateur** (2026-05-21, post-VÉRITÉ MARCHÉ) : étendre ManiTradePro vers ~170 actifs analysables, **SANS** transformer ces 170 actifs en univers d'exécution paper live automatique. Séparation explicite analyse vs live execution. Filtre worker RESTRICTIF uniquement.
