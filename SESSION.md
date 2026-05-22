@@ -10,9 +10,11 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/trades-wipe-local-first-v3` (en cours — PR-TRADES-WIPE-LOCAL-FIRST-V3 : bugfix iPhone Safari. Handlers wipe refactorés en local-first : UI/localStorage purgés AVANT l'await réseau).
-- **Dernier merge connu** : PR #257 `docs(session): SESSION.md post-merge PR #256 + rappel migration 017 obligatoire` (commit `a571cb0` sur `main`).
-- **⚠ ACTION CRÉATEUR TOUJOURS OBLIGATOIRE** : appliquer la migration SQL `017_trades_meta.sql` pour activer V2 multi-device. V3 ci-dessous corrige le bug iPhone indépendamment (la suppression locale fonctionne même sans migration ni serveur).
+- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #258 sur `claude/session-md-post-wipe-v3-merge`.
+- **Dernier merge connu** : PR #258 `fix(trades): wipe local-first iPhone Safari (PR-TRADES-WIPE-LOCAL-FIRST-V3)` (commit `4648cdf` sur `main`).
+- **⚠ DEUX ACTIONS CRÉATEUR EN ATTENTE** :
+  1. **Migration SQL 017_trades_meta.sql** à appliquer dans Supabase Studio pour activer V2 multi-device (pas encore confirmée appliquée).
+  2. **Test manuel iPhone post-V3** : fermer complètement Safari/PWA, rouvrir, tester "Tout vider" → l'historique doit disparaître IMMÉDIATEMENT même si Safari renvoie "Load failed".
 - **À VÉRIFIER MANUELLEMENT (créateur)** : supprimer historique dans l'app → refresh → fermer/réouvrir app → confirmer que l'historique ne revient pas. Vérifier Supabase si possible (`mtp_trades` doit rester vide après wipe).
 - **Prochaine étape après vérification** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief ChatGPT.
 - **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. ManiTradePro analyse désormais ~170 actifs (analysisUniverse + experimental visibles côté UI) MAIS limite les ouvertures paper auto à 42 actifs livePaperCore (filtre RESTRICTIF `auvIsLivePaperCore` dans `isTrainingCandidateAllowed`). Architecture cohérente : **on n'a pas scalé l'exécution avant de scaler la compréhension**.
@@ -140,7 +142,34 @@
 - **⚠ Action créateur post-merge** : appliquer la migration `017_trades_meta.sql` dans Supabase Studio. Sinon V2 reste inactif (comportement gracieux V1 fallback).
 - **Statut merge** : `GO MERGE` reçu (ChatGPT) après resync (PR initialement behind_by=2 — corrigé via merge main, head e903c4c).
 
+## Dernière session / dernière PR mergée (duodecies)
+
+- **Date** : 2026-05-22.
+- **PR** : #258 — `fix(trades): wipe local-first iPhone Safari (PR-TRADES-WIPE-LOCAL-FIRST-V3)`.
+- **Objectif** : bugfix V3 critique iPhone Safari. Les 2 handlers wipe (`data-clear-all-history` + `data-clear-history` par source) étaient server-first → Safari "Load failed" bloquait le wipe local. Refactor en local-first.
+- **Résultat** : merge squash sur `main` (commit `4648cdf`). 24/24 tests pass. 2 bug-hunters OK (scan #1 a remonté une fragilité mineure → corrigée immédiatement). `sw.js` CACHE_VERSION bumpé `v8.5` → `v8.6` pour cache-bust iPhone PWA.
+- **Impact runtime** : front uniquement (assets/app.js + sw.js). Worker non touché. Migration 017 inchangée.
+- **Impact quant** : aucun. 0 fonction décisionnelle modifiée.
+- **Point clé ChatGPT** : *« Le serveur ne doit jamais empêcher une suppression locale demandée par l'utilisateur. »*
+- **Statut merge** : `GO MERGE` reçu (ChatGPT).
+
 ## PR en cours
+
+- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #258 uniquement (`claude/session-md-post-wipe-v3-merge`).
+- **Phase actuelle** : *VÉRITÉ MARCHÉ* — observation paper live concentrée sur 42 actifs livePaperCore. Confiance suppression rétablie post-V3 (sous réserve validation manuelle iPhone par le créateur).
+- **Actions utilisateur en attente** (BLOQUANTES avant nouveau brief Analytics) :
+  1. Attendre déploiement Cloudflare Pages (~2-5 min post-merge).
+  2. Sur iPhone : fermer complètement Safari/PWA, rouvrir.
+  3. Tester "Tout vider" → vérifier que l'historique disparaît IMMÉDIATEMENT (avant le fetch).
+  4. Si Safari "Load failed" : vérifier toast "supprimé localement, synchro en attente" (au lieu de l'ancien alert "Rien n'a été supprimé").
+  5. Refresh iPhone → historique TOUJOURS vide.
+  6. Fermer/réouvrir PWA → historique TOUJOURS vide.
+  7. (Si migration 017 appliquée) : sur PC, vérifier au prochain refresh que le wipe iPhone est propagé.
+- **Prochaine étape produit** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) — bloquée jusqu'à validation iPhone post-V3.
+
+## Mission précédente (PR-TRADES-WIPE-LOCAL-FIRST-V3, livrée 2026-05-22)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (duodecies)* + PR #258 + KNOWN_ISSUES #16 V3.
 
 - **PR** : PR-TRADES-WIPE-LOCAL-FIRST-V3 — bugfix iPhone Safari "Load failed" — branche `claude/trades-wipe-local-first-v3`.
 - **Mission créateur** (2026-05-22, priorité ABSOLUE) : la suppression iPhone ne fonctionne toujours pas même avec V1 + V2. Bug réel dans le flux UI. Règle non négociable : *« L'utilisateur ne doit jamais voir "Rien n'a été supprimé" si la suppression locale peut être faite. »*
