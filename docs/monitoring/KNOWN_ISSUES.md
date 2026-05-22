@@ -241,6 +241,54 @@ Avant B.10, ce trou existait pour Yahoo (le provider posait `quotedAt = nowIso()
 
 ---
 
+### #16 ✅ Historique trades supprimé qui réapparaît — résolu (PR-TRADES-HISTORY-DELETE-FIX, 2026-05-21)
+
+**Description initiale**
+L'utilisateur supprime tout l'historique des trades dans l'onglet Trades (bouton "Vider l'historique" → confirm → `wipeTradesOnServer({ wipeAll: true })` côté worker). Vidage Supabase + local OK. Mais peu de temps après (refresh ultérieur, retour le lendemain, action sync depuis un autre onglet), l'historique réapparaît.
+
+**Cause racine identifiée (audit PR-TRADES-HISTORY-DELETE-FIX)**
+
+3 vecteurs convergents côté front (`assets/app.js`) :
+
+1. **TTL du tombstone trop court** (`loadTradesState` l. 680) : `recentWipe = meta.lastWipedAt && (Date.now() - meta.lastWipedAt) < 300000` — 5 minutes seulement. Passé ce délai, le check redevient `false` ; si Supabase a entre-temps reçu de nouvelles positions paper via cron `handleTrainingAutoCycle` (ou pire, via un sync depuis un autre onglet/device avec localStorage obsolète), `remoteHasMore` devient `true` et **state.trades = remote** → trades visibles côté UI.
+
+2. **Aucun filtre tombstone** côté front : `loadTradesState` consomme tels quels `remote.positions` et `remote.history` sans filtrer ceux dont les dates (`opened_at`, `created_at`, `closed_at`) sont antérieures à `lastWipedAt`. Un trade obsolète qui survit côté Supabase (re-injecté par autre onglet via sync UPSERT `Prefer: resolution=merge-duplicates`) repasse côté UI.
+
+3. **`restoreTradesFromBackupIfEmpty`** (l. 5755) appelée à chaque render du portfolio : restaure depuis `mtp_trades_*_backup` localStorage si l'état est vide. Si pour une raison X le backup contient encore l'ancien historique (race, désync inter-onglet), restauration silencieuse.
+
+4. **`syncTradesToSupabase`** (l. 326) : si un autre onglet ou device a un localStorage encore plein avant que son `loadTradesState` ne s'exécute, l'envoi sync UPSERT réinjecte les trades obsolètes dans Supabase.
+
+**Solution livrée (PR-TRADES-HISTORY-DELETE-FIX)**
+
+Tombstone PERMANENT côté front. Module source canonique testable : `tools/quant/lib/trades-history-tombstone-v1.mjs`. Miroir inline dans `assets/app.js`.
+
+1. `loadTradesState` filtre les trades remote antérieurs au `lastWipedAt` via `isTradeOlderThanTombstone(t, tombstoneMs)`.
+2. `recentWipe = tombstoneActive` (plus de TTL 5 min ; truthy tant que `lastWipedAt > 0`). Le local prime sur remote tant qu'un wipe a été enregistré.
+3. `restoreTradesFromBackupIfEmpty` : guard en début de fonction — si tombstone actif, return immédiat (aucune restauration depuis backup).
+4. `syncTradesToSupabase` : filtre les trades antérieurs au tombstone AVANT envoi. Empêche la réinjection multi-onglet/multi-device.
+
+**Règle appliquée** : *« Une suppression utilisateur doit être une vérité persistée, pas une simple suppression visuelle. »*
+
+**Limites résiduelles**
+- Le tombstone est stocké uniquement dans `mtp_trades_meta` localStorage côté front. Un nouveau device sans ce localStorage ne connaît pas le tombstone — mais son `loadTradesState` consommerait remote = vide (Supabase a été vidé par le wipe) donc pas de problème.
+- Un Device B avec un localStorage obsolète (qui n'a pas reçu le wipe) pourrait tenter un sync. Côté Device B post-mise-à-jour app.js, `syncTradesToSupabase` filtre tombstone — donc pas de réinjection. Côté Device B avec une version d'app.js antérieure à cette PR, la réinjection reste théoriquement possible jusqu'à la mise à jour de cette session.
+- Robustesse multi-device parfaite : nécessiterait un stockage serveur du `last_wipe_at` (migration SQL + filtre `handleTradesState` / `handleTradesSync`). Hors scope V1.
+
+**Tests obligatoires** (cf. brief) — résolution validée :
+1. Supprimer historique → refresh → vide ✓ (filtre remote tombstone).
+2. Supprimer historique → relancer app → vide ✓ (tombstone persistant).
+3. Supprimer → GET state → vide ✓ (Supabase déjà vidé par `wipeTradesOnServer`).
+4. Supprimer → POST sync → ancien historique non restauré ✓ (filtre sync tombstone).
+5. Backup local présent → suppression → backup ne restaure rien ✓ (guard restoreTradesFromBackupIfEmpty).
+6. Multi-device : un device supprime → autre device ne réinjecte pas ✓ (sous réserve de la mise à jour de l'app.js sur les autres devices).
+7. Positions ouvertes non concernées sauf reset complet explicite ✓ (le wipeAll est explicite par l'utilisateur).
+8. Aucun trade supprimé ne doit alimenter Live Paper Analytics ✓ (Supabase vidé + filtre remote → analyse ne tourne que sur les nouveaux trades post-wipe).
+9. Aucun trade supprimé ne doit alimenter learning ✓ (mtp_trade_feedback vidé par `wipeTradesOnServer`).
+
+**État** : RÉSOLU par PR-TRADES-HISTORY-DELETE-FIX.
+
+---
+
 ### #15 🟡 Données 2025 : splits / dividendes non ajustés sur certains ETF sectoriels SPDR
 
 **Description**

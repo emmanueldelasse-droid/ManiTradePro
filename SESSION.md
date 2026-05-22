@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #252 sur `claude/session-md-post-staged-merge`.
-- **Dernier merge connu** : PR #252 `quant(universe): add Asset Universe staged V1 (PR-ASSET-UNIVERSE-170-STAGED-V1)` (commit `c76dc4d` sur `main`).
+- **Branche / PR active** : `claude/trades-history-delete-fix` (en cours — PR-TRADES-HISTORY-DELETE-FIX : bugfix prioritaire « historique supprimé qui réapparaît ». Tombstone permanent côté front + filtre remote/sync + guard backup).
+- **Dernier merge connu** : PR #253 `docs(session): SESSION.md post-merge PR #252 + acter philosophie "compréhension avant exécution"` (commit `5e8845e` sur `main`).
 - **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. ManiTradePro analyse désormais ~170 actifs (analysisUniverse + experimental visibles côté UI) MAIS limite les ouvertures paper auto à 42 actifs livePaperCore (filtre RESTRICTIF `auvIsLivePaperCore` dans `isTrainingCandidateAllowed`). Architecture cohérente : **on n'a pas scalé l'exécution avant de scaler la compréhension**.
 - **Statut global** : phase de recherche quantitative active, sous **gel méthodologique** (Research Framework Freeze v1, cf. `docs/research/RESEARCH_FRAMEWORK_FREEZE_V1.md`).
 - **Mode actuel** : recherche + documentation. Pas de capital réel. Pas de bot live actif.
@@ -117,8 +117,32 @@
 
 ## PR en cours
 
-- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #252 uniquement (`claude/session-md-post-staged-merge`).
-- **Phase actuelle** : *« VÉRITÉ MARCHÉ »* — observation paper live concentrée sur 42 actifs livePaperCore. Mission = OBSERVER. Ne PAS accélérer vers broker / IA complexe / RL / auto-learning ni ouvrir l'auto-open au-delà du core sans nouveau brief.
+- **PR** : PR-TRADES-HISTORY-DELETE-FIX — bugfix prioritaire « historique supprimé qui réapparaît » — branche `claude/trades-history-delete-fix`.
+- **Mission créateur** (2026-05-21, priorité ABSOLUE, AVANT le dashboard Analytics) : auditer et corriger définitivement le bug où l'historique supprimé dans l'onglet Trades réapparaît ensuite. Confiance dans le paper trading en jeu.
+- **Cause racine identifiée** (audit complet via Explore) :
+  1. TTL du tombstone trop court (5 min, `loadTradesState` l. 680). Après, `recentWipe=false` et Supabase reprend la main si de nouveaux trades arrivent entre temps via cron auto-cycle.
+  2. Aucun filtre tombstone côté front : trades remote consommés tels quels, même ceux antérieurs au wipe.
+  3. `restoreTradesFromBackupIfEmpty` peut restaurer depuis backup local non synchronisé.
+  4. `syncTradesToSupabase` ne filtre pas les trades obsolètes → réinjection multi-onglet/device.
+- **Solution livrée** : tombstone PERMANENT côté front, source canonique `tools/quant/lib/trades-history-tombstone-v1.mjs` + miroir inline dans `assets/app.js`.
+- **Fichiers créés** :
+  - `tools/quant/lib/trades-history-tombstone-v1.mjs` (~135 lignes) — module pur testable.
+  - `tools/quant/test/trades-history-tombstone-v1.test.mjs` — 15 tests `node:test`, tous pass.
+- **Fichiers modifiés** :
+  - `assets/app.js` — 4 modifications ciblées : ajout helper `isTradeOlderThanTombstone`, filtre remote dans `loadTradesState`, `recentWipe` permanent (plus de TTL 5 min), filtre sync dans `syncTradesToSupabase`, guard tombstone dans `restoreTradesFromBackupIfEmpty`.
+  - `docs/monitoring/KNOWN_ISSUES.md` — issue #16 ajoutée + marquée résolue avec cause racine détaillée et tests validés.
+  - `docs/project/DATA_PIPELINE.md` — section « Tombstone de suppression historique » ajoutée.
+  - `SESSION.md` — cette mise à jour.
+- **Worker.js** : non touché. Le filtre côté front suffit (Supabase est déjà vidé par `wipeTradesOnServer`).
+- **Bug-hunters** (4 scans monolithic-file hook) :
+  - Scan #1 (filtre tombstone) : BLOQUANT (helper non défini) → corrigé immédiatement.
+  - Scan #2 (helper ajouté) : VERDICT OK.
+  - Scan #3 (sync filter) : VERDICT OK.
+  - Scan #4 (restore guard) : VERDICT OK.
+- **Validation tests** : `node --test tools/quant/test/trades-history-tombstone-v1.test.mjs` → 15/15 pass. `node --check assets/app.js` → OK.
+- **Impact runtime** : front uniquement. Aucun changement worker. Aucun changement Supabase (DB déjà vidée par le wipe existant — le tombstone empêche juste la réapparition).
+- **Impact quant** : aucun.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`. Priorité ABSOLUE avant dashboard Analytics.
 
 ## Mission précédente (PR-ASSET-UNIVERSE-170-STAGED-V1, livrée 2026-05-21)
 

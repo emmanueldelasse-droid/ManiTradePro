@@ -376,6 +376,24 @@ Réponse : `{ generatedAt, windowHours, cutoffAt, totals:{openBlocked, closeBloc
 
 `analysis_snapshot` contient désormais `strategicAnalysis` et `liveContext` (additif, ne casse pas l'existant).
 
+### Tombstone de suppression historique (PR-TRADES-HISTORY-DELETE-FIX, mai 2026)
+
+L'utilisateur peut vider l'historique paper depuis l'onglet Trades (bouton "Vider l'historique"). Cette action :
+
+1. Appelle `wipeTradesOnServer({ wipeAll: true, includePositions: true })` côté worker — DELETE Supabase sur `mtp_positions`, `mtp_trades`, `mtp_trade_feedback`, `mtp_training_events`, `mtp_engine_adjustments`.
+2. Vide `state.trades.history` / `state.trades.positions` en mémoire.
+3. Enregistre `lastWipedAt = Date.now()` dans `mtp_trades_meta` localStorage (TOMBSTONE).
+4. Persiste l'état vide dans localStorage + backups via `persistTradesState`.
+
+**Le tombstone est PERMANENT** (plus de TTL 5 min). Tant que `meta.lastWipedAt > 0` :
+- `loadTradesState` filtre les trades remote dont `opened_at` (ou `created_at` / `closed_at`) est antérieur à `lastWipedAt`.
+- `syncTradesToSupabase` filtre les trades obsolètes AVANT envoi (anti-réinjection multi-onglet/device).
+- `restoreTradesFromBackupIfEmpty` est désactivée (no restore).
+
+Source canonique testable : `tools/quant/lib/trades-history-tombstone-v1.mjs`. Miroir inline dans `assets/app.js`.
+
+Doc complète + cause racine : `docs/monitoring/KNOWN_ISSUES.md` issue #16 (résolue).
+
 ### Live Paper Analytics V1 (PR-LIVE-PAPER-ANALYTICS-1, mai 2026)
 
 Depuis PR-LIVE-PAPER-ANALYTICS-1, deux sous-clés JSONB additives sont peuplées dans `analysis_snapshot` pour chaque trade paper :

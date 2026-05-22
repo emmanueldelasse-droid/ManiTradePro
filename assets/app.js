@@ -325,12 +325,25 @@
 
   async function syncTradesToSupabase() {
     try {
+      // PR fix bug "historique supprimé qui réapparaît" :
+      // Si tombstone actif, retirer les trades antérieurs au wipe AVANT
+      // l'envoi sync. Empêche la réinjection d'ancien historique depuis
+      // un autre onglet / device dont le localStorage n'aurait pas été
+      // mis à jour.
+      const meta = loadTradesMeta();
+      const tombstoneMs = Number(meta.lastWipedAt);
+      const tombstoneActive = Number.isFinite(tombstoneMs) && tombstoneMs > 0;
+      const positionsRaw = Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [];
+      const historyRaw = Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : [];
+      const positions = tombstoneActive
+        ? positionsRaw.filter((t) => !isTradeOlderThanTombstone(t, tombstoneMs))
+        : positionsRaw;
+      const history = tombstoneActive
+        ? historyRaw.filter((t) => !isTradeOlderThanTombstone(t, tombstoneMs))
+        : historyRaw;
       const payload = await workerTradesRequest(WORKER_TRADES_ROUTES.sync, {
         method: "POST",
-        body: JSON.stringify({
-          positions: Array.isArray(state.trades.positions) ? state.trades.positions.map(normalizePositionRecord) : [],
-          history: Array.isArray(state.trades.history) ? state.trades.history.map((x) => normalizePositionRecord(x)) : []
-        })
+        body: JSON.stringify({ positions, history })
       });
       const configured = !!payload?.data?.configured;
       state.trades.remoteStatus = configured ? "connected" : "fallback_local";
@@ -657,6 +670,27 @@
     }
   }
 
+  // === TRADES HISTORY TOMBSTONE V1 ==========================================
+  // Helper inline miroir de tools/quant/lib/trades-history-tombstone-v1.mjs.
+  // Empêche la réapparition d'anciens trades après une suppression utilisateur.
+  // Maintenir synchrone avec le module pur.
+  //
+  // Convention : on regarde dans l'ordre opened_at, puis created_at, puis
+  // closed_at. Si aucune date disponible → return false (on garde par prudence).
+  // Trade strictement à `lastWipedAt` → return false (gardé). Trade
+  // strictement avant `lastWipedAt` → return true (obsolète).
+  function isTradeOlderThanTombstone(trade, tombstoneMs) {
+    if (!Number.isFinite(tombstoneMs) || tombstoneMs <= 0) return false;
+    if (!trade || typeof trade !== "object") return false;
+    const refDate = trade.opened_at || trade.openedAt
+      || trade.created_at || trade.createdAt
+      || trade.closed_at || trade.closedAt;
+    if (!refDate) return false;
+    const ms = Date.parse(String(refDate));
+    if (!Number.isFinite(ms)) return false;
+    return ms < tombstoneMs;
+  }
+
   async function loadTradesState() {
     const remote = await loadTradesFromWorker();
     const rawPositions = readJsonFromKeys(TRADE_STORAGE.positions, []);
@@ -665,6 +699,20 @@
     const localPositions = Array.isArray(rawPositions) ? rawPositions.map(normalizePositionRecord) : [];
     const localHistory = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
     const meta = loadTradesMeta();
+
+    // PR fix bug "historique supprimé qui réapparaît" :
+    // Si `meta.lastWipedAt` est défini (tombstone), filtrer les trades remote
+    // antérieurs au wipe. Une suppression utilisateur est une VÉRITÉ
+    // PERSISTÉE, pas une simple suppression visuelle.
+    // Source canonique : tools/quant/lib/trades-history-tombstone-v1.mjs.
+    const tombstoneMs = Number(meta.lastWipedAt);
+    const tombstoneActive = Number.isFinite(tombstoneMs) && tombstoneMs > 0;
+    if (tombstoneActive && Array.isArray(remote.positions)) {
+      remote.positions = remote.positions.filter((t) => !isTradeOlderThanTombstone(t, tombstoneMs));
+    }
+    if (tombstoneActive && Array.isArray(remote.history)) {
+      remote.history = remote.history.filter((t) => !isTradeOlderThanTombstone(t, tombstoneMs));
+    }
 
     const remotePositionsCount = Array.isArray(remote.positions) ? remote.positions.length : 0;
     const remoteHistoryCount = Array.isArray(remote.history) ? remote.history.length : 0;
@@ -677,7 +725,10 @@
       const remoteHasMoreHistory = remoteHistoryCount > localHistoryCount;
       const localHasMorePositions = localPositionsCount > remotePositionsCount;
       const localHasMoreHistory = localHistoryCount > remoteHistoryCount;
-      const recentWipe = meta.lastWipedAt && (Date.now() - meta.lastWipedAt) < 300000;
+      // Tombstone permanent (plus de TTL 5 min). Tant que lastWipedAt est
+      // défini, on traite la suppression comme une vérité persistée et le
+      // local prime sur remote pour préserver la décision utilisateur.
+      const recentWipe = tombstoneActive;
 
       if (!recentWipe && (remoteHasMorePositions || remoteHasMoreHistory || !hasLocalTrades)) {
         // Supabase a plus de données → prioritaire (sauf si suppression récente côté local)
@@ -5753,6 +5804,19 @@ function normalizeOpenPositionsState(){
 }
 
 function restoreTradesFromBackupIfEmpty() {
+  // PR fix bug "historique supprimé qui réapparaît" :
+  // Si tombstone actif (l'utilisateur a wipé), NE JAMAIS restaurer depuis
+  // le backup. La suppression est une vérité persistée — restaurer un
+  // ancien état depuis le backup local serait une régression silencieuse.
+  // Source canonique : tools/quant/lib/trades-history-tombstone-v1.mjs.
+  try {
+    const meta = readJson(TRADE_STORAGE.meta, {});
+    const tombstoneMs = Number(meta && meta.lastWipedAt);
+    if (Number.isFinite(tombstoneMs) && tombstoneMs > 0) return;
+  } catch (_) {
+    // En cas d'erreur lecture meta, on continue avec le comportement legacy.
+  }
+
   const backupPositions = readJson(TRADE_STORAGE.positionsBackup, []);
   const backupHistory = readJson(TRADE_STORAGE.historyBackup, []);
   const backupAlgo = readJson(TRADE_STORAGE.algoJournalBackup, []);
