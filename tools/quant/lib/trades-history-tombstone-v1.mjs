@@ -123,3 +123,80 @@ export function shouldIgnoreTradeForSyncV1(trade, meta) {
   if (ts === null) return false;
   return isTradeOlderThanTombstoneV1(trade, ts);
 }
+
+// === TOMBSTONE SERVEUR (PR-TRADES-TOMBSTONE-SERVER-V2) =====================
+//
+// Étend le tombstone V1 (local uniquement) avec une vérité centrale côté
+// Supabase. Permet la synchronisation multi-device (PC ↔ iPhone) :
+// un wipe sur un device propage au prochain refresh des autres.
+//
+// Source SQL : cloudflare-worker/migrations/017_trades_meta.sql
+// Endpoint  : GET /api/trades/state → payload.data.meta = { lastWipedAt, wipeVersion, updatedAt }
+//             POST /api/trades/sync → idem dans response.
+
+/**
+ * Parse une string ISO en ms epoch, ou retourne 0 si invalide.
+ *
+ * @param {string|null|undefined} iso
+ * @returns {number}
+ */
+export function parseIsoToMsSafeV1(iso) {
+  if (typeof iso !== "string" || iso.length === 0) return 0;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+/**
+ * Fusionne le tombstone local et le tombstone serveur. Le plus récent gagne.
+ *
+ * Cas :
+ *   - server > local : adoption server. Le client s'aligne.
+ *   - local > server : le client a wipé hors-ligne. Flag `pendingRemoteWipe`
+ *     pour retenter au prochain sync.
+ *   - server == local : aligné, rien à faire.
+ *   - both null : pas de tombstone du tout.
+ *
+ * @param {Object} input
+ * @param {Object|null} input.localMeta   payload `loadTradesMeta()` côté front
+ * @param {Object|null} input.serverMeta  payload `response.data.meta` du worker
+ * @returns {Object} {
+ *   effectiveTombstoneMs: number,    // max des deux (0 si aucun)
+ *   serverTombstoneMs:    number,
+ *   localTombstoneMs:     number,
+ *   serverWins:           boolean,   // adopter le serveur
+ *   pendingRemoteWipe:    boolean,   // pusher au serveur au prochain wipe
+ *   inSync:               boolean    // server == local exactement
+ * }
+ */
+export function mergeTombstonesV1({ localMeta, serverMeta } = {}) {
+  const localMs = Number(localMeta?.lastWipedAt);
+  const localTombstoneMs = Number.isFinite(localMs) && localMs > 0 ? localMs : 0;
+  const serverTombstoneMs = parseIsoToMsSafeV1(serverMeta?.lastWipedAt);
+
+  const effectiveTombstoneMs = Math.max(localTombstoneMs, serverTombstoneMs);
+  const serverWins = serverTombstoneMs > localTombstoneMs;
+  const pendingRemoteWipe = localTombstoneMs > serverTombstoneMs;
+  const inSync = localTombstoneMs > 0 && localTombstoneMs === serverTombstoneMs;
+
+  return {
+    effectiveTombstoneMs,
+    serverTombstoneMs,
+    localTombstoneMs,
+    serverWins,
+    pendingRemoteWipe,
+    inSync,
+  };
+}
+
+/**
+ * Faut-il pousser un wipe au serveur ? OUI si tombstone local > serveur
+ * (donc l'utilisateur a wipé hors-ligne et le serveur ne l'a pas encore vu).
+ *
+ * @param {Object|null} localMeta
+ * @param {Object|null} serverMeta
+ * @returns {boolean}
+ */
+export function shouldPushPendingWipeV1(localMeta, serverMeta) {
+  const merged = mergeTombstonesV1({ localMeta, serverMeta });
+  return merged.pendingRemoteWipe;
+}

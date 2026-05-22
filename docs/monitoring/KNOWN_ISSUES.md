@@ -285,7 +285,73 @@ Tombstone PERMANENT côté front. Module source canonique testable : `tools/quan
 8. Aucun trade supprimé ne doit alimenter Live Paper Analytics ✓ (Supabase vidé + filtre remote → analyse ne tourne que sur les nouveaux trades post-wipe).
 9. Aucun trade supprimé ne doit alimenter learning ✓ (mtp_trade_feedback vidé par `wipeTradesOnServer`).
 
-**État** : RÉSOLU par PR-TRADES-HISTORY-DELETE-FIX.
+**État V1** : RÉSOLU par PR-TRADES-HISTORY-DELETE-FIX (PR #254, commit `c50cdfe`).
+
+### #16 (suite) — V2 multi-device server tombstone (PR-TRADES-TOMBSTONE-SERVER-V2, 2026-05-21)
+
+**Limite V1 identifiée par le créateur** : le tombstone V1 vit uniquement dans `localStorage` (clé `mtp_trades_meta`). Multi-device problématique :
+- Suppression sur PC → iPhone ne sait pas, peut réinjecter via sync UPSERT.
+- Suppression sur iPhone → PC ne sait pas, idem.
+- Vérité non centralisée.
+
+**Solution V2 livrée** : tombstone serveur via nouvelle table Supabase `mtp_trades_meta` (key='global', last_wiped_at, wipe_version, updated_at). Migration `cloudflare-worker/migrations/017_trades_meta.sql` (idempotente, aucune destruction).
+
+**Modifications worker (`cloudflare-worker/worker.js`)** :
+- `handleTradesState` : lit le marker global + filtre les trades remote antérieurs au `last_wiped_at` + renvoie le marker dans `data.meta`.
+- `handleTradesSync` : filtre l'input avant UPSERT — tout trade antérieur au `last_wiped_at` est REJETÉ (anti-réinjection multi-device). Réponse inclut `meta` + `rejectedAsObsolete[]`.
+- `handleTradesWipe` (branche `wipeAll=true`) : appelle `bumpTradesGlobalMeta(env)` APRÈS les DELETE pour incrémenter le marker global. Réponse inclut `meta`.
+- 4 helpers ajoutés : `TRADES_META_TABLE`, `readTradesGlobalMeta`, `bumpTradesGlobalMeta`, `isTradeOlderThanServerTombstone`.
+
+**Modifications front (`assets/app.js`)** :
+- `loadTradesFromWorker` : récupère `serverMeta` depuis `payload.data.meta`.
+- `loadTradesState` : merge tombstone local et server (le max gagne). Si server > local → adoption locale (`saveTradesMeta({ lastWipedAt: serverMs, serverWipeAdoptedAt, pendingRemoteWipe: false })`). Si local > server → flag `pendingRemoteWipe` pour retenter au prochain sync.
+- `syncTradesToSupabase` : adopte aussi le marker server au passage.
+- `wipeTradesOnServer` (succès wipeAll) : adopte le marker server. (Échec wipeAll) : set `pendingRemoteWipe=true`.
+
+**Comportement attendu post-V2** :
+
+| Scénario | Résultat |
+|---|---|
+| PC wipe → iPhone refresh | iPhone récupère server.lastWipedAt, vide son local automatiquement. ✓ |
+| iPhone wipe → PC refresh | Symétrique. ✓ |
+| Device offline + vieux localStorage → revient online → POST sync | Worker filtre les trades antérieurs au server tombstone → rejet silencieux + `rejectedAsObsolete[]` retourné. ✓ |
+| Device wipe offline (Safari "Load failed") | Local mis à jour, `pendingRemoteWipe=true`. Au retour online, prochain sync ou wipe pushe au serveur. ✓ |
+| Backup local présent post-wipe | Toujours bloqué par guard PR #254 (tombstone local actif). ✓ |
+| server.lastWipedAt > local.lastWipedAt | Server gagne, local s'aligne. ✓ |
+| local.lastWipedAt > server.lastWipedAt | pendingRemoteWipe=true, push au prochain wipeTradesOnServer. ✓ |
+
+**Tests obligatoires V2** (12 cas brief) — couverts par module pur + tests d'intégration manuels :
+
+1. PC wipe → GET state iPhone → historique vide ✓ (filtre `handleTradesState`).
+2. iPhone wipe → GET state PC → historique vide ✓ (symétrique).
+3. Device offline avec vieux localStorage → POST sync → vieux trades rejetés ✓ (filtre `handleTradesSync` + `rejectedAsObsolete[]`).
+4. Backup local présent → non restauré si server tombstone actif ✓ (guard `restoreTradesFromBackupIfEmpty` PR #254 + adoption locale post-loadState).
+5. server tombstone > local tombstone → server gagne ✓ (`mergeTombstonesV1.serverWins`).
+6. local tombstone > server tombstone → client pousse wipe ✓ (`pendingRemoteWipe` + retry).
+7. Refresh après wipe → rien ne revient ✓.
+8. Fermeture/réouverture app → rien ne revient ✓.
+9. Positions ouvertes protégées sauf reset complet explicite ✓.
+10. Aucun trade supprimé ne nourrit learning ✓.
+11. Aucun trade supprimé ne nourrit Live Paper Analytics ✓.
+12. Safari/iPhone "Load failed" → pendingRemoteWipe stocké ✓.
+
+**Migration SQL à appliquer manuellement** :
+- Fichier : `cloudflare-worker/migrations/017_trades_meta.sql`.
+- Exécuter dans Supabase Studio → SQL Editor → exécuter le contenu du fichier.
+- Idempotent (IF NOT EXISTS / ON CONFLICT DO NOTHING) — peut être rejoué sans risque.
+- Aucune action destructive.
+
+**Comportement gracieux si migration non appliquée** :
+- `readTradesGlobalMeta` retourne `null` (catch silencieux).
+- `bumpTradesGlobalMeta` retourne `null` (catch silencieux).
+- Le wipe trades fonctionne quand même (DELETE Supabase OK).
+- Le tombstone serveur n'est juste pas mis à jour → V2 inactif, V1 reste fonctionnel comme avant.
+
+**Limites résiduelles V2** :
+- Le filtre `handleTradesSync` rejette silencieusement. Le caller obtient `rejectedAsObsolete[]` dans le retour pour traçabilité. UI peut afficher un toast si désiré (PR future).
+- Cas de course extrême : si 2 devices wipent simultanément en < 1 ms, les deux `bumpTradesGlobalMeta` peuvent se chevaucher (last write wins). Acceptable — le résultat est qu'au moins un wipe est enregistré et le marker représente "il y a eu un wipe".
+
+**État V2** : RÉSOLU par PR-TRADES-TOMBSTONE-SERVER-V2.
 
 ---
 

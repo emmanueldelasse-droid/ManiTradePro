@@ -270,6 +270,12 @@
       const positions = Array.isArray(payload?.data?.positions) ? payload.data.positions.map(normalizePositionRecord) : [];
       const history = Array.isArray(payload?.data?.history) ? payload.data.history.map((x) => normalizePositionRecord(x)) : [];
       const configured = !!payload?.data?.configured;
+      // PR-TRADES-TOMBSTONE-SERVER-V2 : récupérer le marker global serveur.
+      // Format attendu : { lastWipedAt: ISO string, wipeVersion: number, updatedAt: ISO }.
+      // null si la migration 017 n'est pas appliquée (comportement dégradé OK).
+      const serverMeta = (payload?.data?.meta && typeof payload.data.meta === "object")
+        ? payload.data.meta
+        : null;
       state.trades.remoteStatus = configured ? "connected" : "fallback_local";
       state.trades.remoteError = configured ? null : (payload?.message || "worker_not_configured");
       state.trades.lastRemoteSyncAt = Date.now();
@@ -278,6 +284,7 @@
         configured,
         positions,
         history,
+        serverMeta,
         payload
       };
     } catch (err) {
@@ -288,6 +295,7 @@
         configured: false,
         positions: [],
         history: [],
+        serverMeta: null,
         payload: null
       };
     }
@@ -313,12 +321,37 @@
           wipeAll: wipeAll === true
         })
       });
+      // PR-TRADES-TOMBSTONE-SERVER-V2 : sur wipeAll réussi, le worker
+      // renvoie le marker global frais (data.meta). On l'adopte localement
+      // pour aligner immédiatement le tombstone front + clear le flag
+      // pendingRemoteWipe (s'il était posé suite à un wipe hors-ligne).
+      const serverMeta = payload?.data?.meta && typeof payload.data.meta === "object"
+        ? payload.data.meta
+        : null;
+      if (wipeAll === true && serverMeta && serverMeta.lastWipedAt) {
+        const serverMsRaw = Date.parse(String(serverMeta.lastWipedAt));
+        const serverMs = Number.isFinite(serverMsRaw) && serverMsRaw > 0 ? serverMsRaw : Date.now();
+        saveTradesMeta({
+          lastWipedAt: serverMs,
+          serverWipeAdoptedAt: Date.now(),
+          pendingRemoteWipe: false
+        });
+      }
       return {
         ok: true,
         deletedTrades: Number(payload?.data?.deletedTrades || 0),
-        deletedPositions: Number(payload?.data?.deletedPositions || 0)
+        deletedPositions: Number(payload?.data?.deletedPositions || 0),
+        serverMeta
       };
     } catch (err) {
+      // PR-TRADES-TOMBSTONE-SERVER-V2 : wipe échoué (offline, Safari "Load
+      // failed", worker indispo). Si on tentait un wipeAll, marquer le flag
+      // pendingRemoteWipe pour retenter au prochain sync / loadTradesState.
+      // Le tombstone local reste actif et empêche déjà toute réapparition
+      // côté front (PR #254).
+      if (wipeAll === true) {
+        saveTradesMeta({ pendingRemoteWipe: true, lastRemoteWipeFailAt: Date.now() });
+      }
       return { ok: false, error: err?.message || "wipe_failed" };
     }
   }
@@ -349,13 +382,31 @@
       state.trades.remoteStatus = configured ? "connected" : "fallback_local";
       state.trades.remoteError = configured ? null : (payload?.message || "worker_not_configured");
       state.trades.lastRemoteSyncAt = Date.now();
-      saveTradesMeta({
+
+      // PR-TRADES-TOMBSTONE-SERVER-V2 : si le worker a retourné un marker
+      // global plus récent que notre tombstone local, on s'aligne. Garantit
+      // la synchro multi-device au prochain sync (PC <-> iPhone).
+      const serverMeta = payload?.data?.meta && typeof payload.data.meta === "object"
+        ? payload.data.meta
+        : null;
+      const metaUpdate = {
         positionsCount: Array.isArray(state.trades.positions) ? state.trades.positions.length : 0,
         historyCount: Array.isArray(state.trades.history) ? state.trades.history.length : 0,
         pendingRemoteSync: !configured,
         lastSuccessfulRemoteSyncAt: configured ? Date.now() : (loadTradesMeta().lastSuccessfulRemoteSyncAt || null),
         lastRemoteSyncAttemptAt: Date.now()
-      });
+      };
+      if (serverMeta && serverMeta.lastWipedAt) {
+        const serverMsRaw = Date.parse(String(serverMeta.lastWipedAt));
+        const serverMs = Number.isFinite(serverMsRaw) && serverMsRaw > 0 ? serverMsRaw : 0;
+        const localMs = Number(meta.lastWipedAt) > 0 ? Number(meta.lastWipedAt) : 0;
+        if (serverMs > localMs) {
+          metaUpdate.lastWipedAt = serverMs;
+          metaUpdate.serverWipeAdoptedAt = Date.now();
+          metaUpdate.pendingRemoteWipe = false;
+        }
+      }
+      saveTradesMeta(metaUpdate);
       return configured;
     } catch (err) {
       state.trades.remoteStatus = "fallback_local";
@@ -700,18 +751,37 @@
     const localHistory = Array.isArray(rawHistory) ? rawHistory.map((x) => normalizePositionRecord(x)) : [];
     const meta = loadTradesMeta();
 
-    // PR fix bug "historique supprimé qui réapparaît" :
-    // Si `meta.lastWipedAt` est défini (tombstone), filtrer les trades remote
-    // antérieurs au wipe. Une suppression utilisateur est une VÉRITÉ
-    // PERSISTÉE, pas une simple suppression visuelle.
+    // PR fix bug "historique supprimé qui réapparaît" + V2 multi-device :
+    // Merge le tombstone local et le tombstone serveur (`remote.serverMeta`).
+    // Le plus récent gagne. Empêche un device offline / vieux client de
+    // réinjecter des trades supprimés depuis un autre device.
     // Source canonique : tools/quant/lib/trades-history-tombstone-v1.mjs.
-    const tombstoneMs = Number(meta.lastWipedAt);
-    const tombstoneActive = Number.isFinite(tombstoneMs) && tombstoneMs > 0;
+    const localTombstoneMs = Number(meta.lastWipedAt);
+    const serverTombstoneIso = remote.serverMeta && remote.serverMeta.lastWipedAt
+      ? String(remote.serverMeta.lastWipedAt)
+      : null;
+    const serverTombstoneMsRaw = serverTombstoneIso ? Date.parse(serverTombstoneIso) : 0;
+    const serverTombstoneMs = Number.isFinite(serverTombstoneMsRaw) && serverTombstoneMsRaw > 0 ? serverTombstoneMsRaw : 0;
+    const localTombstoneMsClean = Number.isFinite(localTombstoneMs) && localTombstoneMs > 0 ? localTombstoneMs : 0;
+    const effectiveTombstoneMs = Math.max(localTombstoneMsClean, serverTombstoneMs);
+    const tombstoneActive = effectiveTombstoneMs > 0;
+
+    // Alignement local sur server si server > local : adoption du marker
+    // distant (cas multi-device : autre device a wipé, on l'apprend).
+    if (serverTombstoneMs > localTombstoneMsClean) {
+      saveTradesMeta({ lastWipedAt: serverTombstoneMs, serverWipeAdoptedAt: Date.now(), pendingRemoteWipe: false });
+    }
+    // Si local > server : ce client a wipé hors-ligne et le serveur ignore.
+    // Flag `pendingRemoteWipe` pour retenter au prochain wipe / sync.
+    if (localTombstoneMsClean > serverTombstoneMs) {
+      saveTradesMeta({ pendingRemoteWipe: true });
+    }
+
     if (tombstoneActive && Array.isArray(remote.positions)) {
-      remote.positions = remote.positions.filter((t) => !isTradeOlderThanTombstone(t, tombstoneMs));
+      remote.positions = remote.positions.filter((t) => !isTradeOlderThanTombstone(t, effectiveTombstoneMs));
     }
     if (tombstoneActive && Array.isArray(remote.history)) {
-      remote.history = remote.history.filter((t) => !isTradeOlderThanTombstone(t, tombstoneMs));
+      remote.history = remote.history.filter((t) => !isTradeOlderThanTombstone(t, effectiveTombstoneMs));
     }
 
     const remotePositionsCount = Array.isArray(remote.positions) ? remote.positions.length : 0;
