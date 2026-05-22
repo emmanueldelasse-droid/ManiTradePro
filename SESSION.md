@@ -10,10 +10,9 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #256 sur `claude/session-md-post-tombstone-v2-merge`.
-- **Dernier merge connu** : PR #256 `fix(trades): tombstone serveur multi-device (PR-TRADES-TOMBSTONE-SERVER-V2)` (commit `e450c8c` sur `main`).
-- **⚠ ACTION CRÉATEUR OBLIGATOIRE** : appliquer la migration SQL `cloudflare-worker/migrations/017_trades_meta.sql` dans Supabase Studio (SQL Editor) pour activer le tombstone serveur multi-device. Sans cette étape, V2 reste inactif et seul le V1 local (PR #254) protège — les bugs multi-device PC↔iPhone réapparaissent.
-- **À VÉRIFIER MANUELLEMENT après migration** : suppression PC → refresh iPhone → vide ; suppression iPhone → refresh PC → vide ; vieux localStorage ne réinjecte pas l'historique.
+- **Branche / PR active** : `claude/trades-wipe-local-first-v3` (en cours — PR-TRADES-WIPE-LOCAL-FIRST-V3 : bugfix iPhone Safari. Handlers wipe refactorés en local-first : UI/localStorage purgés AVANT l'await réseau).
+- **Dernier merge connu** : PR #257 `docs(session): SESSION.md post-merge PR #256 + rappel migration 017 obligatoire` (commit `a571cb0` sur `main`).
+- **⚠ ACTION CRÉATEUR TOUJOURS OBLIGATOIRE** : appliquer la migration SQL `017_trades_meta.sql` pour activer V2 multi-device. V3 ci-dessous corrige le bug iPhone indépendamment (la suppression locale fonctionne même sans migration ni serveur).
 - **À VÉRIFIER MANUELLEMENT (créateur)** : supprimer historique dans l'app → refresh → fermer/réouvrir app → confirmer que l'historique ne revient pas. Vérifier Supabase si possible (`mtp_trades` doit rester vide après wipe).
 - **Prochaine étape après vérification** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief ChatGPT.
 - **Phase projet** : **VÉRITÉ MARCHÉ** — *« scaler l'observation avant de scaler l'exécution »*. ManiTradePro analyse désormais ~170 actifs (analysisUniverse + experimental visibles côté UI) MAIS limite les ouvertures paper auto à 42 actifs livePaperCore (filtre RESTRICTIF `auvIsLivePaperCore` dans `isTrainingCandidateAllowed`). Architecture cohérente : **on n'a pas scalé l'exécution avant de scaler la compréhension**.
@@ -143,9 +142,26 @@
 
 ## PR en cours
 
-- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #256 uniquement (`claude/session-md-post-tombstone-v2-merge`).
-- **Action utilisateur en attente** : (1) appliquer migration 017_trades_meta.sql via Supabase Studio, (2) attendre déploiement Worker (~30-60s post-merge), (3) tester PC↔iPhone : suppression sur un device → vide sur l'autre au refresh.
-- **Prochaine étape produit** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) sur nouveau brief, une fois la migration appliquée et les tests multi-device validés.
+- **PR** : PR-TRADES-WIPE-LOCAL-FIRST-V3 — bugfix iPhone Safari "Load failed" — branche `claude/trades-wipe-local-first-v3`.
+- **Mission créateur** (2026-05-22, priorité ABSOLUE) : la suppression iPhone ne fonctionne toujours pas même avec V1 + V2. Bug réel dans le flux UI. Règle non négociable : *« L'utilisateur ne doit jamais voir "Rien n'a été supprimé" si la suppression locale peut être faite. »*
+- **Cause racine V2 → V3** : les 2 handlers (`data-clear-all-history` global + `data-clear-history` par source) sont **server-first**. Si `wipeTradesOnServer` échoue (Safari "Load failed", offline, worker indispo), l'alert "Rien n'a été supprimé" affiche et `return` → **wipe local jamais effectué**.
+- **Solution V3 livrée** : refactor en **local-first**. UI/localStorage purgés AVANT l'await réseau. Best-effort serveur en arrière-plan. Toast honnête au lieu d'un alert anxiogène.
+- **Fichiers modifiés** :
+  - `assets/app.js` — 2 handlers refactorés en local-first (`data-clear-all-history` lignes ~7964, `data-clear-history` par source lignes ~7940). Fix mineur défense en profondeur : `wipeTradesOnServer` catch pose `pendingRemoteWipe` aussi pour wipe par-source (symétrie avec wipeAll).
+  - `sw.js` — `CACHE_VERSION` bumpé `manitradepro-v8.5` → `manitradepro-v8.6` pour cache-bust iPhone PWA.
+  - `docs/monitoring/KNOWN_ISSUES.md` — issue #16 étendue V3 avec cause racine précise (server-first → local-first), 10 tests obligatoires brief couverts.
+  - `SESSION.md` — cette mise à jour.
+- **Worker.js** : non touché. Migration 017 : déjà livrée par PR #256.
+- **Bug-hunters** (2 scans monolithic-file hook) : tous OK. Scan #1 a noté une fragilité mineure (pendingRemoteWipe non posé par catch pour mode par-source) → corrigé immédiatement par fix défense en profondeur.
+- **Garanties V3** :
+  - UI vide IMMÉDIATEMENT après confirmation, même si Safari renvoie "Load failed".
+  - localStorage vide IMMÉDIATEMENT (clés + backups).
+  - Tombstone local PR #254 posé IMMÉDIATEMENT → blocage réapparition au refresh.
+  - `pendingRemoteWipe` posé AUTOMATIQUEMENT sur échec serveur → retry au prochain wipe ou `loadTradesState`.
+  - Toast honnête : succès "supprimé local + serveur" / échec "supprimé localement, synchro en attente".
+- **Validation tests** : `node --test tools/quant/test/trades-history-tombstone-v1.test.mjs` → 24/24 pass. `node --check assets/app.js` → OK.
+- **Cache iPhone PWA** : CACHE_VERSION bumpé force le réinstall du service worker côté iPhone → user récupère la nouvelle app.js sans hard refresh manuel.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`. Priorité ABSOLUE avant interface Analytics.
 
 ## Mission précédente (PR-TRADES-TOMBSTONE-SERVER-V2, livrée 2026-05-22)
 

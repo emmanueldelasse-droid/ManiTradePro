@@ -344,12 +344,12 @@
         serverMeta
       };
     } catch (err) {
-      // PR-TRADES-TOMBSTONE-SERVER-V2 : wipe échoué (offline, Safari "Load
-      // failed", worker indispo). Si on tentait un wipeAll, marquer le flag
-      // pendingRemoteWipe pour retenter au prochain sync / loadTradesState.
-      // Le tombstone local reste actif et empêche déjà toute réapparition
-      // côté front (PR #254).
-      if (wipeAll === true) {
+      // PR-TRADES-TOMBSTONE-SERVER-V2 + V3 : wipe échoué (offline, Safari
+      // "Load failed", worker indispo). Marquer le flag pendingRemoteWipe
+      // pour retenter au prochain sync / loadTradesState. Vise wipeAll ET
+      // wipe par-source (symétrie). Le tombstone local reste actif et
+      // empêche déjà toute réapparition côté front (PR #254).
+      if (wipeAll === true || validSource !== null) {
         saveTradesMeta({ pendingRemoteWipe: true, lastRemoteWipeFailAt: Date.now() });
       }
       return { ok: false, error: err?.message || "wipe_failed" };
@@ -7945,18 +7945,26 @@ function renderMain() {
         if (!confirm(`Supprimer définitivement tous les trades ${label} (Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
         exportTradesToCSV(victims, `backup_${label}_avant_suppression`);
         haptic([30, 60, 30]);
-        // Suppression exhaustive côté serveur : on s'appuie sur le filtre `source`
-        // et non sur la liste d'IDs locaux (forcément partielle si le cache local
-        // n'a pas tout téléchargé — sinon les trades non listés réapparaissent au reload).
-        const res = await wipeTradesOnServer([], { source: src });
-        if (!res.ok) {
-          alert(`Suppression serveur échouée : ${res.error}. Rien n'a été supprimé. Le CSV de sauvegarde reste dans tes téléchargements.`);
-          return;
-        }
+
+        // PR-TRADES-WIPE-LOCAL-FIRST-V3 : LOCAL-FIRST.
+        // On vide IMMÉDIATEMENT côté local + tombstone. Garantit que
+        // l'UI/localStorage sont purgés même si Safari renvoie
+        // "Load failed". Anti-régression iPhone PWA.
         state.trades.history = state.trades.history.filter(p => tradeSource(p) !== src);
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
-        showAlertToast("Historique", `${res.deletedTrades} trade(s) ${label} supprimé(s) définitivement.`);
+        render();
+
+        // Best-effort serveur en arrière-plan. Le catch interne de
+        // wipeTradesOnServer (V2) pose déjà pendingRemoteWipe sur
+        // échec wipeAll — pour le mode par-source, on s'aligne aussi.
+        const res = await wipeTradesOnServer([], { source: src });
+        if (res.ok) {
+          showAlertToast("Historique", `${res.deletedTrades} trade(s) ${label} supprimé(s) (local + serveur).`);
+        } else {
+          saveTradesMeta({ pendingRemoteWipe: true, lastRemoteWipeFailAt: Date.now() });
+          showAlertToast("Historique", `Historique ${label} supprimé localement. Synchro serveur en attente (${res.error || "indisponible"}).`);
+        }
         render();
       });
     });
@@ -7968,17 +7976,28 @@ function renderMain() {
         if (!confirm(`Supprimer définitivement tout l'historique (Supabase inclus) ? Un CSV de sauvegarde sera téléchargé avant. Action irréversible.`)) return;
         exportTradesToCSV(victims, "backup_complet_avant_suppression");
         haptic([30, 60, 30]);
-        // Wipe exhaustif : ignore les IDs locaux, nettoie toute la table côté serveur.
-        const res = await wipeTradesOnServer([], { wipeAll: true, includePositions: true });
-        if (!res.ok) {
-          alert(`Suppression serveur échouée : ${res.error}. Rien n'a été supprimé. Le CSV de sauvegarde reste dans tes téléchargements.`);
-          return;
-        }
+
+        // PR-TRADES-WIPE-LOCAL-FIRST-V3 : LOCAL-FIRST.
+        // L'UI/localStorage doivent être purgés IMMÉDIATEMENT après
+        // confirmation, même si Safari/iPhone échoue à joindre le
+        // worker (cas "Load failed" récurrent en PWA iOS).
+        // Tombstone local posé immédiatement → blocage réapparition
+        // au refresh (PR #254). pendingRemoteWipe posé pour retry au
+        // prochain sync (PR #256).
         state.trades.history = [];
         state.trades.positions = [];
         saveTradesMeta({ lastWipedAt: Date.now() });
         persistTradesState();
-        showAlertToast("Historique", `${res.deletedTrades} trade(s) supprimé(s) définitivement.`);
+        render();
+
+        // Best-effort serveur. wipeTradesOnServer V2 met à jour
+        // serverWipeAdoptedAt sur succès, pendingRemoteWipe sur échec.
+        const res = await wipeTradesOnServer([], { wipeAll: true, includePositions: true });
+        if (res.ok) {
+          showAlertToast("Historique", `${res.deletedTrades} trade(s) supprimé(s) (local + serveur).`);
+        } else {
+          showAlertToast("Historique", `Historique supprimé localement. Synchro serveur en attente (${res.error || "indisponible"}). Réessai automatique au prochain sync.`);
+        }
         render();
       });
     });
