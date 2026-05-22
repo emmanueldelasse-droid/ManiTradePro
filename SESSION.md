@@ -10,8 +10,9 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : `claude/ui-live-paper-insights-v1` (en cours — PR-UI-LIVE-PAPER-INSIGHTS-1 : sous-vue Analytics READ-ONLY dans l'onglet Trade. Visualise `livePaperAnalytics` + `livePaperOutcome`).
-- **Dernier merge connu** : PR #260 `docs(session): validation iPhone OK, stack suppression historique complète` (commit `e09ee55` sur `main`).
+- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #261 sur `claude/session-md-post-analytics-merge`.
+- **Dernier merge connu** : PR #261 `feat(ui): Live Paper Analytics — sous-vue Analytics dans Trade (PR-UI-LIVE-PAPER-INSIGHTS-1)` (commit `aabffe8` sur `main`).
+- **Phase officielle** : *VÉRITÉ MARCHÉ VISIBLE* — les analytics livePaperAnalytics + livePaperOutcome sont désormais observables côté UI dans l'onglet Trade.
 - **✅ STACK SUPPRESSION HISTORIQUE TRADES — VALIDÉE BOUT EN BOUT (2026-05-22)** :
   - V1 tombstone local (PR #254) actif.
   - V2 tombstone serveur Supabase (PR #256 + migration 017 appliquée par le créateur le 2026-05-22 à 20:54 UTC) actif.
@@ -157,7 +158,26 @@
 - **Point clé ChatGPT** : *« Le serveur ne doit jamais empêcher une suppression locale demandée par l'utilisateur. »*
 - **Statut merge** : `GO MERGE` reçu (ChatGPT).
 
+## Dernière session / dernière PR mergée (terdecies)
+
+- **Date** : 2026-05-22.
+- **PR** : #261 — `feat(ui): Live Paper Analytics — sous-vue Analytics dans Trade (PR-UI-LIVE-PAPER-INSIGHTS-1)`.
+- **Objectif** : phase officielle *VÉRITÉ MARCHÉ VISIBLE*. Sous-vue Analytics READ-ONLY dans l'onglet Trade qui expose les `livePaperAnalytics` + `livePaperOutcome` déjà capturés en base depuis PR #249/#250.
+- **Résultat** : merge squash sur `main` (commit `aabffe8`). 5 sections livrées (Overview, Setup insights, Régimes, Warnings, Derniers trades instrumentés). État vide géré. Trades legacy comptés séparément. Responsive iPhone + dark/light theme.
+- **Impact runtime** : front uniquement (assets/app.js + assets/styles.css). 0 worker / migration / endpoint / write Supabase / module quant touchés.
+- **Impact quant** : aucun.
+- **Statut merge** : `GO MERGE` reçu (ChatGPT). *« ManiTradePro change de nature : observable au lieu d'opaque »*.
+
 ## PR en cours
+
+- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #261 uniquement (`claude/session-md-post-analytics-merge`).
+- **Phase actuelle** : *VÉRITÉ MARCHÉ VISIBLE* — observabilité analytique livrée. Stack suppression historique trades validée (V1+V2+V3 + migration 017).
+- **À vérifier manuellement (créateur)** : ouvrir l'app après déploiement Pages, aller dans Trades, scroller en bas → vérifier que la section "📊 Analytics — Live Paper Insights" s'affiche (avec état vide si aucun trade instrumenté, ou les 5 sections si trades présents). Tester iPhone + dark/light.
+- **Prochaine étape produit** : à définir par le créateur. Suggestions natuelles selon directive ChatGPT post-CTX-3 (priorité = validation empirique des setups) : (a) walk-forward conditionnel régime sur RS Rotation, (b) friction ×2/×3 hardening complémentaire, (c) décision A/B/C Mean Reversion V1, (d) audit anti-look-ahead sectorMomentum (préalable à toute reprise SECTOR_RS), (e) re-ingestion ajustée datasets pour fermer KNOWN_ISSUES #15.
+
+## Mission précédente (PR-UI-LIVE-PAPER-INSIGHTS-1, livrée 2026-05-22)
+
+> Bloc archivé pour traçabilité. Détails dans la fiche § *Dernière session / dernière PR mergée (terdecies)* + PR #261.
 
 - **PR** : PR-UI-LIVE-PAPER-INSIGHTS-1 — sous-vue Analytics dans l'onglet Trade — branche `claude/ui-live-paper-insights-v1`.
 - **Mission créateur** (2026-05-22, phase officielle *VÉRITÉ MARCHÉ VISIBLE*) : rendre observable la vie analytique du bot. `livePaperAnalytics` (PR #249) + `livePaperOutcome` (PR #250) existent en base depuis fin mai mais sont invisibles côté UI. Cette PR les expose en lecture seule.
