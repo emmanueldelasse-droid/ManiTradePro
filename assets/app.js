@@ -6189,6 +6189,387 @@ function openPositionsRiskView() {
       </div>`;
   }
 
+  // ============================================================
+  // LIVE PAPER ANALYTICS — VISUAL INSIGHTS V1
+  // PR-UI-LIVE-PAPER-INSIGHTS-1 (2026-05-22)
+  // ============================================================
+  // Sous-vue Analytics dans l'onglet Trade. READ-ONLY.
+  //
+  // Source data : trades enrichis par PR-LIVE-PAPER-ANALYTICS-1 (#249) +
+  //   PR-LIVE-PAPER-EXEC-1b (#250). Champs lus depuis analysis_snapshot :
+  //   - livePaperAnalytics (à l'ouverture : setupId, regime, scores,
+  //     riskContext, setupAuthorization observée, warnings).
+  //   - livePaperOutcome (à la clôture : signalQuality GOOD/NOISY/BAD,
+  //     validationStatus OK/SUSPECT/INVALID, MAE/MFE, exitReason).
+  //
+  // Trades pré-PR #249 → "legacy" (badge dédié, exclus des stats avancées).
+  //
+  // Aucun fetch, aucun write, aucun crash si champs partiels.
+
+  // --- Extraction défensive ---
+  function extractLivePaperAnalytics(trade) {
+    if (!trade || typeof trade !== "object") return null;
+    return trade.livePaperAnalytics
+      || (trade.analysisSnapshot && trade.analysisSnapshot.livePaperAnalytics)
+      || (trade.analysis_snapshot && trade.analysis_snapshot.livePaperAnalytics)
+      || null;
+  }
+
+  function extractLivePaperOutcome(trade) {
+    if (!trade || typeof trade !== "object") return null;
+    return trade.livePaperOutcome
+      || (trade.analysisSnapshot && trade.analysisSnapshot.livePaperOutcome)
+      || (trade.analysis_snapshot && trade.analysis_snapshot.livePaperOutcome)
+      || null;
+  }
+
+  function isInstrumentedTrade(trade) {
+    return extractLivePaperAnalytics(trade) !== null;
+  }
+
+  function lpiFiniteNumber(v) {
+    if (v == null) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  // --- Agrégations ---
+  function lpiBuildOverview(allClosed, allOpen) {
+    const open = Array.isArray(allOpen) ? allOpen : [];
+    const closed = Array.isArray(allClosed) ? allClosed : [];
+    const total = open.length + closed.length;
+    const instrumented = [...open, ...closed].filter(isInstrumentedTrade).length;
+    const legacy = total - instrumented;
+
+    let pnlTotal = 0;
+    let wins = 0;
+    let losses = 0;
+    let pnlCount = 0;
+    for (const t of closed) {
+      const p = lpiFiniteNumber(t.pnl ?? t.pnl_eur ?? extractLivePaperOutcome(t)?.pnl);
+      if (p !== null) { pnlTotal += p; pnlCount++; if (p > 0) wins++; else if (p < 0) losses++; }
+    }
+    const winrate = (wins + losses) > 0 ? (wins / (wins + losses)) * 100 : null;
+    const avgPnl = pnlCount > 0 ? pnlTotal / pnlCount : null;
+
+    // Distribution signalQuality (sur trades fermés instrumentés).
+    const signalQualityCounts = { GOOD: 0, NOISY: 0, BAD: 0, UNKNOWN: 0 };
+    const validationStatusCounts = { OK: 0, SUSPECT: 0, INVALID: 0, UNKNOWN: 0 };
+    for (const t of closed) {
+      const out = extractLivePaperOutcome(t);
+      if (!out) continue;
+      const sq = typeof out.signalQuality === "string" ? out.signalQuality.toUpperCase() : "UNKNOWN";
+      signalQualityCounts[sq in signalQualityCounts ? sq : "UNKNOWN"]++;
+      const vs = typeof out.validationStatus === "string" ? out.validationStatus.toUpperCase() : "UNKNOWN";
+      validationStatusCounts[vs in validationStatusCounts ? vs : "UNKNOWN"]++;
+    }
+
+    return { total, open: open.length, closed: closed.length, instrumented, legacy, pnlTotal, wins, losses, winrate, avgPnl, signalQualityCounts, validationStatusCounts };
+  }
+
+  function lpiBuildBySetup(closedTrades) {
+    const byId = new Map();
+    for (const t of closedTrades) {
+      const an = extractLivePaperAnalytics(t);
+      const out = extractLivePaperOutcome(t);
+      if (!an) continue;
+      const id = an.setupId || an.engineSetupType || "UNKNOWN_SETUP";
+      const entry = byId.get(id) || { setupId: id, statusRef: an.setupStatusRef || null, trades: 0, wins: 0, losses: 0, pnl: 0, pnlCount: 0, sigQ: { GOOD: 0, NOISY: 0, BAD: 0, UNKNOWN: 0 }, validation: { OK: 0, SUSPECT: 0, INVALID: 0, UNKNOWN: 0 }, regimes: new Map() };
+      entry.trades++;
+      const pnl = lpiFiniteNumber(t.pnl);
+      if (pnl !== null) { entry.pnl += pnl; entry.pnlCount++; if (pnl > 0) entry.wins++; else if (pnl < 0) entry.losses++; }
+      if (out) {
+        const sq = typeof out.signalQuality === "string" ? out.signalQuality.toUpperCase() : "UNKNOWN";
+        entry.sigQ[sq in entry.sigQ ? sq : "UNKNOWN"]++;
+        const vs = typeof out.validationStatus === "string" ? out.validationStatus.toUpperCase() : "UNKNOWN";
+        entry.validation[vs in entry.validation ? vs : "UNKNOWN"]++;
+      }
+      if (an.regime) {
+        const c = entry.regimes.get(an.regime) || 0;
+        entry.regimes.set(an.regime, c + 1);
+      }
+      byId.set(id, entry);
+    }
+    // Compute derived: WR + dominant regime.
+    const arr = [];
+    for (const e of byId.values()) {
+      const wr = (e.wins + e.losses) > 0 ? (e.wins / (e.wins + e.losses)) * 100 : null;
+      const avgPnl = e.pnlCount > 0 ? e.pnl / e.pnlCount : null;
+      let dominantRegime = null;
+      let dominantCount = -1;
+      for (const [r, c] of e.regimes) {
+        if (c > dominantCount) { dominantCount = c; dominantRegime = r; }
+      }
+      arr.push({ ...e, wr, avgPnl, dominantRegime });
+    }
+    return arr;
+  }
+
+  function lpiBuildByRegime(closedTrades) {
+    const byRegime = new Map();
+    for (const t of closedTrades) {
+      const an = extractLivePaperAnalytics(t);
+      const out = extractLivePaperOutcome(t);
+      if (!an) continue;
+      const r = an.regime || "UNKNOWN";
+      const entry = byRegime.get(r) || { regime: r, trades: 0, wins: 0, losses: 0, pnl: 0, pnlCount: 0, sigQ: { GOOD: 0, NOISY: 0, BAD: 0, UNKNOWN: 0 }, validation: { OK: 0, SUSPECT: 0, INVALID: 0, UNKNOWN: 0 } };
+      entry.trades++;
+      const pnl = lpiFiniteNumber(t.pnl);
+      if (pnl !== null) { entry.pnl += pnl; entry.pnlCount++; if (pnl > 0) entry.wins++; else if (pnl < 0) entry.losses++; }
+      if (out) {
+        const sq = typeof out.signalQuality === "string" ? out.signalQuality.toUpperCase() : "UNKNOWN";
+        entry.sigQ[sq in entry.sigQ ? sq : "UNKNOWN"]++;
+        const vs = typeof out.validationStatus === "string" ? out.validationStatus.toUpperCase() : "UNKNOWN";
+        entry.validation[vs in entry.validation ? vs : "UNKNOWN"]++;
+      }
+      byRegime.set(r, entry);
+    }
+    const arr = [];
+    for (const e of byRegime.values()) {
+      const wr = (e.wins + e.losses) > 0 ? (e.wins / (e.wins + e.losses)) * 100 : null;
+      const avgPnl = e.pnlCount > 0 ? e.pnl / e.pnlCount : null;
+      arr.push({ ...e, wr, avgPnl });
+    }
+    // Ordre canon : RISK_ON, RANGE, RISK_OFF, HIGH_VOL, autres.
+    const order = ["RISK_ON", "RANGE", "RISK_OFF", "HIGH_VOL"];
+    return arr.sort((a, b) => {
+      const ai = order.indexOf(a.regime);
+      const bi = order.indexOf(b.regime);
+      if (ai === -1 && bi === -1) return a.regime.localeCompare(b.regime);
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+  }
+
+  function lpiBuildWarningsTop(allTrades, limit = 8) {
+    const counts = new Map();
+    let tradesWithWarnings = 0;
+    for (const t of allTrades) {
+      const an = extractLivePaperAnalytics(t);
+      const out = extractLivePaperOutcome(t);
+      const allW = [];
+      if (an && Array.isArray(an.warnings)) allW.push(...an.warnings);
+      if (out && Array.isArray(out.warnings)) allW.push(...out.warnings);
+      if (allW.length > 0) tradesWithWarnings++;
+      for (const w of allW) {
+        if (typeof w !== "string") continue;
+        // Bucketise les warnings paramétrés (ex. "ctx3_would_block:regime_blocked:RISK_OFF"
+        // → bucket "ctx3_would_block"). Garde la chaîne complète pour les courts.
+        const bucket = w.split(":")[0] || w;
+        counts.set(bucket, (counts.get(bucket) || 0) + 1);
+      }
+    }
+    const arr = [...counts.entries()].map(([w, c]) => ({ warning: w, count: c }));
+    arr.sort((a, b) => b.count - a.count);
+    return { tradesWithWarnings, top: arr.slice(0, limit) };
+  }
+
+  function lpiBuildRecentInstrumented(allTrades, limit = 20) {
+    const onlyInstrumented = allTrades.filter(isInstrumentedTrade);
+    // Tri : closedAt DESC (ou openedAt si pas fermé).
+    onlyInstrumented.sort((a, b) => {
+      const ta = Date.parse(a.closedAt || a.openedAt || 0) || 0;
+      const tb = Date.parse(b.closedAt || b.openedAt || 0) || 0;
+      return tb - ta;
+    });
+    return onlyInstrumented.slice(0, limit);
+  }
+
+  // --- Rendu HTML ---
+  function lpiBadgeSignalQuality(sq) {
+    const cls = sq === "GOOD" ? "lpi-badge-good"
+              : sq === "NOISY" ? "lpi-badge-noisy"
+              : sq === "BAD" ? "lpi-badge-bad"
+              : "lpi-badge-unknown";
+    return `<span class="lpi-badge ${cls}">${safeText(sq || "UNKNOWN")}</span>`;
+  }
+
+  function lpiBadgeValidation(vs) {
+    const cls = vs === "OK" ? "lpi-badge-ok"
+              : vs === "SUSPECT" ? "lpi-badge-suspect"
+              : vs === "INVALID" ? "lpi-badge-invalid"
+              : "lpi-badge-unknown";
+    return `<span class="lpi-badge ${cls}">${safeText(vs || "UNKNOWN")}</span>`;
+  }
+
+  function lpiBadgeRegime(r) {
+    const cls = r === "RISK_ON" ? "lpi-badge-risk-on"
+              : r === "RANGE" ? "lpi-badge-range"
+              : r === "RISK_OFF" ? "lpi-badge-risk-off"
+              : r === "HIGH_VOL" ? "lpi-badge-high-vol"
+              : "lpi-badge-unknown";
+    return `<span class="lpi-badge ${cls}">${safeText(r || "UNKNOWN")}</span>`;
+  }
+
+  function lpiFmtPnl(v) {
+    const n = lpiFiniteNumber(v);
+    if (n === null) return "—";
+    const sign = n > 0 ? "+" : "";
+    return `<span class="${n > 0 ? "lpi-profit" : n < 0 ? "lpi-loss" : ""}">${sign}${n.toFixed(2)}</span>`;
+  }
+
+  function lpiFmtPct(v) {
+    const n = lpiFiniteNumber(v);
+    if (n === null) return "—";
+    return `${n.toFixed(1)}%`;
+  }
+
+  function renderTradesAnalyticsSection() {
+    const closed = Array.isArray(state.trades.history) ? state.trades.history : [];
+    const open = Array.isArray(state.trades.positions) ? state.trades.positions : [];
+    const all = [...open, ...closed];
+
+    const overview = lpiBuildOverview(closed, open);
+    const bySetup = lpiBuildBySetup(closed);
+    const byRegime = lpiBuildByRegime(closed);
+    const warnings = lpiBuildWarningsTop(all);
+    const recent = lpiBuildRecentInstrumented(all);
+
+    // État vide explicite (aucun trade instrumenté du tout).
+    if (overview.instrumented === 0) {
+      return `
+        <div class="card lpi-section" id="trades-analytics">
+          <div class="section-title">📊 Analytics</div>
+          <div class="empty-state">
+            Les prochains trades paper analysés apparaîtront ici.
+            ${overview.legacy > 0 ? `<br/><small>${overview.legacy} trade(s) legacy détecté(s) (avant instrumentation).</small>` : ""}
+          </div>
+        </div>`;
+    }
+
+    // --- Section 1 : Overview ---
+    const overviewHtml = `
+      <div class="lpi-overview-grid">
+        <div class="lpi-stat-card"><div class="lpi-stat-label">Ouverts</div><div class="lpi-stat-value">${overview.open}</div></div>
+        <div class="lpi-stat-card"><div class="lpi-stat-label">Fermés</div><div class="lpi-stat-value">${overview.closed}</div></div>
+        <div class="lpi-stat-card"><div class="lpi-stat-label">Instrumentés</div><div class="lpi-stat-value">${overview.instrumented}</div></div>
+        <div class="lpi-stat-card"><div class="lpi-stat-label">Legacy</div><div class="lpi-stat-value">${overview.legacy}</div></div>
+        <div class="lpi-stat-card"><div class="lpi-stat-label">PnL total</div><div class="lpi-stat-value">${lpiFmtPnl(overview.pnlTotal)}</div></div>
+        <div class="lpi-stat-card"><div class="lpi-stat-label">Winrate</div><div class="lpi-stat-value">${overview.winrate !== null ? lpiFmtPct(overview.winrate) : "—"}</div></div>
+        <div class="lpi-stat-card"><div class="lpi-stat-label">PnL moyen</div><div class="lpi-stat-value">${lpiFmtPnl(overview.avgPnl)}</div></div>
+      </div>
+      <div class="lpi-distribution">
+        <div class="lpi-distribution-label">Qualité signal</div>
+        <div class="lpi-distribution-row">
+          ${lpiBadgeSignalQuality("GOOD")} ${overview.signalQualityCounts.GOOD}
+          ${lpiBadgeSignalQuality("NOISY")} ${overview.signalQualityCounts.NOISY}
+          ${lpiBadgeSignalQuality("BAD")} ${overview.signalQualityCounts.BAD}
+          ${lpiBadgeSignalQuality("UNKNOWN")} ${overview.signalQualityCounts.UNKNOWN}
+        </div>
+        <div class="lpi-distribution-label">Validation</div>
+        <div class="lpi-distribution-row">
+          ${lpiBadgeValidation("OK")} ${overview.validationStatusCounts.OK}
+          ${lpiBadgeValidation("SUSPECT")} ${overview.validationStatusCounts.SUSPECT}
+          ${lpiBadgeValidation("INVALID")} ${overview.validationStatusCounts.INVALID}
+          ${lpiBadgeValidation("UNKNOWN")} ${overview.validationStatusCounts.UNKNOWN}
+        </div>
+      </div>`;
+
+    // --- Section 2 : Setup insights ---
+    bySetup.sort((a, b) => b.pnl - a.pnl);
+    const setupRows = bySetup.length === 0
+      ? `<tr><td colspan="6" class="lpi-empty-row">Aucun setup instrumenté pour l'instant.</td></tr>`
+      : bySetup.map(s => `
+        <tr>
+          <td><code>${safeText(s.setupId)}</code>${s.statusRef ? `<br/><small class="lpi-muted">${safeText(s.statusRef)}</small>` : ""}</td>
+          <td class="lpi-num">${s.trades}</td>
+          <td class="lpi-num">${s.wr !== null ? lpiFmtPct(s.wr) : "—"}</td>
+          <td class="lpi-num">${lpiFmtPnl(s.pnl)}</td>
+          <td>${s.dominantRegime ? lpiBadgeRegime(s.dominantRegime) : "—"}</td>
+          <td><small>G ${s.sigQ.GOOD} · N ${s.sigQ.NOISY} · B ${s.sigQ.BAD}</small></td>
+        </tr>`).join("");
+    const setupTableHtml = `
+      <div class="lpi-subtitle">Par setup</div>
+      <div class="lpi-table-wrap">
+        <table class="lpi-table">
+          <thead><tr><th>Setup</th><th class="lpi-num">N</th><th class="lpi-num">WR</th><th class="lpi-num">PnL</th><th>Régime dom.</th><th>Qualité</th></tr></thead>
+          <tbody>${setupRows}</tbody>
+        </table>
+      </div>`;
+
+    // --- Section 3 : Régimes ---
+    const regimeRows = byRegime.length === 0
+      ? `<tr><td colspan="5" class="lpi-empty-row">Aucun régime exploitable pour l'instant.</td></tr>`
+      : byRegime.map(r => `
+        <tr>
+          <td>${lpiBadgeRegime(r.regime)}</td>
+          <td class="lpi-num">${r.trades}</td>
+          <td class="lpi-num">${r.wr !== null ? lpiFmtPct(r.wr) : "—"}</td>
+          <td class="lpi-num">${lpiFmtPnl(r.pnl)}</td>
+          <td><small>G ${r.sigQ.GOOD} · N ${r.sigQ.NOISY} · B ${r.sigQ.BAD}</small></td>
+        </tr>`).join("");
+    const regimeTableHtml = `
+      <div class="lpi-subtitle">Par régime</div>
+      <div class="lpi-table-wrap">
+        <table class="lpi-table">
+          <thead><tr><th>Régime</th><th class="lpi-num">N</th><th class="lpi-num">WR</th><th class="lpi-num">PnL</th><th>Qualité</th></tr></thead>
+          <tbody>${regimeRows}</tbody>
+        </table>
+      </div>`;
+
+    // --- Section 4 : Warnings ---
+    const warningsHtml = warnings.top.length === 0
+      ? `<div class="lpi-muted lpi-small">Aucun warning relevé sur la cohorte instrumentée.</div>`
+      : `
+        <div class="lpi-muted lpi-small">${warnings.tradesWithWarnings} trade(s) avec warnings — top fréquences :</div>
+        <div class="lpi-warning-list">
+          ${warnings.top.map(w => `<span class="lpi-warning-item"><code>${safeText(w.warning)}</code> <small>×${w.count}</small></span>`).join(" ")}
+        </div>`;
+    const warningsSection = `
+      <div class="lpi-subtitle">Warnings observés</div>
+      ${warningsHtml}`;
+
+    // --- Section 5 : Derniers trades ---
+    const recentRows = recent.length === 0
+      ? `<tr><td colspan="8" class="lpi-empty-row">Aucun trade instrumenté récent.</td></tr>`
+      : recent.map(t => {
+          const an = extractLivePaperAnalytics(t) || {};
+          const out = extractLivePaperOutcome(t) || {};
+          const isOpen = !(t.closedAt || out.closedAt);
+          const date = t.closedAt || t.openedAt || "";
+          const dateShort = date ? new Date(date).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" }) : "—";
+          const setupShort = an.setupId || an.engineSetupType || "—";
+          const regimeShort = an.regime || "—";
+          const sq = out.signalQuality || (isOpen ? "—" : "UNKNOWN");
+          const vs = out.validationStatus || (isOpen ? "—" : "UNKNOWN");
+          const pnl = isOpen ? "—" : lpiFmtPnl(t.pnl);
+          const exit = isOpen ? "<small class='lpi-muted'>ouvert</small>" : safeText(out.exitReason || t.closeType || "—");
+          const warns = [...(an.warnings || []), ...(out.warnings || [])].slice(0, 2);
+          const warnHtml = warns.length === 0 ? "" : warns.map(w => `<small class="lpi-warning-pill">${safeText((w || "").split(":")[0])}</small>`).join("");
+          return `
+            <tr>
+              <td><small>${safeText(dateShort)}</small></td>
+              <td><strong>${safeText(t.symbol || "—")}</strong></td>
+              <td><small><code>${safeText(setupShort)}</code></small></td>
+              <td>${lpiBadgeRegime(regimeShort)}</td>
+              <td>${sq === "—" ? "—" : lpiBadgeSignalQuality(sq)}</td>
+              <td>${vs === "—" ? "—" : lpiBadgeValidation(vs)}</td>
+              <td class="lpi-num">${pnl}</td>
+              <td><small>${exit}</small> ${warnHtml}</td>
+            </tr>`;
+        }).join("");
+    const recentTableHtml = `
+      <div class="lpi-subtitle">Derniers trades instrumentés</div>
+      <div class="lpi-table-wrap lpi-table-scroll">
+        <table class="lpi-table lpi-table-compact">
+          <thead><tr><th>Date</th><th>Symb</th><th>Setup</th><th>Régime</th><th>Signal</th><th>Valid.</th><th class="lpi-num">PnL</th><th>Sortie</th></tr></thead>
+          <tbody>${recentRows}</tbody>
+        </table>
+      </div>`;
+
+    return `
+      <div class="card lpi-section" id="trades-analytics">
+        <div class="section-title">📊 Analytics — Live Paper Insights</div>
+        <div class="lpi-muted lpi-small">Vérité marché visible — lecture seule. Source : <code>livePaperAnalytics</code> + <code>livePaperOutcome</code>.</div>
+        ${overviewHtml}
+        ${setupTableHtml}
+        ${regimeTableHtml}
+        ${warningsSection}
+        ${recentTableHtml}
+      </div>`;
+  }
+
   function renderPortfolio() {
     restoreTradesFromBackupIfEmpty();
     normalizeTradesHistoryState();
@@ -6323,6 +6704,11 @@ function openPositionsRiskView() {
                l'accordéon ici. -->
           ${renderBotMiniSection()}
           ${renderWeeklyReportSection()}
+
+          ${/* PR-UI-LIVE-PAPER-INSIGHTS-1 : sous-vue Analytics READ-ONLY.
+                Visualise livePaperAnalytics + livePaperOutcome. Pas de
+                nouvel onglet principal, section dédiée en bas. */ ""}
+          ${renderTradesAnalyticsSection()}
         `}
       </div>`;
   }

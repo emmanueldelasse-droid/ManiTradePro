@@ -10,8 +10,8 @@
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
 - **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : aucune. Maintenance documentaire post-validation iPhone sur `claude/session-md-iphone-validated`.
-- **Dernier merge connu** : PR #259 `docs(session): SESSION.md post-merge PR #258 + checklist iPhone V3 obligatoire` (commit `d4be8b8` sur `main`).
+- **Branche / PR active** : `claude/ui-live-paper-insights-v1` (en cours — PR-UI-LIVE-PAPER-INSIGHTS-1 : sous-vue Analytics READ-ONLY dans l'onglet Trade. Visualise `livePaperAnalytics` + `livePaperOutcome`).
+- **Dernier merge connu** : PR #260 `docs(session): validation iPhone OK, stack suppression historique complète` (commit `e09ee55` sur `main`).
 - **✅ STACK SUPPRESSION HISTORIQUE TRADES — VALIDÉE BOUT EN BOUT (2026-05-22)** :
   - V1 tombstone local (PR #254) actif.
   - V2 tombstone serveur Supabase (PR #256 + migration 017 appliquée par le créateur le 2026-05-22 à 20:54 UTC) actif.
@@ -159,10 +159,35 @@
 
 ## PR en cours
 
-- **PR** : aucune PR de feature. Maintenance documentaire post-validation iPhone (`claude/session-md-iphone-validated`).
-- **Phase actuelle** : *VÉRITÉ MARCHÉ* — observation paper live concentrée sur 42 actifs livePaperCore. **Stack suppression historique trades validée bout en bout (V1 + V2 + V3 + migration 017 + test iPhone manuel OK).**
-- **Aucune action utilisateur en attente** sur le bug suppression historique.
-- **Prochaine étape produit** : PR-UI-LIVE-PAPER-INSIGHTS-1 (dashboard Analytics) — **débloquée**, attente du nouveau brief ChatGPT.
+- **PR** : PR-UI-LIVE-PAPER-INSIGHTS-1 — sous-vue Analytics dans l'onglet Trade — branche `claude/ui-live-paper-insights-v1`.
+- **Mission créateur** (2026-05-22, phase officielle *VÉRITÉ MARCHÉ VISIBLE*) : rendre observable la vie analytique du bot. `livePaperAnalytics` (PR #249) + `livePaperOutcome` (PR #250) existent en base depuis fin mai mais sont invisibles côté UI. Cette PR les expose en lecture seule.
+- **Scope strict** : UI / READ-ONLY uniquement. AUCUN worker touché. AUCUN write Supabase. AUCUN endpoint ajouté.
+- **Placement UI** : pas de nouvel onglet principal. Section "📊 Analytics — Live Paper Insights" ajoutée en bas de l'onglet Trade (après bot mini + rapport hebdo).
+- **5 sections livrées** :
+  1. **Overview** — 7 cartes compactes (ouverts, fermés, instrumentés, legacy, PnL total, winrate, PnL moyen) + distribution `signalQuality` (GOOD/NOISY/BAD/UNKNOWN) + distribution `validationStatus` (OK/SUSPECT/INVALID/UNKNOWN).
+  2. **Setup insights** — table par `setupId` (N, WR, PnL, régime dominant, qualité signal).
+  3. **Régimes** — table par régime officiel (RISK_ON, RANGE, RISK_OFF, HIGH_VOL).
+  4. **Warnings** — top warnings bucketisés (préfixe avant `:`).
+  5. **Derniers trades instrumentés** — table responsive limitée à 20 (date, symbole, setup, régime, signal, validation, PnL, sortie + 2 warnings).
+- **État vide** : message explicite si aucun trade instrumenté + mention legacy count si applicable.
+- **Fichiers modifiés** :
+  - `assets/app.js` — bloc ~330 lignes inséré avant `renderPortfolio` : helpers extraction (`extractLivePaperAnalytics`, `extractLivePaperOutcome`, `isInstrumentedTrade`), agrégations (`lpiBuildOverview`, `lpiBuildBySetup`, `lpiBuildByRegime`, `lpiBuildWarningsTop`, `lpiBuildRecentInstrumented`), rendu (`renderTradesAnalyticsSection`, `lpiBadge*`, `lpiFmt*`). Appel ajouté dans `renderPortfolio` (mode training, juste après `renderWeeklyReportSection`).
+  - `assets/styles.css` — ~200 lignes CSS classes `lpi-*` (cartes compactes, badges colorés par qualité/régime, table responsive, dark + light theme override, breakpoints 620px / 430px iPhone).
+  - `SESSION.md` — cette mise à jour.
+- **Worker.js / migrations / tools/quant/lib** : NON touchés. Aucun endpoint ajouté.
+- **Bug-hunters** (3 scans monolithic-file hook) : tous OK.
+  - Scan #1 (bloc analytics insert) : VERDICT OK 7/7 (collision noms, scope safeText, console.log, await, mutation state, return string toujours, Array.isArray guards).
+  - Scan #2 (integration renderPortfolio) : VERDICT OK 3/3 (hoisting, commentaire inline, template literal).
+  - Scan #3 (CSS bloc styles.css) : en cours.
+- **Validation tests** : `node --check assets/app.js` → OK. Tests automatiques : non applicables (UI). Tests manuels iPhone + dark/light à faire par le créateur.
+- **Limites V1** :
+  - Pas de chart externe (recharts, etc.). Tables et badges uniquement.
+  - Pas de filtre interactif (tri par PnL est fixe).
+  - Pas de drill-down par trade (cliquer sur un trade ne déplie rien).
+  - Trades legacy (avant PR #249) exclus des stats avancées, comptés séparément.
+  - 20 derniers trades affichés max (anti-perf sur device faible).
+- **Impact runtime** : front uniquement. Aucun changement worker / Supabase / décision bot / scoring / sizing / safety gate / learning.
+- **Statut merge** : attente `GO MERGE explicite de ChatGPT`.
 
 ## Mission précédente (PR-TRADES-WIPE-LOCAL-FIRST-V3, livrée 2026-05-22)
 

@@ -1910,3 +1910,208 @@ button:focus-visible,a:focus-visible,.btn:focus-visible,.nav-item:focus-visible,
 .app-shell.theme-light .qq-summary.qq-tone-positive{color:#0c8456}
 .app-shell.theme-light .qq-summary.qq-tone-warn{color:#8a5a10}
 .app-shell.theme-light .qq-summary.qq-tone-negative{color:#a83030}
+
+/* ============================================================
+   LIVE PAPER ANALYTICS — VISUAL INSIGHTS V1
+   PR-UI-LIVE-PAPER-INSIGHTS-1 (2026-05-22)
+   ============================================================
+   Sous-vue Analytics dans l'onglet Trade. Read-only.
+   Lisibilité iPhone prioritaire. Pas de chart externe.
+   Variables CSS réutilisées du thème existant. */
+
+.lpi-section{margin-top:18px}
+.lpi-section .section-title{margin-bottom:6px}
+.lpi-muted{color:var(--text-secondary)}
+.lpi-small{font-size:.78rem}
+.lpi-num{text-align:right;font-variant-numeric:tabular-nums}
+.lpi-profit{color:var(--profit, #00e5a0);font-weight:600}
+.lpi-loss{color:var(--loss, #e05a5a);font-weight:600}
+
+.lpi-subtitle{
+  margin:14px 0 6px;
+  font-size:.84rem;
+  font-weight:600;
+  color:var(--text-secondary);
+  text-transform:uppercase;
+  letter-spacing:.04em;
+}
+
+/* --- Overview cartes compactes --- */
+.lpi-overview-grid{
+  display:grid;
+  grid-template-columns:repeat(4, 1fr);
+  gap:8px;
+  margin:10px 0;
+}
+.lpi-stat-card{
+  background:var(--bg-secondary);
+  border:1px solid var(--border-subtle);
+  border-radius:10px;
+  padding:8px 10px;
+}
+.lpi-stat-label{font-size:.7rem;color:var(--text-secondary);margin-bottom:2px}
+.lpi-stat-value{font-size:1.05rem;font-weight:600}
+
+/* --- Distribution rows --- */
+.lpi-distribution{margin:8px 0}
+.lpi-distribution-label{
+  font-size:.72rem;
+  color:var(--text-secondary);
+  margin:6px 0 4px;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+}
+.lpi-distribution-row{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+  font-variant-numeric:tabular-nums;
+  font-size:.85rem;
+}
+
+/* --- Badges colorés --- */
+.lpi-badge{
+  display:inline-block;
+  padding:1px 7px;
+  border-radius:10px;
+  font-size:.7rem;
+  font-weight:600;
+  letter-spacing:.02em;
+  background:rgba(255,255,255,.06);
+  color:var(--text-primary);
+  border:1px solid var(--border-subtle);
+  white-space:nowrap;
+}
+.lpi-badge-good   {background:rgba(0,229,160,.16); color:#00e5a0; border-color:rgba(0,229,160,.3)}
+.lpi-badge-ok     {background:rgba(0,229,160,.16); color:#00e5a0; border-color:rgba(0,229,160,.3)}
+.lpi-badge-noisy  {background:rgba(224,166,74,.16); color:#e0a64a; border-color:rgba(224,166,74,.3)}
+.lpi-badge-suspect{background:rgba(224,166,74,.16); color:#e0a64a; border-color:rgba(224,166,74,.3)}
+.lpi-badge-bad    {background:rgba(224,90,90,.16); color:#e05a5a; border-color:rgba(224,90,90,.3)}
+.lpi-badge-invalid{background:rgba(224,90,90,.16); color:#e05a5a; border-color:rgba(224,90,90,.3)}
+.lpi-badge-unknown{background:rgba(136,146,176,.16); color:#8892b0; border-color:rgba(136,146,176,.3)}
+
+/* Régimes — couleurs distinctes pour lecture rapide */
+.lpi-badge-risk-on  {background:rgba(0,229,160,.16); color:#00e5a0; border-color:rgba(0,229,160,.3)}
+.lpi-badge-range    {background:rgba(96,165,250,.16); color:#60a5fa; border-color:rgba(96,165,250,.3)}
+.lpi-badge-risk-off {background:rgba(224,90,90,.16); color:#e05a5a; border-color:rgba(224,90,90,.3)}
+.lpi-badge-high-vol {background:rgba(180,120,220,.18); color:#b478dc; border-color:rgba(180,120,220,.32)}
+
+/* --- Tables compactes --- */
+.lpi-table-wrap{
+  margin:6px 0 12px;
+  border:1px solid var(--border-subtle);
+  border-radius:10px;
+  overflow:hidden;
+}
+.lpi-table-scroll{overflow-x:auto}
+.lpi-table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:.82rem;
+}
+.lpi-table thead th{
+  background:var(--bg-secondary);
+  font-weight:600;
+  text-align:left;
+  padding:6px 10px;
+  color:var(--text-secondary);
+  font-size:.74rem;
+  text-transform:uppercase;
+  letter-spacing:.03em;
+  border-bottom:1px solid var(--border-subtle);
+}
+.lpi-table tbody td{
+  padding:7px 10px;
+  border-bottom:1px solid var(--border-subtle);
+  vertical-align:middle;
+}
+.lpi-table tbody tr:last-child td{border-bottom:none}
+.lpi-table code{
+  font-size:.78rem;
+  background:rgba(255,255,255,.04);
+  padding:1px 5px;
+  border-radius:4px;
+}
+.lpi-table-compact thead th,
+.lpi-table-compact tbody td{padding:5px 8px}
+.lpi-table tbody td.lpi-empty-row{
+  text-align:center;
+  color:var(--text-secondary);
+  padding:12px;
+  font-size:.8rem;
+}
+
+/* --- Warnings list --- */
+.lpi-warning-list{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin-top:6px;
+}
+.lpi-warning-item{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  padding:2px 8px;
+  background:rgba(224,166,74,.12);
+  border:1px solid rgba(224,166,74,.28);
+  border-radius:8px;
+  font-size:.75rem;
+  color:#e0a64a;
+}
+.lpi-warning-pill{
+  display:inline-block;
+  padding:1px 5px;
+  margin-left:4px;
+  background:rgba(224,166,74,.12);
+  border-radius:4px;
+  font-size:.65rem;
+  color:#e0a64a;
+}
+
+/* --- Responsive iPhone --- */
+@media (max-width: 620px){
+  .lpi-overview-grid{grid-template-columns:repeat(2, 1fr)}
+}
+@media (max-width: 430px){
+  .lpi-overview-grid{grid-template-columns:1fr}
+  .lpi-table{font-size:.76rem}
+  .lpi-table-compact thead th,
+  .lpi-table-compact tbody td{padding:4px 6px}
+  .lpi-badge{font-size:.62rem;padding:1px 5px}
+}
+
+/* --- Light theme overrides --- */
+.app-shell.theme-light .lpi-stat-card{
+  background:#f4f6fb;
+  border-color:rgba(0,0,0,.08);
+}
+.app-shell.theme-light .lpi-table-wrap{border-color:rgba(0,0,0,.08)}
+.app-shell.theme-light .lpi-table thead th{
+  background:#f4f6fb;
+  color:#5a6376;
+  border-bottom-color:rgba(0,0,0,.08);
+}
+.app-shell.theme-light .lpi-table tbody td{border-bottom-color:rgba(0,0,0,.06)}
+.app-shell.theme-light .lpi-table code{background:rgba(0,0,0,.04)}
+.app-shell.theme-light .lpi-badge{
+  background:rgba(0,0,0,.04);
+  border-color:rgba(0,0,0,.1);
+  color:#2d3142;
+}
+.app-shell.theme-light .lpi-badge-good,
+.app-shell.theme-light .lpi-badge-ok{color:#0c8456;background:rgba(0,137,91,.12);border-color:rgba(0,137,91,.25)}
+.app-shell.theme-light .lpi-badge-noisy,
+.app-shell.theme-light .lpi-badge-suspect{color:#8a5a10;background:rgba(190,135,10,.12);border-color:rgba(190,135,10,.25)}
+.app-shell.theme-light .lpi-badge-bad,
+.app-shell.theme-light .lpi-badge-invalid{color:#a83030;background:rgba(168,48,48,.12);border-color:rgba(168,48,48,.25)}
+.app-shell.theme-light .lpi-badge-unknown{color:#5a6376;background:rgba(90,99,118,.12);border-color:rgba(90,99,118,.25)}
+.app-shell.theme-light .lpi-badge-risk-on{color:#0c8456;background:rgba(0,137,91,.12);border-color:rgba(0,137,91,.25)}
+.app-shell.theme-light .lpi-badge-range{color:#1f5fbf;background:rgba(31,95,191,.12);border-color:rgba(31,95,191,.25)}
+.app-shell.theme-light .lpi-badge-risk-off{color:#a83030;background:rgba(168,48,48,.12);border-color:rgba(168,48,48,.25)}
+.app-shell.theme-light .lpi-badge-high-vol{color:#6b3aa0;background:rgba(107,58,160,.12);border-color:rgba(107,58,160,.25)}
+.app-shell.theme-light .lpi-warning-item{color:#8a5a10;background:rgba(190,135,10,.1);border-color:rgba(190,135,10,.25)}
+.app-shell.theme-light .lpi-warning-pill{color:#8a5a10;background:rgba(190,135,10,.1)}
+.app-shell.theme-light .lpi-profit{color:#0c8456}
+.app-shell.theme-light .lpi-loss{color:#a83030}
