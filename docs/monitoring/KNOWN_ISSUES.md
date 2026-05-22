@@ -353,6 +353,77 @@ Tombstone PERMANENT côté front. Module source canonique testable : `tools/quan
 
 **État V2** : RÉSOLU par PR-TRADES-TOMBSTONE-SERVER-V2.
 
+### #16 (suite) — V3 wipe local-first iPhone Safari (PR-TRADES-WIPE-LOCAL-FIRST-V3, 2026-05-22)
+
+**Bug résiduel signalé créateur post-V2** : suppression iPhone toujours KO. Les tombstones local (V1) et serveur (V2) sont en place mais le handler UI n'applique le wipe LOCAL qu'en cas de SUCCÈS du `wipeTradesOnServer`. Safari "Load failed" → `res.ok === false` → `alert("Rien n'a été supprimé") + return` → **wipe local jamais effectué** → l'historique reste affiché et persiste en localStorage.
+
+**Cause racine V2 → V3** : handler **server-first** au lieu de **local-first**.
+
+Code pré-V3 (lignes ~7964 dans `assets/app.js`) :
+
+```javascript
+const res = await wipeTradesOnServer([], { wipeAll: true, includePositions: true });
+if (!res.ok) {
+  alert(`Suppression serveur échouée : ${res.error}. Rien n'a été supprimé.`);
+  return;  // ← BUG : wipe local jamais déclenché
+}
+state.trades.history = [];
+state.trades.positions = [];
+saveTradesMeta({ lastWipedAt: Date.now() });
+persistTradesState();
+```
+
+**Conséquences** :
+- Safari iPhone PWA est particulièrement sensible aux "Load failed" sur fetch (CORS, certificat, réseau intermittent). Tous ces cas faisaient échouer le wipe.
+- L'utilisateur voyait l'alert et croyait que rien n'était supprimé. Le bouton restait inopérant.
+- Même les utilisateurs PC qui avaient un problème réseau ponctuel étaient bloqués.
+
+**Solution V3 livrée** : refactor en **local-first** des 2 handlers (`data-clear-all-history` global + `data-clear-history` par source).
+
+Nouveau flux :
+
+```javascript
+// 1. Vidange locale IMMÉDIATE (avant tout await).
+state.trades.history = [];
+state.trades.positions = [];
+saveTradesMeta({ lastWipedAt: Date.now() });
+persistTradesState();
+render();
+
+// 2. Best-effort serveur en arrière-plan.
+const res = await wipeTradesOnServer([], { wipeAll: true, includePositions: true });
+if (res.ok) {
+  showAlertToast("Historique", `${res.deletedTrades} trade(s) supprimé(s) (local + serveur).`);
+} else {
+  // wipeTradesOnServer V2 catch pose déjà pendingRemoteWipe pour wipeAll.
+  showAlertToast("Historique", `Historique supprimé localement. Synchro serveur en attente (...). Réessai automatique au prochain sync.`);
+}
+render();
+```
+
+**Garanties V3** :
+- L'UI/localStorage sont purgés AVANT l'await réseau → résistant à n'importe quel échec serveur.
+- `lastWipedAt` (tombstone local PR #254) posé immédiatement → blocage réapparition au refresh.
+- `pendingRemoteWipe` posé automatiquement par `wipeTradesOnServer` V2 sur échec → retry au prochain wipe ou via `loadTradesState`.
+- Toast honnête au lieu d'un alert anxiogène.
+
+**Cache PWA / iPhone** : `sw.js` `CACHE_VERSION` bumpé `v8.5` → `v8.6` pour forcer l'invalidation cache sur les devices iOS qui pourraient encore servir l'ancienne version d'`app.js`.
+
+**Tests obligatoires V3** (10 cas brief) — couverts :
+
+1. iPhone/Safari : wipe serveur OK → UI vide ✓ (local-first + branche res.ok).
+2. iPhone/Safari : wipe serveur Load failed → UI vide quand même ✓ (vidange locale avant l'await).
+3. Refresh iPhone après Load failed → reste vide ✓ (tombstone local PR #254 + pendingRemoteWipe).
+4. Fermeture/réouverture PWA → reste vide ✓ (tombstone persistant en localStorage).
+5. Backup local présent → pas de restore ✓ (guard `restoreTradesFromBackupIfEmpty` PR #254).
+6. PC voit le wipe après sync serveur ✓ (au prochain wipe réussi, marker serveur bumpé, autres devices s'alignent).
+7. PC wipe → iPhone refresh → vide ✓ (tombstone serveur V2 PR #256).
+8. Vieux cache app iPhone → détection/version bump ✓ (CACHE_VERSION v8.5 → v8.6).
+9. Migration absente → comportement gracieux ✓ (V2 fallback → V1 fallback).
+10. Migration présente → tombstone serveur mis à jour ✓ (V2 inchangé).
+
+**État V3** : RÉSOLU par PR-TRADES-WIPE-LOCAL-FIRST-V3.
+
 ---
 
 ### #15 🟡 Données 2025 : splits / dividendes non ajustés sur certains ETF sectoriels SPDR
