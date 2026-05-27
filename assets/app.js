@@ -6207,24 +6207,67 @@ function openPositionsRiskView() {
   // Aucun fetch, aucun write, aucun crash si champs partiels.
 
   // --- Extraction défensive ---
+  function lpiParseMaybeJsonObject(v) {
+    if (!v) return null;
+    if (typeof v === "object") return v;
+    if (typeof v !== "string") return null;
+    try { const parsed = JSON.parse(v); return (parsed && typeof parsed === "object") ? parsed : null; }
+    catch (_) { return null; }
+  }
+
+  function lpiResolveAnalysisSnapshot(trade) {
+    if (!trade || typeof trade !== "object") return null;
+    return lpiParseMaybeJsonObject(trade.analysisSnapshot)
+      || lpiParseMaybeJsonObject(trade.analysis_snapshot)
+      || null;
+  }
+
   function extractLivePaperAnalytics(trade) {
     if (!trade || typeof trade !== "object") return null;
-    return trade.livePaperAnalytics
-      || (trade.analysisSnapshot && trade.analysisSnapshot.livePaperAnalytics)
-      || (trade.analysis_snapshot && trade.analysis_snapshot.livePaperAnalytics)
-      || null;
+    // Top-level direct (peu probable).
+    if (trade.livePaperAnalytics && typeof trade.livePaperAnalytics === "object") return trade.livePaperAnalytics;
+    // Dans analysis_snapshot (snake ou camel, objet ou string JSON).
+    const snap = lpiResolveAnalysisSnapshot(trade);
+    if (snap && snap.livePaperAnalytics && typeof snap.livePaperAnalytics === "object") return snap.livePaperAnalytics;
+    return null;
   }
 
   function extractLivePaperOutcome(trade) {
     if (!trade || typeof trade !== "object") return null;
-    return trade.livePaperOutcome
-      || (trade.analysisSnapshot && trade.analysisSnapshot.livePaperOutcome)
-      || (trade.analysis_snapshot && trade.analysis_snapshot.livePaperOutcome)
-      || null;
+    if (trade.livePaperOutcome && typeof trade.livePaperOutcome === "object") return trade.livePaperOutcome;
+    const snap = lpiResolveAnalysisSnapshot(trade);
+    if (snap && snap.livePaperOutcome && typeof snap.livePaperOutcome === "object") return snap.livePaperOutcome;
+    return null;
   }
 
   function isInstrumentedTrade(trade) {
     return extractLivePaperAnalytics(trade) !== null;
+  }
+
+  // PR-UI-LIVE-PAPER-INSIGHTS-1 DIAGNOSTIC : helper qui inspecte un trade
+  // et retourne quelles "couches" sont présentes. Sert au panneau
+  // diagnostic affiché quand aucun trade n'est instrumenté.
+  function lpiInspectTrade(trade) {
+    const flags = {
+      hasAnalysisSnapshot: false,
+      analysisSnapshotIsString: false,
+      hasLivePaperAnalytics: false,
+      hasLivePaperOutcome: false,
+      snapshotKeys: [],
+    };
+    if (!trade || typeof trade !== "object") return flags;
+    const raw = trade.analysisSnapshot ?? trade.analysis_snapshot;
+    if (raw) {
+      flags.hasAnalysisSnapshot = true;
+      if (typeof raw === "string") flags.analysisSnapshotIsString = true;
+      const snap = lpiParseMaybeJsonObject(raw);
+      if (snap) {
+        flags.snapshotKeys = Object.keys(snap).slice(0, 15);
+        flags.hasLivePaperAnalytics = !!snap.livePaperAnalytics;
+        flags.hasLivePaperOutcome = !!snap.livePaperOutcome;
+      }
+    }
+    return flags;
   }
 
   function lpiFiniteNumber(v) {
@@ -6428,13 +6471,67 @@ function openPositionsRiskView() {
 
     // État vide explicite (aucun trade instrumenté du tout).
     if (overview.instrumented === 0) {
+      // PR analytics diagnostic fix : afficher EXACTEMENT pourquoi la
+      // section est vide. Permet au créateur de comprendre s'il s'agit
+      // de "0 trade ouvert depuis le wipe" ou "trades existent mais
+      // sans livePaperAnalytics" (bug instrumentation worker).
+      const sampleSize = Math.min(all.length, 3);
+      const inspections = all.slice(0, sampleSize).map(lpiInspectTrade);
+      const totalWithSnap = all.filter(t => lpiInspectTrade(t).hasAnalysisSnapshot).length;
+      const totalWithLpaInSnap = all.filter(t => lpiInspectTrade(t).hasLivePaperAnalytics).length;
+      const stringSnaps = all.filter(t => lpiInspectTrade(t).analysisSnapshotIsString).length;
+
+      const diagnosticRows = inspections.length === 0
+        ? `<tr><td colspan="2" class="lpi-empty-row">Aucun trade en base.</td></tr>`
+        : inspections.map((f, i) => `
+          <tr>
+            <td><strong>${i + 1}</strong> <small>${safeText(all[i].symbol || "—")}</small></td>
+            <td>
+              <small>
+                analysis_snapshot: <code>${f.hasAnalysisSnapshot ? "présent" : "absent"}</code>${f.analysisSnapshotIsString ? " <span class='lpi-badge lpi-badge-noisy'>STRING</span>" : ""}<br/>
+                livePaperAnalytics: <code>${f.hasLivePaperAnalytics ? "présent" : "absent"}</code><br/>
+                livePaperOutcome: <code>${f.hasLivePaperOutcome ? "présent" : "absent"}</code><br/>
+                ${f.snapshotKeys.length > 0 ? `clés snapshot: <small>${f.snapshotKeys.map(k => `<code>${safeText(k)}</code>`).join(", ")}</small>` : ""}
+              </small>
+            </td>
+          </tr>`).join("");
+
       return `
         <div class="card lpi-section" id="trades-analytics">
-          <div class="section-title">📊 Analytics</div>
+          <div class="section-title">📊 Analytics — Live Paper Insights</div>
           <div class="empty-state">
-            Les prochains trades paper analysés apparaîtront ici.
+            Aucun trade instrumenté détecté.
             ${overview.legacy > 0 ? `<br/><small>${overview.legacy} trade(s) legacy détecté(s) (avant instrumentation).</small>` : ""}
           </div>
+          <div class="lpi-subtitle">Diagnostic</div>
+          <div class="lpi-overview-grid" style="grid-template-columns:repeat(2,1fr)">
+            <div class="lpi-stat-card"><div class="lpi-stat-label">Total trades (positions + history)</div><div class="lpi-stat-value">${all.length}</div></div>
+            <div class="lpi-stat-card"><div class="lpi-stat-label">Avec analysis_snapshot</div><div class="lpi-stat-value">${totalWithSnap}</div></div>
+            <div class="lpi-stat-card"><div class="lpi-stat-label">Avec livePaperAnalytics</div><div class="lpi-stat-value">${totalWithLpaInSnap}</div></div>
+            <div class="lpi-stat-card"><div class="lpi-stat-label">analysis_snapshot stocké en string</div><div class="lpi-stat-value">${stringSnaps}</div></div>
+          </div>
+          ${all.length > 0 ? `
+            <div class="lpi-subtitle">Échantillon (${sampleSize} premier(s) trade(s))</div>
+            <div class="lpi-table-wrap">
+              <table class="lpi-table lpi-table-compact">
+                <thead><tr><th>#</th><th>Diagnostic</th></tr></thead>
+                <tbody>${diagnosticRows}</tbody>
+              </table>
+            </div>
+            <div class="lpi-muted lpi-small" style="margin-top:8px">
+              <strong>Lecture :</strong>
+              • Si "Total trades = 0" → le bot n'a ouvert/fermé aucun trade depuis le dernier wipe.
+              • Si "Total > 0" et "Avec livePaperAnalytics = 0" → trades en base mais sans instrumentation (PR #249/#250 inactive ou contournée).
+              • Si "stocké en string > 0" → l'extracteur le gère désormais (fix PR analytics diagnostic).
+            </div>
+          ` : `
+            <div class="lpi-muted lpi-small">
+              Le bot n'a aucun trade en base (positions ouvertes + historique vides).
+              Causes possibles : wipe récent, asset universe staged restrictif (42 livePaperCore),
+              riskState désactivé, cooldown, ou bot inactif. Vérifier <code>SELECT * FROM mtp_trades_meta;</code>
+              et <code>SELECT count(*) FROM mtp_positions;</code> côté Supabase.
+            </div>
+          `}
         </div>`;
     }
 
