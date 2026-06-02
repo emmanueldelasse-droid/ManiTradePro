@@ -19,6 +19,19 @@ Ce fichier liste **ce qui ne va pas dans le projet** : bugs identifiés, incohé
 
 ## Issues actuelles (mai 2026)
 
+### #0bis ✅ Actions EODHD bloquées « données trop fragiles » — résolu B.14 (2026-06-02)
+
+**Description**
+Après le déblocage exploration, les cryptos (Binance « live ») généraient des trades mais TOUTES les actions (NVDA, OR.PA, COIN, NFLX…) restaient « Pas de trade » quel que soit le score (COIN 84, NFLX 82), avec le blocage « données trop fragiles ».
+
+**Cause (code-confirmée)**
+`calcDetailScore` : `dataQuality = freshness==="live"?92:"recent"?78:48`. Le flux EODHD/Twelve est `delayed_15m` (différé **légal**), qui tombait dans le bucket `48` → `dataTooWeak` (<55) → hard flag **`data_quality_low`**, un blocage MAJEUR (`majorHardBlockerCount`) qui force « Pas de trade » et neutralise le plancher exploration. Incohérent avec `quoteQualityEngine` qui tolère le différé (seuil stale 1800 s) et garde `executionSafe = true`. Donc une donnée **exécutable** était traitée comme **inexploitable**. La ligne de mapping est antérieure aux patchs exploration ; ceux-ci l'ont seulement rendue visible.
+
+**Solution livrée (B.14)**
+`data_quality_low` n'est déclenché que si `dataQuality < 55 ET quoteQuality.executionSafe === false`. Le différé exécutable n'est plus un blocage (affiché/proposé normalement) ; eod/snapshot/stale/devise restent bloqués. **Scoring inchangé** (`dataQuality` conserve sa valeur). La garde d'exécution (`applyUnsafeDowngrade` + `evaluateExecutionSafety` à l'auto-open) reste seule autorité sur la fiabilité du prix réel.
+
+**État** : ✅ résolu côté moteur + tests (`tools/engine-tests.mjs`, 2 tests B.14). Vérif live (NVDA/COIN passent en « Trade proposé exploration ») à confirmer par le créateur après déploiement Worker.
+
 ### #0 ✅ Analytics 403 + bot qui ne propose aucun trade — résolu (2026-06-02)
 
 **Description**

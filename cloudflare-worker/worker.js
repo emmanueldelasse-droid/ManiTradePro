@@ -3339,6 +3339,16 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
   const atrPct = (Number.isFinite(avgRangeValue) && last > 0) ? (avgRangeValue / last) * 100 : null;
   const dataQuality = quote.freshness === "live" ? 92 : quote.freshness === "recent" ? 78 : 48;
 
+  // Vague B.14 — DÉCOUPLAGE qualité de donnée / qualité d'exécution.
+  // dataQuality (ci-dessus) alimente le score brut et reste inchangé. Mais un
+  // flux légalement différé (EODHD/Twelve 15 min) tombe à 48 alors qu'il est
+  // parfaitement exploitable en daily/swing. On calcule ici la qualité
+  // d'exécution (executionSafe) pour ne déclencher le blocage data_quality_low
+  // que sur des données VRAIMENT inexécutables (eod/stale/devise/snapshot…),
+  // pas sur un simple différé. quoteQualityEngine reste la seule autorité sur
+  // la fiabilité d'exécution (R5). Réutilisé tel quel dans liveContext plus bas.
+  const quoteQuality = quoteQualityEngine(quote, candles);
+
   // Détection de configuration (nouveau moteur)
   const detectedConfig = detectConfiguration(candles, quote);
 
@@ -3404,7 +3414,12 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
     (direction === "short" && chg5 != null && chg20 != null && chg5 > 0 && chg20 < 0);
   const extensionTooHigh = distanceToEma20Pct != null && Math.abs(distanceToEma20Pct) > 12;
   const riskTooHigh = risk < 42;
-  const dataTooWeak = dataQuality < 55;
+  // B.14 — donnée jugée "trop faible" UNIQUEMENT si elle est aussi inexécutable.
+  // Un différé légal (executionSafe=true) n'est plus un blocage majeur : il sera
+  // affiché/proposé normalement, et la garde d'exécution (applyUnsafeDowngrade +
+  // evaluateExecutionSafety à l'auto-open) reste seule à bloquer les quotes
+  // réellement non fiables. Aucun changement du scoring (dataQuality intact).
+  const dataTooWeak = dataQuality < 55 && quoteQuality.executionSafe === false;
   const entryTooLate = timing < 42;
   const lowParticipation = participation < 52;
   const macroFragile = context < 45;
@@ -3599,7 +3614,7 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
       compositeScore: score,
       delta: score - strategicScoreValue
     },
-    quoteQuality: quoteQualityEngine(quote, candles)
+    quoteQuality
   };
 
   // Bonus de configuration détectée (long + miroirs short)

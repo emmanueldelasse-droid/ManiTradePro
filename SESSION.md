@@ -26,6 +26,12 @@
   - Détail lisible sous chaque carte (`.opp-score-detail`) : Décision / Sûreté / Brut / Confirmations / Blocage.
   - Explication explicite (`opportunityScoreExplain`) : « Score brut élevé (73), mais bloqué par : … » pour les Pas de trade ; « Trade exploration : décision X / sûreté Y · taille réduite » pour l'exploration.
   - **Aucun changement moteur / seuil / auto-open.** Tests : `npm test` 17/17 (4 nouveaux sur l'affichage). bug-hunter : 0 régression.
+  - **PR #265 mergée** dans `main` (squash `946aeff`). Front-only, pas de déploiement Worker.
+- **🔧 SESSION 2026-06-02 (suite) — B.14 DÉCOUPLAGE QUALITÉ DONNÉE / EXÉCUTION (moteur)** (branche `claude/manitradepro-eodhd-data-quality`) :
+  - Audit terrain : les actions (EODHD/Twelve « delayed_15m ») restaient « Pas de trade » quel que soit le score, alors que les cryptos (Binance live) passaient. Cause : `calcDetailScore` mappait toute fraîcheur ≠ live/recent à `dataQuality = 48` → `data_quality_low` (blocage MAJEUR), y compris le différé légal 15 min — incohérent avec `quoteQualityEngine` qui, lui, tolère le différé (`executionSafe = true`).
+  - Fix B.14 : `data_quality_low` n'est plus déclenché que si `dataQuality < 55 ET quoteQuality.executionSafe === false`. Le différé exécutable cesse d'être un blocage ; eod/snapshot/stale/devise restent bloqués. **`dataQuality` (donc le scoring) reste inchangé** ; `quoteQuality` calculé une fois et réutilisé.
+  - Effet : NVDA/COIN/NFLX repassent en « Trade proposé exploration » ; la garde d'exécution (R5) reste seule juge de la fiabilité du prix réel.
+  - Tests : `npm test` 19/19 (2 nouveaux B.14 exécutant le vrai `calcDetailScore` : delayed_15m execution-safe ⇒ pas de `data_quality_low` ; eod/snapshot ⇒ blocage conservé).
 - **Dernier merge connu** : PR #261 `feat(ui): Live Paper Analytics — sous-vue Analytics dans Trade (PR-UI-LIVE-PAPER-INSIGHTS-1)` (commit `aabffe8` sur `main`).
 - **Phase officielle** : *VÉRITÉ MARCHÉ VISIBLE* — les analytics livePaperAnalytics + livePaperOutcome sont désormais observables côté UI dans l'onglet Trade.
 - **✅ STACK SUPPRESSION HISTORIQUE TRADES — VALIDÉE BOUT EN BOUT (2026-05-22)** :
