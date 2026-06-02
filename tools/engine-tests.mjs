@@ -44,7 +44,8 @@ const {
   getTradeDecisionProfile,
   isTrainingCandidateAllowed,
   normalizeTrainingSettingsRow,
-  getTrainingDefaults
+  getTrainingDefaults,
+  calcDetailScore
 } = sandbox;
 
 // Garde-fou : si l'évaluation vm n'a pas exposé les fonctions, on échoue tôt
@@ -271,6 +272,75 @@ test("auth — les routes feedback/reports sont protégées admin côté Worker"
     assert.ok(after.includes("requireAdminAccess"),
       `route ${route} doit exiger requireAdminAccess`);
   }
+});
+
+// --- B.14 : découplage qualité de donnée / qualité d'exécution -----------------
+// Un flux légalement différé (EODHD/Twelve 15 min) ne doit plus produire le
+// blocage majeur data_quality_low ; seules les données réellement inexécutables
+// (eod/snapshot/stale) le déclenchent. calcDetailScore est chargé via vm.
+function makeCandles(n = 60, start = 100, step = 0.5) {
+  const out = [];
+  const day = 86400000;
+  const nowMs = Date.now();
+  for (let i = 0; i < n; i++) {
+    const close = start + i * step;
+    out.push({
+      time: nowMs - (n - 1 - i) * day,
+      open: close - 0.2,
+      high: close + 0.6,
+      low: close - 0.6,
+      close,
+      volume: 1_000_000
+    });
+  }
+  return out;
+}
+
+test("B.14 — un flux différé 15 min (execution-safe) ne déclenche PAS data_quality_low", () => {
+  assert.equal(typeof calcDetailScore, "function", "calcDetailScore doit être chargée");
+  const candles = makeCandles();
+  const lastClose = candles[candles.length - 1].close;
+  const delayedQuote = {
+    symbol: "NVDA", name: "NVIDIA", assetClass: "stock",
+    price: lastClose, change24hPct: 0.4, volume24h: 5_000_000,
+    freshness: "delayed_15m", quotedAt: new Date().toISOString(),
+    currency: "USD", sourceUsed: "twelvedata"
+  };
+  const res = calcDetailScore(delayedQuote, candles);
+  const flags = res?.hardFilters?.flags || [];
+  const execSafe = res?.liveContext?.quoteQuality?.executionSafe;
+
+  // Invariant central du fix : executionSafe===true ⇒ jamais data_quality_low.
+  if (execSafe === true) {
+    assert.ok(!flags.includes("data_quality_low"),
+      "un flux différé execution-safe ne doit pas être marqué data_quality_low");
+  }
+  // Et réciproquement : si data_quality_low est présent, c'est que la donnée est
+  // réellement inexécutable (executionSafe===false).
+  if (flags.includes("data_quality_low")) {
+    assert.equal(execSafe, false,
+      "data_quality_low ne peut venir que d'une donnée inexécutable");
+  }
+  // Le scénario différé doit bien être jugé exécutable (différé ≠ unsafe).
+  assert.equal(execSafe, true, "delayed_15m frais doit rester execution-safe");
+  assert.ok(Number.isFinite(res.score), "le score brut reste calculé normalement");
+});
+
+test("B.14 — une donnée EOD/snapshot (inexécutable) reste bloquée data_quality_low", () => {
+  const candles = makeCandles();
+  const lastClose = candles[candles.length - 1].close;
+  const eodQuote = {
+    symbol: "NVDA", name: "NVIDIA", assetClass: "stock",
+    price: lastClose, change24hPct: 0.4, volume24h: 5_000_000,
+    freshness: "eod", quotedAt: new Date().toISOString(),
+    currency: "USD", sourceUsed: "snapshot"
+  };
+  const res = calcDetailScore(eodQuote, candles);
+  const flags = res?.hardFilters?.flags || [];
+  const execSafe = res?.liveContext?.quoteQuality?.executionSafe;
+  assert.equal(execSafe, false, "un snapshot EOD ne doit pas être execution-safe");
+  assert.ok(flags.includes("data_quality_low"),
+    "une donnée inexécutable doit conserver le blocage data_quality_low");
 });
 
 // --- Cohérence affichage scores Opportunités (UI only, app.js dans une IIFE) ---

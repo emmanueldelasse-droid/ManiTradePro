@@ -88,6 +88,19 @@ Exposé dans `liveContext.quoteQuality`. Diagnostic structuré de la qualité de
 
 Cf. `docs/project/DATA_PIPELINE.md` pour la structure complète et les règles de détection.
 
+### Découplage qualité de donnée / qualité d'exécution — vague B.14 (2026-06-02)
+
+`dataQuality` (entrée du score brut dans `calcDetailScore`) et `quoteQuality.executionSafe`
+(fiabilité d'exécution) sont deux notions distinctes. Le hard flag **`data_quality_low`**
+(blocage majeur) n'est désormais déclenché que si `dataQuality < 55` **ET**
+`quoteQuality.executionSafe === false`. Conséquence : un flux **légalement différé**
+(EODHD/Twelve `delayed_15m`, `executionSafe = true`) reste classé/proposé normalement —
+il n'est plus traité comme « données trop fragiles ». Les données réellement inexécutables
+(eod/snapshot/stale/devise → `executionSafe = false`) restent bloquées. `dataQuality`
+conserve sa valeur dans le score (aucun changement de scoring). La garde d'exécution
+(`applyUnsafeDowngrade` + `evaluateExecutionSafety` à l'auto-open, R5) reste seule juge de
+la fiabilité du prix réel.
+
 ---
 
 ## Règles d'ouverture (cron `handleTrainingAutoCycle`)
