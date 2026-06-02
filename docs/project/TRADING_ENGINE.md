@@ -264,6 +264,11 @@ Diagnostic : `GET /api/training/debug-opportunities` (admin, lecture seule) expo
 pour chaque actif la décision moteur complète + la première garde qui bloque
 l'auto-open (`explainAutoOpenBlock`).
 
+UI : un trade exploration porte `plan.exploration = true` et s'affiche avec un
+badge ambre **« Exploration · paper réduit »** (cartes opportunité + fiche détail,
+`rowIsExploration()` / `.badge.exploration`) pour le distinguer d'un « Trade
+proposé » pleine confiance.
+
 ### Risk limits
 
 - `max_daily_loss_pct` (défaut 30 %)

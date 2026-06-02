@@ -1713,6 +1713,13 @@ function rowTradePlan(item) {
   return item.plan;
 }
 
+// Vrai si l'opportunité est un trade "exploration" (paper, taille réduite) issu
+// du plancher d'apprentissage du moteur — à distinguer d'un vrai "Trade proposé"
+// pleine confiance. Le flag vient de plan.exploration (worker buildWorkerPlan).
+function rowIsExploration(item) {
+  return rowTradePlan(item)?.exploration === true;
+}
+
 function currentTradePlan() {
   return officialPlanForDetail(state.detail) || state.detail?.plan || null;
 }
@@ -3491,6 +3498,7 @@ function getOpportunityCardViewModel(item) {
     scoreState,
     decisionLabel: decisionState.label,
     decisionTone: decisionState.tone,
+    explorationBadge: rowIsExploration(item) ? badge("Exploration · paper réduit", "exploration") : "",
     trendLabel: rowTrendLabel(item),
     assetBadge: assetClassLabel(item.assetClass),
     blockerLine,
@@ -3571,6 +3579,7 @@ function renderOppRow(item, rank) {
             <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:8px;">
               <div style="display:flex;flex-wrap:wrap;gap:8px;">
                 ${badge(vm.decisionLabel, vm.decisionTone)}
+                ${vm.explorationBadge}
                 ${badge(vm.trendLabel, item.direction || "")}
               </div>
               <div class="price">${vm.priceHtml}</div>
@@ -3604,6 +3613,7 @@ function renderOppRow(item, rank) {
           ${scoreRing(vm.scoreState.score, vm.scoreState.tone)}
           <div class="score-meta" style="display:flex;flex-direction:column;gap:8px;">
             ${badge(vm.decisionLabel, vm.decisionTone)}
+            ${vm.explorationBadge}
             ${badge(vm.trendLabel, item.direction || "")}
           </div>
         </div>
@@ -4114,6 +4124,7 @@ function renderTradePlanHero(detail, plan) {
         </div>
         <div class="legend plan-card-head-badges">
           ${badge(plan?.decision || "Pas de trade", statusToneFromDecision(plan?.decision))}
+          ${plan?.exploration === true ? badge("Exploration · paper réduit", "exploration") : ""}
           ${badge(setupLabel)}
           ${badge(regimeVm.label, regimeVm.tone)}
           ${badge(`confiance ${confidenceText}`)}
