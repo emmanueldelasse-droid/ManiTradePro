@@ -582,6 +582,8 @@ input[type="checkbox"],input[type="radio"]{accent-color:var(--accent);cursor:poi
 
 .priority-note{margin:-6px 0 12px 2px;font-size:.86rem}
 .opp-note{font-size:12px;margin-top:6px}
+.opp-score-detail{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;margin-top:4px;line-height:1.4}
+.opp-score-detail b{color:var(--text-primary);font-weight:700}
 
 .ai-shortlist{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}
 .ai-top{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}

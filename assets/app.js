@@ -3385,6 +3385,30 @@ function actionabilityScoreFrom(source) {
     return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
   }
 
+  // Score réellement utilisé pour la décision moteur (directionalOpportunityScore).
+  // C'est lui qu'on affiche dans le cercle pour que le chiffre corresponde à la
+  // décision (cf. correction cohérence affichage). plan.decisionScore est posé
+  // par buildWorkerPlan côté worker dans les deux chemins.
+  function decisionScoreFrom(source) {
+    const raw = Number(
+      source?.plan?.decisionScore ??
+      source?.decisionScore ??
+      NaN
+    );
+    return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
+  }
+
+  // Score officiel (= sûreté composite côté worker). Sert de repli si la
+  // décision n'a pas de decisionScore.
+  function officialScoreFrom(source) {
+    const raw = Number(
+      source?.officialScore ??
+      source?.plan?.safetyScore ??
+      NaN
+    );
+    return Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw))) : null;
+  }
+
   function safetyLabel(score, source = null) {
     const decision = source?.officialDecision || source?.decision || source?.plan?.decision || null;
     if (decision === "Trade propose") return "fiable";
@@ -3472,25 +3496,60 @@ function getDecisionState(item) {
 }
 
 function getScoreState(item) {
-  const plan = rowTradePlan(item) || item || {};
-  const score = safetyScoreFrom(plan) ?? safetyScoreFrom(item) ?? dossierScoreFrom(plan) ?? dossierScoreFrom(item) ?? actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
+  // Le cercle affiche le score utilisé pour la décision (decisionScore), avec
+  // repli officialScore puis score brut. Le ton et le libellé restent pilotés
+  // par la décision (cf. safetyTone/safetyLabel) → cohérence chiffre ↔ couleur
+  // ↔ décision. Le détail complet (sûreté, brut…) est rendu sous la carte.
+  const score = decisionScoreFrom(item) ?? officialScoreFrom(item) ?? dossierScoreFrom(item) ?? actionabilityScoreFrom(item);
   const tone = safetyTone(score, item);
   const label = safetyLabel(score, item);
   return { score, tone, label };
+}
+
+// Phrase d'explication alignée sur la décision — lève l'incohérence perçue
+// "score élevé mais Pas de trade" / "score bas mais Trade proposé".
+function opportunityScoreExplain(item, plan, decisionState) {
+  const dec = decisionScoreFrom(item);
+  const saf = safetyScoreFrom(item);
+  const brut = dossierScoreFrom(item);
+  const blocker = shortBlockerLabel(plan, item);
+  if (rowIsExploration(item)) {
+    return `Trade exploration : décision ${dec ?? "—"} / sûreté ${saf ?? "—"} · taille réduite (paper, pas pleine confiance)`;
+  }
+  if (decisionState.key === "pas_de_trade") {
+    if (brut != null && brut >= 65) return `Score brut élevé (${brut}), mais bloqué par : ${blocker}`;
+    return `Pas actionnable maintenant : ${blocker}`;
+  }
+  if (decisionState.key === "a_surveiller") {
+    return `À surveiller : ${blocker}`;
+  }
+  return `Trade proposé : sûreté ${saf ?? "—"}/100`;
+}
+
+// Détail discret des scores réels derrière la décision (point lisibilité).
+function renderScoreBreakdown(item, plan) {
+  const dec = decisionScoreFrom(item);
+  const saf = safetyScoreFrom(item);
+  const brut = dossierScoreFrom(item);
+  const conf = Number(plan?.confirmationCount ?? item?.confirmationCount ?? 0) || 0;
+  const blocker = shortBlockerLabel(plan, item);
+  return `<div class="opp-score-detail muted">
+    <span>Décision <b>${dec ?? "—"}</b></span>
+    <span>Sûreté <b>${saf ?? "—"}</b></span>
+    <span>Brut <b>${brut ?? "—"}</b></span>
+    <span>Confirmations <b>${conf}</b></span>
+    <span>Blocage : ${safeText(blocker)}</span>
+  </div>`;
 }
 
 function getOpportunityCardViewModel(item) {
   const plan = rowTradePlan(item) || {};
   const decisionState = getDecisionState(item);
   const scoreState = getScoreState(item);
-  const actionScore = actionabilityScoreFrom(plan) ?? actionabilityScoreFrom(item);
   const confirmationText = confirmationLabelText(plan);
   const scoreLine = scoreState.score != null
     ? `${scoreState.score}/100 · ${scoreState.label}`
     : "score de surete indisponible";
-  const blockerLine = (decisionState.key === "pas_de_trade" && scoreState.score != null && actionScore != null && Math.abs(actionScore - scoreState.score) >= 4)
-    ? `${shortBlockerLabel(plan, item)} · exploitabilite ${actionScore}/100`
-    : shortBlockerLabel(plan, item);
   return {
     item,
     plan,
@@ -3501,7 +3560,8 @@ function getOpportunityCardViewModel(item) {
     explorationBadge: rowIsExploration(item) ? badge("Exploration · paper réduit", "exploration") : "",
     trendLabel: rowTrendLabel(item),
     assetBadge: assetClassLabel(item.assetClass),
-    blockerLine,
+    scoreExplain: opportunityScoreExplain(item, plan, decisionState),
+    scoreBreakdownHtml: renderScoreBreakdown(item, plan),
     nextActionLine: shortActionLabel(plan, item),
     confirmationText,
     riskBadge: plan?.riskQuality != null ? badge(`risque ${safeText(simpleRiskQualityLabel(plan.riskQuality))}`, riskBadgeClass(plan)) : "",
@@ -3585,7 +3645,8 @@ function renderOppRow(item, rank) {
               <div class="price">${vm.priceHtml}</div>
               <div class="change ${vm.changeClass}">${vm.changeText}</div>
               <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
-              <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
+              <div class="muted opp-note">${safeText(vm.scoreExplain)}</div>
+              ${vm.scoreBreakdownHtml}
               <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
               ${(() => { const s = quoteQualityState(item); return `<div class="qq-summary qq-tone-${s.tone}" title="${safeText(quoteSourceLine(item))}">${safeText(quoteQualitySummaryLine(item))}</div>`; })()}
             </div>
@@ -3621,7 +3682,8 @@ function renderOppRow(item, rank) {
           <div class="price">${vm.priceHtml}</div>
           <div class="change ${vm.changeClass}">${vm.changeText}</div>
           <div class="muted opp-note" style="font-weight:700; color:${scoreColor(vm.scoreState.score, vm.scoreState.tone)}">${safeText(vm.scoreLine)}</div>
-          <div class="muted opp-note">${safeText(vm.blockerLine)}</div>
+          <div class="muted opp-note">${safeText(vm.scoreExplain)}</div>
+          ${vm.scoreBreakdownHtml}
           <div class="muted opp-note">${safeText(vm.nextActionLine)}</div>
           ${(() => { const s = quoteQualityState(item); return `<div class="qq-summary qq-tone-${s.tone}" title="${safeText(quoteSourceLine(item))}">${safeText(quoteQualitySummaryLine(item))}</div>`; })()}
         </div>

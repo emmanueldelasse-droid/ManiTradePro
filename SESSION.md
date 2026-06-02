@@ -19,6 +19,13 @@
   - **Tests** : `tools/engine-tests.mjs` (13 tests, `npm test`) — classement 70 sans blocage, blocage critique conservé, table de vérité exploration, éligibilité auto-open exploration + garde R5 non contournée, auth feedback/reports.
   - **Badge UI « Exploration · paper réduit »** (revue ChatGPT, condition GO MERGE) : `rowIsExploration()` + badge ambre (`.badge.exploration`) sur les cartes opportunité (mobile + desktop) et la fiche détail, pour ne pas confondre un trade d'apprentissage avec un vrai « Trade proposé ».
   - **À vérifier (créateur)** : déployer le Worker, ouvrir `GET /api/training/debug-opportunities` avec le token admin pour lire la vraie raison de blocage de NVDA & co.
+  - **PR #264 mergée** dans `main` (squash `ac6e541`), Worker déployé (Action #90, success).
+- **🔧 SESSION 2026-06-02 (suite) — COHÉRENCE AFFICHAGE SCORES (UI only)** :
+  - Problème post-#264 : la carte Opportunités affichait un chiffre (sûreté) sans libellé → « NVDA 73 mais Pas de trade », « ETH 64 mais Trade proposé » paraissaient incohérents.
+  - Cercle aligné sur la décision : `getScoreState` affiche `decisionScore` (repli `officialScore` → brut). Ton/label restent pilotés par la décision.
+  - Détail lisible sous chaque carte (`.opp-score-detail`) : Décision / Sûreté / Brut / Confirmations / Blocage.
+  - Explication explicite (`opportunityScoreExplain`) : « Score brut élevé (73), mais bloqué par : … » pour les Pas de trade ; « Trade exploration : décision X / sûreté Y · taille réduite » pour l'exploration.
+  - **Aucun changement moteur / seuil / auto-open.** Tests : `npm test` 17/17 (4 nouveaux sur l'affichage). bug-hunter : 0 régression.
 - **Dernier merge connu** : PR #261 `feat(ui): Live Paper Analytics — sous-vue Analytics dans Trade (PR-UI-LIVE-PAPER-INSIGHTS-1)` (commit `aabffe8` sur `main`).
 - **Phase officielle** : *VÉRITÉ MARCHÉ VISIBLE* — les analytics livePaperAnalytics + livePaperOutcome sont désormais observables côté UI dans l'onglet Trade.
 - **✅ STACK SUPPRESSION HISTORIQUE TRADES — VALIDÉE BOUT EN BOUT (2026-05-22)** :
