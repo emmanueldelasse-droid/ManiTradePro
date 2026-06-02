@@ -272,3 +272,51 @@ test("auth — les routes feedback/reports sont protégées admin côté Worker"
       `route ${route} doit exiger requireAdminAccess`);
   }
 });
+
+// --- Cohérence affichage scores Opportunités (UI only, app.js dans une IIFE) ---
+// Les fonctions front ne sont pas exportables (IIFE) : on vérifie le câblage au
+// niveau source, comme pour l'auth. Garantit que la correction de lisibilité
+// reste en place (chiffre aligné sur la décision + détail brut/sûreté/blocage).
+test("affichage — le cercle Opportunités utilise le score de décision en priorité", () => {
+  const appSrc = readFileSync(path.join(REPO, "assets", "app.js"), "utf8");
+  // getScoreState doit privilégier decisionScore puis officialScore puis brut.
+  const fn = appSrc.slice(appSrc.indexOf("function getScoreState"), appSrc.indexOf("function getScoreState") + 600);
+  assert.ok(/decisionScoreFrom\(item\)\s*\?\?\s*officialScoreFrom\(item\)\s*\?\?\s*dossierScoreFrom\(item\)/.test(fn),
+    "getScoreState doit suivre la priorité decisionScore → officialScore → brut");
+  assert.ok(appSrc.includes("function decisionScoreFrom"), "helper decisionScoreFrom requis");
+  assert.ok(appSrc.includes("source?.plan?.decisionScore"), "decisionScoreFrom lit plan.decisionScore");
+});
+
+test("affichage — un 'Pas de trade' à brut élevé explique le blocage", () => {
+  const appSrc = readFileSync(path.join(REPO, "assets", "app.js"), "utf8");
+  const fn = appSrc.slice(appSrc.indexOf("function opportunityScoreExplain"), appSrc.indexOf("function opportunityScoreExplain") + 900);
+  // Branche pas_de_trade + brut >= 65 → message "Score brut élevé … bloqué par".
+  assert.ok(fn.includes("pas_de_trade"), "doit traiter le cas Pas de trade");
+  assert.ok(/brut\s*>=\s*65/.test(fn), "doit détecter un score brut élevé (>=65)");
+  assert.ok(fn.includes("Score brut élevé"), "doit afficher 'Score brut élevé' + raison");
+  assert.ok(fn.includes("bloqué par"), "doit nommer le blocage");
+});
+
+test("affichage — un trade exploration est étiqueté décision/sûreté/taille réduite", () => {
+  const appSrc = readFileSync(path.join(REPO, "assets", "app.js"), "utf8");
+  const fn = appSrc.slice(appSrc.indexOf("function opportunityScoreExplain"), appSrc.indexOf("function opportunityScoreExplain") + 900);
+  assert.ok(fn.includes("rowIsExploration(item)"), "doit détecter l'exploration");
+  assert.ok(fn.includes("Trade exploration"), "doit afficher 'Trade exploration'");
+  assert.ok(fn.includes("taille réduite"), "doit préciser taille réduite (pas pleine confiance)");
+});
+
+test("affichage — le détail des scores (décision/sûreté/brut/confirmations/blocage) est rendu", () => {
+  const appSrc = readFileSync(path.join(REPO, "assets", "app.js"), "utf8");
+  const fn = appSrc.slice(appSrc.indexOf("function renderScoreBreakdown"), appSrc.indexOf("function renderScoreBreakdown") + 700);
+  for (const lbl of ["Décision", "Sûreté", "Brut", "Confirmations", "Blocage"]) {
+    assert.ok(fn.includes(lbl), `le détail doit afficher '${lbl}'`);
+  }
+  assert.ok(fn.includes("safeText(blocker)"), "le libellé de blocage doit être échappé (safeText)");
+  // Le VM expose et les deux cartes (mobile + desktop) rendent ces blocs.
+  assert.ok(appSrc.includes("scoreExplain: opportunityScoreExplain("), "le VM expose scoreExplain");
+  assert.ok(appSrc.includes("scoreBreakdownHtml: renderScoreBreakdown("), "le VM expose scoreBreakdownHtml");
+  assert.equal((appSrc.match(/\$\{vm\.scoreBreakdownHtml\}/g) || []).length, 2,
+    "le détail doit être rendu dans les 2 cartes (mobile + desktop)");
+  assert.equal((appSrc.match(/safeText\(vm\.scoreExplain\)/g) || []).length, 2,
+    "l'explication doit être rendue dans les 2 cartes (mobile + desktop)");
+});
