@@ -19,6 +19,20 @@ Ce fichier liste **ce qui ne va pas dans le projet** : bugs identifiés, incohé
 
 ## Issues actuelles (mai 2026)
 
+### #0 ✅ Analytics 403 + bot qui ne propose aucun trade — résolu (2026-06-02)
+
+**Description**
+Deux symptômes liés au déblocage du bot d'apprentissage :
+1. Console navigateur : `403` sur `/api/training/feedback?limit=500` et `/api/reports/weekly?limit=20`. Causes : ces routes sont protégées `requireAdminAccess` côté Worker, mais `loadTradeFeedback()` et `loadReports()` (assets/app.js) appelaient `api()` qui n'envoie pas le token admin. L'erreur était de plus avalée en silence (`.catch(() => null)`), donc Analytics restait vide sans message.
+2. Des actifs atteignaient 68–71/100 mais ressortaient « Pas de trade », « 0 à surveiller », sans raison lisible. Pas d'outil pour voir POURQUOI un actif propre était rejeté.
+
+**Solution livrée (2026-06-02, branche `claude/manitradepro-bot-blockage-JiOJl`)**
+- Front : `loadTradeFeedback()` / `loadReports()` passent par `apiGetAuth()`. Les 403 sont affichés clairement dans l'UI Analytics (`state.tradeFeedbackError`, classe `.lpi-error`).
+- Worker : nouvelle route admin lecture seule `GET /api/training/debug-opportunities` — pour chaque actif, expose la décision moteur complète + la première garde qui bloque l'auto-open (`explainAutoOpenBlock`).
+- Worker : mode exploration (`applyExplorationFloor`) — score ≥ 65 sans blocage critique → « À surveiller » ; score ≥ 70 + risque acceptable → paper trade exploration à taille réduite. Gardes de sécurité (quote unsafe R5, setup structurel, heures marché, buckets toxiques, cooldown, news window, risk state) inchangées. Jamais d'argent réel.
+
+**État** : ✅ résolu côté code + tests (`tools/engine-tests.mjs`). Vérification live (lecture `debug-opportunities`) à faire par le créateur après déploiement Worker.
+
 ### #1 ✅ Score volatile — résolu en vague A.1 (mai 2026)
 
 **Description initiale**

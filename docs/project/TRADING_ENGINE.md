@@ -239,6 +239,30 @@ Cas réel évité : position ASML ouverte à 1531 $US Nasdaq, live arrivé à 13
 - `mean_reversion_enabled`
 - `require_structural_setup`
 - `learning_enabled`
+- `exploration_auto_open` (défaut `true`), `exploration_size_factor` (défaut `0.5`), `exploration_min_safety` (défaut `60`)
+
+### Mode exploration — plancher de classement (2026-06-02)
+
+`applyExplorationFloor` (dans `buildWorkerPlan`) débloque la collecte de données du
+bot d'apprentissage sans toucher aux gardes de sécurité :
+
+- score ≥ 65, confirmations ≥ 3, **aucun blocage critique** (`majorHardBlockerCount === 0`
+  + `watchFilterOk`) → au minimum **« À surveiller »**.
+- score ≥ 70, confirmations ≥ 3, **risque acceptable** (`risk ≥ watchRiskMin`),
+  aucun blocage critique → **« Trade proposé » exploration** (`plan.exploration = true`).
+
+Conséquences auto-open (paper uniquement, JAMAIS d'argent réel) :
+- `isTrainingCandidateAllowed` applique aux trades exploration des seuils de score
+  assouplis : actionability ≤ 50, dossier ≤ 65, **sûreté = `exploration_min_safety`
+  (60) au lieu de 68**. Tous les autres filtres restent identiques (setup structurel,
+  heures de marché, buckets toxiques, cooldown, news window, risk state, rr ≥ 1.6).
+- `chooseTrainingExecution` multiplie la taille par `exploration_size_factor` (0.5).
+- La garde quote unsafe (R5, `applyUnsafeDowngrade`) s'applique **en aval** et peut
+  toujours redescendre un payload exploration à « Pas de trade ». Jamais contournée.
+
+Diagnostic : `GET /api/training/debug-opportunities` (admin, lecture seule) expose
+pour chaque actif la décision moteur complète + la première garde qui bloque
+l'auto-open (`explainAutoOpenBlock`).
 
 ### Risk limits
 
