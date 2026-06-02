@@ -9,8 +9,16 @@
 ## État actuel
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
-- **Date dernière mise à jour** : 2026-05-21.
-- **Branche / PR active** : aucune. Maintenance documentaire post-merge PR #261 sur `claude/session-md-post-analytics-merge`.
+- **Date dernière mise à jour** : 2026-06-02.
+- **Branche / PR active** : `claude/manitradepro-bot-blockage-JiOJl` — déblocage bot d'apprentissage (auth Analytics + diagnostic moteur + mode exploration). Pas encore de PR ni de GO MERGE.
+- **🔧 SESSION 2026-06-02 — DÉBLOCAGE BOT D'APPRENTISSAGE** (branche `claude/manitradepro-bot-blockage-JiOJl`) :
+  - **Auth Analytics réparée** : `loadTradeFeedback()` et `loadReports()` (assets/app.js) passaient par `api()` (sans token) → 403 sur `/api/training/feedback` et `/api/reports/weekly` (routes `requireAdminAccess`). Bascule sur `apiGetAuth()`. Erreurs 403 désormais affichées dans l'UI Analytics (`state.tradeFeedbackError`, `.lpi-error`) au lieu d'un échec silencieux.
+  - **Diagnostic moteur** : nouvelle route `GET /api/training/debug-opportunities` (admin, lecture seule). Pour chaque actif : score, decision, tradeNow, blockers, confirmations, safety/actionability/dossier, quoteQuality, setup, régime, ET la première garde qui bloque l'auto-open (`explainAutoOpenBlock`). But : comprendre pourquoi un actif à 70+ reste « Pas de trade » ou n'ouvre aucun paper trade.
+  - **Mode exploration (plancher de classement)** : `applyExplorationFloor` dans `buildWorkerPlan`. score ≥ 65 + confirmations ≥ 3 + aucun blocage critique → au minimum « À surveiller ». score ≥ 70 + risque acceptable → « Trade proposé » exploration (paper, taille réduite). N'altère JAMAIS la garde quote unsafe (R5, `applyUnsafeDowngrade` reste en aval) ni l'argent réel (inexistant).
+  - **Auto-open exploration** : `isTrainingCandidateAllowed` accepte les trades exploration à seuils de score assouplis (`exploration_min_safety` 60 vs 68) et `chooseTrainingExecution` applique `exploration_size_factor` (0.5). Toutes les autres gardes (setup structurel, heures marché, buckets toxiques, cooldown, news window, risk state, rr ≥ 1.6) restent intactes. Nouveaux réglages : `exploration_auto_open` (true), `exploration_size_factor` (0.5), `exploration_min_safety` (60).
+  - **Tests** : `tools/engine-tests.mjs` (13 tests, `npm test`) — classement 70 sans blocage, blocage critique conservé, table de vérité exploration, éligibilité auto-open exploration + garde R5 non contournée, auth feedback/reports.
+  - **Badge UI « Exploration · paper réduit »** (revue ChatGPT, condition GO MERGE) : `rowIsExploration()` + badge ambre (`.badge.exploration`) sur les cartes opportunité (mobile + desktop) et la fiche détail, pour ne pas confondre un trade d'apprentissage avec un vrai « Trade proposé ».
+  - **À vérifier (créateur)** : déployer le Worker, ouvrir `GET /api/training/debug-opportunities` avec le token admin pour lire la vraie raison de blocage de NVDA & co.
 - **Dernier merge connu** : PR #261 `feat(ui): Live Paper Analytics — sous-vue Analytics dans Trade (PR-UI-LIVE-PAPER-INSIGHTS-1)` (commit `aabffe8` sur `main`).
 - **Phase officielle** : *VÉRITÉ MARCHÉ VISIBLE* — les analytics livePaperAnalytics + livePaperOutcome sont désormais observables côté UI dans l'onglet Trade.
 - **✅ STACK SUPPRESSION HISTORIQUE TRADES — VALIDÉE BOUT EN BOUT (2026-05-22)** :

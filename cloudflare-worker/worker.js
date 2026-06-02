@@ -3665,6 +3665,70 @@ function calcDetailScore(quote, candles, regime = null, env = null, regimeIndica
 }
 
 // ============================================================
+// MODE EXPLORATION — plancher de classement pour bot d'apprentissage
+// ============================================================
+// ManiTradePro est un bot d'apprentissage paper trading : son objectif est de
+// produire assez de trades pour identifier les setups les plus surs. Avec les
+// seuils stricts par defaut, des actifs propres (score 65-73, aucun blocage
+// critique) tombent en "Pas de trade" et le bot n'apprend jamais. Ce plancher
+// corrige ca SANS toucher aux gardes de securite :
+//
+//   - score >= 65, confirmations >= 3, AUCUN blocage critique
+//       => au minimum "A surveiller" (jamais d'execution)
+//   - score >= 70, confirmations >= 3, risque acceptable, AUCUN blocage critique
+//       => "Trade propose" en mode exploration (paper, taille reduite)
+//
+// "Blocage critique" = un des hard blockers majeurs (donnees faibles, risque
+// trop haut, entree trop tardive, conflit de tendance) OU un filtre dur non
+// rattrapable. Ces cas restent "Pas de trade". La garde quote unsafe
+// (applyUnsafeDowngrade) s'applique APRES et peut toujours redescendre a
+// "Pas de trade" — on ne contourne jamais R5. JAMAIS d'argent reel : ce
+// plancher n'agit que sur le classement et le paper trading.
+function applyExplorationFloor({
+  decision,
+  decisionScore,
+  confirmationCount,
+  majorBlockerCount,
+  watchFilterOk,
+  riskQuality,
+  direction,
+  profile
+}) {
+  // Deja un trade plein : rien a faire.
+  if (decision === "Trade propose") return { decision, exploration: false };
+  // Direction neutre = pas d'opportunite exploitable, on ne force rien.
+  if (direction !== "long" && direction !== "short") return { decision, exploration: false };
+
+  const score = Number(decisionScore);
+  const hasCriticalBlocker = Number(majorBlockerCount) > 0 || !watchFilterOk;
+  const enoughConfirmations = Number(confirmationCount) >= 3;
+  if (hasCriticalBlocker || !enoughConfirmations || !Number.isFinite(score)) {
+    return { decision, exploration: false };
+  }
+
+  // Trade exploration : score >= 70 + risque acceptable.
+  const riskAcceptable = Number(riskQuality) >= Number(profile.watchRiskMin);
+  if (score >= 70 && riskAcceptable) {
+    return {
+      decision: "Trade propose",
+      exploration: true,
+      reason: "Mode exploration : trade paper a taille reduite pour collecter des donnees. Jamais en argent reel."
+    };
+  }
+
+  // Surveillance exploration : score >= 65.
+  if (score >= 65) {
+    return {
+      decision: decision === "Pas de trade" ? "A surveiller" : decision,
+      exploration: false,
+      reason: "Mode exploration : dossier suffisant pour surveiller, en attente d'une execution plus propre."
+    };
+  }
+
+  return { decision, exploration: false };
+}
+
+// ============================================================
 // BUILD WORKER PLAN V2
 // ============================================================
 function buildWorkerPlan(base, regime = null) {
@@ -3754,21 +3818,40 @@ function buildWorkerPlan(base, regime = null) {
       entryQuality >= profile.watchEntryMin &&
       riskQuality >= profile.watchRiskMin &&
       contextQuality >= profile.watchContextMin;
-    const structuredDecision = structuredTradeReady ? "Trade propose" : structuredWatchReady ? "A surveiller" : "Pas de trade";
+    const baseStructuredDecision = structuredTradeReady ? "Trade propose" : structuredWatchReady ? "A surveiller" : "Pas de trade";
+    const baseConfirmationCount = baseStructuredDecision === "Trade propose" ? 5 : baseStructuredDecision === "A surveiller" ? 4 : 3;
+    const explo = applyExplorationFloor({
+      decision: baseStructuredDecision,
+      decisionScore,
+      confirmationCount: baseConfirmationCount,
+      majorBlockerCount,
+      watchFilterOk,
+      riskQuality,
+      direction,
+      profile
+    });
+    const structuredDecision = explo.decision;
+    const isExplorationTrade = explo.exploration === true;
     const structuredBlockers = structuredDecision === "Trade propose" ? [] : buildDecisionBlockers(structuredDecision === "A surveiller" ? "watch" : "trade");
+    // Pour transparence : on garde les ecarts non satisfaits meme quand le mode
+    // exploration propose le trade (sert au diagnostic /api/training/debug-opportunities).
+    const structuredSoftGaps = isExplorationTrade ? buildDecisionBlockers("trade") : [];
     const structuredTradeNow = structuredDecision === "Trade propose";
 
     return {
       ...structuredPlan,
       decision: structuredDecision,
       tradeNow: structuredTradeNow,
+      exploration: isExplorationTrade,
+      explorationReason: isExplorationTrade ? explo.reason : (explo.exploration === false && explo.reason && structuredDecision === "A surveiller" ? explo.reason : null),
+      softGaps: structuredSoftGaps,
       finalScore: score,
       decisionScore,
       safetyScore,
       exploitabilityScore,
-      setupStatus: structuredDecision === "Trade propose" ? "Setup confirme" : structuredDecision === "A surveiller" ? "Setup a surveiller" : "Setup encore trop fragile",
-      confirmationCount: structuredDecision === "Trade propose" ? 5 : structuredDecision === "A surveiller" ? 4 : 3,
-      confirmationLabel: structuredDecision === "Trade propose" ? "forte" : "moyenne",
+      setupStatus: structuredDecision === "Trade propose" ? (isExplorationTrade ? "Setup exploration" : "Setup confirme") : structuredDecision === "A surveiller" ? "Setup a surveiller" : "Setup encore trop fragile",
+      confirmationCount: isExplorationTrade ? 3 : (structuredDecision === "Trade propose" ? 5 : structuredDecision === "A surveiller" ? 4 : 3),
+      confirmationLabel: isExplorationTrade ? "exploration" : (structuredDecision === "Trade propose" ? "forte" : "moyenne"),
       trendLabel: direction === "long" ? "tendance haussiere" : direction === "short" ? "tendance baissiere" : "tendance neutre",
       waitFor: structuredDecision === "Trade propose"
         ? "rien de special"
@@ -3777,17 +3860,21 @@ function buildWorkerPlan(base, regime = null) {
           : "contexte plus propre",
       timing: entryQuality >= profile.tradeEntryMin + 4 ? "bon" : entryQuality >= profile.watchEntryMin ? "moyen" : "faible",
       safety: safetyScore >= 82 ? "elevee" : safetyScore >= 66 ? "moyenne" : "faible",
-      reason: structuredDecision === "Trade propose"
-        ? structuredPlan.reason
-        : structuredDecision === "A surveiller"
-          ? "Configuration detectee, mais l execution demande encore une validation plus propre."
-          : "Configuration detectee, mais le dossier reste trop fragile pour etre active.",
+      reason: isExplorationTrade
+        ? explo.reason
+        : structuredDecision === "Trade propose"
+          ? structuredPlan.reason
+          : structuredDecision === "A surveiller"
+            ? (explo.reason || "Configuration detectee, mais l execution demande encore une validation plus propre.")
+            : "Configuration detectee, mais le dossier reste trop fragile pour etre active.",
       refusalReason: structuredTradeNow ? null : "Configuration encore insuffisante pour declencher un trade.",
-      aiSummary: structuredDecision === "Trade propose"
-        ? `Configuration ${structuredPlan.setupType} detectee et validee en regime ${regime?.regime || "inconnu"}.`
-        : structuredDecision === "A surveiller"
-          ? `Configuration ${structuredPlan.setupType} detectee, mais le moteur prefere attendre une execution plus propre.`
-          : `Configuration ${structuredPlan.setupType} detectee, mais le moteur juge le dossier encore trop fragile.`,
+      aiSummary: isExplorationTrade
+        ? `Mode exploration : configuration ${structuredPlan.setupType} suffisante pour un paper trade a taille reduite (collecte de donnees).`
+        : structuredDecision === "Trade propose"
+          ? `Configuration ${structuredPlan.setupType} detectee et validee en regime ${regime?.regime || "inconnu"}.`
+          : structuredDecision === "A surveiller"
+            ? `Configuration ${structuredPlan.setupType} detectee, mais le moteur prefere attendre une execution plus propre.`
+            : `Configuration ${structuredPlan.setupType} detectee, mais le moteur juge le dossier encore trop fragile.`,
       aiContext: [structuredPlan.reason, structuredPlan.regimeValidation].filter(Boolean),
       blockerFlags,
       blockers: structuredBlockers,
@@ -3835,9 +3922,23 @@ function buildWorkerPlan(base, regime = null) {
     exploitabilityScore >= profile.watchActionabilityMin &&
     safetyScore >= profile.watchSafetyMin;
 
-  let decision = "Pas de trade";
-  if (tradeReady) decision = "Trade propose";
-  else if (watchReady) decision = "A surveiller";
+  let baseDecision = "Pas de trade";
+  if (tradeReady) baseDecision = "Trade propose";
+  else if (watchReady) baseDecision = "A surveiller";
+
+  // Mode exploration — plancher de classement (cf. applyExplorationFloor).
+  const exploF = applyExplorationFloor({
+    decision: baseDecision,
+    decisionScore,
+    confirmationCount: 3,
+    majorBlockerCount,
+    watchFilterOk,
+    riskQuality,
+    direction,
+    profile
+  });
+  const decision = exploF.decision;
+  const isExplorationTrade = exploF.exploration === true;
 
   const tradeNow = decision === "Trade propose";
   const trendLabel = direction === "long" ? "tendance haussiere" : direction === "short" ? "tendance baissiere" : "tendance neutre";
@@ -3862,16 +3963,21 @@ function buildWorkerPlan(base, regime = null) {
   const decisionBlockers = decision === "Trade propose"
     ? []
     : buildDecisionBlockers(decision === "A surveiller" ? "watch" : "trade");
+  // Ecarts non satisfaits conserves pour le diagnostic meme si le mode
+  // exploration propose le trade.
+  const softGaps = isExplorationTrade ? buildDecisionBlockers("trade") : [];
   const waitFor = decision === "Trade propose"
     ? "rien de special"
     : decision === "A surveiller"
       ? (entryQuality < profile.tradeEntryMin ? "une execution plus propre" : "une confirmation supplementaire")
       : "un dossier plus robuste";
-  const reason = decision === "Trade propose"
-    ? "Setup propre, surete suffisante et execution exploitable."
-    : decision === "A surveiller"
-      ? "Le contexte existe, mais la surete globale reste encore insuffisante pour declencher le trade."
-      : "Le dossier reste trop fragile pour proposer une position.";
+  const reason = isExplorationTrade
+    ? exploF.reason
+    : decision === "Trade propose"
+      ? "Setup propre, surete suffisante et execution exploitable."
+      : decision === "A surveiller"
+        ? (exploF.reason || "Le contexte existe, mais la surete globale reste encore insuffisante pour declencher le trade.")
+        : "Le dossier reste trop fragile pour proposer une position.";
 
   return {
     finalScore: score,
@@ -3879,11 +3985,14 @@ function buildWorkerPlan(base, regime = null) {
     safetyScore,
     exploitabilityScore,
     decision,
-    setupStatus: decision === "Trade propose" ? "Setup confirme" : decision === "A surveiller" ? "A surveiller" : "Non exploitable",
+    exploration: isExplorationTrade,
+    explorationReason: isExplorationTrade ? exploF.reason : (decision === "A surveiller" && exploF.reason ? exploF.reason : null),
+    softGaps,
+    setupStatus: decision === "Trade propose" ? (isExplorationTrade ? "Setup exploration" : "Setup confirme") : decision === "A surveiller" ? "A surveiller" : "Non exploitable",
     tradeNow,
     setupType: base?.setupType || "aucun",
     confirmationCount: 3,
-    confirmationLabel: "moyenne",
+    confirmationLabel: isExplorationTrade ? "exploration" : "moyenne",
     trendLabel,
     waitFor,
     side,
@@ -3896,7 +4005,7 @@ function buildWorkerPlan(base, regime = null) {
     safety: safetyScore >= 76 ? "elevee" : safetyScore >= 60 ? "moyenne" : "faible",
     reason,
     refusalReason: tradeNow ? null : "Signal insuffisant pour proposer un trade.",
-    aiSummary: tradeNow ? "Le moteur voit un setup exploitable avec une surete suffisante." : decision === "A surveiller" ? "Le moteur prefere attendre une execution plus propre." : "Le moteur juge le dossier encore trop fragile.",
+    aiSummary: isExplorationTrade ? "Mode exploration : paper trade a taille reduite pour collecter des donnees (jamais en argent reel)." : tradeNow ? "Le moteur voit un setup exploitable avec une surete suffisante." : decision === "A surveiller" ? "Le moteur prefere attendre une execution plus propre." : "Le moteur juge le dossier encore trop fragile.",
     aiContext: [],
     blockerFlags,
     blockers: decisionBlockers,
@@ -4747,6 +4856,16 @@ function getTrainingDefaults() {
     // post-mortem). 24h = laisse le temps au signal de mourir naturellement.
     // 0 désactive le cooldown.
     post_stop_cooldown_hours: 24,
+    // Mode exploration auto-open (bot d'apprentissage). Quand un actif est
+    // classe "Trade propose" via le plancher exploration (score >= 70, aucun
+    // blocage critique, risque acceptable), l'auto-cycle peut ouvrir un paper
+    // trade a TAILLE REDUITE pour collecter des donnees. Toutes les autres
+    // gardes (quote unsafe, heures de marche, setup structurel, buckets
+    // toxiques, cooldown, news window, risk state) restent appliquees. JAMAIS
+    // d'argent reel. Mettre a false pour revenir au comportement strict.
+    exploration_auto_open: true,
+    exploration_size_factor: 0.5,    // taille = 50% d'un trade normal
+    exploration_min_safety: 60,      // surete minimale d'un trade exploration (vs 68 normal)
     max_daily_loss_pct: 0.30,        // garde-fou jour uniquement (30%)
     max_weekly_loss_pct: 1.0,        // désactivé (100%)
     max_consecutive_losses: 999,     // désactivé
@@ -4953,9 +5072,22 @@ function isTrainingCandidateAllowed(row, settings, openRows, riskState = null, n
 
   // Scores (avec boost éventuel de règle 1)
   const scoreBoost = activeAdjustments?.minScoreBoosts?.get(bucketKey) || 0;
-  const minActionability = Number(settings.min_actionability_score || 72) + scoreBoost;
-  const minDecision = Number(settings.min_dossier_score || 74) + scoreBoost;
-  const minSafety = Math.max(68, minDecision - 4);
+  // Mode exploration (bot d'apprentissage) : un trade classe "Trade propose"
+  // via le plancher exploration (score >= 70, aucun blocage critique, risque
+  // acceptable) peut ouvrir un paper trade a TAILLE REDUITE avec des seuils de
+  // score assouplis. TOUTES les autres gardes (setup structurel, heures de
+  // marche, quote unsafe, buckets toxiques, cooldown, news window, risk state,
+  // rr >= 1.6) restent appliquees. JAMAIS d'argent reel.
+  const explorationTrade = row.plan?.exploration === true && settings.exploration_auto_open !== false;
+  const minActionability = explorationTrade
+    ? Math.min(Number(settings.min_actionability_score || 72) + scoreBoost, 50)
+    : Number(settings.min_actionability_score || 72) + scoreBoost;
+  const minDecision = explorationTrade
+    ? Math.min(Number(settings.min_dossier_score || 74) + scoreBoost, 65)
+    : Number(settings.min_dossier_score || 74) + scoreBoost;
+  const minSafety = explorationTrade
+    ? clampInt(settings.exploration_min_safety, 40, 100, 60)
+    : Math.max(68, minDecision - 4);
   const actionabilityScore = Number(row.plan?.exploitabilityScore || 0);
   const decisionScore = Number(
     row.plan?.decisionScore ??
@@ -5580,6 +5712,9 @@ function normalizeTrainingSettingsRow(row) {
     allowed_setups: Array.isArray(safe.allowed_setups) ? safe.allowed_setups : base.allowed_setups,
     mean_reversion_enabled: coerceBoolean(safe.mean_reversion_enabled, base.mean_reversion_enabled),
     require_structural_setup: coerceBoolean(safe.require_structural_setup, base.require_structural_setup),
+    exploration_auto_open: coerceBoolean(safe.exploration_auto_open, base.exploration_auto_open),
+    exploration_size_factor: clampFloat(safe.exploration_size_factor, 0.1, 1, base.exploration_size_factor),
+    exploration_min_safety: clampInt(safe.exploration_min_safety, 40, 100, base.exploration_min_safety),
     post_stop_cooldown_hours: clampInt(safe.post_stop_cooldown_hours, 0, 720, base.post_stop_cooldown_hours),
     max_daily_loss_pct: clampFloat(safe.max_daily_loss_pct, 0.001, 1.0, base.max_daily_loss_pct),
     max_weekly_loss_pct: clampFloat(safe.max_weekly_loss_pct, 0.001, 1.0, base.max_weekly_loss_pct),
@@ -5776,7 +5911,13 @@ function chooseTrainingExecution(payload, settings, currentAvailableCash, active
   const availableCash = Math.max(0, Number(currentAvailableCash ?? capitalBase));
   // PR #6 Phase 2 — règle 5/6 : multiplicateur de taille global (reduce_size)
   const sizeMult = Number.isFinite(Number(activeAdjustments?.sizeMultiplier)) ? Number(activeAdjustments.sizeMultiplier) : 1;
-  const allocatedCash = Math.min(availableCash, capitalBase * Number(settings?.allocation_per_trade_pct || 0.10) * sizeMult);
+  // Mode exploration : taille réduite pour les paper trades issus du plancher
+  // exploration (collecte de données à risque moindre). Facteur configurable
+  // (exploration_size_factor, défaut 0.5). N'affecte que le paper trading.
+  const explorationFactor = (plan?.exploration === true && settings?.exploration_auto_open !== false)
+    ? clampFloat(settings?.exploration_size_factor, 0.1, 1, 0.5)
+    : 1;
+  const allocatedCash = Math.min(availableCash, capitalBase * Number(settings?.allocation_per_trade_pct || 0.10) * sizeMult * explorationFactor);
   if (!Number.isFinite(allocatedCash) || allocatedCash <= 50) return null;
   const quantity = allocatedCash / price;
   if (!Number.isFinite(quantity) || quantity <= 0) return null;
@@ -6914,6 +7055,183 @@ async function buildOpportunityRowsForTraining(env) {
   rows.sort((a, b) => getComparableOpportunityScore(b) - getComparableOpportunityScore(a));
   setMemoryCache("route:opportunities:data", TTL.opportunitiesNonCrypto, cloneJsonPayload(rows));
   return rows;
+}
+
+// ============================================================
+// DIAGNOSTIC AUTO-OPEN — best-effort
+// ============================================================
+// Renvoie la PREMIERE garde qui bloque l'ouverture auto d'un candidat, sous
+// forme { code, reason } FR lisible, ou null si le candidat passerait. Reflete
+// isTrainingCandidateAllowed (meme ordre) mais pour le diagnostic uniquement —
+// isTrainingCandidateAllowed reste la source autoritaire du booleen.
+function explainAutoOpenBlock(row, settings, openRows, riskState, newsWindow, activeAdjustments, cooldownSet) {
+  const R = (code, reason) => ({ code, reason });
+  if (!row || row.status !== "ok") return R("status_unavailable", "Données indisponibles pour cet actif.");
+  if (row.decision !== "Trade propose") return R("not_trade_proposed", `Classé "${row.decision || "Pas de trade"}", pas "Trade proposé".`);
+  if (!row.plan?.tradeNow) return R("not_trade_now", "Le moteur ne déclenche pas l'entrée maintenant.");
+  if (riskState && riskState.tradingEnabled === false) return R("risk_state", "Garde-fou risque actif (pertes jour/semaine/série).");
+  if (!auvIsLivePaperCore(row.symbol)) return R("not_live_paper_core", "Hors univers auto-open (livePaperCore) : visible mais pas ouvrable automatiquement.");
+  if (isMarketHoliday(row.symbol)) return R("market_holiday", "Bourse fermée (jour férié).");
+  if (newsWindow && newsWindow.blocked) return R("news_window", `Fenêtre événement macro (±30 min) : ${newsWindow.reason || "high-impact"}.`);
+
+  const setupType = String(row.plan?.setupType || row.setupType || "").toLowerCase();
+  const VALID_SETUPS = new Set(["pullback","breakout","continuation","pullback_short","breakdown","continuation_short","mean_reversion"]);
+  const requireSetup = settings?.require_structural_setup !== false;
+  if (requireSetup && !VALID_SETUPS.has(setupType)) return R("no_structural_setup", "Aucun setup structurel détecté (require_structural_setup activé).");
+  const allowedSetups = Array.isArray(settings.allowed_setups) ? settings.allowed_setups : ["pullback","breakout","continuation"];
+  if (!allowedSetups.includes(setupType)) return R("setup_not_allowed", `Setup "${setupType}" non activé dans les réglages.`);
+  if (setupType === "mean_reversion" && !settings.mean_reversion_enabled) return R("mean_reversion_off", "Mean reversion désactivé.");
+
+  const side = String(row.plan?.side || row.direction || "long").toLowerCase();
+  const regime = normalizeRegimeLabel(row.plan?.regime || row.regime || "UNKNOWN");
+  const assetClass = row.assetClass || row.asset_class || getAssetClass(parseSymbol(row.symbol || ""));
+  const bucketKey = makeBucketKey(setupType || "unknown", side, regime, assetClass);
+  if (activeAdjustments?.disabledBuckets?.has(bucketKey)) return R("bucket_disabled", `Bucket ${bucketKey} désactivé par un ajustement actif.`);
+  const bucketKeyNoRegime = `${setupType || "unknown"}|${side}|${assetClass}`;
+  if (TOXIC_BUCKETS_BACKTEST_2026_04_28.has(bucketKeyNoRegime)) return R("toxic_bucket", `Combinaison ${bucketKeyNoRegime} statistiquement perdante (backtest).`);
+
+  const explorationTrade = row.plan?.exploration === true && settings.exploration_auto_open !== false;
+  const scoreBoost = activeAdjustments?.minScoreBoosts?.get(bucketKey) || 0;
+  const minActionability = explorationTrade ? Math.min(Number(settings.min_actionability_score || 72) + scoreBoost, 50) : Number(settings.min_actionability_score || 72) + scoreBoost;
+  const minDecision = explorationTrade ? Math.min(Number(settings.min_dossier_score || 74) + scoreBoost, 65) : Number(settings.min_dossier_score || 74) + scoreBoost;
+  const minSafety = explorationTrade ? clampInt(settings.exploration_min_safety, 40, 100, 60) : Math.max(68, minDecision - 4);
+  const actionabilityScore = Number(row.plan?.exploitabilityScore || 0);
+  const decisionScore = Number(row.plan?.decisionScore ?? directionalOpportunityScore(row.plan?.finalScore ?? row.score, row.direction));
+  const safetyScore = Number(row.plan?.safetyScore ?? row.safetyScore ?? 0);
+  if (actionabilityScore < minActionability) return R("actionability_low", `Exécutabilité ${actionabilityScore} < ${minActionability} requis${explorationTrade ? " (exploration)" : ""}.`);
+  if (decisionScore < minDecision) return R("decision_low", `Score direction ${decisionScore} < ${minDecision} requis${explorationTrade ? " (exploration)" : ""}.`);
+  if (safetyScore < minSafety) return R("safety_low", `Sûreté ${safetyScore} < ${minSafety} requis${explorationTrade ? " (exploration)" : ""}.`);
+  if (Number(row.plan?.rr || 0) < 1.6) return R("rr_low", `Ratio gain/risque ${Number(row.plan?.rr || 0).toFixed(2)} < 1.6.`);
+  if (!Number.isFinite(Number(row.plan?.entry))) return R("no_entry", "Niveau d'entrée manquant.");
+  if (!Number.isFinite(Number(row.plan?.stopLoss))) return R("no_stop", "Stop manquant.");
+  if (!Number.isFinite(Number(row.plan?.takeProfit))) return R("no_tp", "Objectif manquant.");
+  if (side === "short" && !settings.allow_short) return R("short_off", "Short désactivé.");
+  if (side === "long" && !settings.allow_long) return R("long_off", "Long désactivé.");
+
+  if (assetClass === "stock" || assetClass === "etf") {
+    const nowUtc = new Date();
+    const utcDay = nowUtc.getUTCDay();
+    if (utcDay < 1 || utcDay > 5) return R("market_closed", "Hors session : week-end (bourse fermée).");
+    const utcMin = nowUtc.getUTCHours() * 60 + nowUtc.getUTCMinutes();
+    const y = nowUtc.getUTCFullYear();
+    const sym = parseSymbol(row.symbol || "");
+    if (isEuroStock(sym)) {
+      const lastMarch = new Date(Date.UTC(y, 2, 31));
+      const dstStartEu = new Date(Date.UTC(y, 2, 31 - lastMarch.getUTCDay()));
+      const lastOct = new Date(Date.UTC(y, 9, 31));
+      const dstEndEu = new Date(Date.UTC(y, 9, 31 - lastOct.getUTCDay()));
+      const inDstEu = nowUtc >= dstStartEu && nowUtc < dstEndEu;
+      const openMinEu = inDstEu ? (7 * 60) : (8 * 60);
+      const closeMinEu = inDstEu ? (15 * 60 + 30) : (16 * 60 + 30);
+      if (utcMin < openMinEu || utcMin >= closeMinEu) return R("market_closed", "Hors session bourse européenne.");
+    } else {
+      const marchFirst = new Date(Date.UTC(y, 2, 1));
+      const dstStartUs = new Date(Date.UTC(y, 2, 1 + ((7 - marchFirst.getUTCDay()) % 7) + 7));
+      const novFirst = new Date(Date.UTC(y, 10, 1));
+      const dstEndUs = new Date(Date.UTC(y, 10, 1 + ((7 - novFirst.getUTCDay()) % 7)));
+      const inDstUs = nowUtc >= dstStartUs && nowUtc < dstEndUs;
+      const openMinUs = inDstUs ? (13 * 60 + 30) : (14 * 60 + 30);
+      const closeMinUs = inDstUs ? (20 * 60) : (21 * 60);
+      if (utcMin < openMinUs || utcMin >= closeMinUs) return R("market_closed", "Hors session bourse US.");
+    }
+  }
+
+  const allowedList = Array.isArray(settings.allowed_symbols) ? settings.allowed_symbols : [];
+  if (allowedList.length && !allowedList.includes(parseSymbol(row.symbol))) return R("symbol_not_allowed", "Symbole hors liste autorisée.");
+  const alreadyOpen = (openRows || []).filter(x => parseSymbol(x.symbol) === parseSymbol(row.symbol)).length;
+  if (alreadyOpen >= Number(settings.max_positions_per_symbol || 1)) return R("already_open", "Position déjà ouverte sur ce symbole.");
+  if ((openRows || []).length >= Number(settings.max_open_positions || 10)) return R("max_positions", "Nombre max de positions ouvertes atteint.");
+  if (cooldownSet && cooldownSet.has && cooldownSet.has(parseSymbol(row.symbol))) return R("cooldown", "Cooldown post-stop actif sur ce symbole.");
+
+  const safety = evaluateExecutionSafety(row);
+  if (!safety.safe) return R(`quote_unsafe:${safety.code}`, safety.human || "Prix live non fiable — exécution bloquée.");
+
+  return null;
+}
+
+// ============================================================
+// DEBUG OPPORTUNITIES — diagnostic moteur (read-only, admin)
+// ============================================================
+// Expose, pour chaque actif scanné, le détail complet de la décision moteur
+// ET la raison d'un éventuel blocage d'auto-open. But : comprendre pourquoi un
+// actif à 70+/100 reste "Pas de trade" ou ne déclenche aucun paper trade.
+async function handleTrainingDebugOpportunities(env, url) {
+  const settings = await getTrainingSettings(env);
+  const rows = await buildOpportunityRowsForTraining(env);
+
+  let openRows = [];
+  let closedRows = [];
+  if (supabaseConfigured(env)) {
+    openRows = await getOpenTrainingPositionsRaw(env).catch(() => []);
+    closedRows = await getClosedTrainingTradesRaw(env, 500).catch(() => []);
+  }
+  const riskState = buildTrainingRiskState(settings, openRows, closedRows);
+  const newsWindow = await getNewsWindowForCycle(env).catch(() => ({ blocked: false }));
+  const activeAdjustments = await resolveActiveAdjustments(env).catch(() => null);
+  const cooldownHours = Number(settings?.post_stop_cooldown_hours);
+  const cooldownSet = (Number.isFinite(cooldownHours) && cooldownHours > 0)
+    ? await lookupRecentStopsForSymbol(env, cooldownHours).catch(() => new Set())
+    : new Set();
+
+  const limitRaw = url?.searchParams?.get("limit");
+  const limit = (limitRaw == null || limitRaw === "") ? 60 : clampInt(limitRaw, 1, 200, 60);
+
+  const opportunities = (Array.isArray(rows) ? rows : []).slice(0, limit).map((row) => {
+    const plan = row.plan || {};
+    const qq = row.liveContext?.quoteQuality || null;
+    const eligible = isTrainingCandidateAllowed(row, settings, openRows, riskState, newsWindow, activeAdjustments, cooldownSet);
+    const block = eligible ? null : explainAutoOpenBlock(row, settings, openRows, riskState, newsWindow, activeAdjustments, cooldownSet);
+    return {
+      symbol: row.symbol,
+      assetClass: row.assetClass,
+      score: row.score,
+      officialDecision: row.officialDecision ?? row.decision ?? null,
+      planDecision: plan.decision ?? null,
+      tradeNow: !!plan.tradeNow,
+      exploration: plan.exploration === true,
+      blockers: Array.isArray(plan.blockers) ? plan.blockers : [],
+      softGaps: Array.isArray(plan.softGaps) ? plan.softGaps : [],
+      blockerFlags: Array.isArray(plan.blockerFlags) ? plan.blockerFlags : [],
+      confirmationCount: plan.confirmationCount ?? null,
+      confirmationLabel: plan.confirmationLabel ?? null,
+      safetyScore: plan.safetyScore ?? null,
+      actionabilityScore: plan.exploitabilityScore ?? null,
+      decisionScore: plan.decisionScore ?? null,
+      dossierScore: plan.finalScore ?? row.score ?? null,
+      dataQuality: row.breakdown?.dataQuality ?? null,
+      quoteQuality: qq ? {
+        executionSafe: qq.executionSafe ?? null,
+        reasons: Array.isArray(qq.reasons) ? qq.reasons : [],
+        stale: qq.stale ?? null,
+        isSnapshot: qq.isSnapshot ?? null
+      } : null,
+      setup: plan.setupType ?? row.setupType ?? "aucun",
+      regime: row.regime?.regime ?? null,
+      direction: row.direction ?? null,
+      refusalReason: plan.refusalReason ?? plan.reason ?? null,
+      autoOpenEligible: eligible,
+      autoOpenBlockCode: block ? block.code : null,
+      autoOpenBlockReason: block ? block.reason : null
+    };
+  });
+
+  return ok({
+    asOf: nowIso(),
+    botEnabled: !!settings.is_enabled,
+    autoOpenEnabled: !!settings.auto_open_enabled,
+    explorationAutoOpen: settings.exploration_auto_open !== false,
+    thresholds: {
+      min_dossier_score: settings.min_dossier_score,
+      min_actionability_score: settings.min_actionability_score,
+      exploration_min_safety: settings.exploration_min_safety,
+      require_structural_setup: settings.require_structural_setup
+    },
+    riskState: { tradingEnabled: riskState?.tradingEnabled ?? null, blockers: riskState?.blockers ?? [] },
+    newsWindow: { blocked: !!newsWindow?.blocked, reason: newsWindow?.reason ?? null },
+    eligibleCount: opportunities.filter(o => o.autoOpenEligible).length,
+    count: opportunities.length,
+    opportunities
+  }, "worker_training", nowIso(), "recent", null);
 }
 
 // ============================================================
@@ -11439,6 +11757,11 @@ async function handleRequest(request, env) {
       const denied = await requireAdminAccess(request, env);
       if (denied) return denied;
       return safeRoute(() => handleTrainingFeedback(url, env));
+    }
+    if (url.pathname === "/api/training/debug-opportunities") {
+      const denied = await requireAdminAccess(request, env);
+      if (denied) return denied;
+      return safeRoute(() => handleTrainingDebugOpportunities(env, url));
     }
     if (url.pathname === "/api/user-assets") {
       const denied = await requireAdminAccess(request, env);

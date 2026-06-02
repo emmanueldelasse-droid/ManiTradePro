@@ -120,7 +120,8 @@
     bot: { account: null, events: [], stats: null, loading: false, error: null, forcingCycle: false, settingsOpen: false, editDraft: null, savingDraft: false, statsTab: "setup", paramsOpen: false, subTab: "stats", learning: { stats: null, loading: false, error: null, filterMode: "all", lastLoadedAt: 0, showUnknown: false } },
     health: { adjustments: [], bucketStats: [], loading: false, error: null, lastLoadedAt: 0 },
     reports: { list: [], loading: false, error: null, openId: null, generating: false },   // PR #9 Phase 2 — rapports hebdo
-    tradeFeedback: {} // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
+    tradeFeedback: {}, // trade_id → { mae_pct, mfe_pct, exit_reason, mae_vs_stop_ratio, mfe_vs_tp_ratio, ... } (PR #5 Phase 2)
+    tradeFeedbackError: null // message d'erreur de chargement du feedback (ex : 403 si token admin manquant)
   };
 
   const app = document.getElementById("app");
@@ -1712,6 +1713,13 @@ function rowTradePlan(item) {
   return item.plan;
 }
 
+// Vrai si l'opportunité est un trade "exploration" (paper, taille réduite) issu
+// du plancher d'apprentissage du moteur — à distinguer d'un vrai "Trade proposé"
+// pleine confiance. Le flag vient de plan.exploration (worker buildWorkerPlan).
+function rowIsExploration(item) {
+  return rowTradePlan(item)?.exploration === true;
+}
+
 function currentTradePlan() {
   return officialPlanForDetail(state.detail) || state.detail?.plan || null;
 }
@@ -2455,17 +2463,25 @@ async function confirmTradeFromModal() {
   }
 
   async function loadTradeFeedback() {
-    // PR #5 Phase 2 — hydrate state.tradeFeedback (map par trade_id)
+    // PR #5 Phase 2 — hydrate state.tradeFeedback (map par trade_id).
+    // Route protegee par requireAdminAccess cote Worker → on DOIT passer le
+    // token admin (apiGetAuth), sinon 403. On ne masque plus l'erreur en
+    // silence : on l'expose dans state.tradeFeedbackError pour que l'UI
+    // Analytics affiche un message clair au lieu de rester vide sans raison.
     try {
-      const resp = await api("/api/training/feedback?limit=500").catch(() => null);
+      const resp = await apiGetAuth("/api/training/feedback?limit=500");
       const rows = Array.isArray(resp?.data) ? resp.data : [];
       const map = {};
       for (const row of rows) {
         if (row && row.trade_id) map[String(row.trade_id)] = row;
       }
       state.tradeFeedback = map;
-    } catch {
-      // silencieux — l'UI garde le dernier snapshot
+      state.tradeFeedbackError = null;
+    } catch (e) {
+      const msg = e?.message || "";
+      state.tradeFeedbackError = /403|401|token|admin/i.test(msg)
+        ? "Accès refusé aux données d'analyse (token admin requis). Connecte-toi en mode admin pour voir le détail des trades."
+        : `Impossible de charger les données d'analyse : ${msg || "erreur réseau"}`;
     }
   }
 
@@ -2475,12 +2491,18 @@ async function confirmTradeFromModal() {
     state.reports.error = null;
     render();
     try {
-      const resp = await api("/api/reports/weekly?limit=20").catch(() => null);
+      // Route protegee par requireAdminAccess → apiGetAuth (token admin), sinon
+      // 403. On laisse l'erreur remonter au catch pour l'afficher dans l'UI au
+      // lieu de la masquer avec un .catch(() => null) qui rendait la vue vide.
+      const resp = await apiGetAuth("/api/reports/weekly?limit=20");
       const rows = Array.isArray(resp?.data) ? resp.data : [];
       state.reports.list = rows;
       state.reports.error = null;
     } catch (e) {
-      state.reports.error = e.message || "Erreur de chargement";
+      const msg = e?.message || "";
+      state.reports.error = /403|401|token|admin/i.test(msg)
+        ? "Accès refusé aux rapports (token admin requis). Connecte-toi en mode admin."
+        : (msg || "Erreur de chargement");
       state.reports.list = [];
     } finally {
       state.reports.loading = false;
@@ -3476,6 +3498,7 @@ function getOpportunityCardViewModel(item) {
     scoreState,
     decisionLabel: decisionState.label,
     decisionTone: decisionState.tone,
+    explorationBadge: rowIsExploration(item) ? badge("Exploration · paper réduit", "exploration") : "",
     trendLabel: rowTrendLabel(item),
     assetBadge: assetClassLabel(item.assetClass),
     blockerLine,
@@ -3556,6 +3579,7 @@ function renderOppRow(item, rank) {
             <div style="min-width:0;flex:1;display:flex;flex-direction:column;gap:8px;">
               <div style="display:flex;flex-wrap:wrap;gap:8px;">
                 ${badge(vm.decisionLabel, vm.decisionTone)}
+                ${vm.explorationBadge}
                 ${badge(vm.trendLabel, item.direction || "")}
               </div>
               <div class="price">${vm.priceHtml}</div>
@@ -3589,6 +3613,7 @@ function renderOppRow(item, rank) {
           ${scoreRing(vm.scoreState.score, vm.scoreState.tone)}
           <div class="score-meta" style="display:flex;flex-direction:column;gap:8px;">
             ${badge(vm.decisionLabel, vm.decisionTone)}
+            ${vm.explorationBadge}
             ${badge(vm.trendLabel, item.direction || "")}
           </div>
         </div>
@@ -4099,6 +4124,7 @@ function renderTradePlanHero(detail, plan) {
         </div>
         <div class="legend plan-card-head-badges">
           ${badge(plan?.decision || "Pas de trade", statusToneFromDecision(plan?.decision))}
+          ${plan?.exploration === true ? badge("Exploration · paper réduit", "exploration") : ""}
           ${badge(setupLabel)}
           ${badge(regimeVm.label, regimeVm.tone)}
           ${badge(`confiance ${confidenceText}`)}
@@ -6426,11 +6452,18 @@ function openPositionsRiskView() {
     const warnings = lpiBuildWarningsTop(all);
     const recent = lpiBuildRecentInstrumented(all);
 
+    // Message d'erreur clair si le chargement du feedback a échoué (ex : 403
+    // token admin manquant). On ne laisse plus la vue vide sans explication.
+    const feedbackErrorHtml = state.tradeFeedbackError
+      ? `<div class="lpi-error" role="alert">⚠️ ${safeText(state.tradeFeedbackError)}</div>`
+      : "";
+
     // État vide explicite (aucun trade instrumenté du tout).
     if (overview.instrumented === 0) {
       return `
         <div class="card lpi-section" id="trades-analytics">
           <div class="section-title">📊 Analytics</div>
+          ${feedbackErrorHtml}
           <div class="empty-state">
             Les prochains trades paper analysés apparaîtront ici.
             ${overview.legacy > 0 ? `<br/><small>${overview.legacy} trade(s) legacy détecté(s) (avant instrumentation).</small>` : ""}
@@ -6562,6 +6595,7 @@ function openPositionsRiskView() {
       <div class="card lpi-section" id="trades-analytics">
         <div class="section-title">📊 Analytics — Live Paper Insights</div>
         <div class="lpi-muted lpi-small">Vérité marché visible — lecture seule. Source : <code>livePaperAnalytics</code> + <code>livePaperOutcome</code>.</div>
+        ${feedbackErrorHtml}
         ${overviewHtml}
         ${setupTableHtml}
         ${regimeTableHtml}

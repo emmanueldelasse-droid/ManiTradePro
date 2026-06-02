@@ -1922,6 +1922,7 @@ button:focus-visible,a:focus-visible,.btn:focus-visible,.nav-item:focus-visible,
 .lpi-section{margin-top:18px}
 .lpi-section .section-title{margin-bottom:6px}
 .lpi-muted{color:var(--text-secondary)}
+.lpi-error{margin:8px 0;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,80,80,.45);background:rgba(255,80,80,.12);color:var(--text-primary);font-size:.82rem;line-height:1.35}
 .lpi-small{font-size:.78rem}
 .lpi-num{text-align:right;font-variant-numeric:tabular-nums}
 .lpi-profit{color:var(--profit, #00e5a0);font-weight:600}
