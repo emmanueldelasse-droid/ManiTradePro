@@ -14,52 +14,178 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 0,
+    "totalCount": 2,
     "winCount": 0,
-    "lossCount": 0,
-    "winRate": null,
-    "totalPnl": 0,
+    "lossCount": 2,
+    "winRate": 0,
+    "totalPnl": -50.2120864270612,
     "avgWin": 0,
-    "avgLoss": 0,
-    "expectancy": null,
-    "rrActual": null,
-    "openCount": 2,
-    "bySetup": [],
-    "byClass": [],
-    "topSymbols": [],
-    "bottomSymbols": []
+    "avgLoss": 25.1060432135306,
+    "expectancy": -25.1060432135306,
+    "rrActual": 0,
+    "openCount": 0,
+    "bySetup": [
+      {
+        "setup": "continuation",
+        "count": 2,
+        "wins": 0,
+        "pnl": -50.2120864270612,
+        "winRate": 0
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 2,
+        "wins": 0,
+        "pnl": -50.2120864270612,
+        "winRate": 0
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "MSFT",
+        "count": 1,
+        "pnl": -20.235841525443117,
+        "wins": 0
+      },
+      {
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": -29.976244901618085,
+        "wins": 0
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": -29.976244901618085,
+        "wins": 0
+      },
+      {
+        "symbol": "MSFT",
+        "count": 1,
+        "pnl": -20.235841525443117,
+        "wins": 0
+      }
+    ]
   },
   "stats7d": {
-    "totalCount": 0,
+    "totalCount": 2,
     "winCount": 0,
-    "lossCount": 0,
-    "winRate": null,
-    "totalPnl": 0,
+    "lossCount": 2,
+    "winRate": 0,
+    "totalPnl": -50.2120864270612,
     "avgWin": 0,
-    "avgLoss": 0,
-    "expectancy": null,
-    "rrActual": null,
+    "avgLoss": 25.1060432135306,
+    "expectancy": -25.1060432135306,
+    "rrActual": 0,
     "openCount": 0,
-    "bySetup": [],
-    "byClass": [],
-    "topSymbols": [],
-    "bottomSymbols": []
+    "bySetup": [
+      {
+        "setup": "continuation",
+        "count": 2,
+        "wins": 0,
+        "pnl": -50.2120864270612,
+        "winRate": 0
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 2,
+        "wins": 0,
+        "pnl": -50.2120864270612,
+        "winRate": 0
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "MSFT",
+        "count": 1,
+        "pnl": -20.235841525443117,
+        "wins": 0
+      },
+      {
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": -29.976244901618085,
+        "wins": 0
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": -29.976244901618085,
+        "wins": 0
+      },
+      {
+        "symbol": "MSFT",
+        "count": 1,
+        "pnl": -20.235841525443117,
+        "wins": 0
+      }
+    ]
   },
   "stats30d": {
-    "totalCount": 0,
+    "totalCount": 2,
     "winCount": 0,
-    "lossCount": 0,
-    "winRate": null,
-    "totalPnl": 0,
+    "lossCount": 2,
+    "winRate": 0,
+    "totalPnl": -50.2120864270612,
     "avgWin": 0,
-    "avgLoss": 0,
-    "expectancy": null,
-    "rrActual": null,
+    "avgLoss": 25.1060432135306,
+    "expectancy": -25.1060432135306,
+    "rrActual": 0,
     "openCount": 0,
-    "bySetup": [],
-    "byClass": [],
-    "topSymbols": [],
-    "bottomSymbols": []
+    "bySetup": [
+      {
+        "setup": "continuation",
+        "count": 2,
+        "wins": 0,
+        "pnl": -50.2120864270612,
+        "winRate": 0
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 2,
+        "wins": 0,
+        "pnl": -50.2120864270612,
+        "winRate": 0
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "MSFT",
+        "count": 1,
+        "pnl": -20.235841525443117,
+        "wins": 0
+      },
+      {
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": -29.976244901618085,
+        "wins": 0
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": -29.976244901618085,
+        "wins": 0
+      },
+      {
+        "symbol": "MSFT",
+        "count": 1,
+        "pnl": -20.235841525443117,
+        "wins": 0
+      }
+    ]
   },
-  "lastClosedAt": null
+  "lastClosedAt": "2026-06-03T21:46:05.715Z"
 }
