@@ -14,35 +14,41 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 2,
+    "totalCount": 3,
     "winCount": 0,
-    "lossCount": 2,
+    "lossCount": 3,
     "winRate": 0,
-    "totalPnl": -50.2120864270612,
+    "totalPnl": -53.57385260869694,
     "avgWin": 0,
-    "avgLoss": 25.1060432135306,
-    "expectancy": -25.1060432135306,
+    "avgLoss": 17.857950869565645,
+    "expectancy": -17.857950869565645,
     "rrActual": 0,
-    "openCount": 2,
+    "openCount": 1,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 2,
+        "count": 3,
         "wins": 0,
-        "pnl": -50.2120864270612,
+        "pnl": -53.57385260869694,
         "winRate": 0
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 2,
+        "count": 3,
         "wins": 0,
-        "pnl": -50.2120864270612,
+        "pnl": -53.57385260869694,
         "winRate": 0
       }
     ],
     "topSymbols": [
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
+        "wins": 0
+      },
       {
         "symbol": "MSFT",
         "count": 1,
@@ -67,40 +73,52 @@
         "symbol": "MSFT",
         "count": 1,
         "pnl": -20.235841525443117,
+        "wins": 0
+      },
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
         "wins": 0
       }
     ]
   },
   "stats7d": {
-    "totalCount": 2,
+    "totalCount": 3,
     "winCount": 0,
-    "lossCount": 2,
+    "lossCount": 3,
     "winRate": 0,
-    "totalPnl": -50.2120864270612,
+    "totalPnl": -53.57385260869694,
     "avgWin": 0,
-    "avgLoss": 25.1060432135306,
-    "expectancy": -25.1060432135306,
+    "avgLoss": 17.857950869565645,
+    "expectancy": -17.857950869565645,
     "rrActual": 0,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 2,
+        "count": 3,
         "wins": 0,
-        "pnl": -50.2120864270612,
+        "pnl": -53.57385260869694,
         "winRate": 0
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 2,
+        "count": 3,
         "wins": 0,
-        "pnl": -50.2120864270612,
+        "pnl": -53.57385260869694,
         "winRate": 0
       }
     ],
     "topSymbols": [
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
+        "wins": 0
+      },
       {
         "symbol": "MSFT",
         "count": 1,
@@ -125,40 +143,52 @@
         "symbol": "MSFT",
         "count": 1,
         "pnl": -20.235841525443117,
+        "wins": 0
+      },
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
         "wins": 0
       }
     ]
   },
   "stats30d": {
-    "totalCount": 2,
+    "totalCount": 3,
     "winCount": 0,
-    "lossCount": 2,
+    "lossCount": 3,
     "winRate": 0,
-    "totalPnl": -50.2120864270612,
+    "totalPnl": -53.57385260869694,
     "avgWin": 0,
-    "avgLoss": 25.1060432135306,
-    "expectancy": -25.1060432135306,
+    "avgLoss": 17.857950869565645,
+    "expectancy": -17.857950869565645,
     "rrActual": 0,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 2,
+        "count": 3,
         "wins": 0,
-        "pnl": -50.2120864270612,
+        "pnl": -53.57385260869694,
         "winRate": 0
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 2,
+        "count": 3,
         "wins": 0,
-        "pnl": -50.2120864270612,
+        "pnl": -53.57385260869694,
         "winRate": 0
       }
     ],
     "topSymbols": [
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
+        "wins": 0
+      },
       {
         "symbol": "MSFT",
         "count": 1,
@@ -184,8 +214,14 @@
         "count": 1,
         "pnl": -20.235841525443117,
         "wins": 0
+      },
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
+        "wins": 0
       }
     ]
   },
-  "lastClosedAt": "2026-06-03T21:46:05.715Z"
+  "lastClosedAt": "2026-06-08T17:00:50.867Z"
 }
