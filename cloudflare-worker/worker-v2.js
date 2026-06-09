@@ -335,7 +335,7 @@ async function closePositionStore(env, pos, trade) {
 
 async function insertCycle(env, cycle) {
   if (supaConfigured(env)) {
-    try { await supa(env, TBL.cycles, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(cycle) }); } catch { /* non bloquant */ }
+    await supa(env, TBL.cycles, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(cycle) });
     return;
   }
   const arr = await kvGet(env, KV.cycles, []);
@@ -354,13 +354,24 @@ async function upsertSetupStats(env, stats) {
     updated_at: new Date().toISOString(),
   }));
   if (!rows.length) return;
+  await supa(env, `${TBL.stats}?on_conflict=setup_type`, {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+    body: JSON.stringify(rows),
+  });
+}
+
+// Sonde de diagnostic : statut brut d'un appel REST Supabase (debug temporaire).
+async function supaProbe(env) {
+  if (!supaConfigured(env)) return { store: "kv" };
   try {
-    await supa(env, `${TBL.stats}?on_conflict=setup_type`, {
-      method: "POST",
-      headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
-      body: JSON.stringify(rows),
-    });
-  } catch { /* non bloquant */ }
+    const base = String(env.SUPABASE_URL).replace(/\/$/, "");
+    const res = await fetchWithTimeout(`${base}/rest/v1/${TBL.cycles}?select=id&limit=1`, { headers: supaHeaders(env) }, 9000);
+    const body = await res.text().catch(() => "");
+    return { store: "supabase", ok: res.ok, status: res.status, body: String(body).slice(0, 300) };
+  } catch (e) {
+    return { store: "supabase", ok: false, error: String(e?.message || e) };
+  }
 }
 
 function toPositionRow(p) {
@@ -419,6 +430,11 @@ async function runCycle(env) {
   const opportunities = [];
   let scanned = 0;
   let errors = 0;
+  // Debug temporaire (audit écritures Supabase).
+  const positionInsertErrors = [];
+  const tradeInsertErrors = [];
+  let cycleInsertError = null;
+  let statsError = null;
 
   const latestPriceBySymbol = {};
 
@@ -466,7 +482,8 @@ async function runCycle(env) {
       openedAt: pos.openedAt, closedAt, durationHours: Math.round(heldMs / 3600000),
       exitReason: res.exitReason,
     };
-    try { await closePositionStore(env, pos, trade); closed++; openBySymbol.delete(pos.symbol); } catch { errors++; }
+    try { await closePositionStore(env, pos, trade); closed++; openBySymbol.delete(pos.symbol); }
+    catch (e) { errors++; if (tradeInsertErrors.length < 5) tradeInsertErrors.push(String(e?.message || e)); }
   }
 
   // 3) Ouvrir de nouveaux paper trades pour les opportunités.
@@ -491,7 +508,7 @@ async function runCycle(env) {
       openCount++;
       opened++;
       opp.opened = true;
-    } catch { errors++; }
+    } catch (e) { errors++; if (positionInsertErrors.length < 5) positionInsertErrors.push(`${opp.symbol}: ${String(e?.message || e)}`); }
   }
 
   // 4) Stocker le cycle + recalculer les stats d'apprentissage.
@@ -501,14 +518,14 @@ async function runCycle(env) {
     scanned, detected: opportunities.length, opened, closed, errors,
     note: supaConfigured(env) ? "supabase" : "kv",
   };
-  await insertCycle(env, cycle);
+  try { await insertCycle(env, cycle); } catch (e) { cycleInsertError = String(e?.message || e); }
 
   let stats = null;
   try {
     const trades = (await getClosedTrades(env, 2000)).map(normalizeTrade);
     stats = computeStats(trades);
     await upsertSetupStats(env, stats);
-  } catch { /* non bloquant */ }
+  } catch (e) { statsError = String(e?.message || e); }
 
   const health = {
     active: true,
@@ -521,7 +538,16 @@ async function runCycle(env) {
   // État rapide en KV (toujours dispo, lecture publique sans rescanner).
   await kvPut(env, STATE_KEY, { health, opportunities, updatedAt: finishedAt });
 
-  return { health, opportunities, cycle, stats };
+  // Debug temporaire (audit écritures Supabase). À retirer une fois validé.
+  const debug = {
+    supabase: await supaProbe(env),
+    positionInsertErrors,
+    tradeInsertErrors,
+    cycleInsertError,
+    statsError,
+  };
+
+  return { health, opportunities, cycle, stats, debug };
 }
 
 // ============================================================
