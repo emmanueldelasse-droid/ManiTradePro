@@ -8,7 +8,9 @@
 
 ## 🆕 SESSION 2026-06-09 — MANITRADEPRO V2 (LEARNING BOT, reconstruction propre)
 
-> Branche `claude/manitradepro-v2-learning-bot`. **Pas de PR, pas de merge** : livraison sur branche uniquement (gouvernance — un `GO MERGE` reste requis avant tout merge sur `main`).
+> **PR #267 mergée sur `main` le 2026-06-10 par le créateur** (squash `d4340968`, sans GO MERGE ChatGPT — décision créateur assumée).  
+> CI vert : Pages ✅, Worker V1 ✅, Migrations Supabase (racine) ✅.  
+> **⚠ Deux actions manuelles restantes** : déploiement Worker V2 + migrations V2 (voir § *À faire créateur* ci-dessous).
 
 - **Mission** : recréer l'app depuis zéro en V2, **sans réparer la V1**. Objectif réel = bot d'apprentissage qui *prend* des trades (paper) pour mesurer quels setups gagnent. Fin du modèle V1 « 0 trade parfaitement filtré ».
 - **Décision créateur (cette session)** : livrer sur la branche `claude/manitradepro-v2-learning-bot` + **fichiers V2 séparés** (la V1 — `worker.js`, `assets/`, tables `mtp_*` — reste 100 % intacte).
@@ -22,7 +24,11 @@
   - `docs/v2/ARCHITECTURE_V2.md` + `docs/v2/README_V2.md` — architecture, schéma, endpoints, déploiement.
 - **Règle absolue respectée** : « si un trade est affiché ouvrable, il est ouvrable, sinon il n'est pas affiché ». Aucun score, aucun filtre caché.
 - **Sécurité** : paper trading strict. Aucun broker, aucun argent réel, aucun secret modifié/exposé.
-- **À faire (créateur)** : appliquer la migration SQL V2, `wrangler deploy -c wrangler-v2.toml`, vérifier `wrangler secret list -c wrangler-v2.toml`, lancer un premier cycle (front admin ou `POST /api/v2/cycle`).
+- **À faire (créateur) — ⚠ BLOQUANT pour que le V2 fonctionne** :
+  1. **Migrations SQL V2** (non appliquées par la CI — glob `*.sql` ne descend pas dans `v2/`) : ouvrir Supabase Studio → SQL Editor → exécuter successivement `cloudflare-worker/migrations/v2/001_v2_learning_schema.sql` puis `cloudflare-worker/migrations/v2/002_opened_bar_time.sql`. Idempotents, aucun risque.
+  2. **Déploiement Worker V2** (non couvert par le GitHub Action — celui-ci fait `wrangler deploy` sans `-c wrangler-v2.toml`) : depuis `C:\Users\Emman\Documents\ManiTradePro\cloudflare-worker` (après `git pull origin main`) : `wrangler deploy -c wrangler-v2.toml`.
+  3. Vérifier les secrets du worker V2 : `wrangler secret list -c wrangler-v2.toml`.
+  4. Lancer un premier cycle : `POST /api/v2/cycle` ou via le front admin V2 (`/v2/index.html` sur GitHub Pages).
 - **Agents / skills utilisés** : aucun (moteur quant implémenté directement, conforme `GOVERNANCE.md`).
 - **Correctifs post-déploiement (audit créateur, branche)** :
   - Écritures Supabase KO → cache de schéma PostgREST non rechargé après création des tables (la base acceptait les INSERT). Rechargé côté Supabase + champ `debug` temporaire ajouté à `POST /api/v2/cycle`.
