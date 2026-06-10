@@ -1,5 +1,5 @@
 // ManiTradePro V2 — service worker (network-first sur l'app shell).
-const CACHE_VERSION = "manitradepro-v2-2";
+const CACHE_VERSION = "manitradepro-v2-3";
 const ASSETS = ["./", "./index.html", "./app.js", "./styles.css", "./manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {

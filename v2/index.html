@@ -27,6 +27,7 @@
     <nav class="tabs">
       <button class="tab active" data-tab="dashboard">Tableau de bord</button>
       <button class="tab" data-tab="opportunities">Opportunités</button>
+      <button class="tab" data-tab="positions">Positions ouvertes</button>
       <button class="tab" data-tab="trades">Trades</button>
     </nav>
 
@@ -63,6 +64,21 @@
           </tr></thead><tbody></tbody></table>
         </div>
         <div class="empty" id="opp-empty" hidden>Aucune opportunité au dernier scan.</div>
+      </section>
+
+      <!-- POSITIONS OUVERTES -->
+      <section class="view" id="view-positions">
+        <div class="view-head">
+          <h2>Positions ouvertes</h2>
+          <span class="muted" id="pos-count"></span>
+        </div>
+        <p class="hint">Paper trades en cours. Ils se ferment quand une bougie <strong>postérieure</strong> à l'entrée touche le stop ou l'objectif (ou après 25 jours).</p>
+        <div class="table-wrap">
+          <table id="pos-table"><thead><tr>
+            <th>Actif</th><th>Setup</th><th>Sens</th><th>Entrée</th><th>Stop</th><th>Objectif</th><th>Gain/Risque</th><th>Quantité</th><th>Ouvert le</th><th>Bougie d'entrée</th><th>Pourquoi</th>
+          </tr></thead><tbody></tbody></table>
+        </div>
+        <div class="empty" id="pos-empty" hidden>Aucune position ouverte pour l'instant.</div>
       </section>
 
       <!-- TRADES -->

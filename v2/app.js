@@ -143,6 +143,29 @@
     }
   }
 
+  function renderPositions(positions) {
+    const tb = $("#pos-table tbody");
+    tb.innerHTML = "";
+    $("#pos-count").textContent = positions.length ? `${positions.length} ouvertes` : "";
+    $("#pos-empty").hidden = positions.length > 0;
+    $("#pos-table").parentElement.hidden = positions.length === 0;
+    for (const p of positions) {
+      const tr = el("tr");
+      tr.appendChild(el("td", null, p.symbol));
+      const st = el("td"); st.appendChild(el("span", "badge setup", SETUP_LABELS[p.setupType] || p.setupType)); tr.appendChild(st);
+      const dir = el("td"); dir.appendChild(el("span", "badge " + p.direction, p.direction === "long" ? "achat" : "vente")); tr.appendChild(dir);
+      tr.appendChild(el("td", null, fmtNum(p.entry, 4)));
+      tr.appendChild(el("td", null, fmtNum(p.stopLoss, 4)));
+      tr.appendChild(el("td", null, fmtNum(p.takeProfit, 4)));
+      tr.appendChild(el("td", null, fmtNum(p.rr, 2)));
+      tr.appendChild(el("td", null, fmtNum(p.qty, 4)));
+      tr.appendChild(el("td", null, fmtDate(p.openedAt)));
+      tr.appendChild(el("td", null, fmtDate(p.openedBarTime)));
+      tr.appendChild(el("td", "why", p.reason || ""));
+      tb.appendChild(tr);
+    }
+  }
+
   function renderTrades(trades) {
     const tb = $("#trades-table tbody");
     tb.innerHTML = "";
@@ -168,10 +191,11 @@
   // ---------- Chargement ----------
   async function loadAll() {
     try {
-      const [health, stats, opps, trades] = await Promise.all([
+      const [health, stats, opps, positions, trades] = await Promise.all([
         api("/api/v2/health"),
         api("/api/v2/stats"),
         api("/api/v2/opportunities"),
+        api("/api/v2/positions"),
         api("/api/v2/trades?limit=300"),
       ]);
       renderHealth(health);
@@ -179,6 +203,7 @@
       renderSetups(stats.bySetup || {});
       renderAssets(stats.byAsset || {});
       renderOpportunities(opps);
+      renderPositions(positions.positions || []);
       renderTrades(trades.trades || []);
     } catch (e) {
       console.error(e);
