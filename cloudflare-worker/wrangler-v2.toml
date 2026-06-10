@@ -14,6 +14,12 @@ kv_namespaces = [
   { binding = "MTP_CACHE", id = "17eb7ddc41a949dd99bd840142832cfd" }
 ]
 
+# Front V2 servi directement par le Worker (Workers Static Assets).
+# https://manitradepro-v2.<sous-domaine>.workers.dev/ → v2/index.html
+# Les routes /api/v2/* ne matchent aucun fichier → passent au Worker.
+[assets]
+directory = "../v2"
+
 [triggers]
 # Un cycle complet toutes les heures (bougies daily : pas besoin de plus).
 crons = [

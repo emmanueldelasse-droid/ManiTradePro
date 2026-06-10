@@ -27,6 +27,7 @@
 - **Correctifs post-déploiement (audit créateur, branche)** :
   - Écritures Supabase KO → cache de schéma PostgREST non rechargé après création des tables (la base acceptait les INSERT). Rechargé côté Supabase + champ `debug` temporaire ajouté à `POST /api/v2/cycle`.
   - Fermeture immédiate des trades (stop en 0 min, durée 0) → la même bougie daily servait à ouvrir ET à tester stop/TP. Fix : `opened_bar_time` (migration 002), une position n'est évaluée que sur une bougie STRICTEMENT postérieure à sa bougie d'entrée. Risque par trade réduit 1,0 %→0,5 %, `riskPerTrade` affiché. Moteur de setup non modifié.
+  - Front V2 invisible → servi désormais par le Worker V2 lui-même (Workers Static Assets, `[assets]` dans `wrangler-v2.toml`) : `https://manitradepro-v2.emmanueldelasse.workers.dev/` = app complète, sans merge, sans toucher Pages. `API_BASE` auto same-origin sur workers.dev, icônes copiées dans `v2/icons/`. Bouton additif « Tester V2 » dans Réglages V1 (`renderSettings`, section Compte & apparence) + bump `sw.js` v8.6→v8.7 — visibles sur Pages après merge seulement. V1 jamais remplacée.
 
 ## État actuel
 

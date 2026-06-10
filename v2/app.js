@@ -2,8 +2,11 @@
 (() => {
   "use strict";
 
-  // Permet d'overrider l'URL du worker en local : localStorage.setItem('v2_api','http://127.0.0.1:8787')
-  const API_BASE = localStorage.getItem("v2_api") || "https://manitradepro-v2.emmanueldelasse.workers.dev";
+  // Si l'app est servie par le Worker V2 lui-même (workers.dev), l'API est sur
+  // la même origine → chemin relatif. Sinon (GitHub Pages, local), URL absolue.
+  // Override local possible : localStorage.setItem('v2_api','http://127.0.0.1:8787')
+  const API_BASE = localStorage.getItem("v2_api")
+    || (location.hostname.endsWith("workers.dev") ? "" : "https://manitradepro-v2.emmanueldelasse.workers.dev");
 
   const SETUP_LABELS = {
     pullback: "Pullback",

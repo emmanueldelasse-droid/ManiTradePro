@@ -7876,6 +7876,14 @@ function openPositionsRiskView() {
                 : `<button class="btn btn-primary" data-open-pin style="min-width:90px">Se connecter</button>`}
             </div>
 
+            <div class="setting-row">
+              <div>
+                <div class="setting-title">ManiTradePro V2 (bêta)</div>
+                <div class="setting-desc">Nouveau bot d'apprentissage : 4 setups, paper trades réellement ouvrables, stats par setup. App séparée, la V1 reste intacte.</div>
+              </div>
+              <a class="btn btn-primary" href="https://manitradepro-v2.emmanueldelasse.workers.dev/" target="_blank" rel="noopener" style="min-width:90px;text-align:center;text-decoration:none">Tester V2</a>
+            </div>
+
             <label class="setting-row">
               <div>
                 <div class="setting-title">Suivre le thème système</div>

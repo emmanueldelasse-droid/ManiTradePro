@@ -52,18 +52,27 @@ wrangler secret put ADMIN_API_TOKEN -c wrangler-v2.toml
 > de suite : se connecter en admin dans le front et cliquer « Lancer un cycle »,
 > ou `POST /api/v2/cycle` avec le token.
 
-## 3. Front V2
+## 3. Front V2 — servi par le Worker lui-même
 
-Le front est dans `v2/`. Servir statiquement (GitHub Pages, ou
-`npx serve v2`). Pour pointer sur un worker local :
+Le front est dans `v2/` et est **embarqué dans le déploiement du Worker** via
+Workers Static Assets (`[assets] directory = "../v2"` dans `wrangler-v2.toml`).
+Un seul `wrangler deploy -c wrangler-v2.toml` publie **l'app complète** :
+
+- `https://manitradepro-v2.emmanueldelasse.workers.dev/` → interface V2
+- `https://manitradepro-v2.emmanueldelasse.workers.dev/api/v2/*` → API
+
+Aucun GitHub Pages requis, aucun merge requis. L'app détecte qu'elle tourne sur
+`workers.dev` et appelle l'API en même origine (pas de CORS).
+
+Accès depuis la V1 : un bouton **« Tester V2 »** existe dans Réglages →
+*Compte & apparence* (visible sur Pages après merge de cette branche sur
+`main` ; l'URL workers.dev marche dès maintenant sans merge).
+
+Pour pointer sur un worker local :
 
 ```js
 localStorage.setItem("v2_api", "http://127.0.0.1:8787");
 ```
-
-> ⚠️ Le déploiement GitHub Pages V1 publie la racine du repo. `v2/` est servi
-> sous `/<repo>/v2/` une fois mergé sur `main`. Tant que la V2 reste sur sa
-> branche, ouvrir le front en local (`npx serve v2`) ou via un Pages dédié.
 
 ## 4. Vérification rapide
 
