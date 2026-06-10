@@ -84,31 +84,31 @@
     ]
   },
   "stats7d": {
-    "totalCount": 3,
+    "totalCount": 1,
     "winCount": 0,
-    "lossCount": 3,
+    "lossCount": 1,
     "winRate": 0,
-    "totalPnl": -53.57385260869694,
+    "totalPnl": -3.361766181635734,
     "avgWin": 0,
-    "avgLoss": 17.857950869565645,
-    "expectancy": -17.857950869565645,
+    "avgLoss": 3.361766181635734,
+    "expectancy": -3.361766181635734,
     "rrActual": 0,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 3,
+        "count": 1,
         "wins": 0,
-        "pnl": -53.57385260869694,
+        "pnl": -3.361766181635734,
         "winRate": 0
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 3,
+        "count": 1,
         "wins": 0,
-        "pnl": -53.57385260869694,
+        "pnl": -3.361766181635734,
         "winRate": 0
       }
     ],
@@ -118,33 +118,9 @@
         "count": 1,
         "pnl": -3.361766181635734,
         "wins": 0
-      },
-      {
-        "symbol": "MSFT",
-        "count": 1,
-        "pnl": -20.235841525443117,
-        "wins": 0
-      },
-      {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": -29.976244901618085,
-        "wins": 0
       }
     ],
     "bottomSymbols": [
-      {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": -29.976244901618085,
-        "wins": 0
-      },
-      {
-        "symbol": "MSFT",
-        "count": 1,
-        "pnl": -20.235841525443117,
-        "wins": 0
-      },
       {
         "symbol": "SAP",
         "count": 1,
