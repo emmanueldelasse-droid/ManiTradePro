@@ -5,6 +5,8 @@
   "main": "sw.js",
   "scripts": {
     "test": "node --test tools/engine-tests.mjs",
+    "test:v2": "node --test tools/v2/test/engine-v2.test.mjs",
+    "smoke:v2": "node tools/v2/smoke-v2.mjs",
     "check:doc-impact": "node scripts/check-doc-impact.mjs"
   },
   "repository": {

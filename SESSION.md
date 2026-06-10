@@ -6,6 +6,28 @@
 >
 > **Mise à jour obligatoire avant chaque demande de `GO MERGE`** (cf. `CHECKLIST_MERGE.md` et `GOVERNANCE.md` § *Règles synchronisation mémoire*).
 
+## 🆕 SESSION 2026-06-09 — MANITRADEPRO V2 (LEARNING BOT, reconstruction propre)
+
+> Branche `claude/manitradepro-v2-learning-bot`. **Pas de PR, pas de merge** : livraison sur branche uniquement (gouvernance — un `GO MERGE` reste requis avant tout merge sur `main`).
+
+- **Mission** : recréer l'app depuis zéro en V2, **sans réparer la V1**. Objectif réel = bot d'apprentissage qui *prend* des trades (paper) pour mesurer quels setups gagnent. Fin du modèle V1 « 0 trade parfaitement filtré ».
+- **Décision créateur (cette session)** : livrer sur la branche `claude/manitradepro-v2-learning-bot` + **fichiers V2 séparés** (la V1 — `worker.js`, `assets/`, tables `mtp_*` — reste 100 % intacte).
+- **Livré** :
+  - `tools/v2/lib/engine-v2.mjs` — moteur pur (source de vérité unique) : univers 47 actifs, indicateurs (EMA20/50, RSI14, ATR14, volume), 4 setups (pullback, breakout, mean reversion, GLD breakout), validation de plan, sizing, résolution de position, statistiques.
+  - `tools/v2/test/engine-v2.test.mjs` — **31 tests `node:test`, 31/31 pass**. Invariant testé : tout setup détecté+validé est ouvrable.
+  - `cloudflare-worker/worker-v2.js` — worker HTTP + cron INDÉPENDANT (importe le moteur). Données Binance/EODHD/TwelveData/Yahoo, persistance Supabase avec repli KV, gestion du cycle complet. Endpoints `/api/v2/*`.
+  - `cloudflare-worker/wrangler-v2.toml` — déploiement `manitradepro-v2` (cron horaire).
+  - `cloudflare-worker/migrations/v2/001_v2_learning_schema.sql` — tables `mtp_v2_positions`, `mtp_v2_trades`, `mtp_v2_cycles`, `mtp_v2_setup_stats` (idempotent, V1 non touchée).
+  - `v2/` — front PWA V2 (index/app/styles/sw/manifest) : santé bot, performance, stats par setup, opportunités ouvrables, trades. Pas de score, dark/light.
+  - `docs/v2/ARCHITECTURE_V2.md` + `docs/v2/README_V2.md` — architecture, schéma, endpoints, déploiement.
+- **Règle absolue respectée** : « si un trade est affiché ouvrable, il est ouvrable, sinon il n'est pas affiché ». Aucun score, aucun filtre caché.
+- **Sécurité** : paper trading strict. Aucun broker, aucun argent réel, aucun secret modifié/exposé.
+- **À faire (créateur)** : appliquer la migration SQL V2, `wrangler deploy -c wrangler-v2.toml`, vérifier `wrangler secret list -c wrangler-v2.toml`, lancer un premier cycle (front admin ou `POST /api/v2/cycle`).
+- **Agents / skills utilisés** : aucun (moteur quant implémenté directement, conforme `GOVERNANCE.md`).
+- **Correctifs post-déploiement (audit créateur, branche)** :
+  - Écritures Supabase KO → cache de schéma PostgREST non rechargé après création des tables (la base acceptait les INSERT). Rechargé côté Supabase + champ `debug` temporaire ajouté à `POST /api/v2/cycle`.
+  - Fermeture immédiate des trades (stop en 0 min, durée 0) → la même bougie daily servait à ouvrir ET à tester stop/TP. Fix : `opened_bar_time` (migration 002), une position n'est évaluée que sur une bougie STRICTEMENT postérieure à sa bougie d'entrée. Risque par trade réduit 1,0 %→0,5 %, `riskPerTrade` affiché. Moteur de setup non modifié.
+
 ## État actuel
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.

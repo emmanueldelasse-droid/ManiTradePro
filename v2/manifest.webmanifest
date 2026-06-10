@@ -1,0 +1,14 @@
+{
+  "name": "ManiTradePro V2 — Learning Bot",
+  "short_name": "MTP V2",
+  "description": "Bot d'apprentissage paper trading : scanne, détecte des setups, ouvre des trades, mesure, apprend.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "icons": [
+    { "src": "../icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "../icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
