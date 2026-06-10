@@ -91,6 +91,13 @@ résultats d'apprentissage.
 node --test tools/v2/test/engine-v2.test.mjs
 ```
 
+### Test manuel — modale « Accès admin »
+
+1. Ouvrir l'app, cliquer **Admin** → la modale s'affiche.
+2. Cliquer **Annuler** → la modale disparaît, le dashboard est de nouveau utilisable.
+3. Cliquer **Admin** à nouveau, taper le PIN, valider → la modale **disparaît** (connexion OK).
+4. Cliquer **Admin** une dernière fois → cette fois le panneau « Lancer un cycle » s'affiche directement (déjà connecté) ; **Fermer**, clic en dehors de la boîte, ou touche **Échap** referment la modale.
+
 ## 6. Critère de succès
 
 Après déploiement et quelques cycles, le bot doit pouvoir dire : **quel setup

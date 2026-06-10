@@ -86,16 +86,20 @@
   <div class="modal" id="login-modal" hidden>
     <div class="modal-box">
       <h3>Accès admin</h3>
-      <p class="muted">Entre le PIN pour lancer un cycle manuellement.</p>
-      <input type="password" id="pin-input" inputmode="numeric" placeholder="PIN" />
-      <div class="modal-actions">
-        <button class="ghost" id="login-cancel">Annuler</button>
-        <button class="primary" id="login-submit">Connexion</button>
+      <div id="login-form">
+        <p class="muted">Entre le PIN pour lancer un cycle manuellement.</p>
+        <input type="password" id="pin-input" inputmode="numeric" placeholder="PIN" />
+        <div class="modal-actions">
+          <button class="ghost" id="login-cancel">Annuler</button>
+          <button class="primary" id="login-submit">Connexion</button>
+        </div>
       </div>
       <div class="admin-panel" id="admin-panel" hidden>
-        <hr/>
         <button class="primary" id="run-cycle-btn">▶ Lancer un cycle maintenant</button>
         <div class="muted" id="cycle-result"></div>
+        <div class="modal-actions" style="margin-top:14px">
+          <button class="ghost" id="admin-close">Fermer</button>
+        </div>
       </div>
       <div class="error" id="login-error"></div>
     </div>

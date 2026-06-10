@@ -95,6 +95,9 @@ td.why { text-align: left; white-space: normal; max-width: 320px; color: var(--m
 .footer { text-align: center; color: var(--muted); font-size: 12px; margin-top: 32px; }
 
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 20; padding: 16px; }
+/* `.modal[hidden]` (spécificité 0,2,0) bat `.modal` (0,1,0) : l'attribut hidden
+   cache vraiment la modale malgré le display:flex ci-dessus. */
+.modal[hidden] { display: none; }
 .modal-box { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 22px; width: 100%; max-width: 360px; }
 .modal-box h3 { margin: 0 0 6px; }
 .modal-box input { width: 100%; padding: 11px; margin: 12px 0; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 16px; }

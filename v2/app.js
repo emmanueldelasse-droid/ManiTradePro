@@ -210,11 +210,22 @@
 
   // ---------- Login / admin ----------
   const modal = $("#login-modal");
-  function openModal() { modal.hidden = false; $("#admin-panel").hidden = !token; $("#login-error").textContent = ""; }
+  // Déjà connecté → on affiche directement le panneau admin (lancer un cycle).
+  // Sinon → le formulaire PIN.
+  function openModal() {
+    modal.hidden = false;
+    $("#login-form").hidden = !!token;
+    $("#admin-panel").hidden = !token;
+    $("#login-error").textContent = "";
+  }
   function closeModal() { modal.hidden = true; }
   $("#login-btn").addEventListener("click", openModal);
   $("#login-cancel").addEventListener("click", closeModal);
+  $("#admin-close").addEventListener("click", closeModal);
+  // Clic sur le fond (hors de la boîte) ferme la modale.
   modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+  // Touche Échap ferme la modale si elle est ouverte.
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) closeModal(); });
 
   $("#login-submit").addEventListener("click", async () => {
     const pin = $("#pin-input").value.trim();
@@ -223,8 +234,8 @@
       const r = await api("/api/v2/session/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ pin }) });
       token = r.token;
       sessionStorage.setItem("v2_token", token);
-      $("#admin-panel").hidden = false;
       $("#pin-input").value = "";
+      closeModal(); // connexion réussie → la modale disparaît
     } catch (e) {
       $("#login-error").textContent = e.message;
     }
