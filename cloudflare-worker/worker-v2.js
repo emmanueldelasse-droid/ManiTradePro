@@ -18,7 +18,7 @@
 import {
   V2_UNIVERSE, V2_SYMBOLS, V2_DEFAULT_SETTINGS, getAsset,
   computeIndicators, bestSetup, validatePlan, computePositionSize,
-  resolvePosition, computePnl, computeStats,
+  resolvePosition, computePnl, computeStats, riskPerTrade,
 } from "../tools/v2/lib/engine-v2.mjs";
 
 const CANDLE_LIMIT = 220;            // ~1 an de bougies daily
@@ -378,7 +378,8 @@ function toPositionRow(p) {
   return {
     id: p.id, symbol: p.symbol, setup_type: p.setupType, direction: p.direction,
     entry: p.entry, stop_loss: p.stopLoss, take_profit: p.takeProfit, rr: p.rr,
-    qty: p.qty, opened_at: p.openedAt, reason: p.reason, status: "open",
+    qty: p.qty, opened_at: p.openedAt, opened_bar_time: p.openedBarTime || null,
+    reason: p.reason, status: "open",
   };
 }
 function toTradeRow(t) {
@@ -399,7 +400,9 @@ function normalizePosition(row) {
     direction: row.direction,
     entry: +row.entry, stopLoss: +(row.stopLoss ?? row.stop_loss),
     takeProfit: +(row.takeProfit ?? row.take_profit), rr: +row.rr, qty: +row.qty,
-    openedAt: row.openedAt || row.opened_at, reason: row.reason,
+    openedAt: row.openedAt || row.opened_at,
+    openedBarTime: row.openedBarTime || row.opened_bar_time || null,
+    reason: row.reason,
   };
 }
 function normalizeTrade(row) {
@@ -457,6 +460,7 @@ async function runCycle(env) {
       setupType: setup.setupType, direction: setup.direction,
       entry: setup.entry, stopLoss: setup.stopLoss, takeProfit: setup.takeProfit,
       rr: setup.rr, reason: setup.reason, source: candles.source || null,
+      barTime: last.time, // bougie d'entrée → garde anti fermeture immédiate
       alreadyOpen: openBySymbol.has(asset.symbol),
     };
     opportunities.push(opp);
@@ -464,10 +468,20 @@ async function runCycle(env) {
   }
 
   // 2) Gérer les positions ouvertes : stop / target / temps.
+  //
+  // RÈGLE ANTI « fermeture immédiate » : une position daily/swing ne peut JAMAIS
+  // être fermée par la même bougie qui a servi à l'ouverture (ni par une bougie
+  // antérieure). On n'évalue stop/TP que sur une bougie STRICTEMENT postérieure
+  // à la bougie d'ouverture (`openedBarTime`). Sans ça, la bougie daily du jour
+  // d'entrée contient déjà tout le range intraday → stop touché en 0 minute.
   let closed = 0;
   for (const pos of openRows) {
     const candle = latestPriceBySymbol[pos.symbol];
     if (!candle) continue;
+    const openedBarMs = new Date(pos.openedBarTime || pos.openedAt).getTime();
+    const candleMs = new Date(candle.time).getTime();
+    // Bougie d'ouverture (ou antérieure) → on ne touche pas. On attend la suite.
+    if (!(candleMs > openedBarMs)) continue;
     const heldMs = Date.now() - new Date(pos.openedAt).getTime();
     const heldDays = heldMs / (24 * 3600 * 1000);
     const forceTimeExit = heldDays >= settings.maxHoldDays;
@@ -475,11 +489,13 @@ async function runCycle(env) {
     if (!res) continue;
     const { pnl, pnlPct } = computePnl(pos, res.exit);
     const closedAt = new Date().toISOString();
+    // Durée en heures basée sur les bougies (jamais 0 pour une position swing).
+    const barDurationH = Math.round((candleMs - openedBarMs) / 3600000);
     const trade = {
       id: pos.id, symbol: pos.symbol, setupType: pos.setupType, direction: pos.direction,
       entry: pos.entry, exit: res.exit, stopLoss: pos.stopLoss, takeProfit: pos.takeProfit,
       rr: pos.rr, qty: pos.qty, pnl, pnlPct,
-      openedAt: pos.openedAt, closedAt, durationHours: Math.round(heldMs / 3600000),
+      openedAt: pos.openedAt, closedAt, durationHours: Math.max(barDurationH, Math.round(heldMs / 3600000)),
       exitReason: res.exitReason,
     };
     try { await closePositionStore(env, pos, trade); closed++; openBySymbol.delete(pos.symbol); }
@@ -500,7 +516,7 @@ async function runCycle(env) {
       id: crypto.randomUUID(),
       symbol: opp.symbol, setupType: opp.setupType, direction: opp.direction,
       entry: opp.entry, stopLoss: opp.stopLoss, takeProfit: opp.takeProfit,
-      rr: opp.rr, qty, openedAt: new Date().toISOString(), reason: opp.reason,
+      rr: opp.rr, qty, openedAt: new Date().toISOString(), openedBarTime: opp.barTime, reason: opp.reason,
     };
     try {
       await insertPosition(env, pos);
@@ -541,6 +557,8 @@ async function runCycle(env) {
   // Debug temporaire (audit écritures Supabase). À retirer une fois validé.
   const debug = {
     supabase: await supaProbe(env),
+    riskPerTrade: riskPerTrade(settings),
+    riskPerTradePct: settings.riskPerTradePct,
     positionInsertErrors,
     tradeInsertErrors,
     cycleInsertError,
@@ -639,7 +657,8 @@ export default {
 
       if (path === "/api/v2/settings") {
         if (request.method === "GET") {
-          return json({ status: "ok", settings: await loadSettings(env) }, 200, request, env);
+          const s = await loadSettings(env);
+          return json({ status: "ok", settings: s, riskPerTrade: riskPerTrade(s) }, 200, request, env);
         }
         if (request.method === "POST") {
           if (!(await isAdmin(request, env))) return fail("Admin requis", 403, request, env);

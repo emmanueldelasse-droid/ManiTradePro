@@ -24,6 +24,9 @@
 - **Sécurité** : paper trading strict. Aucun broker, aucun argent réel, aucun secret modifié/exposé.
 - **À faire (créateur)** : appliquer la migration SQL V2, `wrangler deploy -c wrangler-v2.toml`, vérifier `wrangler secret list -c wrangler-v2.toml`, lancer un premier cycle (front admin ou `POST /api/v2/cycle`).
 - **Agents / skills utilisés** : aucun (moteur quant implémenté directement, conforme `GOVERNANCE.md`).
+- **Correctifs post-déploiement (audit créateur, branche)** :
+  - Écritures Supabase KO → cache de schéma PostgREST non rechargé après création des tables (la base acceptait les INSERT). Rechargé côté Supabase + champ `debug` temporaire ajouté à `POST /api/v2/cycle`.
+  - Fermeture immédiate des trades (stop en 0 min, durée 0) → la même bougie daily servait à ouvrir ET à tester stop/TP. Fix : `opened_bar_time` (migration 002), une position n'est évaluée que sur une bougie STRICTEMENT postérieure à sa bougie d'entrée. Risque par trade réduit 1,0 %→0,5 %, `riskPerTrade` affiché. Moteur de setup non modifié.
 
 ## État actuel
 

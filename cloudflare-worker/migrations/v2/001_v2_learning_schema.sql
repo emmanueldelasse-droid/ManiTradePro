@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS mtp_v2_positions (
   rr           double precision,
   qty          double precision,
   opened_at    timestamptz NOT NULL DEFAULT now(),
+  opened_bar_time timestamptz,               -- horodatage de la bougie d'entrée (garde anti fermeture immédiate)
   reason       text,
   status       text NOT NULL DEFAULT 'open'  -- 'open' | 'closed'
 );

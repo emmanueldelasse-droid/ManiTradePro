@@ -6,7 +6,7 @@ import {
   ema, sma, rsi, atr, computeIndicators,
   detectPullback, detectBreakout, detectMeanReversion, detectGldBreakout,
   detectSetups, bestSetup, validatePlan, computePositionSize,
-  resolvePosition, computePnl, computeStats,
+  resolvePosition, computePnl, computeStats, riskPerTrade,
 } from "../lib/engine-v2.mjs";
 
 // ---------- Helpers de génération de bougies ----------
@@ -221,6 +221,14 @@ test("INVARIANT : tout setup détecté+validé est ouvrable", () => {
 });
 
 // ---------- Sizing ----------
+
+test("riskPerTrade = équité × pourcentage", () => {
+  assert.equal(riskPerTrade({ startingEquity: 100000, riskPerTradePct: 0.5 }), 500);
+});
+
+test("risque par défaut réduit à 0,5 %", () => {
+  assert.equal(riskPerTrade(), 500);
+});
 
 test("computePositionSize proportionnelle au risque", () => {
   const setup = { entry: 100, stopLoss: 90 };

@@ -89,9 +89,16 @@ export const V2_DEFAULT_SETTINGS = Object.freeze({
   rrMin: 1.5,             // ratio gain/risque minimum pour ouvrir
   maxOpenPositions: 20,   // capacité paper (apprentissage large)
   maxHoldDays: 25,        // fermeture automatique après N jours
-  riskPerTradePct: 1.0,   // % du capital virtuel risqué par trade
+  riskPerTradePct: 0.5,   // % du capital virtuel risqué par trade (réduit de 1.0)
   startingEquity: 100000, // capital virtuel de référence
 });
+
+// Montant risqué par trade (en monnaie du capital virtuel) — pour affichage.
+export function riskPerTrade(settings = V2_DEFAULT_SETTINGS) {
+  const equity = settings?.startingEquity ?? V2_DEFAULT_SETTINGS.startingEquity;
+  const pct = settings?.riskPerTradePct ?? V2_DEFAULT_SETTINGS.riskPerTradePct;
+  return equity * (pct / 100);
+}
 
 // ---------- Indicateurs ----------
 
