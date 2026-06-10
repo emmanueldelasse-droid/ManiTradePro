@@ -221,8 +221,7 @@ async function fetchYahoo(sym, klass) {
 }
 
 // Dispatch par classe d'actif, avec fallback Yahoo. KV cache 6 h.
-async function getCandles(asset, env) {
-  const cacheKey = `v2:candles:${asset.symbol}`;
+async function getCandles(asset, env) {  const cacheKey = `v2:candles:${asset.symbol}`;
   try {
     const cached = await env.MTP_CACHE?.get(cacheKey);
     if (cached) {
@@ -258,6 +257,116 @@ async function getCandles(asset, env) {
     candles._source = source;
   }
   return candles ? Object.assign(candles, { source }) : null;
+}
+
+// ============================================================
+// QUOTES TEMPS RÉEL — dernier prix réel pour les positions ouvertes.
+// Règle absolue : aucun prix inventé. Si aucune source ne répond pour un
+// symbole, currentPrice = null et le front affiche « — ».
+// Cache KV court (3 min) pour ne pas marteler les APIs à chaque ouverture.
+// ============================================================
+
+const QUOTE_TTL_S = 180;
+
+async function fetchBinancePrices(cryptoAssets) {
+  if (!cryptoAssets.length) return {};
+  const pairs = cryptoAssets.map((a) => binanceSymbol(a.symbol));
+  const pairToSym = Object.fromEntries(cryptoAssets.map((a) => [binanceSymbol(a.symbol), a.symbol]));
+  const url = `https://api.binance.com/api/v3/ticker/price?symbols=${encodeURIComponent(JSON.stringify(pairs))}`;
+  const res = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, 6000);
+  if (!res.ok) throw new Error(`binance_price_${res.status}`);
+  const rows = await res.json();
+  const out = {};
+  const now = new Date().toISOString();
+  for (const r of Array.isArray(rows) ? rows : []) {
+    const sym = pairToSym[r?.symbol];
+    const price = Number(r?.price);
+    if (sym && Number.isFinite(price) && price > 0) out[sym] = { price, source: "binance", quotedAt: now };
+  }
+  return out;
+}
+
+async function fetchEodhdPrices(assets, env) {
+  if (!assets.length || !env.EODHD_API_KEY) return {};
+  const mapped = assets.map((a) => ({ sym: a.symbol, td: eodhdSymbol(a.symbol) }));
+  const tdToSym = Object.fromEntries(mapped.map((m) => [m.td.toUpperCase(), m.sym]));
+  const head = mapped[0].td;
+  const tail = mapped.slice(1).map((m) => m.td);
+  const sParam = tail.length ? `&s=${encodeURIComponent(tail.join(","))}` : "";
+  const url = `https://eodhd.com/api/real-time/${encodeURIComponent(head)}?api_token=${encodeURIComponent(env.EODHD_API_KEY)}&fmt=json${sParam}`;
+  const res = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, 8000);
+  if (!res.ok) throw new Error(`eodhd_rt_${res.status}`);
+  const payload = await res.json();
+  const rows = Array.isArray(payload) ? payload : (payload && typeof payload === "object" ? [payload] : []);
+  const out = {};
+  for (const r of rows) {
+    const sym = tdToSym[String(r?.code || "").toUpperCase()];
+    const price = Number(r?.close);
+    if (!sym || !Number.isFinite(price) || price <= 0) continue;
+    const ts = Number(r?.timestamp);
+    out[sym] = {
+      price,
+      source: "eodhd",
+      quotedAt: Number.isFinite(ts) ? new Date(ts * 1000).toISOString() : new Date().toISOString(),
+    };
+  }
+  return out;
+}
+
+async function fetchTwelvePrice(sym, env) {
+  const keys = [env.TWELVE_KEY_1, env.TWELVE_KEY_2, env.TWELVE_KEY_3, env.TWELVE_KEY_4].filter(Boolean);
+  if (!keys.length) throw new Error("twelve_disabled");
+  const key = keys[Math.floor(Math.random() * keys.length)];
+  const url = `https://api.twelvedata.com/price?symbol=${encodeURIComponent(twelveSymbol(sym))}&apikey=${encodeURIComponent(key)}`;
+  const res = await fetchWithTimeout(url, { headers: { Accept: "application/json" } }, 6000);
+  if (!res.ok) throw new Error(`twelve_price_${res.status}`);
+  const data = await res.json();
+  const price = Number(data?.price);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("twelve_price_shape");
+  return { price, source: "twelve", quotedAt: new Date().toISOString() };
+}
+
+async function fetchYahooPrice(sym, klass) {
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol(sym, klass))}?interval=1d&range=1d`;
+  const res = await fetchWithTimeout(url, { headers: { Accept: "application/json", "User-Agent": "Mozilla/5.0" } }, 6000);
+  if (!res.ok) throw new Error(`yahoo_price_${res.status}`);
+  const data = await res.json();
+  const meta = data?.chart?.result?.[0]?.meta;
+  const price = Number(meta?.regularMarketPrice);
+  if (!Number.isFinite(price) || price <= 0) throw new Error("yahoo_price_shape");
+  const ts = Number(meta?.regularMarketTime);
+  return {
+    price,
+    source: "yahoo",
+    quotedAt: Number.isFinite(ts) ? new Date(ts * 1000).toISOString() : new Date().toISOString(),
+  };
+}
+
+async function getQuotesForSymbols(symbols, env) {
+  const unique = [...new Set(symbols)].sort();
+  if (!unique.length) return {};
+  const cacheKey = `v2:quotes:${unique.join(",")}`;
+  const cached = await kvGet(env, cacheKey, null);
+  if (cached && typeof cached === "object") return cached;
+
+  const assets = unique.map(getAsset).filter(Boolean);
+  const cryptos = assets.filter((a) => a.class === "crypto");
+  const fx = assets.filter((a) => a.class === "forex");
+  const rest = assets.filter((a) => a.class !== "crypto" && a.class !== "forex");
+
+  const quotes = {};
+  // Batchs principaux (1 appel Binance, 1 appel EODHD pour tout le panier).
+  try { Object.assign(quotes, await fetchBinancePrices(cryptos)); } catch { /* fallback plus bas */ }
+  try { Object.assign(quotes, await fetchEodhdPrices(rest, env)); } catch { /* fallback plus bas */ }
+  // Forex + trous restants : Twelve par symbole, puis Yahoo en dernier recours.
+  for (const a of [...fx, ...assets.filter((x) => !quotes[x.symbol])]) {
+    if (quotes[a.symbol]) continue;
+    try { quotes[a.symbol] = await fetchTwelvePrice(a.symbol, env); continue; } catch { /* suite */ }
+    try { quotes[a.symbol] = await fetchYahooPrice(a.symbol, a.class); } catch { /* reste null */ }
+  }
+
+  try { await env.MTP_CACHE?.put(cacheKey, JSON.stringify(quotes), { expirationTtl: QUOTE_TTL_S }); } catch { /* ignore */ }
+  return quotes;
 }
 
 // ============================================================
@@ -628,7 +737,31 @@ export default {
 
       if (path === "/api/v2/positions") {
         const positions = (await getOpenPositions(env).catch(() => [])).map(normalizePosition);
-        return json({ status: "ok", count: positions.length, positions }, 200, request, env);
+        // Prix réels actuels (Binance/EODHD/Twelve/Yahoo, cache 3 min). Si un
+        // symbole n'a pas de quote, currentPrice reste null — jamais inventé.
+        let quotes = {};
+        try { quotes = await getQuotesForSymbols(positions.map((p) => p.symbol), env); } catch { /* prix absents */ }
+        const settings = await loadSettings(env);
+        const enriched = positions.map((p) => {
+          const q = quotes[p.symbol];
+          if (!q) return { ...p, currentPrice: null, latentPnl: null, latentPnlPct: null, currentValue: null, priceSource: null, quotedAt: null };
+          const { pnl, pnlPct } = computePnl(p, q.price);
+          return {
+            ...p,
+            currentPrice: q.price,
+            priceSource: q.source,
+            quotedAt: q.quotedAt,
+            latentPnl: pnl,
+            latentPnlPct: pnlPct,
+            currentValue: Math.round(q.price * p.qty * 100) / 100,
+          };
+        });
+        return json({
+          status: "ok",
+          count: enriched.length,
+          positions: enriched,
+          startingEquity: settings.startingEquity,
+        }, 200, request, env);
       }
 
       if (path === "/api/v2/trades") {

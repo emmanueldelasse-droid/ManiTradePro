@@ -37,17 +37,25 @@
         <h2>Santé du bot</h2>
         <div class="cards" id="health-cards"></div>
 
-        <h2>Performance</h2>
+        <h2>Portefeuille <span class="muted">(paper, données réelles)</span></h2>
+        <div class="cards" id="portfolio-cards"></div>
+
+        <h2>Statistiques globales <span class="muted">(trades fermés)</span></h2>
         <div class="cards" id="perf-cards"></div>
 
-        <h2>Setups</h2>
+        <h2>Classement des setups</h2>
         <div class="setups" id="setups-grid"></div>
 
-        <h2>Par actif <span class="muted">(les plus actifs)</span></h2>
-        <div class="table-wrap">
-          <table id="assets-table"><thead><tr>
-            <th>Actif</th><th>Trades</th><th>Réussite</th><th>Facteur profit</th><th>Gain/trade</th>
-          </tr></thead><tbody></tbody></table>
+        <h2>Classement des actifs <span class="muted">(P/L réalisé + latent)</span></h2>
+        <div class="rankings">
+          <div>
+            <h3 class="rank-title pos">Top 10 gagnants</h3>
+            <div class="rank-list" id="rank-winners"></div>
+          </div>
+          <div>
+            <h3 class="rank-title neg">Top 10 perdants</h3>
+            <div class="rank-list" id="rank-losers"></div>
+          </div>
         </div>
       </section>
 
@@ -72,10 +80,11 @@
           <h2>Positions ouvertes</h2>
           <span class="muted" id="pos-count"></span>
         </div>
-        <p class="hint">Paper trades en cours. Ils se ferment quand une bougie <strong>postérieure</strong> à l'entrée touche le stop ou l'objectif (ou après 25 jours).</p>
+        <p class="hint">Paper trades en cours, valorisés au <strong>dernier prix réel</strong> (Binance, EODHD, TwelveData, Yahoo). Ils se ferment quand une bougie <strong>postérieure</strong> à l'entrée touche le stop ou l'objectif (ou après 25 jours).</p>
+        <div class="cards" id="pos-summary"></div>
         <div class="table-wrap">
           <table id="pos-table"><thead><tr>
-            <th>Actif</th><th>Setup</th><th>Sens</th><th>Entrée</th><th>Stop</th><th>Objectif</th><th>Gain/Risque</th><th>Quantité</th><th>Ouvert le</th><th>Bougie d'entrée</th><th>Pourquoi</th>
+            <th>Actif</th><th>Setup</th><th>Sens</th><th>Entrée</th><th>Actuel</th><th>P/L</th><th>P/L %</th><th>Valeur</th><th>Stop ← prix → Objectif</th><th>Dist. stop</th><th>Dist. objectif</th><th>Stop</th><th>Objectif</th><th>Gain/Risque</th><th>Quantité</th><th>Durée</th><th>Ouvert le</th><th>Pourquoi</th>
           </tr></thead><tbody></tbody></table>
         </div>
         <div class="empty" id="pos-empty" hidden>Aucune position ouverte pour l'instant.</div>

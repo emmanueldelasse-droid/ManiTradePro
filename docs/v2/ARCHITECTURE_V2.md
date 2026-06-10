@@ -122,7 +122,7 @@ Base : `https://manitradepro-v2.emmanueldelasse.workers.dev`
 | GET | `/api/v2/health` | public | Santé du bot (actif, dernier cycle, scannés, détectés, ouverts). |
 | GET | `/api/v2/universe` | public | Les 47 actifs. |
 | GET | `/api/v2/opportunities` | public | Opportunités du dernier scan (ouvrables). |
-| GET | `/api/v2/positions` | public | Positions paper ouvertes. |
+| GET | `/api/v2/positions` | public | Positions paper ouvertes, **valorisées au dernier prix réel** (Binance/EODHD/Twelve/Yahoo, cache 3 min) : `currentPrice`, `latentPnl`, `latentPnlPct`, `currentValue`, `priceSource`, `quotedAt` + `startingEquity`. Si aucune source ne répond pour un symbole, `currentPrice: null` — jamais de prix inventé. |
 | GET | `/api/v2/trades?limit=N` | public | Trades fermés. |
 | GET | `/api/v2/stats` | public | Stats globales + par setup + par actif. |
 | GET | `/api/v2/cycles` | public | Journal des cycles. |

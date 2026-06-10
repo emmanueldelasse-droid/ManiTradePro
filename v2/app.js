@@ -66,15 +66,66 @@
     wrap.appendChild(card("Trades ouverts", h.openPositions ?? "—"));
   }
 
-  function renderPerf(overall) {
+  function renderPerf(overall, startingEquity) {
     const wrap = $("#perf-cards");
     wrap.innerHTML = "";
     const pnl = overall.totalPnl || 0;
-    wrap.appendChild(card("P/L total", fmtMoney(pnl), pnl >= 0 ? "green" : "red"));
+    const ddPct = startingEquity > 0 ? (Math.abs(overall.maxDrawdown || 0) / startingEquity) * 100 : null;
+    wrap.appendChild(card("P/L réalisé", fmtMoney(pnl), pnl >= 0 ? "green" : "red"));
     wrap.appendChild(card("Taux de réussite", fmtPct(overall.winRate)));
     wrap.appendChild(card("Facteur de profit", fmtPF(overall.profitFactor)));
-    wrap.appendChild(card("Drawdown max", fmtMoney(-Math.abs(overall.maxDrawdown || 0)), "red"));
+    wrap.appendChild(card("Espérance / trade", fmtMoney(overall.expectancy), (overall.expectancy || 0) >= 0 ? "green" : "red"));
+    wrap.appendChild(card("Gain moyen", fmtMoney(overall.avgWin), "green"));
+    wrap.appendChild(card("Perte moyenne", fmtMoney(-Math.abs(overall.avgLoss || 0)), "red"));
+    wrap.appendChild(card("Drawdown max", `${fmtMoney(-Math.abs(overall.maxDrawdown || 0))}${ddPct != null ? ` (−${ddPct.toFixed(1)} %)` : ""}`, "red"));
     wrap.appendChild(card("Trades fermés", overall.trades ?? 0));
+  }
+
+  // Portefeuille paper : disponible / engagé / latent / réalisé / equity.
+  // Tout est dérivé de prix réels (positions valorisées au dernier prix).
+  function renderPortfolio(positions, overall, startingEquity) {
+    const wrap = $("#portfolio-cards");
+    wrap.innerHTML = "";
+    const realized = overall.totalPnl || 0;
+    const priced = positions.filter((p) => Number.isFinite(p.latentPnl));
+    const latent = priced.reduce((s, p) => s + p.latentPnl, 0);
+    const engaged = priced.reduce((s, p) => s + (p.currentValue || 0), 0);
+    const equity = startingEquity + realized + latent;
+    const available = equity - engaged;
+    const unpriced = positions.length - priced.length;
+    wrap.appendChild(card("Equity", fmtMoney(equity)));
+    wrap.appendChild(card("Disponible", fmtMoney(available)));
+    wrap.appendChild(card("Engagé", fmtMoney(engaged)));
+    wrap.appendChild(card("P/L latent", fmtMoney(latent), latent >= 0 ? "green" : "red"));
+    wrap.appendChild(card("P/L réalisé", fmtMoney(realized), realized >= 0 ? "green" : "red"));
+    if (unpriced > 0) wrap.appendChild(card("Sans prix actuel", String(unpriced), "red"));
+  }
+
+  // Classement des actifs : P/L réalisé (trades fermés) + latent (positions).
+  function renderAssetRankings(byAsset, positions) {
+    const combined = {};
+    for (const [sym, s] of Object.entries(byAsset || {})) {
+      combined[sym] = (combined[sym] || 0) + (s.totalPnl || 0);
+    }
+    for (const p of positions) {
+      if (Number.isFinite(p.latentPnl)) combined[p.symbol] = (combined[p.symbol] || 0) + p.latentPnl;
+    }
+    const entries = Object.entries(combined).filter(([, v]) => Number.isFinite(v));
+    const winners = entries.filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const losers = entries.filter(([, v]) => v < 0).sort((a, b) => a[1] - b[1]).slice(0, 10);
+    const fill = (id, rows, cls) => {
+      const box = $(id);
+      box.innerHTML = "";
+      if (!rows.length) { box.appendChild(el("div", "rank-empty", "Rien à classer pour l'instant.")); return; }
+      for (const [sym, v] of rows) {
+        const row = el("div", "rank-row");
+        row.appendChild(el("span", null, sym));
+        row.appendChild(el("span", cls, fmtMoney(v)));
+        box.appendChild(row);
+      }
+    };
+    fill("#rank-winners", winners, "pos");
+    fill("#rank-losers", losers, "neg");
   }
 
   function renderSetups(bySetup) {
@@ -94,29 +145,6 @@
       row("P/L total", fmtMoney(s.totalPnl), (s.totalPnl || 0) >= 0 ? "pos" : "neg");
       c.appendChild(stats);
       grid.appendChild(c);
-    }
-  }
-
-  function renderAssets(byAsset) {
-    const tb = $("#assets-table tbody");
-    tb.innerHTML = "";
-    const rows = Object.entries(byAsset)
-      .filter(([, s]) => s.trades > 0)
-      .sort((a, b) => b[1].trades - a[1].trades)
-      .slice(0, 15);
-    if (!rows.length) {
-      const tr = el("tr"); const td = el("td", null, "Pas encore de trades fermés."); td.colSpan = 5; td.style.textAlign = "center"; td.style.color = "var(--muted)";
-      tr.appendChild(td); tb.appendChild(tr); return;
-    }
-    for (const [sym, s] of rows) {
-      const tr = el("tr");
-      tr.appendChild(el("td", null, sym));
-      tr.appendChild(el("td", null, String(s.trades)));
-      tr.appendChild(el("td", null, fmtPct(s.winRate)));
-      tr.appendChild(el("td", null, fmtPF(s.profitFactor)));
-      const ev = el("td", (s.expectancy || 0) >= 0 ? "pos" : "neg", fmtMoney(s.expectancy));
-      tr.appendChild(ev);
-      tb.appendChild(tr);
     }
   }
 
@@ -143,6 +171,76 @@
     }
   }
 
+  // Durée réelle depuis l'ouverture : minutes, heures ou jours.
+  function fmtSince(iso) {
+    if (!iso) return "—";
+    const ms = Date.now() - new Date(iso).getTime();
+    if (!Number.isFinite(ms) || ms < 0) return "—";
+    const min = Math.floor(ms / 60000);
+    if (min < 60) return `${min} min`;
+    const h = Math.floor(min / 60);
+    if (h < 48) return `${h} h`;
+    return `${Math.floor(h / 24)} j`;
+  }
+
+  // Position du prix entre stop (0) et objectif (1), directionnel.
+  function progressFraction(p) {
+    if (!Number.isFinite(p.currentPrice)) return null;
+    const span = p.direction === "short" ? p.stopLoss - p.takeProfit : p.takeProfit - p.stopLoss;
+    if (!(span > 0)) return null;
+    const raw = p.direction === "short"
+      ? (p.stopLoss - p.currentPrice) / span
+      : (p.currentPrice - p.stopLoss) / span;
+    return Math.max(0, Math.min(1, raw));
+  }
+
+  function progressBar(p) {
+    const frac = progressFraction(p);
+    const wrap = el("div", "pbar");
+    if (frac == null) return el("span", "muted", "—");
+    const entrySpan = p.direction === "short" ? p.stopLoss - p.takeProfit : p.takeProfit - p.stopLoss;
+    const entryFrac = p.direction === "short"
+      ? (p.stopLoss - p.entry) / entrySpan
+      : (p.entry - p.stopLoss) / entrySpan;
+    const tick = el("div", "entry-tick");
+    tick.style.left = `${Math.max(0, Math.min(1, entryFrac)) * 100}%`;
+    wrap.appendChild(tick);
+    const dot = el("div", "dot-now");
+    if (frac >= 0.85) dot.classList.add("near-tp");
+    else if (frac <= 0.15) dot.classList.add("near-stop");
+    else if ((p.latentPnl || 0) >= 0) dot.classList.add("win");
+    else dot.classList.add("loss");
+    dot.style.left = `${frac * 100}%`;
+    wrap.appendChild(dot);
+    wrap.title = `Stop ${fmtNum(p.stopLoss, 4)} · actuel ${fmtNum(p.currentPrice, 4)} · objectif ${fmtNum(p.takeProfit, 4)}`;
+    return wrap;
+  }
+
+  // Distance (%) entre prix actuel et un niveau, vue trader (toujours positive).
+  function distPct(current, level) {
+    if (!Number.isFinite(current) || !Number.isFinite(level) || current <= 0) return null;
+    return Math.abs((level - current) / current) * 100;
+  }
+
+  function renderPositionsSummary(positions, overall, startingEquity) {
+    const wrap = $("#pos-summary");
+    wrap.innerHTML = "";
+    if (!positions.length) return;
+    const priced = positions.filter((p) => Number.isFinite(p.latentPnl));
+    const winners = priced.filter((p) => p.latentPnl >= 0).length;
+    const losers = priced.filter((p) => p.latentPnl < 0).length;
+    const latent = priced.reduce((s, p) => s + p.latentPnl, 0);
+    const engaged = priced.reduce((s, p) => s + (p.currentValue || 0), 0);
+    const equity = startingEquity + (overall.totalPnl || 0) + latent;
+    const exposure = equity > 0 ? (engaged / equity) * 100 : null;
+    wrap.appendChild(card("Positions ouvertes", String(positions.length)));
+    wrap.appendChild(card("Gagnantes", String(winners), "green"));
+    wrap.appendChild(card("Perdantes", String(losers), losers > 0 ? "red" : undefined));
+    wrap.appendChild(card("P/L latent total", fmtMoney(latent), latent >= 0 ? "green" : "red"));
+    wrap.appendChild(card("Capital engagé", fmtMoney(engaged)));
+    wrap.appendChild(card("Exposition", exposure != null ? `${exposure.toFixed(1)} %` : "—"));
+  }
+
   function renderPositions(positions) {
     const tb = $("#pos-table tbody");
     tb.innerHTML = "";
@@ -151,16 +249,32 @@
     $("#pos-table").parentElement.hidden = positions.length === 0;
     for (const p of positions) {
       const tr = el("tr");
+      const hasPrice = Number.isFinite(p.currentPrice);
+      const winning = hasPrice && p.latentPnl >= 0;
+      const frac = progressFraction(p);
+      // Renforcement près du stop / de l'objectif (15 % du chemin restant).
+      const strong = frac != null && (frac <= 0.15 || frac >= 0.85) ? " strong" : "";
+      const plCls = hasPrice ? (winning ? "pos" + strong : "neg" + strong) : null;
+
       tr.appendChild(el("td", null, p.symbol));
       const st = el("td"); st.appendChild(el("span", "badge setup", SETUP_LABELS[p.setupType] || p.setupType)); tr.appendChild(st);
       const dir = el("td"); dir.appendChild(el("span", "badge " + p.direction, p.direction === "long" ? "achat" : "vente")); tr.appendChild(dir);
       tr.appendChild(el("td", null, fmtNum(p.entry, 4)));
+      tr.appendChild(el("td", null, hasPrice ? fmtNum(p.currentPrice, 4) : "—"));
+      tr.appendChild(el("td", plCls, hasPrice ? fmtMoney(p.latentPnl) : "—"));
+      tr.appendChild(el("td", plCls, hasPrice ? fmtPctRaw(p.latentPnlPct) : "—"));
+      tr.appendChild(el("td", null, hasPrice ? fmtMoney(p.currentValue) : "—"));
+      const barCell = el("td"); barCell.appendChild(progressBar(p)); tr.appendChild(barCell);
+      const dStop = distPct(p.currentPrice, p.stopLoss);
+      const dTp = distPct(p.currentPrice, p.takeProfit);
+      tr.appendChild(el("td", frac != null && frac <= 0.15 ? "neg strong" : null, dStop != null ? `${dStop.toFixed(1)} %` : "—"));
+      tr.appendChild(el("td", frac != null && frac >= 0.85 ? "pos strong" : null, dTp != null ? `${dTp.toFixed(1)} %` : "—"));
       tr.appendChild(el("td", null, fmtNum(p.stopLoss, 4)));
       tr.appendChild(el("td", null, fmtNum(p.takeProfit, 4)));
       tr.appendChild(el("td", null, fmtNum(p.rr, 2)));
       tr.appendChild(el("td", null, fmtNum(p.qty, 4)));
+      tr.appendChild(el("td", null, fmtSince(p.openedAt)));
       tr.appendChild(el("td", null, fmtDate(p.openedAt)));
-      tr.appendChild(el("td", null, fmtDate(p.openedBarTime)));
       tr.appendChild(el("td", "why", p.reason || ""));
       tb.appendChild(tr);
     }
@@ -191,19 +305,24 @@
   // ---------- Chargement ----------
   async function loadAll() {
     try {
-      const [health, stats, opps, positions, trades] = await Promise.all([
+      const [health, stats, opps, positionsRes, trades] = await Promise.all([
         api("/api/v2/health"),
         api("/api/v2/stats"),
         api("/api/v2/opportunities"),
         api("/api/v2/positions"),
         api("/api/v2/trades?limit=300"),
       ]);
+      const positions = positionsRes.positions || [];
+      const overall = stats.overall || {};
+      const startingEquity = Number(positionsRes.startingEquity) || 100000;
       renderHealth(health);
-      renderPerf(stats.overall || {});
+      renderPortfolio(positions, overall, startingEquity);
+      renderPerf(overall, startingEquity);
       renderSetups(stats.bySetup || {});
-      renderAssets(stats.byAsset || {});
+      renderAssetRankings(stats.byAsset || {}, positions);
       renderOpportunities(opps);
-      renderPositions(positions.positions || []);
+      renderPositionsSummary(positions, overall, startingEquity);
+      renderPositions(positions);
       renderTrades(trades.trades || []);
     } catch (e) {
       console.error(e);
