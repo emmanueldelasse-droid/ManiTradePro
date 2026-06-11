@@ -8,7 +8,7 @@
 
 ## 🆕 SESSION 2026-06-09 — MANITRADEPRO V2 (LEARNING BOT, reconstruction propre)
 
-> Branche `claude/manitradepro-v2-learning-bot`. **Pas de PR, pas de merge** : livraison sur branche uniquement (gouvernance — un `GO MERGE` reste requis avant tout merge sur `main`).
+> Branche `claude/manitradepro-v2-learning-bot`. **PR #267 mergée** dans `main` (commit `09fd337`, 2026-06-09). Worker-v2 déployé via `wrangler-v2.toml`. Fixes post-déploiement inclus (Supabase writes + opened_bar_time).
 
 - **Mission** : recréer l'app depuis zéro en V2, **sans réparer la V1**. Objectif réel = bot d'apprentissage qui *prend* des trades (paper) pour mesurer quels setups gagnent. Fin du modèle V1 « 0 trade parfaitement filtré ».
 - **Décision créateur (cette session)** : livrer sur la branche `claude/manitradepro-v2-learning-bot` + **fichiers V2 séparés** (la V1 — `worker.js`, `assets/`, tables `mtp_*` — reste 100 % intacte).
@@ -31,8 +31,8 @@
 ## État actuel
 
 - **Projet** : ManiTradePro — moteur quant de sélection / allocation / gestion du risque, orienté swing / rotation / momentum structurel multi-jours.
-- **Date dernière mise à jour** : 2026-06-02.
-- **Branche / PR active** : `claude/manitradepro-bot-blockage-JiOJl` — déblocage bot d'apprentissage (auth Analytics + diagnostic moteur + mode exploration). Pas encore de PR ni de GO MERGE.
+- **Date dernière mise à jour** : 2026-06-11.
+- **Branche / PR active** : aucune feature active. Session doc maintenance uniquement (`claude/confident-hawking-cstlqd`).
 - **🔧 SESSION 2026-06-02 — DÉBLOCAGE BOT D'APPRENTISSAGE** (branche `claude/manitradepro-bot-blockage-JiOJl`) :
   - **Auth Analytics réparée** : `loadTradeFeedback()` et `loadReports()` (assets/app.js) passaient par `api()` (sans token) → 403 sur `/api/training/feedback` et `/api/reports/weekly` (routes `requireAdminAccess`). Bascule sur `apiGetAuth()`. Erreurs 403 désormais affichées dans l'UI Analytics (`state.tradeFeedbackError`, `.lpi-error`) au lieu d'un échec silencieux.
   - **Diagnostic moteur** : nouvelle route `GET /api/training/debug-opportunities` (admin, lecture seule). Pour chaque actif : score, decision, tradeNow, blockers, confirmations, safety/actionability/dossier, quoteQuality, setup, régime, ET la première garde qui bloque l'auto-open (`explainAutoOpenBlock`). But : comprendre pourquoi un actif à 70+ reste « Pas de trade » ou n'ouvre aucun paper trade.
@@ -54,7 +54,7 @@
   - Fix B.14 : `data_quality_low` n'est plus déclenché que si `dataQuality < 55 ET quoteQuality.executionSafe === false`. Le différé exécutable cesse d'être un blocage ; eod/snapshot/stale/devise restent bloqués. **`dataQuality` (donc le scoring) reste inchangé** ; `quoteQuality` calculé une fois et réutilisé.
   - Effet : NVDA/COIN/NFLX repassent en « Trade proposé exploration » ; la garde d'exécution (R5) reste seule juge de la fiabilité du prix réel.
   - Tests : `npm test` 19/19 (2 nouveaux B.14 exécutant le vrai `calcDetailScore` : delayed_15m execution-safe ⇒ pas de `data_quality_low` ; eod/snapshot ⇒ blocage conservé).
-- **Dernier merge connu** : PR #261 `feat(ui): Live Paper Analytics — sous-vue Analytics dans Trade (PR-UI-LIVE-PAPER-INSIGHTS-1)` (commit `aabffe8` sur `main`).
+- **Dernier merge connu** : PR #267 `feat(v2): ManiTradePro V2 learning bot — clean rebuild` (commit `09fd337` sur `main`, 2026-06-09). Inclut PRs antérieures : #266 (B.14 découp. qualité données), #265 (UI scores), #264 (bot déblocage).
 - **Phase officielle** : *VÉRITÉ MARCHÉ VISIBLE* — les analytics livePaperAnalytics + livePaperOutcome sont désormais observables côté UI dans l'onglet Trade.
 - **✅ STACK SUPPRESSION HISTORIQUE TRADES — VALIDÉE BOUT EN BOUT (2026-05-22)** :
   - V1 tombstone local (PR #254) actif.
@@ -213,8 +213,8 @@
 
 ## PR en cours
 
-- **PR** : aucune PR de feature. Maintenance documentaire post-merge PR #261 uniquement (`claude/session-md-post-analytics-merge`).
-- **Phase actuelle** : *VÉRITÉ MARCHÉ VISIBLE* — observabilité analytique livrée. Stack suppression historique trades validée (V1+V2+V3 + migration 017).
+- **PR** : aucune PR de feature. Mise à jour documentaire SESSION.md post-merge PR #267 (`claude/confident-hawking-cstlqd`).
+- **Phase actuelle** : *V1 VÉRITÉ MARCHÉ VISIBLE* (paper trading V1 actif) + *V2 LEARNING BOT DÉPLOYÉ* (worker-v2 live, 33/33 tests, cron horaire, tables `mtp_v2_*`).
 - **À vérifier manuellement (créateur)** : ouvrir l'app après déploiement Pages, aller dans Trades, scroller en bas → vérifier que la section "📊 Analytics — Live Paper Insights" s'affiche (avec état vide si aucun trade instrumenté, ou les 5 sections si trades présents). Tester iPhone + dark/light.
 - **Philosophie projet officiellement validée (ChatGPT 2026-05-22 post-#261)** : *« ManiTradePro n'est plus seulement un bot qui ouvre des trades, mais devient un système observable qui apprend du marché vivant. »*
 - **Directive ChatGPT post-#261 — interdictions immédiates** :
