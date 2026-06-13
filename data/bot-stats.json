@@ -14,35 +14,41 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 3,
-    "winCount": 0,
+    "totalCount": 4,
+    "winCount": 1,
     "lossCount": 3,
-    "winRate": 0,
-    "totalPnl": -53.57385260869694,
-    "avgWin": 0,
+    "winRate": 0.25,
+    "totalPnl": -33.00330124628164,
+    "avgWin": 20.5705513624153,
     "avgLoss": 17.857950869565645,
-    "expectancy": -17.857950869565645,
-    "rrActual": 0,
-    "openCount": 1,
+    "expectancy": -8.25082531157041,
+    "rrActual": 1.1518987543790702,
+    "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 3,
-        "wins": 0,
-        "pnl": -53.57385260869694,
-        "winRate": 0
+        "count": 4,
+        "wins": 1,
+        "pnl": -33.00330124628164,
+        "winRate": 0.25
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 3,
-        "wins": 0,
-        "pnl": -53.57385260869694,
-        "winRate": 0
+        "count": 4,
+        "wins": 1,
+        "pnl": -33.00330124628164,
+        "winRate": 0.25
       }
     ],
     "topSymbols": [
+      {
+        "symbol": "JPM",
+        "count": 1,
+        "pnl": 20.5705513624153,
+        "wins": 1
+      },
       {
         "symbol": "SAP",
         "count": 1,
@@ -84,35 +90,41 @@
     ]
   },
   "stats7d": {
-    "totalCount": 1,
-    "winCount": 0,
+    "totalCount": 2,
+    "winCount": 1,
     "lossCount": 1,
-    "winRate": 0,
-    "totalPnl": -3.361766181635734,
-    "avgWin": 0,
+    "winRate": 0.5,
+    "totalPnl": 17.208785180779568,
+    "avgWin": 20.5705513624153,
     "avgLoss": 3.361766181635734,
-    "expectancy": -3.361766181635734,
-    "rrActual": 0,
+    "expectancy": 8.604392590389784,
+    "rrActual": 6.118971472431879,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 1,
-        "wins": 0,
-        "pnl": -3.361766181635734,
-        "winRate": 0
+        "count": 2,
+        "wins": 1,
+        "pnl": 17.208785180779568,
+        "winRate": 0.5
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 1,
-        "wins": 0,
-        "pnl": -3.361766181635734,
-        "winRate": 0
+        "count": 2,
+        "wins": 1,
+        "pnl": 17.208785180779568,
+        "winRate": 0.5
       }
     ],
     "topSymbols": [
+      {
+        "symbol": "JPM",
+        "count": 1,
+        "pnl": 20.5705513624153,
+        "wins": 1
+      },
       {
         "symbol": "SAP",
         "count": 1,
@@ -130,35 +142,41 @@
     ]
   },
   "stats30d": {
-    "totalCount": 3,
-    "winCount": 0,
+    "totalCount": 4,
+    "winCount": 1,
     "lossCount": 3,
-    "winRate": 0,
-    "totalPnl": -53.57385260869694,
-    "avgWin": 0,
+    "winRate": 0.25,
+    "totalPnl": -33.00330124628164,
+    "avgWin": 20.5705513624153,
     "avgLoss": 17.857950869565645,
-    "expectancy": -17.857950869565645,
-    "rrActual": 0,
+    "expectancy": -8.25082531157041,
+    "rrActual": 1.1518987543790702,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 3,
-        "wins": 0,
-        "pnl": -53.57385260869694,
-        "winRate": 0
+        "count": 4,
+        "wins": 1,
+        "pnl": -33.00330124628164,
+        "winRate": 0.25
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 3,
-        "wins": 0,
-        "pnl": -53.57385260869694,
-        "winRate": 0
+        "count": 4,
+        "wins": 1,
+        "pnl": -33.00330124628164,
+        "winRate": 0.25
       }
     ],
     "topSymbols": [
+      {
+        "symbol": "JPM",
+        "count": 1,
+        "pnl": 20.5705513624153,
+        "wins": 1
+      },
       {
         "symbol": "SAP",
         "count": 1,
@@ -199,5 +217,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-06-08T17:00:50.867Z"
+  "lastClosedAt": "2026-06-13T16:15:34.909Z"
 }
