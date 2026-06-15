@@ -90,32 +90,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 2,
+    "totalCount": 1,
     "winCount": 1,
-    "lossCount": 1,
-    "winRate": 0.5,
-    "totalPnl": 17.208785180779568,
+    "lossCount": 0,
+    "winRate": 1,
+    "totalPnl": 20.5705513624153,
     "avgWin": 20.5705513624153,
-    "avgLoss": 3.361766181635734,
-    "expectancy": 8.604392590389784,
-    "rrActual": 6.118971472431879,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 2,
+        "count": 1,
         "wins": 1,
-        "pnl": 17.208785180779568,
-        "winRate": 0.5
+        "pnl": 20.5705513624153,
+        "winRate": 1
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 2,
+        "count": 1,
         "wins": 1,
-        "pnl": 17.208785180779568,
-        "winRate": 0.5
+        "pnl": 20.5705513624153,
+        "winRate": 1
       }
     ],
     "topSymbols": [
@@ -124,22 +124,9 @@
         "count": 1,
         "pnl": 20.5705513624153,
         "wins": 1
-      },
-      {
-        "symbol": "SAP",
-        "count": 1,
-        "pnl": -3.361766181635734,
-        "wins": 0
       }
     ],
-    "bottomSymbols": [
-      {
-        "symbol": "SAP",
-        "count": 1,
-        "pnl": -3.361766181635734,
-        "wins": 0
-      }
-    ]
+    "bottomSymbols": []
   },
   "stats30d": {
     "totalCount": 4,
