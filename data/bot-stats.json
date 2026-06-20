@@ -14,32 +14,32 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 5,
-    "winCount": 1,
+    "totalCount": 6,
+    "winCount": 2,
     "lossCount": 4,
-    "winRate": 0.2,
-    "totalPnl": -38.33926962572828,
-    "avgWin": 20.5705513624153,
+    "winRate": 0.3333333333333333,
+    "totalPnl": -31.465679248754828,
+    "avgWin": 13.722070869694374,
     "avgLoss": 14.727455247035895,
-    "expectancy": -7.667853925145657,
-    "rrActual": 1.396748522902856,
-    "openCount": 5,
+    "expectancy": -5.244279874792474,
+    "rrActual": 0.9317340056053561,
+    "openCount": 4,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 5,
-        "wins": 1,
-        "pnl": -38.33926962572828,
-        "winRate": 0.2
+        "count": 6,
+        "wins": 2,
+        "pnl": -31.465679248754828,
+        "winRate": 0.3333333333333333
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 5,
-        "wins": 1,
-        "pnl": -38.33926962572828,
-        "winRate": 0.2
+        "count": 6,
+        "wins": 2,
+        "pnl": -31.465679248754828,
+        "winRate": 0.3333333333333333
       }
     ],
     "topSymbols": [
@@ -47,6 +47,12 @@
         "symbol": "JPM",
         "count": 1,
         "pnl": 20.5705513624153,
+        "wins": 1
+      },
+      {
+        "symbol": "AIR",
+        "count": 1,
+        "pnl": 6.873590376973447,
         "wins": 1
       },
       {
@@ -65,12 +71,6 @@
         "symbol": "MSFT",
         "count": 1,
         "pnl": -20.235841525443117,
-        "wins": 0
-      },
-      {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": -29.976244901618085,
         "wins": 0
       }
     ],
@@ -102,32 +102,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 2,
-    "winCount": 1,
+    "totalCount": 3,
+    "winCount": 2,
     "lossCount": 1,
-    "winRate": 0.5,
-    "totalPnl": 15.23458298296866,
-    "avgWin": 20.5705513624153,
+    "winRate": 0.6666666666666666,
+    "totalPnl": 22.108173359942107,
+    "avgWin": 13.722070869694374,
     "avgLoss": 5.335968379446641,
-    "expectancy": 7.61729149148433,
-    "rrActual": 3.8550736997711637,
+    "expectancy": 7.369391119980702,
+    "rrActual": 2.5716177259501305,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 2,
-        "wins": 1,
-        "pnl": 15.23458298296866,
-        "winRate": 0.5
+        "count": 3,
+        "wins": 2,
+        "pnl": 22.108173359942107,
+        "winRate": 0.6666666666666666
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 2,
-        "wins": 1,
-        "pnl": 15.23458298296866,
-        "winRate": 0.5
+        "count": 3,
+        "wins": 2,
+        "pnl": 22.108173359942107,
+        "winRate": 0.6666666666666666
       }
     ],
     "topSymbols": [
@@ -135,6 +135,12 @@
         "symbol": "JPM",
         "count": 1,
         "pnl": 20.5705513624153,
+        "wins": 1
+      },
+      {
+        "symbol": "AIR",
+        "count": 1,
+        "pnl": 6.873590376973447,
         "wins": 1
       },
       {
@@ -154,32 +160,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 5,
-    "winCount": 1,
+    "totalCount": 6,
+    "winCount": 2,
     "lossCount": 4,
-    "winRate": 0.2,
-    "totalPnl": -38.33926962572828,
-    "avgWin": 20.5705513624153,
+    "winRate": 0.3333333333333333,
+    "totalPnl": -31.465679248754828,
+    "avgWin": 13.722070869694374,
     "avgLoss": 14.727455247035895,
-    "expectancy": -7.667853925145657,
-    "rrActual": 1.396748522902856,
+    "expectancy": -5.244279874792474,
+    "rrActual": 0.9317340056053561,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 5,
-        "wins": 1,
-        "pnl": -38.33926962572828,
-        "winRate": 0.2
+        "count": 6,
+        "wins": 2,
+        "pnl": -31.465679248754828,
+        "winRate": 0.3333333333333333
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 5,
-        "wins": 1,
-        "pnl": -38.33926962572828,
-        "winRate": 0.2
+        "count": 6,
+        "wins": 2,
+        "pnl": -31.465679248754828,
+        "winRate": 0.3333333333333333
       }
     ],
     "topSymbols": [
@@ -187,6 +193,12 @@
         "symbol": "JPM",
         "count": 1,
         "pnl": 20.5705513624153,
+        "wins": 1
+      },
+      {
+        "symbol": "AIR",
+        "count": 1,
+        "pnl": 6.873590376973447,
         "wins": 1
       },
       {
@@ -205,12 +217,6 @@
         "symbol": "MSFT",
         "count": 1,
         "pnl": -20.235841525443117,
-        "wins": 0
-      },
-      {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": -29.976244901618085,
         "wins": 0
       }
     ],
@@ -241,5 +247,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-06-19T20:15:44.599Z"
+  "lastClosedAt": "2026-06-20T08:15:35.848Z"
 }
