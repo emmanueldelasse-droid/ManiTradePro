@@ -14,23 +14,23 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 10,
+    "totalCount": 11,
     "winCount": 4,
-    "lossCount": 6,
-    "winRate": 0.4,
-    "totalPnl": -8.866106281555354,
+    "lossCount": 7,
+    "winRate": 0.36363636363636365,
+    "totalPnl": -23.162812939795188,
     "avgWin": 12.784566675255455,
-    "avgLoss": 10.00072883042953,
-    "expectancy": -0.8866106281555357,
-    "rrActual": 1.2783634965039203,
-    "openCount": 3,
+    "avgLoss": 10.614439948688144,
+    "expectancy": -2.105710267254108,
+    "rrActual": 1.2044504219778003,
+    "openCount": 2,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 10,
+        "count": 11,
         "wins": 4,
-        "pnl": -8.866106281555354,
-        "winRate": 0.4
+        "pnl": -23.162812939795188,
+        "winRate": 0.36363636363636365
       }
     ],
     "byClass": [
@@ -43,9 +43,9 @@
       },
       {
         "class": "etf",
-        "count": 1,
+        "count": 2,
         "wins": 0,
-        "pnl": -0.07949125596186381,
+        "pnl": -14.376197914201702,
         "winRate": 0
       }
     ],
@@ -69,15 +69,15 @@
         "wins": 1
       },
       {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.07949125596186381,
-        "wins": 0
-      },
-      {
         "symbol": "V",
         "count": 1,
         "pnl": -1.0150607384717356,
+        "wins": 0
+      },
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
         "wins": 0
       }
     ],
@@ -95,6 +95,12 @@
         "wins": 0
       },
       {
+        "symbol": "QQQ",
+        "count": 2,
+        "pnl": -14.376197914201702,
+        "wins": 0
+      },
+      {
         "symbol": "LVMH",
         "count": 1,
         "pnl": -5.335968379446641,
@@ -105,33 +111,27 @@
         "count": 1,
         "pnl": -3.361766181635734,
         "wins": 0
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -1.0150607384717356,
-        "wins": 0
       }
     ]
   },
   "stats7d": {
-    "totalCount": 6,
+    "totalCount": 7,
     "winCount": 3,
-    "lossCount": 3,
-    "winRate": 0.5,
-    "totalPnl": 24.137194964726284,
+    "lossCount": 4,
+    "winRate": 0.42857142857142855,
+    "totalPnl": 9.840488306486446,
     "avgWin": 10.189238446202173,
-    "avgLoss": 2.1435067912934134,
-    "expectancy": 4.02286582745438,
-    "rrActual": 4.753536815273576,
+    "avgLoss": 5.181806758030019,
+    "expectancy": 1.4057840437837776,
+    "rrActual": 1.966348596541613,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 6,
+        "count": 7,
         "wins": 3,
-        "pnl": 24.137194964726284,
-        "winRate": 0.5
+        "pnl": 9.840488306486446,
+        "winRate": 0.42857142857142855
       }
     ],
     "byClass": [
@@ -144,9 +144,9 @@
       },
       {
         "class": "etf",
-        "count": 1,
+        "count": 2,
         "wins": 0,
-        "pnl": -0.07949125596186381,
+        "pnl": -14.376197914201702,
         "winRate": 0
       }
     ],
@@ -170,19 +170,25 @@
         "wins": 1
       },
       {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.07949125596186381,
-        "wins": 0
-      },
-      {
         "symbol": "V",
         "count": 1,
         "pnl": -1.0150607384717356,
         "wins": 0
+      },
+      {
+        "symbol": "LVMH",
+        "count": 1,
+        "pnl": -5.335968379446641,
+        "wins": 0
       }
     ],
     "bottomSymbols": [
+      {
+        "symbol": "QQQ",
+        "count": 2,
+        "pnl": -14.376197914201702,
+        "wins": 0
+      },
       {
         "symbol": "LVMH",
         "count": 1,
@@ -194,33 +200,27 @@
         "count": 1,
         "pnl": -1.0150607384717356,
         "wins": 0
-      },
-      {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.07949125596186381,
-        "wins": 0
       }
     ]
   },
   "stats30d": {
-    "totalCount": 10,
+    "totalCount": 11,
     "winCount": 4,
-    "lossCount": 6,
-    "winRate": 0.4,
-    "totalPnl": -8.866106281555354,
+    "lossCount": 7,
+    "winRate": 0.36363636363636365,
+    "totalPnl": -23.162812939795188,
     "avgWin": 12.784566675255455,
-    "avgLoss": 10.00072883042953,
-    "expectancy": -0.8866106281555357,
-    "rrActual": 1.2783634965039203,
+    "avgLoss": 10.614439948688144,
+    "expectancy": -2.105710267254108,
+    "rrActual": 1.2044504219778003,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 10,
+        "count": 11,
         "wins": 4,
-        "pnl": -8.866106281555354,
-        "winRate": 0.4
+        "pnl": -23.162812939795188,
+        "winRate": 0.36363636363636365
       }
     ],
     "byClass": [
@@ -233,9 +233,9 @@
       },
       {
         "class": "etf",
-        "count": 1,
+        "count": 2,
         "wins": 0,
-        "pnl": -0.07949125596186381,
+        "pnl": -14.376197914201702,
         "winRate": 0
       }
     ],
@@ -259,15 +259,15 @@
         "wins": 1
       },
       {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.07949125596186381,
-        "wins": 0
-      },
-      {
         "symbol": "V",
         "count": 1,
         "pnl": -1.0150607384717356,
+        "wins": 0
+      },
+      {
+        "symbol": "SAP",
+        "count": 1,
+        "pnl": -3.361766181635734,
         "wins": 0
       }
     ],
@@ -285,6 +285,12 @@
         "wins": 0
       },
       {
+        "symbol": "QQQ",
+        "count": 2,
+        "pnl": -14.376197914201702,
+        "wins": 0
+      },
+      {
         "symbol": "LVMH",
         "count": 1,
         "pnl": -5.335968379446641,
@@ -295,14 +301,8 @@
         "count": 1,
         "pnl": -3.361766181635734,
         "wins": 0
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -1.0150607384717356,
-        "wins": 0
       }
     ]
   },
-  "lastClosedAt": "2026-06-22T14:30:45.853Z"
+  "lastClosedAt": "2026-06-23T13:45:40.483Z"
 }
