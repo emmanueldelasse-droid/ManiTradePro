@@ -115,54 +115,42 @@
     ]
   },
   "stats7d": {
-    "totalCount": 7,
-    "winCount": 3,
-    "lossCount": 4,
-    "winRate": 0.42857142857142855,
-    "totalPnl": 8.01395656280528,
-    "avgWin": 8.555959414157655,
-    "avgLoss": 4.413480419916921,
-    "expectancy": 1.144850937543612,
-    "rrActual": 1.938596889553826,
+    "totalCount": 3,
+    "winCount": 1,
+    "lossCount": 2,
+    "winRate": 0.3333333333333333,
+    "totalPnl": -14.585616404394196,
+    "avgWin": 1.97375328083989,
+    "avgLoss": 8.279684842617042,
+    "expectancy": -4.861872134798066,
+    "rrActual": 0.23838507362993133,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 7,
-        "wins": 3,
-        "pnl": 8.01395656280528,
-        "winRate": 0.42857142857142855
+        "count": 3,
+        "wins": 1,
+        "pnl": -14.585616404394196,
+        "winRate": 0.3333333333333333
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 5,
-        "wins": 3,
-        "pnl": 22.39015447700698,
-        "winRate": 0.6
+        "count": 2,
+        "wins": 1,
+        "pnl": -0.28890974615435794,
+        "winRate": 0.5
       },
       {
         "class": "etf",
-        "count": 2,
+        "count": 1,
         "wins": 0,
-        "pnl": -14.376197914201702,
+        "pnl": -14.296706658239838,
         "winRate": 0
       }
     ],
     "topSymbols": [
-      {
-        "symbol": "AMD",
-        "count": 1,
-        "pnl": 14.941335474898631,
-        "wins": 1
-      },
-      {
-        "symbol": "JPM",
-        "count": 2,
-        "pnl": 6.490126459740196,
-        "wins": 1
-      },
       {
         "symbol": "AIR",
         "count": 1,
@@ -170,29 +158,29 @@
         "wins": 1
       },
       {
-        "symbol": "V",
+        "symbol": "JPM",
         "count": 1,
-        "pnl": -1.0150607384717356,
+        "pnl": -2.262663026994248,
         "wins": 0
       },
       {
         "symbol": "QQQ",
-        "count": 2,
-        "pnl": -14.376197914201702,
+        "count": 1,
+        "pnl": -14.296706658239838,
         "wins": 0
       }
     ],
     "bottomSymbols": [
       {
         "symbol": "QQQ",
-        "count": 2,
-        "pnl": -14.376197914201702,
+        "count": 1,
+        "pnl": -14.296706658239838,
         "wins": 0
       },
       {
-        "symbol": "V",
+        "symbol": "JPM",
         "count": 1,
-        "pnl": -1.0150607384717356,
+        "pnl": -2.262663026994248,
         "wins": 0
       }
     ]
