@@ -115,23 +115,23 @@
     ]
   },
   "stats7d": {
-    "totalCount": 4,
+    "totalCount": 3,
     "winCount": 1,
-    "lossCount": 3,
-    "winRate": 0.25,
-    "totalPnl": -17.628564147039192,
+    "lossCount": 2,
+    "winRate": 0.3333333333333333,
+    "totalPnl": -3.3318574887993524,
     "avgWin": 1.97375328083989,
-    "avgLoss": 6.534105809293027,
-    "expectancy": -4.407141036759797,
-    "rrActual": 0.3020693784959453,
+    "avgLoss": 2.6528053848196214,
+    "expectancy": -1.110619162933118,
+    "rrActual": 0.7440249074185652,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 4,
+        "count": 3,
         "wins": 1,
-        "pnl": -17.628564147039192,
-        "winRate": 0.25
+        "pnl": -3.3318574887993524,
+        "winRate": 0.3333333333333333
       }
     ],
     "byClass": [
@@ -141,13 +141,6 @@
         "wins": 1,
         "pnl": -3.3318574887993524,
         "winRate": 0.3333333333333333
-      },
-      {
-        "class": "etf",
-        "count": 1,
-        "wins": 0,
-        "pnl": -14.296706658239838,
-        "winRate": 0
       }
     ],
     "topSymbols": [
@@ -162,21 +155,9 @@
         "count": 2,
         "pnl": -5.305610769639243,
         "wins": 0
-      },
-      {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -14.296706658239838,
-        "wins": 0
       }
     ],
     "bottomSymbols": [
-      {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -14.296706658239838,
-        "wins": 0
-      },
       {
         "symbol": "JPM",
         "count": 2,
