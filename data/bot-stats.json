@@ -14,32 +14,32 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 16,
-    "winCount": 6,
+    "totalCount": 17,
+    "winCount": 7,
     "lossCount": 10,
-    "winRate": 0.375,
-    "totalPnl": -0.49302281151262406,
-    "avgWin": 13.269926366683519,
+    "winRate": 0.4117647058823529,
+    "totalPnl": 20.066958444344923,
+    "avgWin": 14.311362779422668,
     "avgLoss": 8.011258101161372,
-    "expectancy": -0.03081392571953856,
-    "rrActual": 1.6564097922097667,
-    "openCount": 2,
+    "expectancy": 1.1804093202555848,
+    "rrActual": 1.78640640442579,
+    "openCount": 1,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 16,
-        "wins": 6,
-        "pnl": -0.49302281151262406,
-        "winRate": 0.375
+        "count": 17,
+        "wins": 7,
+        "pnl": 20.066958444344923,
+        "winRate": 0.4117647058823529
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 13,
-        "wins": 6,
-        "pnl": 14.389065703846544,
-        "winRate": 0.46153846153846156
+        "count": 14,
+        "wins": 7,
+        "pnl": 34.949046959704106,
+        "winRate": 0.5
       },
       {
         "class": "etf",
@@ -63,16 +63,16 @@
         "wins": 2
       },
       {
+        "symbol": "V",
+        "count": 2,
+        "pnl": 19.544920517385822,
+        "wins": 1
+      },
+      {
         "symbol": "AMD",
         "count": 1,
         "pnl": 14.941335474898631,
         "wins": 1
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -1.0150607384717356,
-        "wins": 0
       },
       {
         "symbol": "SAP",
@@ -115,32 +115,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 5,
-    "winCount": 2,
+    "totalCount": 6,
+    "winCount": 3,
     "lossCount": 3,
-    "winRate": 0.4,
-    "totalPnl": 22.669790128282568,
-    "avgWin": 14.240645749539643,
+    "winRate": 0.5,
+    "totalPnl": 43.22977138414012,
+    "avgWin": 16.34709091831228,
     "avgLoss": 1.9371671235989067,
-    "expectancy": 4.5339580256565135,
-    "rrActual": 7.351273711006975,
+    "expectancy": 7.204961897356686,
+    "rrActual": 8.438658037899351,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 5,
-        "wins": 2,
-        "pnl": 22.669790128282568,
-        "winRate": 0.4
+        "count": 6,
+        "wins": 3,
+        "pnl": 43.22977138414012,
+        "winRate": 0.5
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 4,
-        "wins": 2,
-        "pnl": 23.175680729440046,
-        "winRate": 0.5
+        "count": 5,
+        "wins": 3,
+        "pnl": 43.7356619852976,
+        "winRate": 0.6
       },
       {
         "class": "etf",
@@ -156,6 +156,12 @@
         "count": 2,
         "pnl": 28.481291499079287,
         "wins": 2
+      },
+      {
+        "symbol": "V",
+        "count": 1,
+        "pnl": 20.559981255857558,
+        "wins": 1
       },
       {
         "symbol": "QQQ",
@@ -186,32 +192,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 16,
-    "winCount": 6,
+    "totalCount": 17,
+    "winCount": 7,
     "lossCount": 10,
-    "winRate": 0.375,
-    "totalPnl": -0.49302281151262406,
-    "avgWin": 13.269926366683519,
+    "winRate": 0.4117647058823529,
+    "totalPnl": 20.066958444344923,
+    "avgWin": 14.311362779422668,
     "avgLoss": 8.011258101161372,
-    "expectancy": -0.03081392571953856,
-    "rrActual": 1.6564097922097667,
+    "expectancy": 1.1804093202555848,
+    "rrActual": 1.78640640442579,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 16,
-        "wins": 6,
-        "pnl": -0.49302281151262406,
-        "winRate": 0.375
+        "count": 17,
+        "wins": 7,
+        "pnl": 20.066958444344923,
+        "winRate": 0.4117647058823529
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 13,
-        "wins": 6,
-        "pnl": 14.389065703846544,
-        "winRate": 0.46153846153846156
+        "count": 14,
+        "wins": 7,
+        "pnl": 34.949046959704106,
+        "winRate": 0.5
       },
       {
         "class": "etf",
@@ -235,16 +241,16 @@
         "wins": 2
       },
       {
+        "symbol": "V",
+        "count": 2,
+        "pnl": 19.544920517385822,
+        "wins": 1
+      },
+      {
         "symbol": "AMD",
         "count": 1,
         "pnl": 14.941335474898631,
         "wins": 1
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -1.0150607384717356,
-        "wins": 0
       },
       {
         "symbol": "SAP",
@@ -286,5 +292,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-07-02T13:01:05.778Z"
+  "lastClosedAt": "2026-07-02T16:31:05.977Z"
 }
