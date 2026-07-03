@@ -115,32 +115,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 7,
-    "winCount": 4,
+    "totalCount": 6,
+    "winCount": 3,
     "lossCount": 3,
-    "winRate": 0.5714285714285714,
-    "totalPnl": 43.65477475124429,
-    "avgWin": 12.366569030510252,
+    "winRate": 0.5,
+    "totalPnl": 41.6810214704044,
+    "avgWin": 15.83084094706704,
     "avgLoss": 1.9371671235989067,
-    "expectancy": 6.236396393034898,
-    "rrActual": 6.383842095944412,
+    "expectancy": 6.946836911734067,
+    "rrActual": 8.172160653674627,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 7,
-        "wins": 4,
-        "pnl": 43.65477475124429,
-        "winRate": 0.5714285714285714
+        "count": 6,
+        "wins": 3,
+        "pnl": 41.6810214704044,
+        "winRate": 0.5
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 6,
-        "wins": 4,
-        "pnl": 44.160665352401764,
-        "winRate": 0.6666666666666666
+        "count": 5,
+        "wins": 3,
+        "pnl": 42.18691207156188,
+        "winRate": 0.6
       },
       {
         "class": "etf",
@@ -153,9 +153,9 @@
     "topSymbols": [
       {
         "symbol": "AIR",
-        "count": 2,
-        "pnl": 28.481291499079287,
-        "wins": 2
+        "count": 1,
+        "pnl": 26.507538218239397,
+        "wins": 1
       },
       {
         "symbol": "V",
