@@ -115,32 +115,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 5,
+    "totalCount": 4,
     "winCount": 3,
-    "lossCount": 2,
-    "winRate": 0.6,
-    "totalPnl": 43.94368449739865,
+    "lossCount": 1,
+    "winRate": 0.75,
+    "totalPnl": 46.98663224004365,
     "avgWin": 15.83084094706704,
-    "avgLoss": 1.774419171901236,
-    "expectancy": 8.788736899479728,
-    "rrActual": 8.921703055149464,
+    "avgLoss": 0.5058906011574772,
+    "expectancy": 11.746658060010912,
+    "rrActual": 31.293012581862744,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 5,
+        "count": 4,
         "wins": 3,
-        "pnl": 43.94368449739865,
-        "winRate": 0.6
+        "pnl": 46.98663224004365,
+        "winRate": 0.75
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 4,
+        "count": 3,
         "wins": 3,
-        "pnl": 44.449575098556124,
-        "winRate": 0.75
+        "pnl": 47.49252284120112,
+        "winRate": 1
       },
       {
         "class": "etf",
@@ -164,25 +164,19 @@
         "wins": 1
       },
       {
+        "symbol": "JPM",
+        "count": 1,
+        "pnl": 0.4250033671041626,
+        "wins": 1
+      },
+      {
         "symbol": "QQQ",
         "count": 1,
         "pnl": -0.5058906011574772,
         "wins": 0
-      },
-      {
-        "symbol": "JPM",
-        "count": 2,
-        "pnl": -2.6179443755408327,
-        "wins": 1
       }
     ],
     "bottomSymbols": [
-      {
-        "symbol": "JPM",
-        "count": 2,
-        "pnl": -2.6179443755408327,
-        "wins": 1
-      },
       {
         "symbol": "QQQ",
         "count": 1,
