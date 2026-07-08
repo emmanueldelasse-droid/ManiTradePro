@@ -198,32 +198,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 17,
+    "totalCount": 16,
     "winCount": 8,
-    "lossCount": 9,
-    "winRate": 0.47058823529411764,
-    "totalPnl": 65.02729185952064,
+    "lossCount": 8,
+    "winRate": 0.5,
+    "totalPnl": 68.38905804115637,
     "avgWin": 12.575567852882855,
-    "avgLoss": 3.953027884838021,
-    "expectancy": 3.825134815265921,
-    "rrActual": 3.181249467305023,
+    "avgLoss": 4.026935597738307,
+    "expectancy": 4.274316127572274,
+    "rrActual": 3.1228629183803718,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 17,
+        "count": 16,
         "wins": 8,
-        "pnl": 65.02729185952064,
-        "winRate": 0.47058823529411764
+        "pnl": 68.38905804115637,
+        "winRate": 0.5
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 14,
+        "count": 13,
         "wins": 8,
-        "pnl": 79.90938037487982,
-        "winRate": 0.5714285714285714
+        "pnl": 83.27114655651555,
+        "winRate": 0.6153846153846154
       },
       {
         "class": "etf",
@@ -259,9 +259,9 @@
         "wins": 1
       },
       {
-        "symbol": "SAP",
+        "symbol": "LVMH",
         "count": 1,
-        "pnl": -3.361766181635734,
+        "pnl": -5.335968379446641,
         "wins": 0
       }
     ],
@@ -282,12 +282,6 @@
         "symbol": "LVMH",
         "count": 1,
         "pnl": -5.335968379446641,
-        "wins": 0
-      },
-      {
-        "symbol": "SAP",
-        "count": 1,
-        "pnl": -3.361766181635734,
         "wins": 0
       }
     ]
