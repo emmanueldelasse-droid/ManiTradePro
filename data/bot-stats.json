@@ -23,7 +23,7 @@
     "avgLoss": 7.799030671873036,
     "expectancy": 0.7797476543399702,
     "rrActual": 1.6124526728989865,
-    "openCount": 1,
+    "openCount": 2,
     "bySetup": [
       {
         "setup": "continuation",
