@@ -115,23 +115,23 @@
     ]
   },
   "stats7d": {
-    "totalCount": 5,
+    "totalCount": 4,
     "winCount": 3,
-    "lossCount": 2,
-    "winRate": 0.6,
-    "totalPnl": 41.30987586105399,
+    "lossCount": 1,
+    "winRate": 0.75,
+    "totalPnl": 41.815766462211464,
     "avgWin": 15.83084094706704,
-    "avgLoss": 3.091323490073565,
-    "expectancy": 8.261975172210796,
-    "rrActual": 5.1210560777288014,
+    "avgLoss": 5.676756378989652,
+    "expectancy": 10.453941615552868,
+    "rrActual": 2.7887124072575773,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 5,
+        "count": 4,
         "wins": 3,
-        "pnl": 41.30987586105399,
-        "winRate": 0.6
+        "pnl": 41.815766462211464,
+        "winRate": 0.75
       }
     ],
     "byClass": [
@@ -141,13 +141,6 @@
         "wins": 3,
         "pnl": 41.815766462211464,
         "winRate": 0.75
-      },
-      {
-        "class": "etf",
-        "count": 1,
-        "wins": 0,
-        "pnl": -0.5058906011574772,
-        "winRate": 0
       }
     ],
     "topSymbols": [
@@ -170,12 +163,6 @@
         "wins": 1
       },
       {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.5058906011574772,
-        "wins": 0
-      },
-      {
         "symbol": "TSLA",
         "count": 1,
         "pnl": -5.676756378989652,
@@ -187,12 +174,6 @@
         "symbol": "TSLA",
         "count": 1,
         "pnl": -5.676756378989652,
-        "wins": 0
-      },
-      {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.5058906011574772,
         "wins": 0
       }
     ]
