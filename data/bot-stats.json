@@ -115,41 +115,35 @@
     ]
   },
   "stats7d": {
-    "totalCount": 3,
-    "winCount": 2,
+    "totalCount": 2,
+    "winCount": 1,
     "lossCount": 1,
-    "winRate": 0.6666666666666666,
-    "totalPnl": 15.308228243972067,
-    "avgWin": 10.492492311480861,
+    "winRate": 0.5,
+    "totalPnl": -5.25175301188549,
+    "avgWin": 0.4250033671041626,
     "avgLoss": 5.676756378989652,
-    "expectancy": 5.102742747990689,
-    "rrActual": 1.8483252778496568,
+    "expectancy": -2.625876505942745,
+    "rrActual": 0.07486729017950293,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 3,
-        "wins": 2,
-        "pnl": 15.308228243972067,
-        "winRate": 0.6666666666666666
+        "count": 2,
+        "wins": 1,
+        "pnl": -5.25175301188549,
+        "winRate": 0.5
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 3,
-        "wins": 2,
-        "pnl": 15.308228243972067,
-        "winRate": 0.6666666666666666
+        "count": 2,
+        "wins": 1,
+        "pnl": -5.25175301188549,
+        "winRate": 0.5
       }
     ],
     "topSymbols": [
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": 20.559981255857558,
-        "wins": 1
-      },
       {
         "symbol": "JPM",
         "count": 1,
