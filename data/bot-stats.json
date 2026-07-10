@@ -14,32 +14,32 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 19,
+    "totalCount": 20,
     "winCount": 8,
-    "lossCount": 11,
-    "winRate": 0.42105263157894735,
-    "totalPnl": 14.81520543245944,
+    "lossCount": 12,
+    "winRate": 0.4,
+    "totalPnl": 12.422936059502323,
     "avgWin": 12.575567852882855,
-    "avgLoss": 7.799030671873036,
-    "expectancy": 0.7797476543399702,
-    "rrActual": 1.6124526728989865,
-    "openCount": 3,
+    "avgLoss": 7.348467230296708,
+    "expectancy": 0.6211468029751179,
+    "rrActual": 1.7113184911590187,
+    "openCount": 2,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 19,
+        "count": 20,
         "wins": 8,
-        "pnl": 14.81520543245944,
-        "winRate": 0.42105263157894735
+        "pnl": 12.422936059502323,
+        "winRate": 0.4
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 16,
+        "count": 17,
         "wins": 8,
-        "pnl": 29.69729394781861,
-        "winRate": 0.5
+        "pnl": 27.30502457486151,
+        "winRate": 0.47058823529411764
       },
       {
         "class": "etf",
@@ -64,8 +64,8 @@
       },
       {
         "symbol": "V",
-        "count": 2,
-        "pnl": 19.544920517385822,
+        "count": 3,
+        "pnl": 17.152651144428713,
         "wins": 1
       },
       {
@@ -115,35 +115,41 @@
     ]
   },
   "stats7d": {
-    "totalCount": 1,
+    "totalCount": 2,
     "winCount": 0,
-    "lossCount": 1,
+    "lossCount": 2,
     "winRate": 0,
-    "totalPnl": -5.676756378989652,
+    "totalPnl": -8.069025751946763,
     "avgWin": 0,
-    "avgLoss": 5.676756378989652,
-    "expectancy": -5.676756378989652,
+    "avgLoss": 4.034512875973381,
+    "expectancy": -4.034512875973381,
     "rrActual": 0,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 1,
+        "count": 2,
         "wins": 0,
-        "pnl": -5.676756378989652,
+        "pnl": -8.069025751946763,
         "winRate": 0
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 1,
+        "count": 2,
         "wins": 0,
-        "pnl": -5.676756378989652,
+        "pnl": -8.069025751946763,
         "winRate": 0
       }
     ],
     "topSymbols": [
+      {
+        "symbol": "V",
+        "count": 1,
+        "pnl": -2.3922693729571103,
+        "wins": 0
+      },
       {
         "symbol": "TSLA",
         "count": 1,
@@ -157,36 +163,42 @@
         "count": 1,
         "pnl": -5.676756378989652,
         "wins": 0
+      },
+      {
+        "symbol": "V",
+        "count": 1,
+        "pnl": -2.3922693729571103,
+        "wins": 0
       }
     ]
   },
   "stats30d": {
-    "totalCount": 16,
+    "totalCount": 17,
     "winCount": 8,
-    "lossCount": 8,
-    "winRate": 0.5,
-    "totalPnl": 68.38905804115637,
+    "lossCount": 9,
+    "winRate": 0.47058823529411764,
+    "totalPnl": 65.99678866819926,
     "avgWin": 12.575567852882855,
-    "avgLoss": 4.026935597738307,
-    "expectancy": 4.274316127572274,
-    "rrActual": 3.1228629183803718,
+    "avgLoss": 3.845306017207062,
+    "expectancy": 3.8821640393058403,
+    "rrActual": 3.270368547160986,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 16,
+        "count": 17,
         "wins": 8,
-        "pnl": 68.38905804115637,
-        "winRate": 0.5
+        "pnl": 65.99678866819926,
+        "winRate": 0.47058823529411764
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 13,
+        "count": 14,
         "wins": 8,
-        "pnl": 83.27114655651555,
-        "winRate": 0.6153846153846154
+        "pnl": 80.87887718355844,
+        "winRate": 0.5714285714285714
       },
       {
         "class": "etf",
@@ -211,8 +223,8 @@
       },
       {
         "symbol": "V",
-        "count": 2,
-        "pnl": 19.544920517385822,
+        "count": 3,
+        "pnl": 17.152651144428713,
         "wins": 1
       },
       {
@@ -249,5 +261,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-07-08T04:01:08.998Z"
+  "lastClosedAt": "2026-07-10T04:00:44.787Z"
 }
