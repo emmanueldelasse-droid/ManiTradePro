@@ -14,32 +14,32 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 25,
+    "totalCount": 26,
     "winCount": 10,
-    "lossCount": 15,
-    "winRate": 0.4,
-    "totalPnl": 10.988125550748151,
+    "lossCount": 16,
+    "winRate": 0.38461538461538464,
+    "totalPnl": 2.9644314204304507,
     "avgWin": 11.414239909947595,
-    "avgLoss": 6.876951569915187,
-    "expectancy": 0.43952502202992605,
-    "rrActual": 1.659781924287765,
-    "openCount": 5,
+    "avgLoss": 6.948622979940344,
+    "expectancy": 0.11401659309347867,
+    "rrActual": 1.6426621422544916,
+    "openCount": 4,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 25,
+        "count": 26,
         "wins": 10,
-        "pnl": 10.988125550748151,
-        "winRate": 0.4
+        "pnl": 2.9644314204304507,
+        "winRate": 0.38461538461538464
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 22,
+        "count": 23,
         "wins": 10,
-        "pnl": 25.870214066107327,
-        "winRate": 0.45454545454545453
+        "pnl": 17.84651993578962,
+        "winRate": 0.43478260869565216
       },
       {
         "class": "etf",
@@ -101,46 +101,46 @@
         "wins": 0
       },
       {
-        "symbol": "TSLA",
+        "symbol": "GOOGL",
         "count": 1,
-        "pnl": -5.676756378989652,
+        "pnl": -8.023694130317706,
         "wins": 0
       },
       {
-        "symbol": "LVMH",
+        "symbol": "TSLA",
         "count": 1,
-        "pnl": -5.335968379446641,
+        "pnl": -5.676756378989652,
         "wins": 0
       }
     ]
   },
   "stats7d": {
-    "totalCount": 6,
+    "totalCount": 7,
     "winCount": 2,
-    "lossCount": 4,
-    "winRate": 0.3333333333333333,
-    "totalPnl": -3.8270798817112937,
+    "lossCount": 5,
+    "winRate": 0.2857142857142857,
+    "totalPnl": -11.850774012029,
     "avgWin": 6.768928138206562,
-    "avgLoss": 4.341234039531104,
-    "expectancy": -0.6378466469518824,
-    "rrActual": 1.5592175120182354,
+    "avgLoss": 5.077726057688425,
+    "expectancy": -1.6929677160041432,
+    "rrActual": 1.33306288313002,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 6,
+        "count": 7,
         "wins": 2,
-        "pnl": -3.8270798817112937,
-        "winRate": 0.3333333333333333
+        "pnl": -11.850774012029,
+        "winRate": 0.2857142857142857
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 6,
+        "count": 7,
         "wins": 2,
-        "pnl": -3.8270798817112937,
-        "winRate": 0.3333333333333333
+        "pnl": -11.850774012029,
+        "winRate": 0.2857142857142857
       }
     ],
     "topSymbols": [
@@ -169,9 +169,9 @@
         "wins": 0
       },
       {
-        "symbol": "AMD",
-        "count": 2,
-        "pnl": -11.335226026873407,
+        "symbol": "GOOGL",
+        "count": 1,
+        "pnl": -8.023694130317706,
         "wins": 0
       }
     ],
@@ -180,6 +180,12 @@
         "symbol": "AMD",
         "count": 2,
         "pnl": -11.335226026873407,
+        "wins": 0
+      },
+      {
+        "symbol": "GOOGL",
+        "count": 1,
+        "pnl": -8.023694130317706,
         "wins": 0
       },
       {
@@ -197,32 +203,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 21,
+    "totalCount": 22,
     "winCount": 9,
-    "lossCount": 12,
-    "winRate": 0.42857142857142855,
-    "totalPnl": 43.99142679702978,
+    "lossCount": 13,
+    "winRate": 0.4090909090909091,
+    "totalPnl": 35.96773266671209,
     "avgWin": 10.396871970784517,
-    "avgLoss": 4.131701745002572,
-    "expectancy": 2.094829847477609,
-    "rrActual": 2.51636555890315,
+    "avgLoss": 4.431085774642198,
+    "expectancy": 1.6348969393960044,
+    "rrActual": 2.3463486151143274,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 21,
+        "count": 22,
         "wins": 9,
-        "pnl": 43.99142679702978,
-        "winRate": 0.42857142857142855
+        "pnl": 35.96773266671209,
+        "winRate": 0.4090909090909091
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 18,
+        "count": 19,
         "wins": 9,
-        "pnl": 58.87351531238896,
-        "winRate": 0.5
+        "pnl": 50.84982118207126,
+        "winRate": 0.47368421052631576
       },
       {
         "class": "etf",
@@ -272,6 +278,12 @@
         "wins": 0
       },
       {
+        "symbol": "GOOGL",
+        "count": 1,
+        "pnl": -8.023694130317706,
+        "wins": 0
+      },
+      {
         "symbol": "TSLA",
         "count": 1,
         "pnl": -5.676756378989652,
@@ -285,5 +297,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-07-15T15:00:48.758Z"
+  "lastClosedAt": "2026-07-16T18:30:41.400Z"
 }
