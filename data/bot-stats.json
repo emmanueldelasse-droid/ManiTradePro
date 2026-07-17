@@ -115,32 +115,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 7,
+    "totalCount": 6,
     "winCount": 2,
-    "lossCount": 5,
-    "winRate": 0.2857142857142857,
-    "totalPnl": -11.850774012029,
+    "lossCount": 4,
+    "winRate": 0.3333333333333333,
+    "totalPnl": -9.45850463907189,
     "avgWin": 6.768928138206562,
-    "avgLoss": 5.077726057688425,
-    "expectancy": -1.6929677160041432,
-    "rrActual": 1.33306288313002,
+    "avgLoss": 5.749090228871253,
+    "expectancy": -1.576417439845316,
+    "rrActual": 1.1773911816888527,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 7,
+        "count": 6,
         "wins": 2,
-        "pnl": -11.850774012029,
-        "winRate": 0.2857142857142857
+        "pnl": -9.45850463907189,
+        "winRate": 0.3333333333333333
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 7,
+        "count": 6,
         "wins": 2,
-        "pnl": -11.850774012029,
-        "winRate": 0.2857142857142857
+        "pnl": -9.45850463907189,
+        "winRate": 0.3333333333333333
       }
     ],
     "topSymbols": [
@@ -157,12 +157,6 @@
         "wins": 1
       },
       {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -2.3922693729571103,
-        "wins": 0
-      },
-      {
         "symbol": "JPM",
         "count": 1,
         "pnl": -3.637440758293898,
@@ -172,6 +166,12 @@
         "symbol": "GOOGL",
         "count": 1,
         "pnl": -8.023694130317706,
+        "wins": 0
+      },
+      {
+        "symbol": "AMD",
+        "count": 2,
+        "pnl": -11.335226026873407,
         "wins": 0
       }
     ],
@@ -192,12 +192,6 @@
         "symbol": "JPM",
         "count": 1,
         "pnl": -3.637440758293898,
-        "wins": 0
-      },
-      {
-        "symbol": "V",
-        "count": 1,
-        "pnl": -2.3922693729571103,
         "wins": 0
       }
     ]
