@@ -191,32 +191,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 23,
+    "totalCount": 22,
     "winCount": 10,
-    "lossCount": 13,
-    "winRate": 0.43478260869565216,
-    "totalPnl": 57.15719472697397,
+    "lossCount": 12,
+    "winRate": 0.45454545454545453,
+    "totalPnl": 62.49316310642061,
     "avgWin": 11.476130979732256,
-    "avgLoss": 4.431085774642198,
-    "expectancy": 2.485095422911912,
-    "rrActual": 2.5899139767067436,
+    "avgLoss": 4.355678890908494,
+    "expectancy": 2.8405983230191194,
+    "rrActual": 2.6347513825424813,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 23,
+        "count": 22,
         "wins": 10,
-        "pnl": 57.15719472697397,
-        "winRate": 0.43478260869565216
+        "pnl": 62.49316310642061,
+        "winRate": 0.45454545454545453
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 20,
+        "count": 19,
         "wins": 10,
-        "pnl": 72.03928324233316,
-        "winRate": 0.5
+        "pnl": 77.3752516217798,
+        "winRate": 0.5263157894736842
       },
       {
         "class": "etf",
@@ -275,12 +275,6 @@
         "symbol": "TSLA",
         "count": 1,
         "pnl": -5.676756378989652,
-        "wins": 0
-      },
-      {
-        "symbol": "LVMH",
-        "count": 1,
-        "pnl": -5.335968379446641,
         "wins": 0
       }
     ]
