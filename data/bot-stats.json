@@ -191,32 +191,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 22,
-    "winCount": 10,
+    "totalCount": 21,
+    "winCount": 9,
     "lossCount": 12,
-    "winRate": 0.45454545454545453,
-    "totalPnl": 62.49316310642061,
-    "avgWin": 11.476130979732256,
+    "winRate": 0.42857142857142855,
+    "totalPnl": 55.619572729447164,
+    "avgWin": 11.987524380038789,
     "avgLoss": 4.355678890908494,
-    "expectancy": 2.8405983230191194,
-    "rrActual": 2.6347513825424813,
+    "expectancy": 2.648551082354627,
+    "rrActual": 2.752159807983106,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 22,
-        "wins": 10,
-        "pnl": 62.49316310642061,
-        "winRate": 0.45454545454545453
+        "count": 21,
+        "wins": 9,
+        "pnl": 55.619572729447164,
+        "winRate": 0.42857142857142855
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 19,
-        "wins": 10,
-        "pnl": 77.3752516217798,
-        "winRate": 0.5263157894736842
+        "count": 18,
+        "wins": 9,
+        "pnl": 70.50166124480634,
+        "winRate": 0.5
       },
       {
         "class": "etf",
@@ -229,9 +229,9 @@
     "topSymbols": [
       {
         "symbol": "AIR",
-        "count": 3,
-        "pnl": 35.35488187605274,
-        "wins": 3
+        "count": 2,
+        "pnl": 28.481291499079287,
+        "wins": 2
       },
       {
         "symbol": "AAPL",
