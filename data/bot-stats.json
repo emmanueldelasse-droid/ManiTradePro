@@ -115,32 +115,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 7,
+    "totalCount": 6,
     "winCount": 2,
-    "lossCount": 5,
-    "winRate": 0.2857142857142857,
-    "totalPnl": -2.9039247026698782,
+    "lossCount": 4,
+    "winRate": 0.3333333333333333,
+    "totalPnl": 0.6309692780839788,
     "avgWin": 12.171447616737346,
-    "avgLoss": 5.449363987228914,
-    "expectancy": -0.4148463860956966,
-    "rrActual": 2.2335537955002187,
+    "avgLoss": 5.927981488847678,
+    "expectancy": 0.10516154634732988,
+    "rrActual": 2.053219572233063,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 7,
+        "count": 6,
         "wins": 2,
-        "pnl": -2.9039247026698782,
-        "winRate": 0.2857142857142857
+        "pnl": 0.6309692780839788,
+        "winRate": 0.3333333333333333
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 7,
+        "count": 6,
         "wins": 2,
-        "pnl": -2.9039247026698782,
-        "winRate": 0.2857142857142857
+        "pnl": 0.6309692780839788,
+        "winRate": 0.3333333333333333
       }
     ],
     "topSymbols": [
@@ -157,6 +157,12 @@
         "wins": 1
       },
       {
+        "symbol": "AMD",
+        "count": 1,
+        "pnl": -7.800332046119551,
+        "wins": 0
+      },
+      {
         "symbol": "JPM",
         "count": 2,
         "pnl": -7.8878997789534555,
@@ -166,23 +172,11 @@
         "symbol": "GOOGL",
         "count": 1,
         "pnl": -8.023694130317706,
-        "wins": 0
-      },
-      {
-        "symbol": "AMD",
-        "count": 2,
-        "pnl": -11.335226026873407,
         "wins": 0
       }
     ],
     "bottomSymbols": [
       {
-        "symbol": "AMD",
-        "count": 2,
-        "pnl": -11.335226026873407,
-        "wins": 0
-      },
-      {
         "symbol": "GOOGL",
         "count": 1,
         "pnl": -8.023694130317706,
@@ -192,6 +186,12 @@
         "symbol": "JPM",
         "count": 2,
         "pnl": -7.8878997789534555,
+        "wins": 0
+      },
+      {
+        "symbol": "AMD",
+        "count": 1,
+        "pnl": -7.800332046119551,
         "wins": 0
       }
     ]
