@@ -14,32 +14,32 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 32,
+    "totalCount": 33,
     "winCount": 12,
-    "lossCount": 20,
-    "winRate": 0.375,
-    "totalPnl": 10.649249317956816,
+    "lossCount": 21,
+    "winRate": 0.36363636363636365,
+    "totalPnl": 8.537046155756698,
     "avgWin": 11.540441194412553,
-    "avgLoss": 6.391802250749691,
-    "expectancy": 0.3327890411861505,
-    "rrActual": 1.8055066070072772,
-    "openCount": 2,
+    "avgLoss": 6.188011817961617,
+    "expectancy": 0.2586983683562627,
+    "rrActual": 1.864967542711331,
+    "openCount": 1,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 32,
+        "count": 33,
         "wins": 12,
-        "pnl": 10.649249317956816,
-        "winRate": 0.375
+        "pnl": 8.537046155756698,
+        "winRate": 0.36363636363636365
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 29,
+        "count": 30,
         "wins": 12,
-        "pnl": 25.53133783331599,
-        "winRate": 0.41379310344827586
+        "pnl": 23.41913467111586,
+        "winRate": 0.4
       },
       {
         "class": "etf",
@@ -58,8 +58,8 @@
       },
       {
         "symbol": "AAPL",
-        "count": 2,
-        "pnl": 27.78974108080356,
+        "count": 3,
+        "pnl": 25.677537918603427,
         "wins": 2
       },
       {
@@ -115,39 +115,39 @@
     ]
   },
   "stats7d": {
-    "totalCount": 7,
+    "totalCount": 8,
     "winCount": 2,
-    "lossCount": 5,
-    "winRate": 0.2857142857142857,
-    "totalPnl": -0.3388762327913266,
+    "lossCount": 6,
+    "winRate": 0.25,
+    "totalPnl": -2.45107939499146,
     "avgWin": 12.171447616737346,
-    "avgLoss": 4.9363542932532045,
-    "expectancy": -0.04841089039876145,
-    "rrActual": 2.4656754547324033,
+    "avgLoss": 4.465662438077692,
+    "expectancy": -0.3063849243739325,
+    "rrActual": 2.7255637400969155,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 7,
+        "count": 8,
         "wins": 2,
-        "pnl": -0.3388762327913266,
-        "winRate": 0.2857142857142857
+        "pnl": -2.45107939499146,
+        "winRate": 0.25
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 7,
+        "count": 8,
         "wins": 2,
-        "pnl": -0.3388762327913266,
-        "winRate": 0.2857142857142857
+        "pnl": -2.45107939499146,
+        "winRate": 0.25
       }
     ],
     "topSymbols": [
       {
         "symbol": "AAPL",
-        "count": 1,
-        "pnl": 21.189462060261896,
+        "count": 2,
+        "pnl": 19.077258898061764,
         "wins": 1
       },
       {
@@ -197,32 +197,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 22,
+    "totalCount": 23,
     "winCount": 8,
-    "lossCount": 14,
-    "winRate": 0.36363636363636365,
-    "totalPnl": 19.515355599512173,
+    "lossCount": 15,
+    "winRate": 0.34782608695652173,
+    "totalPnl": 17.40315243731205,
     "avgWin": 10.918378453991101,
-    "avgLoss": 4.8451194308869034,
-    "expectancy": 0.887061618159644,
-    "rrActual": 2.2534797355846568,
+    "avgLoss": 4.662925012974452,
+    "expectancy": 0.7566588016222617,
+    "rrActual": 2.341529924588329,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 22,
+        "count": 23,
         "wins": 8,
-        "pnl": 19.515355599512173,
-        "winRate": 0.36363636363636365
+        "pnl": 17.40315243731205,
+        "winRate": 0.34782608695652173
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 20,
+        "count": 21,
         "wins": 8,
-        "pnl": 34.317952858909486,
-        "winRate": 0.4
+        "pnl": 32.205749696709354,
+        "winRate": 0.38095238095238093
       },
       {
         "class": "etf",
@@ -241,8 +241,8 @@
       },
       {
         "symbol": "AAPL",
-        "count": 2,
-        "pnl": 27.78974108080356,
+        "count": 3,
+        "pnl": 25.677537918603427,
         "wins": 2
       },
       {
@@ -297,5 +297,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-07-22T21:31:03.048Z"
+  "lastClosedAt": "2026-07-23T07:16:04.868Z"
 }
