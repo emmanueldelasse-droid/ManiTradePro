@@ -23,7 +23,7 @@
     "avgLoss": 6.188011817961617,
     "expectancy": 0.2586983683562627,
     "rrActual": 1.864967542711331,
-    "openCount": 1,
+    "openCount": 2,
     "bySetup": [
       {
         "setup": "continuation",
@@ -197,23 +197,23 @@
     ]
   },
   "stats30d": {
-    "totalCount": 23,
+    "totalCount": 22,
     "winCount": 8,
-    "lossCount": 15,
-    "winRate": 0.34782608695652173,
-    "totalPnl": 17.40315243731205,
+    "lossCount": 14,
+    "winRate": 0.36363636363636365,
+    "totalPnl": 31.699859095551886,
     "avgWin": 10.918378453991101,
-    "avgLoss": 4.662925012974452,
-    "expectancy": 0.7566588016222617,
-    "rrActual": 2.341529924588329,
+    "avgLoss": 3.9747977525983527,
+    "expectancy": 1.440902686161449,
+    "rrActual": 2.7469016371596977,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 23,
+        "count": 22,
         "wins": 8,
-        "pnl": 17.40315243731205,
-        "winRate": 0.34782608695652173
+        "pnl": 31.699859095551886,
+        "winRate": 0.36363636363636365
       }
     ],
     "byClass": [
@@ -226,9 +226,9 @@
       },
       {
         "class": "etf",
-        "count": 2,
+        "count": 1,
         "wins": 0,
-        "pnl": -14.802597259397315,
+        "pnl": -0.5058906011574772,
         "winRate": 0
       }
     ],
@@ -252,25 +252,19 @@
         "wins": 2
       },
       {
+        "symbol": "QQQ",
+        "count": 1,
+        "pnl": -0.5058906011574772,
+        "wins": 0
+      },
+      {
         "symbol": "MA",
         "count": 3,
         "pnl": -3.3037692132645224,
         "wins": 1
-      },
-      {
-        "symbol": "TSLA",
-        "count": 1,
-        "pnl": -5.676756378989652,
-        "wins": 0
       }
     ],
     "bottomSymbols": [
-      {
-        "symbol": "QQQ",
-        "count": 2,
-        "pnl": -14.802597259397315,
-        "wins": 0
-      },
       {
         "symbol": "JPM",
         "count": 5,
@@ -294,6 +288,12 @@
         "count": 1,
         "pnl": -5.676756378989652,
         "wins": 0
+      },
+      {
+        "symbol": "MA",
+        "count": 3,
+        "pnl": -3.3037692132645224,
+        "wins": 1
       }
     ]
   },
