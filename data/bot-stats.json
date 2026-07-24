@@ -14,32 +14,32 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 33,
+    "totalCount": 34,
     "winCount": 12,
-    "lossCount": 21,
-    "winRate": 0.36363636363636365,
-    "totalPnl": 8.537046155756698,
+    "lossCount": 22,
+    "winRate": 0.35294117647058826,
+    "totalPnl": -3.5197783768651476,
     "avgWin": 11.540441194412553,
-    "avgLoss": 6.188011817961617,
-    "expectancy": 0.2586983683562627,
-    "rrActual": 1.864967542711331,
-    "openCount": 3,
+    "avgLoss": 6.454776032264355,
+    "expectancy": -0.10352289343720944,
+    "rrActual": 1.7878918085968247,
+    "openCount": 2,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 33,
+        "count": 34,
         "wins": 12,
-        "pnl": 8.537046155756698,
-        "winRate": 0.36363636363636365
+        "pnl": -3.5197783768651476,
+        "winRate": 0.35294117647058826
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 30,
+        "count": 31,
         "wins": 12,
-        "pnl": 23.41913467111586,
-        "winRate": 0.4
+        "pnl": 11.362310138494024,
+        "winRate": 0.3870967741935484
       },
       {
         "class": "etf",
@@ -75,9 +75,9 @@
         "wins": 3
       },
       {
-        "symbol": "AMD",
+        "symbol": "MA",
         "count": 3,
-        "pnl": 3.606109448025224,
+        "pnl": -3.3037692132645224,
         "wins": 1
       }
     ],
@@ -101,46 +101,46 @@
         "wins": 0
       },
       {
+        "symbol": "AMD",
+        "count": 4,
+        "pnl": -8.450715084596629,
+        "wins": 1
+      },
+      {
         "symbol": "GOOGL",
         "count": 1,
         "pnl": -8.023694130317706,
-        "wins": 0
-      },
-      {
-        "symbol": "TSLA",
-        "count": 1,
-        "pnl": -5.676756378989652,
         "wins": 0
       }
     ]
   },
   "stats7d": {
-    "totalCount": 7,
+    "totalCount": 8,
     "winCount": 2,
-    "lossCount": 5,
-    "winRate": 0.2857142857142857,
-    "totalPnl": 5.572614735326246,
+    "lossCount": 6,
+    "winRate": 0.25,
+    "totalPnl": -6.484209797295598,
     "avgWin": 12.171447616737346,
-    "avgLoss": 3.754056099629689,
-    "expectancy": 0.7960878193323211,
-    "rrActual": 3.242212501283072,
+    "avgLoss": 5.137850838461715,
+    "expectancy": -0.8105262246619498,
+    "rrActual": 2.368976445486204,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 7,
+        "count": 8,
         "wins": 2,
-        "pnl": 5.572614735326246,
-        "winRate": 0.2857142857142857
+        "pnl": -6.484209797295598,
+        "winRate": 0.25
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 7,
+        "count": 8,
         "wins": 2,
-        "pnl": 5.572614735326246,
-        "winRate": 0.2857142857142857
+        "pnl": -6.484209797295598,
+        "winRate": 0.25
       }
     ],
     "topSymbols": [
@@ -167,9 +167,21 @@
         "count": 2,
         "pnl": -10.241346469135983,
         "wins": 0
+      },
+      {
+        "symbol": "AMD",
+        "count": 1,
+        "pnl": -12.056824532621851,
+        "wins": 0
       }
     ],
     "bottomSymbols": [
+      {
+        "symbol": "AMD",
+        "count": 1,
+        "pnl": -12.056824532621851,
+        "wins": 0
+      },
       {
         "symbol": "MA",
         "count": 2,
@@ -185,32 +197,32 @@
     ]
   },
   "stats30d": {
-    "totalCount": 22,
+    "totalCount": 23,
     "winCount": 8,
-    "lossCount": 14,
-    "winRate": 0.36363636363636365,
-    "totalPnl": 31.699859095551886,
+    "lossCount": 15,
+    "winRate": 0.34782608695652173,
+    "totalPnl": 19.64303456293004,
     "avgWin": 10.918378453991101,
-    "avgLoss": 3.9747977525983527,
-    "expectancy": 1.440902686161449,
-    "rrActual": 2.7469016371596977,
+    "avgLoss": 4.513599537933252,
+    "expectancy": 0.8540449809969579,
+    "rrActual": 2.418995828546756,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 22,
+        "count": 23,
         "wins": 8,
-        "pnl": 31.699859095551886,
-        "winRate": 0.36363636363636365
+        "pnl": 19.64303456293004,
+        "winRate": 0.34782608695652173
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 21,
+        "count": 22,
         "wins": 8,
-        "pnl": 32.205749696709354,
-        "winRate": 0.38095238095238093
+        "pnl": 20.14892516408752,
+        "winRate": 0.36363636363636365
       },
       {
         "class": "etf",
@@ -254,16 +266,16 @@
     ],
     "bottomSymbols": [
       {
+        "symbol": "AMD",
+        "count": 3,
+        "pnl": -23.39205055949526,
+        "wins": 0
+      },
+      {
         "symbol": "JPM",
         "count": 5,
         "pnl": -12.768507181488536,
         "wins": 1
-      },
-      {
-        "symbol": "AMD",
-        "count": 2,
-        "pnl": -11.335226026873407,
-        "wins": 0
       },
       {
         "symbol": "GOOGL",
@@ -285,5 +297,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-07-23T07:16:04.868Z"
+  "lastClosedAt": "2026-07-24T19:30:35.819Z"
 }
