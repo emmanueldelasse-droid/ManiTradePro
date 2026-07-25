@@ -115,46 +115,46 @@
     ]
   },
   "stats7d": {
-    "totalCount": 8,
-    "winCount": 2,
+    "totalCount": 7,
+    "winCount": 1,
     "lossCount": 6,
-    "winRate": 0.25,
-    "totalPnl": -6.484209797295598,
-    "avgWin": 12.171447616737346,
+    "winRate": 0.14285714285714285,
+    "totalPnl": -27.673671857557494,
+    "avgWin": 3.1534331732127954,
     "avgLoss": 5.137850838461715,
-    "expectancy": -0.8105262246619498,
-    "rrActual": 2.368976445486204,
+    "expectancy": -3.9533816939367856,
+    "rrActual": 0.6137650298460087,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 8,
-        "wins": 2,
-        "pnl": -6.484209797295598,
-        "winRate": 0.25
+        "count": 7,
+        "wins": 1,
+        "pnl": -27.673671857557494,
+        "winRate": 0.14285714285714285
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 8,
-        "wins": 2,
-        "pnl": -6.484209797295598,
-        "winRate": 0.25
+        "count": 7,
+        "wins": 1,
+        "pnl": -27.673671857557494,
+        "winRate": 0.14285714285714285
       }
     ],
     "topSymbols": [
-      {
-        "symbol": "AAPL",
-        "count": 2,
-        "pnl": 19.077258898061764,
-        "wins": 1
-      },
       {
         "symbol": "V",
         "count": 2,
         "pnl": 0.9871613270600244,
         "wins": 1
+      },
+      {
+        "symbol": "AAPL",
+        "count": 1,
+        "pnl": -2.112203162200132,
+        "wins": 0
       },
       {
         "symbol": "JPM",
@@ -192,6 +192,12 @@
         "symbol": "JPM",
         "count": 1,
         "pnl": -4.250459020659557,
+        "wins": 0
+      },
+      {
+        "symbol": "AAPL",
+        "count": 1,
+        "pnl": -2.112203162200132,
         "wins": 0
       }
     ]
