@@ -115,32 +115,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 6,
+    "totalCount": 5,
     "winCount": 1,
-    "lossCount": 5,
-    "winRate": 0.16666666666666666,
-    "totalPnl": -12.69101207526194,
+    "lossCount": 4,
+    "winRate": 0.2,
+    "totalPnl": -7.659313101487722,
     "avgWin": 13.8856339348488,
-    "avgLoss": 5.315329202022147,
-    "expectancy": -2.1151686792103233,
-    "rrActual": 2.6123751525241734,
+    "avgLoss": 5.38623675908413,
+    "expectancy": -1.5318626202975438,
+    "rrActual": 2.577984324849823,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 6,
+        "count": 5,
         "wins": 1,
-        "pnl": -12.69101207526194,
-        "winRate": 0.16666666666666666
+        "pnl": -7.659313101487722,
+        "winRate": 0.2
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 6,
+        "count": 5,
         "wins": 1,
-        "pnl": -12.69101207526194,
-        "winRate": 0.16666666666666666
+        "pnl": -7.659313101487722,
+        "winRate": 0.2
       }
     ],
     "topSymbols": [
@@ -164,8 +164,8 @@
       },
       {
         "symbol": "MA",
-        "count": 2,
-        "pnl": -10.241346469135983,
+        "count": 1,
+        "pnl": -5.209647495361767,
         "wins": 0
       },
       {
@@ -184,8 +184,8 @@
       },
       {
         "symbol": "MA",
-        "count": 2,
-        "pnl": -10.241346469135983,
+        "count": 1,
+        "pnl": -5.209647495361767,
         "wins": 0
       },
       {
