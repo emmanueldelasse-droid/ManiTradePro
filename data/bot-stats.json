@@ -14,32 +14,32 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 36,
-    "winCount": 14,
+    "totalCount": 37,
+    "winCount": 15,
     "lossCount": 22,
-    "winRate": 0.3888888888888889,
-    "totalPnl": 19.857049295752706,
-    "avgWin": 11.561580143254895,
+    "winRate": 0.40540540540540543,
+    "totalPnl": 21.42088697625039,
+    "avgWin": 10.89506397907108,
     "avgLoss": 6.454776032264355,
-    "expectancy": 0.5515847026597984,
-    "rrActual": 1.791166740017633,
-    "openCount": 3,
+    "expectancy": 0.5789428912500112,
+    "rrActual": 1.687907361093838,
+    "openCount": 2,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 36,
-        "wins": 14,
-        "pnl": 19.857049295752706,
-        "winRate": 0.3888888888888889
+        "count": 37,
+        "wins": 15,
+        "pnl": 21.42088697625039,
+        "winRate": 0.40540540540540543
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 33,
-        "wins": 14,
-        "pnl": 34.73913781111189,
-        "winRate": 0.42424242424242425
+        "count": 34,
+        "wins": 15,
+        "pnl": 36.30297549160957,
+        "winRate": 0.4411764705882353
       },
       {
         "class": "etf",
@@ -58,9 +58,9 @@
       },
       {
         "symbol": "JPM",
-        "count": 8,
-        "pnl": 30.44046760251001,
-        "wins": 4
+        "count": 9,
+        "pnl": 32.0043052830077,
+        "wins": 5
       },
       {
         "symbol": "AAPL",
@@ -115,12 +115,12 @@
     ]
   },
   "stats7d": {
-    "totalCount": 2,
-    "winCount": 2,
+    "totalCount": 3,
+    "winCount": 3,
     "lossCount": 0,
     "winRate": 1,
-    "totalPnl": 23.376827672617868,
-    "avgWin": 11.688413836308934,
+    "totalPnl": 24.940665353115563,
+    "avgWin": 8.313555117705187,
     "avgLoss": 0,
     "expectancy": null,
     "rrActual": null,
@@ -128,27 +128,27 @@
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 2,
-        "wins": 2,
-        "pnl": 23.376827672617868,
+        "count": 3,
+        "wins": 3,
+        "pnl": 24.940665353115563,
         "winRate": 1
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 2,
-        "wins": 2,
-        "pnl": 23.376827672617868,
+        "count": 3,
+        "wins": 3,
+        "pnl": 24.940665353115563,
         "winRate": 1
       }
     ],
     "topSymbols": [
       {
         "symbol": "JPM",
-        "count": 1,
-        "pnl": 13.8856339348488,
-        "wins": 1
+        "count": 2,
+        "pnl": 15.449471615346493,
+        "wins": 2
       },
       {
         "symbol": "AIR",
@@ -160,32 +160,32 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 21,
-    "winCount": 9,
+    "totalCount": 22,
+    "winCount": 10,
     "lossCount": 12,
-    "winRate": 0.42857142857142855,
-    "totalPnl": 46.85761032550473,
-    "avgWin": 12.083344669300756,
+    "winRate": 0.45454545454545453,
+    "totalPnl": 48.42144800600242,
+    "avgWin": 11.03139397042045,
     "avgLoss": 5.157707641516839,
-    "expectancy": 2.2313147774049873,
-    "rrActual": 2.3427742534369678,
+    "expectancy": 2.2009749093637465,
+    "rrActual": 2.138817229891729,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 21,
-        "wins": 9,
-        "pnl": 46.85761032550473,
-        "winRate": 0.42857142857142855
+        "count": 22,
+        "wins": 10,
+        "pnl": 48.42144800600242,
+        "winRate": 0.45454545454545453
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 21,
-        "wins": 9,
-        "pnl": 46.85761032550473,
-        "winRate": 0.42857142857142855
+        "count": 22,
+        "wins": 10,
+        "pnl": 48.42144800600242,
+        "winRate": 0.45454545454545453
       }
     ],
     "topSymbols": [
@@ -209,9 +209,9 @@
       },
       {
         "symbol": "JPM",
-        "count": 4,
-        "pnl": 6.4227375229995065,
-        "wins": 2
+        "count": 5,
+        "pnl": 7.9865752034972,
+        "wins": 3
       },
       {
         "symbol": "MA",
@@ -247,5 +247,5 @@
       }
     ]
   },
-  "lastClosedAt": "2026-07-29T14:30:36.510Z"
+  "lastClosedAt": "2026-07-31T21:31:20.368Z"
 }
