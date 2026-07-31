@@ -115,32 +115,32 @@
     ]
   },
   "stats7d": {
-    "totalCount": 3,
+    "totalCount": 2,
     "winCount": 2,
-    "lossCount": 1,
-    "winRate": 0.6666666666666666,
-    "totalPnl": 11.320003139996016,
+    "lossCount": 0,
+    "winRate": 1,
+    "totalPnl": 23.376827672617868,
     "avgWin": 11.688413836308934,
-    "avgLoss": 12.056824532621851,
-    "expectancy": 3.773334379998671,
-    "rrActual": 0.969443803771373,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 3,
+        "count": 2,
         "wins": 2,
-        "pnl": 11.320003139996016,
-        "winRate": 0.6666666666666666
+        "pnl": 23.376827672617868,
+        "winRate": 1
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 3,
+        "count": 2,
         "wins": 2,
-        "pnl": 11.320003139996016,
-        "winRate": 0.6666666666666666
+        "pnl": 23.376827672617868,
+        "winRate": 1
       }
     ],
     "topSymbols": [
@@ -155,41 +155,28 @@
         "count": 1,
         "pnl": 9.491193737769068,
         "wins": 1
-      },
-      {
-        "symbol": "AMD",
-        "count": 1,
-        "pnl": -12.056824532621851,
-        "wins": 0
       }
     ],
-    "bottomSymbols": [
-      {
-        "symbol": "AMD",
-        "count": 1,
-        "pnl": -12.056824532621851,
-        "wins": 0
-      }
-    ]
+    "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 22,
+    "totalCount": 21,
     "winCount": 9,
-    "lossCount": 13,
-    "winRate": 0.4090909090909091,
-    "totalPnl": 46.351719724347255,
+    "lossCount": 12,
+    "winRate": 0.42857142857142855,
+    "totalPnl": 46.85761032550473,
     "avgWin": 12.083344669300756,
-    "avgLoss": 4.799875561489196,
-    "expectancy": 2.1068963511066943,
-    "rrActual": 2.51742873632995,
+    "avgLoss": 5.157707641516839,
+    "expectancy": 2.2313147774049873,
+    "rrActual": 2.3427742534369678,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 22,
+        "count": 21,
         "wins": 9,
-        "pnl": 46.351719724347255,
-        "winRate": 0.4090909090909091
+        "pnl": 46.85761032550473,
+        "winRate": 0.42857142857142855
       }
     ],
     "byClass": [
@@ -199,13 +186,6 @@
         "wins": 9,
         "pnl": 46.85761032550473,
         "winRate": 0.42857142857142855
-      },
-      {
-        "class": "etf",
-        "count": 1,
-        "wins": 0,
-        "pnl": -0.5058906011574772,
-        "winRate": 0
       }
     ],
     "topSymbols": [
@@ -234,10 +214,10 @@
         "wins": 2
       },
       {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.5058906011574772,
-        "wins": 0
+        "symbol": "MA",
+        "count": 3,
+        "pnl": -3.3037692132645224,
+        "wins": 1
       }
     ],
     "bottomSymbols": [
@@ -264,12 +244,6 @@
         "count": 3,
         "pnl": -3.3037692132645224,
         "wins": 1
-      },
-      {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": -0.5058906011574772,
-        "wins": 0
       }
     ]
   },
