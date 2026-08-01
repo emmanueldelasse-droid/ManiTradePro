@@ -160,41 +160,35 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 22,
-    "winCount": 10,
+    "totalCount": 21,
+    "winCount": 9,
     "lossCount": 12,
-    "winRate": 0.45454545454545453,
-    "totalPnl": 48.42144800600242,
-    "avgWin": 11.03139397042045,
+    "winRate": 0.42857142857142855,
+    "totalPnl": 21.913909787763025,
+    "avgWin": 9.311822387329455,
     "avgLoss": 5.157707641516839,
-    "expectancy": 2.2009749093637465,
-    "rrActual": 2.138817229891729,
+    "expectancy": 1.0435195137030013,
+    "rrActual": 1.805418809002312,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 22,
-        "wins": 10,
-        "pnl": 48.42144800600242,
-        "winRate": 0.45454545454545453
+        "count": 21,
+        "wins": 9,
+        "pnl": 21.913909787763025,
+        "winRate": 0.42857142857142855
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 22,
-        "wins": 10,
-        "pnl": 48.42144800600242,
-        "winRate": 0.45454545454545453
+        "count": 21,
+        "wins": 9,
+        "pnl": 21.913909787763025,
+        "winRate": 0.42857142857142855
       }
     ],
     "topSymbols": [
-      {
-        "symbol": "AIR",
-        "count": 2,
-        "pnl": 35.99873195600846,
-        "wins": 2
-      },
       {
         "symbol": "AAPL",
         "count": 3,
@@ -206,6 +200,12 @@
         "count": 4,
         "pnl": 19.15487320996047,
         "wins": 2
+      },
+      {
+        "symbol": "AIR",
+        "count": 1,
+        "pnl": 9.491193737769068,
+        "wins": 1
       },
       {
         "symbol": "JPM",
