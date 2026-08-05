@@ -23,7 +23,7 @@
     "avgLoss": 6.454776032264355,
     "expectancy": 1.0708426680799241,
     "rrActual": 1.6747101029064222,
-    "openCount": 3,
+    "openCount": 4,
     "bySetup": [
       {
         "setup": "continuation",
@@ -115,12 +115,12 @@
     ]
   },
   "stats7d": {
-    "totalCount": 4,
-    "winCount": 4,
+    "totalCount": 3,
+    "winCount": 3,
     "lossCount": 0,
     "winRate": 1,
-    "totalPnl": 31.397008497133363,
-    "avgWin": 7.849252124283341,
+    "totalPnl": 21.905814759364297,
+    "avgWin": 7.301938253121432,
     "avgLoss": 0,
     "expectancy": null,
     "rrActual": null,
@@ -128,18 +128,18 @@
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 4,
-        "wins": 4,
-        "pnl": 31.397008497133363,
+        "count": 3,
+        "wins": 3,
+        "pnl": 21.905814759364297,
         "winRate": 1
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 4,
-        "wins": 4,
-        "pnl": 31.397008497133363,
+        "count": 3,
+        "wins": 3,
+        "pnl": 21.905814759364297,
         "winRate": 1
       }
     ],
@@ -148,12 +148,6 @@
         "symbol": "MA",
         "count": 1,
         "pnl": 15.49599534654793,
-        "wins": 1
-      },
-      {
-        "symbol": "AIR",
-        "count": 1,
-        "pnl": 9.491193737769068,
         "wins": 1
       },
       {
