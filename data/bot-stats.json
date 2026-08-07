@@ -166,32 +166,32 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 22,
+    "totalCount": 21,
     "winCount": 10,
-    "lossCount": 12,
-    "winRate": 0.45454545454545453,
-    "totalPnl": 21.406618759010655,
+    "lossCount": 11,
+    "winRate": 0.47619047619047616,
+    "totalPnl": 27.083375138000306,
     "avgWin": 8.329911045721271,
-    "avgLoss": 5.157707641516839,
-    "expectancy": 0.9730281254095745,
-    "rrActual": 1.615041337099036,
+    "avgLoss": 5.110521392655674,
+    "expectancy": 1.2896845303809665,
+    "rrActual": 1.629953268113148,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 22,
+        "count": 21,
         "wins": 10,
-        "pnl": 21.406618759010655,
-        "winRate": 0.45454545454545453
+        "pnl": 27.083375138000306,
+        "winRate": 0.47619047619047616
       }
     ],
     "byClass": [
       {
         "class": "stock",
-        "count": 22,
+        "count": 21,
         "wins": 10,
-        "pnl": 21.406618759010655,
-        "winRate": 0.45454545454545453
+        "pnl": 27.083375138000306,
+        "winRate": 0.47619047619047616
       }
     ],
     "topSymbols": [
@@ -237,12 +237,6 @@
         "symbol": "GOOGL",
         "count": 1,
         "pnl": -8.023694130317706,
-        "wins": 0
-      },
-      {
-        "symbol": "TSLA",
-        "count": 1,
-        "pnl": -5.676756378989652,
         "wins": 0
       }
     ]
