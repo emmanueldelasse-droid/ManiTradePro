@@ -206,23 +206,23 @@
     ]
   },
   "stats30d": {
-    "totalCount": 22,
+    "totalCount": 21,
     "winCount": 10,
-    "lossCount": 12,
-    "winRate": 0.45454545454545453,
-    "totalPnl": 14.803102831674273,
+    "lossCount": 11,
+    "winRate": 0.47619047619047616,
+    "totalPnl": 18.440543589968172,
     "avgWin": 7.25169518597816,
-    "avgLoss": 4.809487419008943,
-    "expectancy": 0.6728683105306494,
-    "rrActual": 1.507789615441486,
+    "avgLoss": 4.916037115437583,
+    "expectancy": 0.8781211233318178,
+    "rrActual": 1.4751099342203962,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 21,
+        "count": 20,
         "wins": 9,
-        "pnl": 13.768231564652446,
-        "winRate": 0.42857142857142855
+        "pnl": 17.405672322946344,
+        "winRate": 0.45
       },
       {
         "setup": "pullback_short",
@@ -235,10 +235,10 @@
     "byClass": [
       {
         "class": "stock",
-        "count": 20,
+        "count": 19,
         "wins": 8,
-        "pnl": 12.047405152692285,
-        "winRate": 0.4
+        "pnl": 15.684845910986184,
+        "winRate": 0.42105263157894735
       },
       {
         "class": "etf",
@@ -257,8 +257,8 @@
       },
       {
         "symbol": "JPM",
-        "count": 5,
-        "pnl": 6.993279221411232,
+        "count": 4,
+        "pnl": 10.63071997970513,
         "wins": 2
       },
       {
