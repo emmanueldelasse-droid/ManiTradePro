@@ -1,14 +1,14 @@
-name: Snapshot bot stats
+name: Snapshot V1 V2 stats
 
-# Fetch /api/public/bot-stats depuis un runner GitHub (que Cloudflare ne bloque
-# pas comme il bloque le sandbox WebFetch de Claude) et persiste le JSON sur
-# main dans data/bot-stats.json. Une session Claude future lit le fichier via
-# le MCP GitHub pour répondre à "où en est le bot ?" sans PIN.
+# Monitoring comparatif sans modifier aucun moteur de trading.
+# V1 reste le benchmark historique. V2 est enregistré sous deux vues :
+# - historique brut, uniquement comme référence ;
+# - cohorte V2_POST_ANTI_DUP_FIX, filtrée sur openedAt >= timestamp migration.
 #
-# Le commit utilise [skip ci] dans le message pour ne pas relancer d'autres
-# workflows. Les pushs du GITHUB_TOKEN ne déclenchent de toute façon pas
-# d'événements `push` (sécurité GH Actions native), mais on garde la ceinture
-# ET les bretelles.
+# Le script conserve data/bot-stats.json pour compatibilité avec les lecteurs V1
+# existants et ajoute les snapshots V1/V2 structurés. Aucun generatedAt n'est
+# écrit dans les JSON afin d'éviter un commit toutes les 30 minutes si les stats
+# n'ont pas réellement changé.
 
 on:
   schedule:
@@ -16,38 +16,60 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/snapshot-bot-stats.yml']
+    paths:
+      - '.github/workflows/snapshot-bot-stats.yml'
+      - 'tools/v2/snapshot-v1-v2-stats.mjs'
 
 permissions:
   contents: write
 
 concurrency:
-  group: snapshot-bot-stats
+  group: snapshot-v1-v2-stats
   cancel-in-progress: false
 
 jobs:
   snapshot:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout main
+      - name: Checkout requested ref
         uses: actions/checkout@v4
 
-      - name: Fetch bot stats
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Validate monitoring script
         run: |
-          mkdir -p data
-          curl --fail --show-error --silent \
-            -H 'User-Agent: ManiTradeProSnapshot/1.0' \
-            https://manitradepro.emmanueldelasse.workers.dev/api/public/bot-stats \
-            | jq '.data // empty' > data/bot-stats.json
+          set -euo pipefail
+          node --check tools/v2/snapshot-v1-v2-stats.mjs
+          node tools/v2/test/snapshot-v1-v2-stats.test.mjs
+
+      - name: Fetch V1 and V2 snapshots
+        run: |
+          set -euo pipefail
+          node tools/v2/snapshot-v1-v2-stats.mjs
+          test -s data/bot-stats.json
+          test -s data/bot-stats-v1.json
+          test -s data/bot-stats-v2.json
+          test -s data/bot-stats-v2-post-fix.json
+          test -s data/v1-v2-comparison.json
 
       - name: Commit and push if changed
+        if: github.ref == 'refs/heads/main'
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/bot-stats.json
+          git add \
+            data/bot-stats.json \
+            data/bot-stats-v1.json \
+            data/bot-stats-v2.json \
+            data/bot-stats-v2-post-fix.json \
+            data/v1-v2-comparison.json
           if git diff --cached --quiet; then
-            echo "Pas de changement."
+            echo 'Pas de changement statistique.'
             exit 0
           fi
-          git commit -m "snapshot: bot-stats $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git commit -m "snapshot: V1 V2 stats $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
           git push origin HEAD:main
