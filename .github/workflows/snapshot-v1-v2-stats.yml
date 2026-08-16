@@ -1,0 +1,59 @@
+name: Snapshot V1 V2 stats
+
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: snapshot-v1-v2-stats
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v4
+
+      - name: Fetch V1 and V2 stats
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data
+
+          curl --fail --show-error --silent \
+            -H 'User-Agent: ManiTradeProSnapshot/2.0' \
+            https://manitradepro.emmanueldelasse.workers.dev/api/public/bot-stats \
+            | jq '.data // empty' > data/bot-stats-v1.json
+
+          curl --fail --show-error --silent \
+            -H 'User-Agent: ManiTradeProSnapshot/2.0' \
+            https://manitradepro-v2.emmanueldelasse.workers.dev/api/v2/stats \
+            | jq '.data // .' > data/bot-stats-v2.json
+
+          test -s data/bot-stats-v1.json
+          test -s data/bot-stats-v2.json
+
+          jq -n \
+            --arg generatedAt "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --slurpfile v1 data/bot-stats-v1.json \
+            --slurpfile v2 data/bot-stats-v2.json \
+            '{generatedAt:$generatedAt,v1:$v1[0],v2:$v2[0]}' \
+            > data/v1-v2-comparison.json
+
+      - name: Commit and push if changed
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/bot-stats-v1.json data/bot-stats-v2.json data/v1-v2-comparison.json
+          if git diff --cached --quiet; then
+            echo 'Pas de changement.'
+            exit 0
+          fi
+          git commit -m "snapshot: V1 V2 stats $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push origin HEAD
