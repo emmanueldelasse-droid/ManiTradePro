@@ -9,47 +9,45 @@
 - **Mode** : paper trading uniquement. Aucun broker réel, aucun capital réel.
 - **Architecture en comparaison** : V1 = benchmark actuel ; V2 = challenger learning bot.
 - **V1** : résultats récents positifs mais échantillon limité et forte concentration `continuation`; reste un benchmark, pas un edge validé.
-- **V2 runtime vérifié le 2026-08-16** : `/api/v2/stats` répond `status=ok`, 121 trades clos.
-- **V2 global pré-fix** : win rate 32,23 %, PF 1,0311, expectancy +9,9596, PnL +1 205,11, max drawdown 11 276,40.
-- **V2 par setup pré-fix** : breakout PF 0,789 / expectancy négative ; pullback PF 1,0623 / quasi neutre ; mean_reversion PF 1,2667 / expectancy +56,54 sur 32 trades.
-- **Limite majeure découverte** : plusieurs positions V2 quasi identiques ont été ouvertes simultanément sur le même symbole (ex. CRWD, ORCL, PANW). Les 121 trades pré-fix ne constituent donc pas 121 observations indépendantes.
-- **Cause technique** : `worker-v2.js` possède déjà une garde `openBySymbol`, mais elle n'est pas atomique entre deux cycles concurrents. Deux cycles peuvent lire l'état avant que l'autre ait écrit sa position.
+- **V2 historique pré-fix** : 121 trades clos, win rate 32,2 %, PF 1,031, PnL +1 205,11. Cette cohorte est `V2_PRE_ANTI_DUP_FIX` et ne doit pas être mélangée avec la cohorte post-fix.
+- **V2 par setup pré-fix** : breakout PF 0,789 ; pullback PF 1,062 ; mean_reversion PF 1,267 sur 32 trades.
 
-## PR active — #270 Anti-duplication V2
+## Correctif anti-duplication V2 — ACTIF
 
-- **Branche** : `agent/v2-anti-duplicate-signal`.
-- **Objectif unique** : empêcher atomiquement plusieurs positions V2 ouvertes sur le même symbole sans toucher aux setups, seuils, sizing ou sélection.
-- **Livré** :
-  - `cloudflare-worker/migrations/v2/003_one_open_position_per_symbol.sql` : index unique partiel PostgreSQL sur `symbol WHERE status='open'`.
-  - Préflight non destructif : si des doublons ouverts existent déjà, la migration échoue explicitement et ne modifie aucune ligne.
-  - `tools/v2/test/anti-duplicate-position-v2.test.mjs` : vérifie la contrainte DB, le caractère non destructif et le maintien de `openBySymbol` côté Worker.
-- **Impact runtime** : oui, uniquement après application de la migration 003 ; une seconde insertion concurrente du même symbole est refusée par PostgreSQL.
-- **Impact quant** : aucun changement de setup, signal, seuil, RR ou sizing. Impact méthodologique positif : observations futures plus propres et risque non multiplié par une même idée.
-- **Impact données historiques** : aucun. Les 121 trades actuels restent la cohorte `V2_PRE_ANTI_DUP_FIX` et ne doivent pas être mélangés avec la future cohorte post-fix pour juger V2.
-- **Limite restante** : le Worker peut compter un conflit unique comme une erreur de cycle ; le doublon est néanmoins empêché. Amélioration de reporting à faire séparément si nécessaire.
-- **Migration** : requise dans Supabase avant de considérer le correctif actif en production V2.
+- **PR #270** mergée le 2026-08-16, squash `111747f`.
+- **Cause** : la garde `openBySymbol` du Worker n'était pas atomique entre deux cycles concurrents.
+- **Base Supabase vérifiée** : un seul symbole avait encore des doublons ouverts, `CRWD` avec 3 positions.
+- **Nettoyage non destructif** : la position CRWD la plus ancienne est conservée `open`; les 2 ouvertures supplémentaires sont conservées en base mais reclassées `duplicate_invalid_pre_fix`. Aucune ligne supprimée.
+- **Migration appliquée** : index unique partiel `uq_mtp_v2_positions_one_open_symbol` sur `mtp_v2_positions(symbol) WHERE status='open'`.
+- **Vérification après migration** : 0 symbole avec plus d'une position `open`; 13 positions ouvertes valides ; 2 positions historiques marquées `duplicate_invalid_pre_fix` ; 121 positions closes.
+- **Impact quant** : aucun changement de setup, signal, seuil, RR ou sizing.
+- **Impact expérimental** : les nouvelles observations V2 ne peuvent plus être multipliées par des ouvertures concurrentes du même symbole.
 
-## Décision V1 vs V2
+## État méthodologique V2
 
-- **Aucune décision définitive** au 2026-08-16.
-- V1 reste le benchmark provisoire.
-- V2 doit être réévaluée uniquement sur une cohorte post-fix propre.
-- Critères de décision : expectancy, profit factor, drawdown, concentration PnL, stabilité temporelle, qualité d'exécution et nombre d'observations indépendantes.
-- Ne pas optimiser les setups V2 avant d'avoir rétabli l'intégrité de l'expérience.
+- La cohorte post-fix démarre maintenant sous le label `V2_POST_ANTI_DUP_FIX`.
+- Ne pas optimiser les setups pendant la constitution de cette cohorte.
+- Le breakout pré-fix est nettement sous 1 de PF et reste le setup le plus faible.
+- Mean reversion est le meilleur setup V2 pré-fix, mais 32 trades sont insuffisants pour conclure à un edge robuste.
+- Pullback est proche de l'équilibre et non démontré.
+- Décision V1 vs V2 : **aucune conclusion définitive** avant un échantillon post-fix propre.
 
-## Prochaines étapes obligatoires
+## Prochaine priorité
 
-1. Finaliser et merger PR #270 après checklist documentaire et tests.
-2. Appliquer migration 003 à Supabase et vérifier qu'elle passe sans doublons ouverts existants.
-3. Vérifier `/api/v2/positions` puis laisser démarrer la cohorte `V2_POST_ANTI_DUP_FIX`.
-4. Recréer le monitoring automatique V1/V2 depuis le `main` à jour ; l'ancienne PR #269 ne doit pas être forcée si elle devient obsolète.
-5. Comparer V1 vs V2 post-fix sans modifier les règles en cours d'échantillonnage.
+1. Mettre en place le monitoring automatique V1/V2 depuis le `main` actuel.
+2. Mesurer séparément la cohorte `V2_POST_ANTI_DUP_FIX` : expectancy, PF, drawdown, concentration PnL, stabilité temporelle, observations indépendantes.
+3. Ne modifier les règles V2 qu'après collecte suffisante ou apparition d'un nouveau bug d'intégrité.
+4. Dette séparée : le Worker peut comptabiliser un conflit d'index unique comme une erreur de cycle ; l'intégrité est protégée mais le reporting pourra être nettoyé dans une micro-PR.
+
+## Sécurité / infrastructure observée
+
+- Supabase Advisors signale des problèmes de sécurité préexistants, notamment RLS désactivé sur plusieurs tables publiques V2 (`mtp_v2_positions`, `mtp_v2_trades`, `mtp_v2_cycles`, `mtp_v2_setup_stats`).
+- Ces alertes ne sont pas causées par PR #270. Elles doivent être traitées dans une PR sécurité dédiée pour ne pas mélanger les objectifs.
 
 ## MEMORY FILES UPDATED
 
-- `SESSION.md` : état réel août 2026, V1/V2, stats V2, bug de doublons, PR #270 et prochaine étape.
-- `docs/monitoring/KNOWN_ISSUES.md` : bug V2 anti-duplication tracé ; ancien historique archivé.
-- Archives documentaires : copies immuables des anciens fichiers avant nettoyage de la mémoire.
+- `SESSION.md` : état réel post-merge/post-migration.
+- `docs/monitoring/KNOWN_ISSUES.md` : bug anti-duplication tracé ; historique antérieur archivé.
 - **Cohérence** : alignée avec `GOVERNANCE.md`, `BOT_OBJECTIVE.md`, `PROJECT_RULES.md` et `CHECKLIST_MERGE.md`.
 
 ## Sources canoniques à consulter au prochain démarrage
