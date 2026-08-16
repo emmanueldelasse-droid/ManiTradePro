@@ -1,0 +1,293 @@
+{
+  "configured": true,
+  "settings": {
+    "botMode": "exploration",
+    "learningEnabled": true,
+    "isEnabled": true,
+    "autoOpenEnabled": true,
+    "autoCloseEnabled": true,
+    "allowLong": true,
+    "allowShort": true,
+    "maxOpenPositions": 15,
+    "capitalBase": 10000,
+    "minActionabilityScore": 60,
+    "minDossierScore": 60
+  },
+  "stats": {
+    "totalCount": 45,
+    "winCount": 20,
+    "lossCount": 25,
+    "winRate": 0.4444444444444444,
+    "totalPnl": 37.22900118683587,
+    "avgWin": 9.33296754796288,
+    "avgLoss": 5.977213990896867,
+    "expectancy": 0.8273111374852427,
+    "rrActual": 1.5614243629518259,
+    "openCount": 4,
+    "bySetup": [
+      {
+        "setup": "continuation",
+        "count": 44,
+        "wins": 19,
+        "pnl": 36.194129919814046,
+        "winRate": 0.4318181818181818
+      },
+      {
+        "setup": "pullback_short",
+        "count": 1,
+        "wins": 1,
+        "pnl": 1.0348712670218319,
+        "winRate": 1
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 40,
+        "wins": 18,
+        "pnl": 49.35539202321307,
+        "winRate": 0.45
+      },
+      {
+        "class": "etf",
+        "count": 5,
+        "wins": 2,
+        "pnl": -12.126390836377187,
+        "winRate": 0.4
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "AIR",
+        "count": 6,
+        "pnl": 37.98909116619774,
+        "wins": 4
+      },
+      {
+        "symbol": "JPM",
+        "count": 10,
+        "pnl": 31.436012668025896,
+        "wins": 5
+      },
+      {
+        "symbol": "AAPL",
+        "count": 3,
+        "pnl": 25.677537918603427,
+        "wins": 2
+      },
+      {
+        "symbol": "V",
+        "count": 7,
+        "pnl": 23.12151071915016,
+        "wins": 4
+      },
+      {
+        "symbol": "MA",
+        "count": 4,
+        "pnl": 12.192226133283409,
+        "wins": 2
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": -29.976244901618085,
+        "wins": 0
+      },
+      {
+        "symbol": "MSFT",
+        "count": 1,
+        "pnl": -20.235841525443117,
+        "wins": 0
+      },
+      {
+        "symbol": "QQQ",
+        "count": 4,
+        "pnl": -13.847217248337348,
+        "wins": 1
+      },
+      {
+        "symbol": "AMD",
+        "count": 4,
+        "pnl": -8.450715084596629,
+        "wins": 1
+      },
+      {
+        "symbol": "GOOGL",
+        "count": 1,
+        "pnl": -8.023694130317706,
+        "wins": 0
+      }
+    ]
+  },
+  "stats7d": {
+    "totalCount": 5,
+    "winCount": 2,
+    "lossCount": 3,
+    "winRate": 0.4,
+    "totalPnl": -4.669579383623876,
+    "avgWin": 1.3778488394909965,
+    "avgLoss": 2.4750923542019563,
+    "expectancy": -0.933915876724775,
+    "rrActual": 0.5566858291779807,
+    "openCount": 0,
+    "bySetup": [
+      {
+        "setup": "continuation",
+        "count": 4,
+        "wins": 1,
+        "pnl": -5.704450650645708,
+        "winRate": 0.25
+      },
+      {
+        "setup": "pullback_short",
+        "count": 1,
+        "wins": 1,
+        "pnl": 1.0348712670218319,
+        "winRate": 1
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 3,
+        "wins": 0,
+        "pnl": -7.425277062605869,
+        "winRate": 0
+      },
+      {
+        "class": "etf",
+        "count": 2,
+        "wins": 2,
+        "pnl": 2.755697678981993,
+        "winRate": 1
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "SPY",
+        "count": 1,
+        "pnl": 1.720826411960161,
+        "wins": 1
+      },
+      {
+        "symbol": "QQQ",
+        "count": 1,
+        "pnl": 1.0348712670218319,
+        "wins": 1
+      },
+      {
+        "symbol": "JPM",
+        "count": 1,
+        "pnl": -0.5682926149818065,
+        "wins": 0
+      },
+      {
+        "symbol": "AIR",
+        "count": 2,
+        "pnl": -6.856984447624063,
+        "wins": 0
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "AIR",
+        "count": 2,
+        "pnl": -6.856984447624063,
+        "wins": 0
+      },
+      {
+        "symbol": "JPM",
+        "count": 1,
+        "pnl": -0.5682926149818065,
+        "wins": 0
+      }
+    ]
+  },
+  "stats30d": {
+    "totalCount": 19,
+    "winCount": 10,
+    "lossCount": 9,
+    "winRate": 0.5263157894736842,
+    "totalPnl": 34.26456976640543,
+    "avgWin": 7.25169518597816,
+    "avgLoss": 4.250264677041796,
+    "expectancy": 1.8033984087581807,
+    "rrActual": 1.7061749648554532,
+    "openCount": 0,
+    "bySetup": [
+      {
+        "setup": "continuation",
+        "count": 18,
+        "wins": 9,
+        "pnl": 33.2296984993836,
+        "winRate": 0.5
+      },
+      {
+        "setup": "pullback_short",
+        "count": 1,
+        "wins": 1,
+        "pnl": 1.0348712670218319,
+        "winRate": 1
+      }
+    ],
+    "byClass": [
+      {
+        "class": "stock",
+        "count": 17,
+        "wins": 8,
+        "pnl": 31.50887208742344,
+        "winRate": 0.47058823529411764
+      },
+      {
+        "class": "etf",
+        "count": 2,
+        "wins": 2,
+        "pnl": 2.755697678981993,
+        "winRate": 1
+      }
+    ],
+    "topSymbols": [
+      {
+        "symbol": "AAPL",
+        "count": 2,
+        "pnl": 19.077258898061764,
+        "wins": 1
+      },
+      {
+        "symbol": "JPM",
+        "count": 4,
+        "pnl": 10.63071997970513,
+        "wins": 2
+      },
+      {
+        "symbol": "V",
+        "count": 4,
+        "pnl": 5.9688595747214475,
+        "wins": 3
+      },
+      {
+        "symbol": "MA",
+        "count": 3,
+        "pnl": 5.254648877411947,
+        "wins": 1
+      },
+      {
+        "symbol": "AIR",
+        "count": 3,
+        "pnl": 2.634209290145005,
+        "wins": 1
+      }
+    ],
+    "bottomSymbols": [
+      {
+        "symbol": "AMD",
+        "count": 1,
+        "pnl": -12.056824532621851,
+        "wins": 0
+      }
+    ]
+  },
+  "lastClosedAt": "2026-08-11T19:16:16.993Z"
+}
