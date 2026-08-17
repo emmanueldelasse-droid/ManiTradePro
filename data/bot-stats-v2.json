@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 121,
-    "wins": 39,
+    "trades": 122,
+    "wins": 40,
     "losses": 82,
-    "winRate": 0.3223,
-    "profitFactor": 1.0311,
-    "expectancy": 9.9596,
-    "avgWin": 1025.6737,
+    "winRate": 0.3279,
+    "profitFactor": 1.0542,
+    "expectancy": 17.2483,
+    "avgWin": 1022.5116,
     "avgLoss": 473.124,
-    "totalPnl": 1205.1086,
+    "totalPnl": 2104.2956,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "pullback": {
+      "trades": 63,
+      "wins": 18,
+      "losses": 45,
+      "winRate": 0.2857,
+      "profitFactor": 1.1023,
+      "expectancy": 36.5367,
+      "avgWin": 1377.8784,
+      "avgLoss": 500,
+      "totalPnl": 2301.8119,
+      "maxDrawdown": 9165.2351
+    },
     "breakout": {
       "trades": 27,
       "wins": 7,
@@ -24,18 +36,6 @@
       "avgLoss": 475.5762,
       "totalPnl": -2006.9138,
       "maxDrawdown": 4410.3446
-    },
-    "pullback": {
-      "trades": 62,
-      "wins": 17,
-      "losses": 45,
-      "winRate": 0.2742,
-      "profitFactor": 1.0623,
-      "expectancy": 22.623,
-      "avgWin": 1406.0368,
-      "avgLoss": 500,
-      "totalPnl": 1402.6249,
-      "maxDrawdown": 9165.2351
     },
     "mean_reversion": {
       "trades": 32,
@@ -51,6 +51,18 @@
     }
   },
   "byAsset": {
+    "EURUSD": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 611.4822,
+      "avgWin": 611.4822,
+      "avgLoss": 0,
+      "totalPnl": 1222.9644,
+      "maxDrawdown": 0
+    },
     "AVGO": {
       "trades": 2,
       "wins": 0,
@@ -363,18 +375,6 @@
       "totalPnl": -116.0726,
       "maxDrawdown": 116.0726
     },
-    "EURUSD": {
-      "trades": 1,
-      "wins": 1,
-      "losses": 0,
-      "winRate": 1,
-      "profitFactor": null,
-      "expectancy": 323.7774,
-      "avgWin": 323.7774,
-      "avgLoss": 0,
-      "totalPnl": 323.7774,
-      "maxDrawdown": 0
-    },
     "ASML": {
       "trades": 6,
       "wins": 1,
@@ -532,5 +532,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 121
+  "tradeCount": 122
 }
