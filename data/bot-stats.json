@@ -122,23 +122,23 @@
     ]
   },
   "stats7d": {
-    "totalCount": 5,
-    "winCount": 4,
+    "totalCount": 4,
+    "winCount": 3,
     "lossCount": 1,
-    "winRate": 0.8,
-    "totalPnl": 14.164334687403292,
-    "avgWin": 3.7289653064210464,
+    "winRate": 0.75,
+    "totalPnl": 12.443508275443131,
+    "avgWin": 4.398344937908008,
     "avgLoss": 0.7515265382808937,
-    "expectancy": 2.8328669374806585,
-    "rrActual": 4.961854460856435,
+    "expectancy": 3.1108770688607827,
+    "rrActual": 5.85254773300376,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 5,
-        "wins": 4,
-        "pnl": 14.164334687403292,
-        "winRate": 0.8
+        "count": 4,
+        "wins": 3,
+        "pnl": 12.443508275443131,
+        "winRate": 0.75
       }
     ],
     "byClass": [
@@ -151,9 +151,9 @@
       },
       {
         "class": "etf",
-        "count": 2,
-        "wins": 2,
-        "pnl": 4.051140395216248,
+        "count": 1,
+        "wins": 1,
+        "pnl": 2.330313983256087,
         "winRate": 1
       }
     ],
@@ -174,12 +174,6 @@
         "symbol": "QQQ",
         "count": 1,
         "pnl": 2.330313983256087,
-        "wins": 1
-      },
-      {
-        "symbol": "SPY",
-        "count": 1,
-        "pnl": 1.720826411960161,
         "wins": 1
       },
       {
