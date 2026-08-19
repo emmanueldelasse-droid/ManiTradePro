@@ -1,28 +1,28 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 127,
-    "wins": 43,
+    "trades": 129,
+    "wins": 45,
     "losses": 84,
-    "winRate": 0.3386,
-    "profitFactor": 1.0883,
-    "expectancy": 27.6848,
-    "avgWin": 1007.259,
+    "winRate": 0.3488,
+    "profitFactor": 1.1402,
+    "expectancy": 43.2493,
+    "avgWin": 1008.3407,
     "avgLoss": 473.7639,
-    "totalPnl": 3515.9684,
+    "totalPnl": 5579.1626,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
     "pullback": {
-      "trades": 66,
-      "wins": 19,
+      "trades": 68,
+      "wins": 21,
       "losses": 47,
-      "winRate": 0.2879,
-      "profitFactor": 1.1025,
-      "expectancy": 36.5078,
-      "avgWin": 1363.6588,
+      "winRate": 0.3088,
+      "profitFactor": 1.1903,
+      "expectancy": 65.7752,
+      "avgWin": 1332.0339,
       "avgLoss": 500,
-      "totalPnl": 2409.5177,
+      "totalPnl": 4472.7119,
       "maxDrawdown": 9165.2351
     },
     "mean_reversion": {
@@ -51,6 +51,30 @@
     }
   },
   "byAsset": {
+    "BNB": {
+      "trades": 4,
+      "wins": 1,
+      "losses": 3,
+      "winRate": 0.25,
+      "profitFactor": 0.792,
+      "expectancy": -77.9919,
+      "avgWin": 1188.0323,
+      "avgLoss": 500,
+      "totalPnl": -311.9677,
+      "maxDrawdown": 1500
+    },
+    "ETH": {
+      "trades": 6,
+      "wins": 3,
+      "losses": 3,
+      "winRate": 0.5,
+      "profitFactor": 1.4939,
+      "expectancy": 123.4636,
+      "avgWin": 746.9272,
+      "avgLoss": 500,
+      "totalPnl": 740.7817,
+      "maxDrawdown": 1000
+    },
     "XLK": {
       "trades": 4,
       "wins": 0,
@@ -159,18 +183,6 @@
       "totalPnl": 1638.9311,
       "maxDrawdown": 0
     },
-    "BNB": {
-      "trades": 3,
-      "wins": 0,
-      "losses": 3,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -1500,
-      "maxDrawdown": 1500
-    },
     "XLV": {
       "trades": 8,
       "wins": 4,
@@ -230,18 +242,6 @@
       "avgLoss": 500,
       "totalPnl": 2560.6882,
       "maxDrawdown": 500
-    },
-    "ETH": {
-      "trades": 5,
-      "wins": 2,
-      "losses": 3,
-      "winRate": 0.4,
-      "profitFactor": 0.9104,
-      "expectancy": -26.876,
-      "avgWin": 682.8099,
-      "avgLoss": 500,
-      "totalPnl": -134.3802,
-      "maxDrawdown": 1000
     },
     "USDJPY": {
       "trades": 11,
@@ -544,5 +544,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 127
+  "tradeCount": 129
 }
