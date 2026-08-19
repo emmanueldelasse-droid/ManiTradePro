@@ -1,41 +1,41 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 123,
-    "wins": 41,
-    "losses": 82,
-    "winRate": 0.3333,
-    "profitFactor": 1.0651,
-    "expectancy": 20.5293,
-    "avgWin": 1007.836,
-    "avgLoss": 473.124,
-    "totalPnl": 2525.1089,
+    "trades": 127,
+    "wins": 43,
+    "losses": 84,
+    "winRate": 0.3386,
+    "profitFactor": 1.0883,
+    "expectancy": 27.6848,
+    "avgWin": 1007.259,
+    "avgLoss": 473.7639,
+    "totalPnl": 3515.9684,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
-    "mean_reversion": {
-      "trades": 33,
-      "wins": 16,
-      "losses": 17,
-      "winRate": 0.4848,
-      "profitFactor": 1.3287,
-      "expectancy": 67.5821,
-      "avgWin": 563.4284,
-      "avgLoss": 399.0967,
-      "totalPnl": 2230.2108,
-      "maxDrawdown": 2000
-    },
     "pullback": {
-      "trades": 63,
-      "wins": 18,
-      "losses": 45,
-      "winRate": 0.2857,
-      "profitFactor": 1.1023,
-      "expectancy": 36.5367,
-      "avgWin": 1377.8784,
+      "trades": 66,
+      "wins": 19,
+      "losses": 47,
+      "winRate": 0.2879,
+      "profitFactor": 1.1025,
+      "expectancy": 36.5078,
+      "avgWin": 1363.6588,
       "avgLoss": 500,
-      "totalPnl": 2301.8119,
+      "totalPnl": 2409.5177,
       "maxDrawdown": 9165.2351
+    },
+    "mean_reversion": {
+      "trades": 34,
+      "wins": 17,
+      "losses": 17,
+      "winRate": 0.5,
+      "profitFactor": 1.4589,
+      "expectancy": 91.5695,
+      "avgWin": 582.2358,
+      "avgLoss": 399.0967,
+      "totalPnl": 3113.3645,
+      "maxDrawdown": 2000
     },
     "breakout": {
       "trades": 27,
@@ -51,6 +51,54 @@
     }
   },
   "byAsset": {
+    "XLK": {
+      "trades": 4,
+      "wins": 0,
+      "losses": 4,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -2000,
+      "maxDrawdown": 2000
+    },
+    "AIR": {
+      "trades": 9,
+      "wins": 4,
+      "losses": 5,
+      "winRate": 0.4444,
+      "profitFactor": 1.4044,
+      "expectancy": 112.3232,
+      "avgWin": 877.7271,
+      "avgLoss": 500,
+      "totalPnl": 1010.9084,
+      "maxDrawdown": 1000
+    },
+    "LLY": {
+      "trades": 5,
+      "wins": 1,
+      "losses": 4,
+      "winRate": 0.2,
+      "profitFactor": 0.5539,
+      "expectancy": -178.4588,
+      "avgWin": 1107.7058,
+      "avgLoss": 500,
+      "totalPnl": -892.2942,
+      "maxDrawdown": 2000
+    },
+    "PANW": {
+      "trades": 7,
+      "wins": 4,
+      "losses": 3,
+      "winRate": 0.5714,
+      "profitFactor": 3.3003,
+      "expectancy": 492.925,
+      "avgWin": 1237.6188,
+      "avgLoss": 500,
+      "totalPnl": 3450.4751,
+      "maxDrawdown": 1500
+    },
     "TSLA": {
       "trades": 1,
       "wins": 1,
@@ -135,18 +183,6 @@
       "totalPnl": 2625.9318,
       "maxDrawdown": 511.5238
     },
-    "AIR": {
-      "trades": 8,
-      "wins": 4,
-      "losses": 4,
-      "winRate": 0.5,
-      "profitFactor": 1.7555,
-      "expectancy": 188.8636,
-      "avgWin": 877.7271,
-      "avgLoss": 500,
-      "totalPnl": 1510.9084,
-      "maxDrawdown": 1000
-    },
     "PLTR": {
       "trades": 2,
       "wins": 1,
@@ -169,18 +205,6 @@
       "avgWin": 957.2721,
       "avgLoss": 500,
       "totalPnl": -542.7279,
-      "maxDrawdown": 1500
-    },
-    "XLK": {
-      "trades": 3,
-      "wins": 0,
-      "losses": 3,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -1500,
       "maxDrawdown": 1500
     },
     "SIE": {
@@ -230,30 +254,6 @@
       "avgLoss": 500,
       "totalPnl": -1325.0044,
       "maxDrawdown": 2500
-    },
-    "PANW": {
-      "trades": 6,
-      "wins": 3,
-      "losses": 3,
-      "winRate": 0.5,
-      "profitFactor": 2.7115,
-      "expectancy": 427.8869,
-      "avgWin": 1355.7738,
-      "avgLoss": 500,
-      "totalPnl": 2567.3214,
-      "maxDrawdown": 1500
-    },
-    "LLY": {
-      "trades": 4,
-      "wins": 0,
-      "losses": 4,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -2000,
-      "maxDrawdown": 2000
     },
     "CRWD": {
       "trades": 4,
@@ -544,5 +544,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 123
+  "tradeCount": 127
 }
