@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 122,
-    "wins": 40,
+    "trades": 123,
+    "wins": 41,
     "losses": 82,
-    "winRate": 0.3279,
-    "profitFactor": 1.0542,
-    "expectancy": 17.2483,
-    "avgWin": 1022.5116,
+    "winRate": 0.3333,
+    "profitFactor": 1.0651,
+    "expectancy": 20.5293,
+    "avgWin": 1007.836,
     "avgLoss": 473.124,
-    "totalPnl": 2104.2956,
+    "totalPnl": 2525.1089,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "mean_reversion": {
+      "trades": 33,
+      "wins": 16,
+      "losses": 17,
+      "winRate": 0.4848,
+      "profitFactor": 1.3287,
+      "expectancy": 67.5821,
+      "avgWin": 563.4284,
+      "avgLoss": 399.0967,
+      "totalPnl": 2230.2108,
+      "maxDrawdown": 2000
+    },
     "pullback": {
       "trades": 63,
       "wins": 18,
@@ -36,21 +48,21 @@
       "avgLoss": 475.5762,
       "totalPnl": -2006.9138,
       "maxDrawdown": 4410.3446
-    },
-    "mean_reversion": {
-      "trades": 32,
-      "wins": 15,
-      "losses": 17,
-      "winRate": 0.4688,
-      "profitFactor": 1.2667,
-      "expectancy": 56.5437,
-      "avgWin": 572.9361,
-      "avgLoss": 399.0967,
-      "totalPnl": 1809.3975,
-      "maxDrawdown": 2000
     }
   },
   "byAsset": {
+    "TSLA": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 420.8133,
+      "avgWin": 420.8133,
+      "avgLoss": 0,
+      "totalPnl": 420.8133,
+      "maxDrawdown": 0
+    },
     "EURUSD": {
       "trades": 2,
       "wins": 2,
@@ -532,5 +544,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 122
+  "tradeCount": 123
 }
