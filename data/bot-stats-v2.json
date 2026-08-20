@@ -1,18 +1,42 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 129,
-    "wins": 45,
-    "losses": 84,
-    "winRate": 0.3488,
-    "profitFactor": 1.1402,
-    "expectancy": 43.2493,
-    "avgWin": 1008.3407,
-    "avgLoss": 473.7639,
-    "totalPnl": 5579.1626,
+    "trades": 131,
+    "wins": 46,
+    "losses": 85,
+    "winRate": 0.3511,
+    "profitFactor": 1.1461,
+    "expectancy": 44.9508,
+    "avgWin": 1004.0156,
+    "avgLoss": 474.0726,
+    "totalPnl": 5888.5497,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "mean_reversion": {
+      "trades": 35,
+      "wins": 17,
+      "losses": 18,
+      "winRate": 0.4857,
+      "profitFactor": 1.3587,
+      "expectancy": 74.6676,
+      "avgWin": 582.2358,
+      "avgLoss": 404.7024,
+      "totalPnl": 2613.3645,
+      "maxDrawdown": 2000
+    },
+    "gld_breakout": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 809.3871,
+      "avgWin": 809.3871,
+      "avgLoss": 0,
+      "totalPnl": 809.3871,
+      "maxDrawdown": 0
+    },
     "pullback": {
       "trades": 68,
       "wins": 21,
@@ -24,18 +48,6 @@
       "avgLoss": 500,
       "totalPnl": 4472.7119,
       "maxDrawdown": 9165.2351
-    },
-    "mean_reversion": {
-      "trades": 34,
-      "wins": 17,
-      "losses": 17,
-      "winRate": 0.5,
-      "profitFactor": 1.4589,
-      "expectancy": 91.5695,
-      "avgWin": 582.2358,
-      "avgLoss": 399.0967,
-      "totalPnl": 3113.3645,
-      "maxDrawdown": 2000
     },
     "breakout": {
       "trades": 27,
@@ -51,6 +63,30 @@
     }
   },
   "byAsset": {
+    "ETH": {
+      "trades": 7,
+      "wins": 3,
+      "losses": 4,
+      "winRate": 0.4286,
+      "profitFactor": 1.1204,
+      "expectancy": 34.3974,
+      "avgWin": 746.9272,
+      "avgLoss": 500,
+      "totalPnl": 240.7817,
+      "maxDrawdown": 1000
+    },
+    "GLD": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 474.5767,
+      "avgWin": 474.5767,
+      "avgLoss": 0,
+      "totalPnl": 949.1533,
+      "maxDrawdown": 0
+    },
     "BNB": {
       "trades": 4,
       "wins": 1,
@@ -62,18 +98,6 @@
       "avgLoss": 500,
       "totalPnl": -311.9677,
       "maxDrawdown": 1500
-    },
-    "ETH": {
-      "trades": 6,
-      "wins": 3,
-      "losses": 3,
-      "winRate": 0.5,
-      "profitFactor": 1.4939,
-      "expectancy": 123.4636,
-      "avgWin": 746.9272,
-      "avgLoss": 500,
-      "totalPnl": 740.7817,
-      "maxDrawdown": 1000
     },
     "XLK": {
       "trades": 4,
@@ -483,18 +507,6 @@
       "totalPnl": -932.3521,
       "maxDrawdown": 1000
     },
-    "GLD": {
-      "trades": 1,
-      "wins": 1,
-      "losses": 0,
-      "winRate": 1,
-      "profitFactor": null,
-      "expectancy": 139.7662,
-      "avgWin": 139.7662,
-      "avgLoss": 0,
-      "totalPnl": 139.7662,
-      "maxDrawdown": 0
-    },
     "BTC": {
       "trades": 1,
       "wins": 1,
@@ -544,5 +556,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 129
+  "tradeCount": 131
 }
