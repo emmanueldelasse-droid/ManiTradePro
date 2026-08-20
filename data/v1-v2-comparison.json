@@ -40,17 +40,29 @@
     "scope": "V2_POST_ANTI_DUP_FIX",
     "cohortStart": "2026-08-16T21:04:47Z",
     "cohortRule": "trade.openedAt >= cohortStart",
-    "tradeCount": 5,
-    "wins": 1,
-    "losses": 4,
+    "tradeCount": 10,
+    "wins": 2,
+    "losses": 8,
     "winRate": 0.2,
-    "expectancy": -162.3936,
-    "totalPnl": -811.9678,
-    "avgWin": 1188.0323,
+    "expectancy": 3.3707,
+    "totalPnl": 33.7067,
+    "avgWin": 2016.8534,
     "avgLoss": 500,
-    "profitFactor": 0.594,
-    "maxDrawdown": 1000.0001,
+    "profitFactor": 1.0084,
+    "maxDrawdown": 2000,
     "bySetup": {
+      "pullback": {
+        "trades": 8,
+        "wins": 2,
+        "losses": 6,
+        "winRate": 0.25,
+        "profitFactor": 1.3446,
+        "expectancy": 129.2134,
+        "avgWin": 2016.8534,
+        "avgLoss": 500,
+        "totalPnl": 1033.7068,
+        "maxDrawdown": 2000
+      },
       "mean_reversion": {
         "trades": 2,
         "wins": 0,
@@ -62,21 +74,69 @@
         "avgLoss": 500.0001,
         "totalPnl": -1000.0001,
         "maxDrawdown": 1000.0001
-      },
-      "pullback": {
-        "trades": 3,
-        "wins": 1,
-        "losses": 2,
-        "winRate": 0.3333,
-        "profitFactor": 1.188,
-        "expectancy": 62.6774,
-        "avgWin": 1188.0323,
-        "avgLoss": 500,
-        "totalPnl": 188.0323,
-        "maxDrawdown": 1000
       }
     },
     "byAsset": {
+      "AIR": {
+        "trades": 2,
+        "wins": 0,
+        "losses": 2,
+        "winRate": 0,
+        "profitFactor": 0,
+        "expectancy": -500,
+        "avgWin": 0,
+        "avgLoss": 500,
+        "totalPnl": -1000,
+        "maxDrawdown": 1000
+      },
+      "JPM": {
+        "trades": 1,
+        "wins": 0,
+        "losses": 1,
+        "winRate": 0,
+        "profitFactor": 0,
+        "expectancy": -500,
+        "avgWin": 0,
+        "avgLoss": 500,
+        "totalPnl": -500,
+        "maxDrawdown": 500
+      },
+      "XLK": {
+        "trades": 2,
+        "wins": 0,
+        "losses": 2,
+        "winRate": 0,
+        "profitFactor": 0,
+        "expectancy": -500,
+        "avgWin": 0,
+        "avgLoss": 500,
+        "totalPnl": -1000,
+        "maxDrawdown": 1000
+      },
+      "QQQ": {
+        "trades": 1,
+        "wins": 0,
+        "losses": 1,
+        "winRate": 0,
+        "profitFactor": 0,
+        "expectancy": -500,
+        "avgWin": 0,
+        "avgLoss": 500,
+        "totalPnl": -500,
+        "maxDrawdown": 500
+      },
+      "NOW": {
+        "trades": 1,
+        "wins": 1,
+        "losses": 0,
+        "winRate": 1,
+        "profitFactor": null,
+        "expectancy": 2845.6745,
+        "avgWin": 2845.6745,
+        "avgLoss": 0,
+        "totalPnl": 2845.6745,
+        "maxDrawdown": 0
+      },
       "BTC": {
         "trades": 1,
         "wins": 0,
@@ -112,49 +172,49 @@
         "avgLoss": 0,
         "totalPnl": 1188.0323,
         "maxDrawdown": 0
-      },
-      "XLK": {
-        "trades": 1,
-        "wins": 0,
-        "losses": 1,
-        "winRate": 0,
-        "profitFactor": 0,
-        "expectancy": -500,
-        "avgWin": 0,
-        "avgLoss": 500,
-        "totalPnl": -500,
-        "maxDrawdown": 500
-      },
-      "AIR": {
-        "trades": 1,
-        "wins": 0,
-        "losses": 1,
-        "winRate": 0,
-        "profitFactor": 0,
-        "expectancy": -500,
-        "avgWin": 0,
-        "avgLoss": 500,
-        "totalPnl": -500,
-        "maxDrawdown": 500
       }
     }
   },
   "v2HistoricalReference": {
     "scope": "V2 lifetime incluant V2_PRE_ANTI_DUP_FIX — référence seulement",
-    "tradeCount": 132,
+    "tradeCount": 138,
     "overall": {
-      "trades": 132,
-      "wins": 46,
-      "losses": 86,
-      "winRate": 0.3485,
-      "profitFactor": 1.1321,
-      "expectancy": 40.8223,
-      "avgWin": 1004.0156,
-      "avgLoss": 474.374,
-      "totalPnl": 5388.5496,
+      "trades": 138,
+      "wins": 47,
+      "losses": 91,
+      "winRate": 0.3406,
+      "profitFactor": 1.1324,
+      "expectancy": 41.5523,
+      "avgWin": 1043.1998,
+      "avgLoss": 475.7821,
+      "totalPnl": 5734.2241,
       "maxDrawdown": 11276.3966
     },
     "bySetup": {
+      "pullback": {
+        "trades": 73,
+        "wins": 22,
+        "losses": 51,
+        "winRate": 0.3014,
+        "profitFactor": 1.2086,
+        "expectancy": 72.8546,
+        "avgWin": 1400.8357,
+        "avgLoss": 500,
+        "totalPnl": 5318.3864,
+        "maxDrawdown": 9165.2351
+      },
+      "breakout": {
+        "trades": 28,
+        "wins": 7,
+        "losses": 21,
+        "winRate": 0.25,
+        "profitFactor": 0.7496,
+        "expectancy": -89.5326,
+        "avgWin": 1072.0871,
+        "avgLoss": 476.7392,
+        "totalPnl": -2506.9138,
+        "maxDrawdown": 4410.3446
+      },
       "mean_reversion": {
         "trades": 36,
         "wins": 17,
@@ -178,30 +238,6 @@
         "avgLoss": 0,
         "totalPnl": 809.3871,
         "maxDrawdown": 0
-      },
-      "pullback": {
-        "trades": 68,
-        "wins": 21,
-        "losses": 47,
-        "winRate": 0.3088,
-        "profitFactor": 1.1903,
-        "expectancy": 65.7752,
-        "avgWin": 1332.0339,
-        "avgLoss": 500,
-        "totalPnl": 4472.7119,
-        "maxDrawdown": 9165.2351
-      },
-      "breakout": {
-        "trades": 27,
-        "wins": 7,
-        "losses": 20,
-        "winRate": 0.2593,
-        "profitFactor": 0.789,
-        "expectancy": -74.3301,
-        "avgWin": 1072.0871,
-        "avgLoss": 475.5762,
-        "totalPnl": -2006.9138,
-        "maxDrawdown": 4410.3446
       }
     }
   }
