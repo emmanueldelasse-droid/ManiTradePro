@@ -1,28 +1,28 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 131,
+    "trades": 132,
     "wins": 46,
-    "losses": 85,
-    "winRate": 0.3511,
-    "profitFactor": 1.1461,
-    "expectancy": 44.9508,
+    "losses": 86,
+    "winRate": 0.3485,
+    "profitFactor": 1.1321,
+    "expectancy": 40.8223,
     "avgWin": 1004.0156,
-    "avgLoss": 474.0726,
-    "totalPnl": 5888.5497,
+    "avgLoss": 474.374,
+    "totalPnl": 5388.5496,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
     "mean_reversion": {
-      "trades": 35,
+      "trades": 36,
       "wins": 17,
-      "losses": 18,
-      "winRate": 0.4857,
-      "profitFactor": 1.3587,
-      "expectancy": 74.6676,
+      "losses": 19,
+      "winRate": 0.4722,
+      "profitFactor": 1.2715,
+      "expectancy": 58.7046,
       "avgWin": 582.2358,
-      "avgLoss": 404.7024,
-      "totalPnl": 2613.3645,
+      "avgLoss": 409.7181,
+      "totalPnl": 2113.3644,
       "maxDrawdown": 2000
     },
     "gld_breakout": {
@@ -63,6 +63,18 @@
     }
   },
   "byAsset": {
+    "BTC": {
+      "trades": 2,
+      "wins": 1,
+      "losses": 1,
+      "winRate": 0.5,
+      "profitFactor": 0.2854,
+      "expectancy": -178.6542,
+      "avgWin": 142.6916,
+      "avgLoss": 500.0001,
+      "totalPnl": -357.3085,
+      "maxDrawdown": 500.0001
+    },
     "ETH": {
       "trades": 7,
       "wins": 3,
@@ -507,18 +519,6 @@
       "totalPnl": -932.3521,
       "maxDrawdown": 1000
     },
-    "BTC": {
-      "trades": 1,
-      "wins": 1,
-      "losses": 0,
-      "winRate": 1,
-      "profitFactor": null,
-      "expectancy": 142.6916,
-      "avgWin": 142.6916,
-      "avgLoss": 0,
-      "totalPnl": 142.6916,
-      "maxDrawdown": 0
-    },
     "SMH": {
       "trades": 3,
       "wins": 1,
@@ -556,5 +556,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 131
+  "tradeCount": 132
 }

@@ -2,28 +2,28 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 4,
+  "tradeCount": 5,
   "wins": 1,
-  "losses": 3,
-  "winRate": 0.25,
-  "expectancy": -77.9919,
-  "totalPnl": -311.9677,
+  "losses": 4,
+  "winRate": 0.2,
+  "expectancy": -162.3936,
+  "totalPnl": -811.9678,
   "avgWin": 1188.0323,
   "avgLoss": 500,
-  "profitFactor": 0.792,
-  "maxDrawdown": 1000,
+  "profitFactor": 0.594,
+  "maxDrawdown": 1000.0001,
   "bySetup": {
     "mean_reversion": {
-      "trades": 1,
+      "trades": 2,
       "wins": 0,
-      "losses": 1,
+      "losses": 2,
       "winRate": 0,
       "profitFactor": 0,
       "expectancy": -500,
       "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -500,
-      "maxDrawdown": 500
+      "avgLoss": 500.0001,
+      "totalPnl": -1000.0001,
+      "maxDrawdown": 1000.0001
     },
     "pullback": {
       "trades": 3,
@@ -39,6 +39,18 @@
     }
   },
   "byAsset": {
+    "BTC": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500.0001,
+      "avgWin": 0,
+      "avgLoss": 500.0001,
+      "totalPnl": -500.0001,
+      "maxDrawdown": 500.0001
+    },
     "ETH": {
       "trades": 1,
       "wins": 0,
