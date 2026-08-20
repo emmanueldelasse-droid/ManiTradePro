@@ -180,23 +180,23 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 19,
+    "totalCount": 18,
     "winCount": 11,
-    "lossCount": 8,
-    "winRate": 0.5789473684210527,
-    "totalPnl": 27.367168367314328,
+    "lossCount": 7,
+    "winRate": 0.6111111111111112,
+    "totalPnl": 32.39886734108855,
     "avgWin": 5.5790083127300845,
-    "avgLoss": 4.250240384089576,
-    "expectancy": 1.4403772824902277,
-    "rrActual": 1.3126335944702425,
+    "avgLoss": 4.138603442706056,
+    "expectancy": 1.7999370745049192,
+    "rrActual": 1.3480412873484224,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 18,
+        "count": 17,
         "wins": 10,
-        "pnl": 26.332297100292493,
-        "winRate": 0.5555555555555556
+        "pnl": 31.36399607406671,
+        "winRate": 0.5882352941176471
       },
       {
         "setup": "pullback_short",
@@ -209,10 +209,10 @@
     "byClass": [
       {
         "class": "stock",
-        "count": 16,
+        "count": 15,
         "wins": 8,
-        "pnl": 22.281156705076242,
-        "winRate": 0.5
+        "pnl": 27.31285567885046,
+        "winRate": 0.5333333333333333
       },
       {
         "class": "etf",
@@ -230,15 +230,15 @@
         "wins": 3
       },
       {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": 5.977146205684145,
+        "symbol": "MA",
+        "count": 2,
+        "pnl": 10.286347851186164,
         "wins": 1
       },
       {
-        "symbol": "MA",
-        "count": 3,
-        "pnl": 5.254648877411947,
+        "symbol": "NVDA",
+        "count": 1,
+        "pnl": 5.977146205684145,
         "wins": 1
       },
       {
