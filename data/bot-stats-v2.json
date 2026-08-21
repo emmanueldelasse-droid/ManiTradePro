@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 140,
+    "trades": 141,
     "wins": 47,
-    "losses": 93,
-    "winRate": 0.3357,
-    "profitFactor": 1.1069,
-    "expectancy": 33.8159,
+    "losses": 94,
+    "winRate": 0.3333,
+    "profitFactor": 1.0945,
+    "expectancy": 30.03,
     "avgWin": 1043.1998,
-    "avgLoss": 476.3029,
-    "totalPnl": 4734.2241,
+    "avgLoss": 476.555,
+    "totalPnl": 4234.2241,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "mean_reversion": {
+      "trades": 37,
+      "wins": 17,
+      "losses": 20,
+      "winRate": 0.4595,
+      "profitFactor": 1.1947,
+      "expectancy": 43.6044,
+      "avgWin": 582.2358,
+      "avgLoss": 414.2322,
+      "totalPnl": 1613.3644,
+      "maxDrawdown": 2000
+    },
     "pullback": {
       "trades": 75,
       "wins": 22,
@@ -37,18 +49,6 @@
       "totalPnl": -2506.9138,
       "maxDrawdown": 4410.3446
     },
-    "mean_reversion": {
-      "trades": 36,
-      "wins": 17,
-      "losses": 19,
-      "winRate": 0.4722,
-      "profitFactor": 1.2715,
-      "expectancy": 58.7046,
-      "avgWin": 582.2358,
-      "avgLoss": 409.7181,
-      "totalPnl": 2113.3644,
-      "maxDrawdown": 2000
-    },
     "gld_breakout": {
       "trades": 1,
       "wins": 1,
@@ -63,6 +63,18 @@
     }
   },
   "byAsset": {
+    "XRP": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -500,
+      "maxDrawdown": 500
+    },
     "IWM": {
       "trades": 3,
       "wins": 0,
@@ -568,5 +580,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 140
+  "tradeCount": 141
 }
