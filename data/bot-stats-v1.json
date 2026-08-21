@@ -180,23 +180,23 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 18,
+    "totalCount": 17,
     "winCount": 11,
-    "lossCount": 7,
-    "winRate": 0.6111111111111112,
-    "totalPnl": 32.39886734108855,
+    "lossCount": 6,
+    "winRate": 0.6470588235294118,
+    "totalPnl": 34.565139187241314,
     "avgWin": 5.5790083127300845,
-    "avgLoss": 4.138603442706056,
-    "expectancy": 1.7999370745049192,
-    "rrActual": 1.3480412873484224,
+    "avgLoss": 4.467325375464937,
+    "expectancy": 2.03324348160243,
+    "rrActual": 1.2488475416119535,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 17,
+        "count": 16,
         "wins": 10,
-        "pnl": 31.36399607406671,
-        "winRate": 0.5882352941176471
+        "pnl": 33.53026792021948,
+        "winRate": 0.625
       },
       {
         "setup": "pullback_short",
@@ -209,10 +209,10 @@
     "byClass": [
       {
         "class": "stock",
-        "count": 15,
+        "count": 14,
         "wins": 8,
-        "pnl": 27.31285567885046,
-        "winRate": 0.5333333333333333
+        "pnl": 29.479127525003232,
+        "winRate": 0.5714285714285714
       },
       {
         "class": "etf",
@@ -242,15 +242,15 @@
         "wins": 1
       },
       {
-        "symbol": "QQQ",
+        "symbol": "V",
         "count": 2,
-        "pnl": 3.3651852502779187,
+        "pnl": 4.981698247661423,
         "wins": 2
       },
       {
-        "symbol": "V",
-        "count": 3,
-        "pnl": 2.8154264015086516,
+        "symbol": "QQQ",
+        "count": 2,
+        "pnl": 3.3651852502779187,
         "wins": 2
       }
     ],
