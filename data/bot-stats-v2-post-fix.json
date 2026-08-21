@@ -2,28 +2,40 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 13,
-  "wins": 2,
-  "losses": 11,
-  "winRate": 0.1538,
-  "expectancy": -112.7918,
-  "totalPnl": -1466.2933,
-  "avgWin": 2016.8534,
+  "tradeCount": 16,
+  "wins": 3,
+  "losses": 13,
+  "winRate": 0.1875,
+  "expectancy": -35.9111,
+  "totalPnl": -574.5769,
+  "avgWin": 1975.1411,
   "avgLoss": 500,
-  "profitFactor": 0.7334,
+  "profitFactor": 0.9116,
   "maxDrawdown": 3500,
   "bySetup": {
     "mean_reversion": {
-      "trades": 3,
+      "trades": 5,
       "wins": 0,
-      "losses": 3,
+      "losses": 5,
       "winRate": 0,
       "profitFactor": 0,
       "expectancy": -500,
       "avgWin": 0,
       "avgLoss": 500,
-      "totalPnl": -1500.0001,
-      "maxDrawdown": 1500.0001
+      "totalPnl": -2500.0001,
+      "maxDrawdown": 2500.0001
+    },
+    "breakout": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 1891.7164,
+      "avgWin": 1891.7164,
+      "avgLoss": 0,
+      "totalPnl": 1891.7164,
+      "maxDrawdown": 0
     },
     "pullback": {
       "trades": 10,
@@ -39,6 +51,42 @@
     }
   },
   "byAsset": {
+    "SOL": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -500,
+      "maxDrawdown": 500
+    },
+    "ETH": {
+      "trades": 2,
+      "wins": 0,
+      "losses": 2,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -1000,
+      "maxDrawdown": 1000
+    },
+    "BNB": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 1539.8744,
+      "avgWin": 1539.8744,
+      "avgLoss": 0,
+      "totalPnl": 3079.7487,
+      "maxDrawdown": 0
+    },
     "XRP": {
       "trades": 1,
       "wins": 0,
@@ -146,30 +194,6 @@
       "avgLoss": 500.0001,
       "totalPnl": -500.0001,
       "maxDrawdown": 500.0001
-    },
-    "ETH": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -500,
-      "maxDrawdown": 500
-    },
-    "BNB": {
-      "trades": 1,
-      "wins": 1,
-      "losses": 0,
-      "winRate": 1,
-      "profitFactor": null,
-      "expectancy": 1188.0323,
-      "avgWin": 1188.0323,
-      "avgLoss": 0,
-      "totalPnl": 1188.0323,
-      "maxDrawdown": 0
     }
   }
 }
