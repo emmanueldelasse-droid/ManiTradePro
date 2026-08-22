@@ -2,39 +2,39 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 16,
-  "wins": 3,
-  "losses": 13,
-  "winRate": 0.1875,
-  "expectancy": -35.9111,
-  "totalPnl": -574.5769,
-  "avgWin": 1975.1411,
+  "tradeCount": 18,
+  "wins": 4,
+  "losses": 14,
+  "winRate": 0.2222,
+  "expectancy": 15.0412,
+  "totalPnl": 270.7412,
+  "avgWin": 1817.6853,
   "avgLoss": 500,
-  "profitFactor": 0.9116,
+  "profitFactor": 1.0387,
   "maxDrawdown": 3500,
   "bySetup": {
     "mean_reversion": {
-      "trades": 5,
+      "trades": 6,
       "wins": 0,
-      "losses": 5,
+      "losses": 6,
       "winRate": 0,
       "profitFactor": 0,
       "expectancy": -500,
       "avgWin": 0,
       "avgLoss": 500,
-      "totalPnl": -2500.0001,
-      "maxDrawdown": 2500.0001
+      "totalPnl": -3000.0001,
+      "maxDrawdown": 3000.0001
     },
     "breakout": {
-      "trades": 1,
-      "wins": 1,
+      "trades": 2,
+      "wins": 2,
       "losses": 0,
       "winRate": 1,
       "profitFactor": null,
-      "expectancy": 1891.7164,
-      "avgWin": 1891.7164,
+      "expectancy": 1618.5172,
+      "avgWin": 1618.5172,
       "avgLoss": 0,
-      "totalPnl": 1891.7164,
+      "totalPnl": 3237.0345,
       "maxDrawdown": 0
     },
     "pullback": {
@@ -51,6 +51,30 @@
     }
   },
   "byAsset": {
+    "XRP": {
+      "trades": 2,
+      "wins": 0,
+      "losses": 2,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -1000,
+      "maxDrawdown": 1000
+    },
+    "AVAX": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 1345.3181,
+      "avgWin": 1345.3181,
+      "avgLoss": 0,
+      "totalPnl": 1345.3181,
+      "maxDrawdown": 0
+    },
     "SOL": {
       "trades": 1,
       "wins": 0,
@@ -86,18 +110,6 @@
       "avgLoss": 0,
       "totalPnl": 3079.7487,
       "maxDrawdown": 0
-    },
-    "XRP": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -500,
-      "maxDrawdown": 500
     },
     "IWM": {
       "trades": 1,

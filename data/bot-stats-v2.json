@@ -1,40 +1,40 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 145,
-    "wins": 49,
-    "losses": 96,
-    "winRate": 0.3379,
-    "profitFactor": 1.1149,
-    "expectancy": 36.285,
-    "avgWin": 1041.9898,
-    "avgLoss": 477.0434,
-    "totalPnl": 5261.3319,
+    "trades": 147,
+    "wins": 50,
+    "losses": 97,
+    "winRate": 0.3401,
+    "profitFactor": 1.1319,
+    "expectancy": 41.5418,
+    "avgWin": 1048.0563,
+    "avgLoss": 477.2801,
+    "totalPnl": 6106.65,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
     "mean_reversion": {
-      "trades": 40,
+      "trades": 41,
       "wins": 18,
-      "losses": 22,
-      "winRate": 0.45,
-      "profitFactor": 1.0806,
-      "expectancy": 18.7189,
+      "losses": 23,
+      "winRate": 0.439,
+      "profitFactor": 1.0254,
+      "expectancy": 6.0672,
       "avgWin": 557.4111,
-      "avgLoss": 422.0293,
-      "totalPnl": 748.7558,
-      "maxDrawdown": 2500.0001
+      "avgLoss": 425.4193,
+      "totalPnl": 248.7558,
+      "maxDrawdown": 2864.6087
     },
     "breakout": {
-      "trades": 29,
-      "wins": 8,
+      "trades": 30,
+      "wins": 9,
       "losses": 21,
-      "winRate": 0.2759,
-      "profitFactor": 0.9386,
-      "expectancy": -21.2137,
-      "avgWin": 1174.5408,
+      "winRate": 0.3,
+      "profitFactor": 1.0729,
+      "expectancy": 24.3374,
+      "avgWin": 1193.5161,
       "avgLoss": 476.7392,
-      "totalPnl": -615.1974,
+      "totalPnl": 730.1207,
       "maxDrawdown": 4410.3446
     },
     "pullback": {
@@ -63,6 +63,30 @@
     }
   },
   "byAsset": {
+    "XRP": {
+      "trades": 2,
+      "wins": 0,
+      "losses": 2,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -1000,
+      "maxDrawdown": 1000
+    },
+    "AVAX": {
+      "trades": 3,
+      "wins": 2,
+      "losses": 1,
+      "winRate": 0.6667,
+      "profitFactor": 4.0201,
+      "expectancy": 503.3573,
+      "avgWin": 1005.036,
+      "avgLoss": 500,
+      "totalPnl": 1510.072,
+      "maxDrawdown": 500
+    },
     "CRWD": {
       "trades": 5,
       "wins": 2,
@@ -110,18 +134,6 @@
       "avgLoss": 500,
       "totalPnl": 1579.7487,
       "maxDrawdown": 1500
-    },
-    "XRP": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -500,
-      "maxDrawdown": 500
     },
     "IWM": {
       "trades": 3,
@@ -519,18 +531,6 @@
       "totalPnl": -500,
       "maxDrawdown": 500
     },
-    "AVAX": {
-      "trades": 2,
-      "wins": 1,
-      "losses": 1,
-      "winRate": 0.5,
-      "profitFactor": 1.3295,
-      "expectancy": 82.377,
-      "avgWin": 664.7539,
-      "avgLoss": 500,
-      "totalPnl": 164.7539,
-      "maxDrawdown": 500
-    },
     "UNG": {
       "trades": 4,
       "wins": 1,
@@ -580,5 +580,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 145
+  "tradeCount": 147
 }
