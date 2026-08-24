@@ -1,28 +1,40 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 148,
+    "trades": 150,
     "wins": 51,
-    "losses": 97,
-    "winRate": 0.3446,
-    "profitFactor": 1.1674,
-    "expectancy": 52.3578,
+    "losses": 99,
+    "winRate": 0.34,
+    "profitFactor": 1.1427,
+    "expectancy": 44.9931,
     "avgWin": 1059.7083,
-    "avgLoss": 477.2801,
-    "totalPnl": 7748.9576,
+    "avgLoss": 477.7391,
+    "totalPnl": 6748.9576,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "pullback": {
+      "trades": 76,
+      "wins": 22,
+      "losses": 54,
+      "winRate": 0.2895,
+      "profitFactor": 1.1414,
+      "expectancy": 50.2419,
+      "avgWin": 1400.8357,
+      "avgLoss": 500,
+      "totalPnl": 3818.3864,
+      "maxDrawdown": 9165.2351
+    },
     "breakout": {
-      "trades": 31,
+      "trades": 32,
       "wins": 10,
-      "losses": 21,
-      "winRate": 0.3226,
-      "profitFactor": 1.237,
-      "expectancy": 76.5299,
+      "losses": 22,
+      "winRate": 0.3125,
+      "profitFactor": 1.1781,
+      "expectancy": 58.5134,
       "avgWin": 1238.3952,
-      "avgLoss": 476.7392,
-      "totalPnl": 2372.4283,
+      "avgLoss": 477.7965,
+      "totalPnl": 1872.4283,
       "maxDrawdown": 4410.3446
     },
     "mean_reversion": {
@@ -36,18 +48,6 @@
       "avgLoss": 425.4193,
       "totalPnl": 248.7558,
       "maxDrawdown": 2864.6087
-    },
-    "pullback": {
-      "trades": 75,
-      "wins": 22,
-      "losses": 53,
-      "winRate": 0.2933,
-      "profitFactor": 1.163,
-      "expectancy": 57.5785,
-      "avgWin": 1400.8357,
-      "avgLoss": 500,
-      "totalPnl": 4318.3864,
-      "maxDrawdown": 9165.2351
     },
     "gld_breakout": {
       "trades": 1,
@@ -63,6 +63,30 @@
     }
   },
   "byAsset": {
+    "XLK": {
+      "trades": 6,
+      "wins": 0,
+      "losses": 6,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -3000,
+      "maxDrawdown": 3000
+    },
+    "NVDA": {
+      "trades": 2,
+      "wins": 0,
+      "losses": 2,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -1000,
+      "maxDrawdown": 1000
+    },
     "BTC": {
       "trades": 3,
       "wins": 2,
@@ -194,18 +218,6 @@
       "avgLoss": 500,
       "totalPnl": 2060.6882,
       "maxDrawdown": 500
-    },
-    "XLK": {
-      "trades": 5,
-      "wins": 0,
-      "losses": 5,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -2500,
-      "maxDrawdown": 2500
     },
     "QQQ": {
       "trades": 1,
@@ -566,19 +578,7 @@
       "avgLoss": 500,
       "totalPnl": -1000,
       "maxDrawdown": 1000
-    },
-    "NVDA": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -500,
-      "maxDrawdown": 500
     }
   },
-  "tradeCount": 148
+  "tradeCount": 150
 }

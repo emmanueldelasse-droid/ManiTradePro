@@ -2,17 +2,29 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 19,
+  "tradeCount": 20,
   "wins": 5,
-  "losses": 14,
-  "winRate": 0.2632,
-  "expectancy": 100.6868,
-  "totalPnl": 1913.0488,
+  "losses": 15,
+  "winRate": 0.25,
+  "expectancy": 70.6524,
+  "totalPnl": 1413.0488,
   "avgWin": 1782.6098,
   "avgLoss": 500,
-  "profitFactor": 1.2733,
+  "profitFactor": 1.1884,
   "maxDrawdown": 3500,
   "bySetup": {
+    "pullback": {
+      "trades": 11,
+      "wins": 2,
+      "losses": 9,
+      "winRate": 0.1818,
+      "profitFactor": 0.8964,
+      "expectancy": -42.3903,
+      "avgWin": 2016.8534,
+      "avgLoss": 500,
+      "totalPnl": -466.2932,
+      "maxDrawdown": 3500
+    },
     "breakout": {
       "trades": 3,
       "wins": 3,
@@ -36,21 +48,21 @@
       "avgLoss": 500,
       "totalPnl": -3000.0001,
       "maxDrawdown": 3000.0001
-    },
-    "pullback": {
-      "trades": 10,
-      "wins": 2,
-      "losses": 8,
-      "winRate": 0.2,
-      "profitFactor": 1.0084,
-      "expectancy": 3.3707,
-      "avgWin": 2016.8534,
-      "avgLoss": 500,
-      "totalPnl": 33.7068,
-      "maxDrawdown": 3000
     }
   },
   "byAsset": {
+    "XLK": {
+      "trades": 3,
+      "wins": 0,
+      "losses": 3,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -1500,
+      "maxDrawdown": 1500
+    },
     "BTC": {
       "trades": 2,
       "wins": 1,
@@ -170,18 +182,6 @@
       "avgLoss": 500,
       "totalPnl": -500,
       "maxDrawdown": 500
-    },
-    "XLK": {
-      "trades": 2,
-      "wins": 0,
-      "losses": 2,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -1000,
-      "maxDrawdown": 1000
     },
     "QQQ": {
       "trades": 1,
