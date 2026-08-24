@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 147,
-    "wins": 50,
+    "trades": 148,
+    "wins": 51,
     "losses": 97,
-    "winRate": 0.3401,
-    "profitFactor": 1.1319,
-    "expectancy": 41.5418,
-    "avgWin": 1048.0563,
+    "winRate": 0.3446,
+    "profitFactor": 1.1674,
+    "expectancy": 52.3578,
+    "avgWin": 1059.7083,
     "avgLoss": 477.2801,
-    "totalPnl": 6106.65,
+    "totalPnl": 7748.9576,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "breakout": {
+      "trades": 31,
+      "wins": 10,
+      "losses": 21,
+      "winRate": 0.3226,
+      "profitFactor": 1.237,
+      "expectancy": 76.5299,
+      "avgWin": 1238.3952,
+      "avgLoss": 476.7392,
+      "totalPnl": 2372.4283,
+      "maxDrawdown": 4410.3446
+    },
     "mean_reversion": {
       "trades": 41,
       "wins": 18,
@@ -24,18 +36,6 @@
       "avgLoss": 425.4193,
       "totalPnl": 248.7558,
       "maxDrawdown": 2864.6087
-    },
-    "breakout": {
-      "trades": 30,
-      "wins": 9,
-      "losses": 21,
-      "winRate": 0.3,
-      "profitFactor": 1.0729,
-      "expectancy": 24.3374,
-      "avgWin": 1193.5161,
-      "avgLoss": 476.7392,
-      "totalPnl": 730.1207,
-      "maxDrawdown": 4410.3446
     },
     "pullback": {
       "trades": 75,
@@ -63,6 +63,18 @@
     }
   },
   "byAsset": {
+    "BTC": {
+      "trades": 3,
+      "wins": 2,
+      "losses": 1,
+      "winRate": 0.6667,
+      "profitFactor": 3.57,
+      "expectancy": 428.333,
+      "avgWin": 892.4996,
+      "avgLoss": 500.0001,
+      "totalPnl": 1284.9991,
+      "maxDrawdown": 500.0001
+    },
     "XRP": {
       "trades": 2,
       "wins": 0,
@@ -230,18 +242,6 @@
       "avgLoss": 500,
       "totalPnl": -1104.4852,
       "maxDrawdown": 1500
-    },
-    "BTC": {
-      "trades": 2,
-      "wins": 1,
-      "losses": 1,
-      "winRate": 0.5,
-      "profitFactor": 0.2854,
-      "expectancy": -178.6542,
-      "avgWin": 142.6916,
-      "avgLoss": 500.0001,
-      "totalPnl": -357.3085,
-      "maxDrawdown": 500.0001
     },
     "GLD": {
       "trades": 2,
@@ -580,5 +580,5 @@
       "maxDrawdown": 500
     }
   },
-  "tradeCount": 147
+  "tradeCount": 148
 }

@@ -2,17 +2,29 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 18,
-  "wins": 4,
+  "tradeCount": 19,
+  "wins": 5,
   "losses": 14,
-  "winRate": 0.2222,
-  "expectancy": 15.0412,
-  "totalPnl": 270.7412,
-  "avgWin": 1817.6853,
+  "winRate": 0.2632,
+  "expectancy": 100.6868,
+  "totalPnl": 1913.0488,
+  "avgWin": 1782.6098,
   "avgLoss": 500,
-  "profitFactor": 1.0387,
+  "profitFactor": 1.2733,
   "maxDrawdown": 3500,
   "bySetup": {
+    "breakout": {
+      "trades": 3,
+      "wins": 3,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 1626.4474,
+      "avgWin": 1626.4474,
+      "avgLoss": 0,
+      "totalPnl": 4879.3421,
+      "maxDrawdown": 0
+    },
     "mean_reversion": {
       "trades": 6,
       "wins": 0,
@@ -24,18 +36,6 @@
       "avgLoss": 500,
       "totalPnl": -3000.0001,
       "maxDrawdown": 3000.0001
-    },
-    "breakout": {
-      "trades": 2,
-      "wins": 2,
-      "losses": 0,
-      "winRate": 1,
-      "profitFactor": null,
-      "expectancy": 1618.5172,
-      "avgWin": 1618.5172,
-      "avgLoss": 0,
-      "totalPnl": 3237.0345,
-      "maxDrawdown": 0
     },
     "pullback": {
       "trades": 10,
@@ -51,6 +51,18 @@
     }
   },
   "byAsset": {
+    "BTC": {
+      "trades": 2,
+      "wins": 1,
+      "losses": 1,
+      "winRate": 0.5,
+      "profitFactor": 3.2846,
+      "expectancy": 571.1538,
+      "avgWin": 1642.3076,
+      "avgLoss": 500.0001,
+      "totalPnl": 1142.3075,
+      "maxDrawdown": 500.0001
+    },
     "XRP": {
       "trades": 2,
       "wins": 0,
@@ -194,18 +206,6 @@
       "avgLoss": 0,
       "totalPnl": 2845.6745,
       "maxDrawdown": 0
-    },
-    "BTC": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500.0001,
-      "avgWin": 0,
-      "avgLoss": 500.0001,
-      "totalPnl": -500.0001,
-      "maxDrawdown": 500.0001
     }
   }
 }
