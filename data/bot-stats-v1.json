@@ -122,61 +122,19 @@
     ]
   },
   "stats7d": {
-    "totalCount": 3,
-    "winCount": 3,
+    "totalCount": 0,
+    "winCount": 0,
     "lossCount": 0,
-    "winRate": 1,
-    "totalPnl": 13.195034813724025,
-    "avgWin": 4.398344937908008,
+    "winRate": null,
+    "totalPnl": 0,
+    "avgWin": 0,
     "avgLoss": 0,
     "expectancy": null,
     "rrActual": null,
     "openCount": 0,
-    "bySetup": [
-      {
-        "setup": "continuation",
-        "count": 3,
-        "wins": 3,
-        "pnl": 13.195034813724025,
-        "winRate": 1
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 2,
-        "wins": 2,
-        "pnl": 10.864720830467938,
-        "winRate": 1
-      },
-      {
-        "class": "etf",
-        "count": 1,
-        "wins": 1,
-        "pnl": 2.330313983256087,
-        "winRate": 1
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": 5.977146205684145,
-        "wins": 1
-      },
-      {
-        "symbol": "JPM",
-        "count": 1,
-        "pnl": 4.887574624783793,
-        "wins": 1
-      },
-      {
-        "symbol": "QQQ",
-        "count": 1,
-        "pnl": 2.330313983256087,
-        "wins": 1
-      }
-    ],
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
     "bottomSymbols": []
   },
   "stats30d": {
