@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 150,
-    "wins": 51,
-    "losses": 99,
-    "winRate": 0.34,
-    "profitFactor": 1.1427,
-    "expectancy": 44.9931,
-    "avgWin": 1059.7083,
-    "avgLoss": 477.7391,
-    "totalPnl": 6748.9576,
+    "trades": 152,
+    "wins": 52,
+    "losses": 100,
+    "winRate": 0.3421,
+    "profitFactor": 1.1611,
+    "expectancy": 50.483,
+    "avgWin": 1063.2927,
+    "avgLoss": 476.1781,
+    "totalPnl": 7673.4099,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "breakout": {
+      "trades": 34,
+      "wins": 11,
+      "losses": 23,
+      "winRate": 0.3235,
+      "profitFactor": 1.2582,
+      "expectancy": 82.2612,
+      "avgWin": 1239.0954,
+      "avgLoss": 471.0073,
+      "totalPnl": 2796.8806,
+      "maxDrawdown": 4410.3446
+    },
     "pullback": {
       "trades": 76,
       "wins": 22,
@@ -24,18 +36,6 @@
       "avgLoss": 500,
       "totalPnl": 3818.3864,
       "maxDrawdown": 9165.2351
-    },
-    "breakout": {
-      "trades": 32,
-      "wins": 10,
-      "losses": 22,
-      "winRate": 0.3125,
-      "profitFactor": 1.1781,
-      "expectancy": 58.5134,
-      "avgWin": 1238.3952,
-      "avgLoss": 477.7965,
-      "totalPnl": 1872.4283,
-      "maxDrawdown": 4410.3446
     },
     "mean_reversion": {
       "trades": 41,
@@ -63,6 +63,30 @@
     }
   },
   "byAsset": {
+    "AMZN": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -321.6452,
+      "avgWin": 0,
+      "avgLoss": 321.6452,
+      "totalPnl": -321.6452,
+      "maxDrawdown": 321.6452
+    },
+    "MSFT": {
+      "trades": 1,
+      "wins": 1,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 1246.0975,
+      "avgWin": 1246.0975,
+      "avgLoss": 0,
+      "totalPnl": 1246.0975,
+      "maxDrawdown": 0
+    },
     "XLK": {
       "trades": 6,
       "wins": 0,
@@ -580,5 +604,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 150
+  "tradeCount": 152
 }
