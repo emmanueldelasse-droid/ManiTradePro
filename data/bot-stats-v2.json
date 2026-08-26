@@ -1,28 +1,28 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 152,
+    "trades": 154,
     "wins": 52,
-    "losses": 100,
-    "winRate": 0.3421,
-    "profitFactor": 1.1611,
-    "expectancy": 50.483,
+    "losses": 102,
+    "winRate": 0.3377,
+    "profitFactor": 1.1373,
+    "expectancy": 43.3338,
     "avgWin": 1063.2927,
-    "avgLoss": 476.1781,
-    "totalPnl": 7673.4099,
+    "avgLoss": 476.6452,
+    "totalPnl": 6673.4099,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
     "breakout": {
-      "trades": 34,
+      "trades": 36,
       "wins": 11,
-      "losses": 23,
-      "winRate": 0.3235,
-      "profitFactor": 1.2582,
-      "expectancy": 82.2612,
+      "losses": 25,
+      "winRate": 0.3056,
+      "profitFactor": 1.1519,
+      "expectancy": 49.9134,
       "avgWin": 1239.0954,
-      "avgLoss": 471.0073,
-      "totalPnl": 2796.8806,
+      "avgLoss": 473.3268,
+      "totalPnl": 1796.8806,
       "maxDrawdown": 4410.3446
     },
     "pullback": {
@@ -63,6 +63,30 @@
     }
   },
   "byAsset": {
+    "LLY": {
+      "trades": 6,
+      "wins": 1,
+      "losses": 5,
+      "winRate": 0.1667,
+      "profitFactor": 0.4431,
+      "expectancy": -232.049,
+      "avgWin": 1107.7058,
+      "avgLoss": 500,
+      "totalPnl": -1392.2942,
+      "maxDrawdown": 2000
+    },
+    "CRM": {
+      "trades": 2,
+      "wins": 1,
+      "losses": 1,
+      "winRate": 0.5,
+      "profitFactor": 3.2779,
+      "expectancy": 569.4656,
+      "avgWin": 1638.9311,
+      "avgLoss": 500,
+      "totalPnl": 1138.9311,
+      "maxDrawdown": 500
+    },
     "AMZN": {
       "trades": 1,
       "wins": 0,
@@ -291,18 +315,6 @@
       "totalPnl": 949.1533,
       "maxDrawdown": 0
     },
-    "LLY": {
-      "trades": 5,
-      "wins": 1,
-      "losses": 4,
-      "winRate": 0.2,
-      "profitFactor": 0.5539,
-      "expectancy": -178.4588,
-      "avgWin": 1107.7058,
-      "avgLoss": 500,
-      "totalPnl": -892.2942,
-      "maxDrawdown": 2000
-    },
     "PANW": {
       "trades": 7,
       "wins": 4,
@@ -362,18 +374,6 @@
       "avgLoss": 500,
       "totalPnl": 764.4997,
       "maxDrawdown": 500
-    },
-    "CRM": {
-      "trades": 1,
-      "wins": 1,
-      "losses": 0,
-      "winRate": 1,
-      "profitFactor": null,
-      "expectancy": 1638.9311,
-      "avgWin": 1638.9311,
-      "avgLoss": 0,
-      "totalPnl": 1638.9311,
-      "maxDrawdown": 0
     },
     "XLV": {
       "trades": 8,
@@ -604,5 +604,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 152
+  "tradeCount": 154
 }
