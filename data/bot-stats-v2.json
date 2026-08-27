@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 154,
+    "trades": 155,
     "wins": 52,
-    "losses": 102,
-    "winRate": 0.3377,
-    "profitFactor": 1.1373,
-    "expectancy": 43.3338,
+    "losses": 103,
+    "winRate": 0.3355,
+    "profitFactor": 1.1257,
+    "expectancy": 39.8285,
     "avgWin": 1063.2927,
-    "avgLoss": 476.6452,
-    "totalPnl": 6673.4099,
+    "avgLoss": 476.872,
+    "totalPnl": 6173.4099,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "pullback": {
+      "trades": 77,
+      "wins": 22,
+      "losses": 55,
+      "winRate": 0.2857,
+      "profitFactor": 1.1207,
+      "expectancy": 43.0959,
+      "avgWin": 1400.8357,
+      "avgLoss": 500,
+      "totalPnl": 3318.3864,
+      "maxDrawdown": 9165.2351
+    },
     "breakout": {
       "trades": 36,
       "wins": 11,
@@ -24,18 +36,6 @@
       "avgLoss": 473.3268,
       "totalPnl": 1796.8806,
       "maxDrawdown": 4410.3446
-    },
-    "pullback": {
-      "trades": 76,
-      "wins": 22,
-      "losses": 54,
-      "winRate": 0.2895,
-      "profitFactor": 1.1414,
-      "expectancy": 50.2419,
-      "avgWin": 1400.8357,
-      "avgLoss": 500,
-      "totalPnl": 3818.3864,
-      "maxDrawdown": 9165.2351
     },
     "mean_reversion": {
       "trades": 41,
@@ -63,6 +63,18 @@
     }
   },
   "byAsset": {
+    "AMZN": {
+      "trades": 2,
+      "wins": 0,
+      "losses": 2,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -410.8226,
+      "avgWin": 0,
+      "avgLoss": 410.8226,
+      "totalPnl": -821.6452,
+      "maxDrawdown": 821.6452
+    },
     "LLY": {
       "trades": 6,
       "wins": 1,
@@ -86,18 +98,6 @@
       "avgLoss": 500,
       "totalPnl": 1138.9311,
       "maxDrawdown": 500
-    },
-    "AMZN": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -321.6452,
-      "avgWin": 0,
-      "avgLoss": 321.6452,
-      "totalPnl": -321.6452,
-      "maxDrawdown": 321.6452
     },
     "MSFT": {
       "trades": 1,
@@ -604,5 +604,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 154
+  "tradeCount": 155
 }

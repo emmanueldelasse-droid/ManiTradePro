@@ -2,17 +2,29 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 22,
+  "tradeCount": 23,
   "wins": 5,
-  "losses": 17,
-  "winRate": 0.2273,
-  "expectancy": 18.7749,
-  "totalPnl": 413.0488,
+  "losses": 18,
+  "winRate": 0.2174,
+  "expectancy": -3.7805,
+  "totalPnl": -86.9512,
   "avgWin": 1782.6098,
   "avgLoss": 500,
-  "profitFactor": 1.0486,
+  "profitFactor": 0.9903,
   "maxDrawdown": 3500,
   "bySetup": {
+    "pullback": {
+      "trades": 12,
+      "wins": 2,
+      "losses": 10,
+      "winRate": 0.1667,
+      "profitFactor": 0.8067,
+      "expectancy": -80.5244,
+      "avgWin": 2016.8534,
+      "avgLoss": 500,
+      "totalPnl": -966.2932,
+      "maxDrawdown": 4000
+    },
     "breakout": {
       "trades": 5,
       "wins": 3,
@@ -24,18 +36,6 @@
       "avgLoss": 500,
       "totalPnl": 3879.3421,
       "maxDrawdown": 1000
-    },
-    "pullback": {
-      "trades": 11,
-      "wins": 2,
-      "losses": 9,
-      "winRate": 0.1818,
-      "profitFactor": 0.8964,
-      "expectancy": -42.3903,
-      "avgWin": 2016.8534,
-      "avgLoss": 500,
-      "totalPnl": -466.2932,
-      "maxDrawdown": 3500
     },
     "mean_reversion": {
       "trades": 6,
@@ -51,6 +51,18 @@
     }
   },
   "byAsset": {
+    "AMZN": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -500,
+      "maxDrawdown": 500
+    },
     "LLY": {
       "trades": 1,
       "wins": 0,
