@@ -138,23 +138,23 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 13,
-    "winCount": 10,
+    "totalCount": 12,
+    "winCount": 9,
     "lossCount": 3,
-    "winRate": 0.7692307692307693,
-    "totalPnl": 40.058180442576266,
-    "avgWin": 4.748345750518213,
+    "winRate": 0.75,
+    "totalPnl": 30.566986704807196,
+    "avgWin": 4.221362640823674,
     "avgLoss": 2.4750923542019563,
-    "expectancy": 3.08139849558279,
-    "rrActual": 1.9184519488563576,
+    "expectancy": 2.5472488920672665,
+    "rrActual": 1.7055374251619664,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 12,
-        "wins": 9,
-        "pnl": 39.02330917555443,
-        "winRate": 0.75
+        "count": 11,
+        "wins": 8,
+        "pnl": 29.53211543778536,
+        "winRate": 0.7272727272727273
       },
       {
         "setup": "pullback_short",
@@ -167,10 +167,10 @@
     "byClass": [
       {
         "class": "stock",
-        "count": 10,
-        "wins": 7,
-        "pnl": 34.97216878033819,
-        "winRate": 0.7
+        "count": 9,
+        "wins": 6,
+        "pnl": 25.480975042569117,
+        "winRate": 0.6666666666666666
       },
       {
         "class": "etf",
@@ -212,7 +212,14 @@
         "wins": 2
       }
     ],
-    "bottomSymbols": []
+    "bottomSymbols": [
+      {
+        "symbol": "AIR",
+        "count": 2,
+        "pnl": -6.856984447624063,
+        "wins": 0
+      }
+    ]
   },
   "lastClosedAt": "2026-08-17T03:01:12.044Z"
 }
