@@ -2,17 +2,29 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 23,
-  "wins": 5,
+  "tradeCount": 24,
+  "wins": 6,
   "losses": 18,
-  "winRate": 0.2174,
-  "expectancy": -3.7805,
-  "totalPnl": -86.9512,
-  "avgWin": 1782.6098,
+  "winRate": 0.25,
+  "expectancy": 76.1591,
+  "totalPnl": 1827.8194,
+  "avgWin": 1804.6366,
   "avgLoss": 500,
-  "profitFactor": 0.9903,
+  "profitFactor": 1.2031,
   "maxDrawdown": 3500,
   "bySetup": {
+    "breakout": {
+      "trades": 6,
+      "wins": 4,
+      "losses": 2,
+      "winRate": 0.6667,
+      "profitFactor": 6.7941,
+      "expectancy": 965.6855,
+      "avgWin": 1698.5282,
+      "avgLoss": 500,
+      "totalPnl": 5794.1127,
+      "maxDrawdown": 1000
+    },
     "pullback": {
       "trades": 12,
       "wins": 2,
@@ -24,18 +36,6 @@
       "avgLoss": 500,
       "totalPnl": -966.2932,
       "maxDrawdown": 4000
-    },
-    "breakout": {
-      "trades": 5,
-      "wins": 3,
-      "losses": 2,
-      "winRate": 0.6,
-      "profitFactor": 4.8793,
-      "expectancy": 775.8684,
-      "avgWin": 1626.4474,
-      "avgLoss": 500,
-      "totalPnl": 3879.3421,
-      "maxDrawdown": 1000
     },
     "mean_reversion": {
       "trades": 6,
@@ -51,6 +51,18 @@
     }
   },
   "byAsset": {
+    "SOL": {
+      "trades": 2,
+      "wins": 1,
+      "losses": 1,
+      "winRate": 0.5,
+      "profitFactor": 3.8295,
+      "expectancy": 707.3853,
+      "avgWin": 1914.7706,
+      "avgLoss": 500,
+      "totalPnl": 1414.7706,
+      "maxDrawdown": 500
+    },
     "AMZN": {
       "trades": 1,
       "wins": 0,
@@ -134,18 +146,6 @@
       "avgLoss": 0,
       "totalPnl": 1345.3181,
       "maxDrawdown": 0
-    },
-    "SOL": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -500,
-      "maxDrawdown": 500
     },
     "ETH": {
       "trades": 2,

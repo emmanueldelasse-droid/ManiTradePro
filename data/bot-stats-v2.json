@@ -1,18 +1,42 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 155,
-    "wins": 52,
+    "trades": 157,
+    "wins": 54,
     "losses": 103,
-    "winRate": 0.3355,
-    "profitFactor": 1.1257,
-    "expectancy": 39.8285,
-    "avgWin": 1063.2927,
+    "winRate": 0.3439,
+    "profitFactor": 1.1804,
+    "expectancy": 56.4432,
+    "avgWin": 1073.6924,
     "avgLoss": 476.872,
-    "totalPnl": 6173.4099,
+    "totalPnl": 8861.5746,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "mean_reversion": {
+      "trades": 42,
+      "wins": 19,
+      "losses": 23,
+      "winRate": 0.4524,
+      "profitFactor": 1.1045,
+      "expectancy": 24.3369,
+      "avgWin": 568.7786,
+      "avgLoss": 425.4193,
+      "totalPnl": 1022.1499,
+      "maxDrawdown": 2864.6087
+    },
+    "breakout": {
+      "trades": 37,
+      "wins": 12,
+      "losses": 25,
+      "winRate": 0.3243,
+      "profitFactor": 1.3137,
+      "expectancy": 100.3149,
+      "avgWin": 1295.4017,
+      "avgLoss": 473.3268,
+      "totalPnl": 3711.6512,
+      "maxDrawdown": 4410.3446
+    },
     "pullback": {
       "trades": 77,
       "wins": 22,
@@ -24,30 +48,6 @@
       "avgLoss": 500,
       "totalPnl": 3318.3864,
       "maxDrawdown": 9165.2351
-    },
-    "breakout": {
-      "trades": 36,
-      "wins": 11,
-      "losses": 25,
-      "winRate": 0.3056,
-      "profitFactor": 1.1519,
-      "expectancy": 49.9134,
-      "avgWin": 1239.0954,
-      "avgLoss": 473.3268,
-      "totalPnl": 1796.8806,
-      "maxDrawdown": 4410.3446
-    },
-    "mean_reversion": {
-      "trades": 41,
-      "wins": 18,
-      "losses": 23,
-      "winRate": 0.439,
-      "profitFactor": 1.0254,
-      "expectancy": 6.0672,
-      "avgWin": 557.4111,
-      "avgLoss": 425.4193,
-      "totalPnl": 248.7558,
-      "maxDrawdown": 2864.6087
     },
     "gld_breakout": {
       "trades": 1,
@@ -63,6 +63,30 @@
     }
   },
   "byAsset": {
+    "USDJPY": {
+      "trades": 12,
+      "wins": 4,
+      "losses": 8,
+      "winRate": 0.3333,
+      "profitFactor": 0.8621,
+      "expectancy": -45.9675,
+      "avgWin": 862.0974,
+      "avgLoss": 500,
+      "totalPnl": -551.6103,
+      "maxDrawdown": 2500
+    },
+    "SOL": {
+      "trades": 5,
+      "wins": 2,
+      "losses": 3,
+      "winRate": 0.4,
+      "profitFactor": 1.8028,
+      "expectancy": 240.8372,
+      "avgWin": 1352.093,
+      "avgLoss": 500,
+      "totalPnl": 1204.186,
+      "maxDrawdown": 1500
+    },
     "AMZN": {
       "trades": 2,
       "wins": 0,
@@ -182,18 +206,6 @@
       "avgLoss": 56.1903,
       "totalPnl": 1829.8867,
       "maxDrawdown": 168.5708
-    },
-    "SOL": {
-      "trades": 4,
-      "wins": 1,
-      "losses": 3,
-      "winRate": 0.25,
-      "profitFactor": 0.5263,
-      "expectancy": -177.6461,
-      "avgWin": 789.4154,
-      "avgLoss": 500,
-      "totalPnl": -710.5846,
-      "maxDrawdown": 1500
     },
     "ETH": {
       "trades": 8,
@@ -423,18 +435,6 @@
       "totalPnl": -189.7027,
       "maxDrawdown": 1000
     },
-    "USDJPY": {
-      "trades": 11,
-      "wins": 3,
-      "losses": 8,
-      "winRate": 0.2727,
-      "profitFactor": 0.6687,
-      "expectancy": -120.4549,
-      "avgWin": 891.6652,
-      "avgLoss": 500,
-      "totalPnl": -1325.0044,
-      "maxDrawdown": 2500
-    },
     "SPY": {
       "trades": 1,
       "wins": 0,
@@ -604,5 +604,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 155
+  "tradeCount": 157
 }
