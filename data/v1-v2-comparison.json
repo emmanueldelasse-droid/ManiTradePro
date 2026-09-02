@@ -8,24 +8,24 @@
   },
   "v1": {
     "scope": "V1 lifetime benchmark",
-    "tradeCount": 48,
-    "wins": 23,
+    "tradeCount": 49,
+    "wins": 24,
     "losses": 25,
-    "winRate": 0.4791666666666667,
-    "expectancy": 1.0505007500116657,
-    "totalPnl": 50.42403600055991,
-    "avgWin": 8.689321120564417,
+    "winRate": 0.4897959183673469,
+    "expectancy": 1.2986005541388508,
+    "totalPnl": 63.63142715280367,
+    "avgWin": 8.877574038551057,
     "avgLoss": 5.977213990896867,
-    "realizedWinLossRatio": 1.453741012752432,
-    "openCount": 2,
-    "lastClosedAt": "2026-08-17T03:01:12.044Z",
+    "realizedWinLossRatio": 1.4852361070009137,
+    "openCount": 1,
+    "lastClosedAt": "2026-09-02T03:01:13.173Z",
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 47,
-        "wins": 22,
-        "pnl": 49.38916473353808,
-        "winRate": 0.46808510638297873
+        "count": 48,
+        "wins": 23,
+        "pnl": 62.59655588578181,
+        "winRate": 0.4791666666666667
       },
       {
         "setup": "pullback_short",
