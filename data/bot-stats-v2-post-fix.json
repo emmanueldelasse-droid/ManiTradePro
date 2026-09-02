@@ -2,28 +2,28 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 36,
+  "tradeCount": 37,
   "wins": 8,
-  "losses": 28,
-  "winRate": 0.2222,
-  "expectancy": -30.4756,
-  "totalPnl": -1097.123,
+  "losses": 29,
+  "winRate": 0.2162,
+  "expectancy": -43.1655,
+  "totalPnl": -1597.123,
   "avgWin": 1612.8596,
   "avgLoss": 500,
-  "profitFactor": 0.9216,
-  "maxDrawdown": 3500,
+  "profitFactor": 0.8899,
+  "maxDrawdown": 3630.8297,
   "bySetup": {
     "pullback": {
-      "trades": 19,
+      "trades": 20,
       "wins": 4,
-      "losses": 15,
-      "winRate": 0.2105,
-      "profitFactor": 0.8145,
-      "expectancy": -73.2229,
+      "losses": 16,
+      "winRate": 0.2,
+      "profitFactor": 0.7636,
+      "expectancy": -94.5618,
       "avgWin": 1527.1911,
       "avgLoss": 500,
-      "totalPnl": -1391.2356,
-      "maxDrawdown": 4726.0494
+      "totalPnl": -1891.2356,
+      "maxDrawdown": 4924.9424
     },
     "breakout": {
       "trades": 9,
@@ -63,6 +63,18 @@
     }
   },
   "byAsset": {
+    "GBPUSD": {
+      "trades": 2,
+      "wins": 0,
+      "losses": 2,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -1000,
+      "maxDrawdown": 1000
+    },
     "GLD": {
       "trades": 3,
       "wins": 0,
@@ -74,18 +86,6 @@
       "avgLoss": 500,
       "totalPnl": -1500,
       "maxDrawdown": 1500
-    },
-    "GBPUSD": {
-      "trades": 1,
-      "wins": 0,
-      "losses": 1,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -500,
-      "maxDrawdown": 500
     },
     "USO": {
       "trades": 1,

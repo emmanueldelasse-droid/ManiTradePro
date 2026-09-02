@@ -1,28 +1,28 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 169,
+    "trades": 170,
     "wins": 56,
-    "losses": 113,
-    "winRate": 0.3314,
-    "profitFactor": 1.1097,
-    "expectancy": 35.128,
+    "losses": 114,
+    "winRate": 0.3294,
+    "profitFactor": 1.0995,
+    "expectancy": 31.9802,
     "avgWin": 1072.4008,
-    "avgLoss": 478.9187,
-    "totalPnl": 5936.6322,
+    "avgLoss": 479.1036,
+    "totalPnl": 5436.6322,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
     "pullback": {
-      "trades": 84,
+      "trades": 85,
       "wins": 24,
-      "losses": 60,
-      "winRate": 0.2857,
-      "profitFactor": 1.0964,
-      "expectancy": 34.4458,
+      "losses": 61,
+      "winRate": 0.2824,
+      "profitFactor": 1.0785,
+      "expectancy": 28.1582,
       "avgWin": 1370.5602,
       "avgLoss": 500,
-      "totalPnl": 2893.444,
+      "totalPnl": 2393.444,
       "maxDrawdown": 9165.2351
     },
     "breakout": {
@@ -63,6 +63,18 @@
     }
   },
   "byAsset": {
+    "GBPUSD": {
+      "trades": 4,
+      "wins": 0,
+      "losses": 4,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -2000,
+      "maxDrawdown": 2000
+    },
     "GLD": {
       "trades": 5,
       "wins": 2,
@@ -73,18 +85,6 @@
       "avgWin": 474.5767,
       "avgLoss": 500,
       "totalPnl": -550.8467,
-      "maxDrawdown": 1500
-    },
-    "GBPUSD": {
-      "trades": 3,
-      "wins": 0,
-      "losses": 3,
-      "winRate": 0,
-      "profitFactor": 0,
-      "expectancy": -500,
-      "avgWin": 0,
-      "avgLoss": 500,
-      "totalPnl": -1500,
       "maxDrawdown": 1500
     },
     "USO": {
@@ -604,5 +604,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 169
+  "tradeCount": 170
 }

@@ -40,28 +40,28 @@
     "scope": "V2_POST_ANTI_DUP_FIX",
     "cohortStart": "2026-08-16T21:04:47Z",
     "cohortRule": "trade.openedAt >= cohortStart",
-    "tradeCount": 36,
+    "tradeCount": 37,
     "wins": 8,
-    "losses": 28,
-    "winRate": 0.2222,
-    "expectancy": -30.4756,
-    "totalPnl": -1097.123,
+    "losses": 29,
+    "winRate": 0.2162,
+    "expectancy": -43.1655,
+    "totalPnl": -1597.123,
     "avgWin": 1612.8596,
     "avgLoss": 500,
-    "profitFactor": 0.9216,
-    "maxDrawdown": 3500,
+    "profitFactor": 0.8899,
+    "maxDrawdown": 3630.8297,
     "bySetup": {
       "pullback": {
-        "trades": 19,
+        "trades": 20,
         "wins": 4,
-        "losses": 15,
-        "winRate": 0.2105,
-        "profitFactor": 0.8145,
-        "expectancy": -73.2229,
+        "losses": 16,
+        "winRate": 0.2,
+        "profitFactor": 0.7636,
+        "expectancy": -94.5618,
         "avgWin": 1527.1911,
         "avgLoss": 500,
-        "totalPnl": -1391.2356,
-        "maxDrawdown": 4726.0494
+        "totalPnl": -1891.2356,
+        "maxDrawdown": 4924.9424
       },
       "breakout": {
         "trades": 9,
@@ -101,6 +101,18 @@
       }
     },
     "byAsset": {
+      "GBPUSD": {
+        "trades": 2,
+        "wins": 0,
+        "losses": 2,
+        "winRate": 0,
+        "profitFactor": 0,
+        "expectancy": -500,
+        "avgWin": 0,
+        "avgLoss": 500,
+        "totalPnl": -1000,
+        "maxDrawdown": 1000
+      },
       "GLD": {
         "trades": 3,
         "wins": 0,
@@ -112,18 +124,6 @@
         "avgLoss": 500,
         "totalPnl": -1500,
         "maxDrawdown": 1500
-      },
-      "GBPUSD": {
-        "trades": 1,
-        "wins": 0,
-        "losses": 1,
-        "winRate": 0,
-        "profitFactor": 0,
-        "expectancy": -500,
-        "avgWin": 0,
-        "avgLoss": 500,
-        "totalPnl": -500,
-        "maxDrawdown": 500
       },
       "USO": {
         "trades": 1,
@@ -393,30 +393,30 @@
   },
   "v2HistoricalReference": {
     "scope": "V2 lifetime incluant V2_PRE_ANTI_DUP_FIX — référence seulement",
-    "tradeCount": 169,
+    "tradeCount": 170,
     "overall": {
-      "trades": 169,
+      "trades": 170,
       "wins": 56,
-      "losses": 113,
-      "winRate": 0.3314,
-      "profitFactor": 1.1097,
-      "expectancy": 35.128,
+      "losses": 114,
+      "winRate": 0.3294,
+      "profitFactor": 1.0995,
+      "expectancy": 31.9802,
       "avgWin": 1072.4008,
-      "avgLoss": 478.9187,
-      "totalPnl": 5936.6322,
+      "avgLoss": 479.1036,
+      "totalPnl": 5436.6322,
       "maxDrawdown": 11276.3966
     },
     "bySetup": {
       "pullback": {
-        "trades": 84,
+        "trades": 85,
         "wins": 24,
-        "losses": 60,
-        "winRate": 0.2857,
-        "profitFactor": 1.0964,
-        "expectancy": 34.4458,
+        "losses": 61,
+        "winRate": 0.2824,
+        "profitFactor": 1.0785,
+        "expectancy": 28.1582,
         "avgWin": 1370.5602,
         "avgLoss": 500,
-        "totalPnl": 2893.444,
+        "totalPnl": 2393.444,
         "maxDrawdown": 9165.2351
       },
       "breakout": {
