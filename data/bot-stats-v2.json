@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 172,
-    "wins": 56,
-    "losses": 116,
-    "winRate": 0.3256,
-    "profitFactor": 1.0798,
-    "expectancy": 25.7944,
-    "avgWin": 1072.4008,
-    "avgLoss": 479.4639,
-    "totalPnl": 4436.6322,
+    "trades": 175,
+    "wins": 58,
+    "losses": 117,
+    "winRate": 0.3314,
+    "profitFactor": 1.0984,
+    "expectancy": 31.5416,
+    "avgWin": 1062.7172,
+    "avgLoss": 479.6394,
+    "totalPnl": 5519.7878,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "pullback": {
+      "trades": 88,
+      "wins": 26,
+      "losses": 62,
+      "winRate": 0.2955,
+      "profitFactor": 1.1121,
+      "expectancy": 39.5068,
+      "avgWin": 1326.0231,
+      "avgLoss": 500,
+      "totalPnl": 3476.5996,
+      "maxDrawdown": 9165.2351
+    },
     "mean_reversion": {
       "trades": 44,
       "wins": 19,
@@ -37,18 +49,6 @@
       "totalPnl": 1711.6512,
       "maxDrawdown": 4410.3446
     },
-    "pullback": {
-      "trades": 85,
-      "wins": 24,
-      "losses": 61,
-      "winRate": 0.2824,
-      "profitFactor": 1.0785,
-      "expectancy": 28.1582,
-      "avgWin": 1370.5602,
-      "avgLoss": 500,
-      "totalPnl": 2393.444,
-      "maxDrawdown": 9165.2351
-    },
     "gld_breakout": {
       "trades": 2,
       "wins": 1,
@@ -64,16 +64,40 @@
   },
   "byAsset": {
     "SAP": {
-      "trades": 3,
+      "trades": 4,
       "wins": 1,
-      "losses": 2,
-      "winRate": 0.3333,
-      "profitFactor": 1.2645,
-      "expectancy": 88.1666,
+      "losses": 3,
+      "winRate": 0.25,
+      "profitFactor": 0.843,
+      "expectancy": -58.8751,
       "avgWin": 1264.4997,
       "avgLoss": 500,
-      "totalPnl": 264.4997,
+      "totalPnl": -235.5003,
+      "maxDrawdown": 1000
+    },
+    "XLF": {
+      "trades": 6,
+      "wins": 5,
+      "losses": 1,
+      "winRate": 0.8333,
+      "profitFactor": 9.6709,
+      "expectancy": 722.576,
+      "avgWin": 967.0912,
+      "avgLoss": 500,
+      "totalPnl": 4335.4561,
       "maxDrawdown": 500
+    },
+    "AUDUSD": {
+      "trades": 2,
+      "wins": 2,
+      "losses": 0,
+      "winRate": 1,
+      "profitFactor": null,
+      "expectancy": 787.6012,
+      "avgWin": 787.6012,
+      "avgLoss": 0,
+      "totalPnl": 1575.2025,
+      "maxDrawdown": 0
     },
     "NOW": {
       "trades": 3,
@@ -339,18 +363,6 @@
       "totalPnl": 1579.7487,
       "maxDrawdown": 1500
     },
-    "XLF": {
-      "trades": 5,
-      "wins": 4,
-      "losses": 1,
-      "winRate": 0.8,
-      "profitFactor": 8.1478,
-      "expectancy": 714.7846,
-      "avgWin": 1018.4807,
-      "avgLoss": 500,
-      "totalPnl": 3573.9229,
-      "maxDrawdown": 500
-    },
     "AIR": {
       "trades": 10,
       "wins": 4,
@@ -543,18 +555,6 @@
       "totalPnl": -1000,
       "maxDrawdown": 1000
     },
-    "AUDUSD": {
-      "trades": 1,
-      "wins": 1,
-      "losses": 0,
-      "winRate": 1,
-      "profitFactor": null,
-      "expectancy": 753.5801,
-      "avgWin": 753.5801,
-      "avgLoss": 0,
-      "totalPnl": 753.5801,
-      "maxDrawdown": 0
-    },
     "GOOGL": {
       "trades": 1,
       "wins": 0,
@@ -604,5 +604,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 172
+  "tradeCount": 175
 }
