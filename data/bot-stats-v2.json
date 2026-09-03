@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 171,
+    "trades": 172,
     "wins": 56,
-    "losses": 115,
-    "winRate": 0.3275,
-    "profitFactor": 1.0896,
-    "expectancy": 28.8692,
+    "losses": 116,
+    "winRate": 0.3256,
+    "profitFactor": 1.0798,
+    "expectancy": 25.7944,
     "avgWin": 1072.4008,
-    "avgLoss": 479.2853,
-    "totalPnl": 4936.6322,
+    "avgLoss": 479.4639,
+    "totalPnl": 4436.6322,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "mean_reversion": {
+      "trades": 44,
+      "wins": 19,
+      "losses": 25,
+      "winRate": 0.4318,
+      "profitFactor": 1.0021,
+      "expectancy": 0.5034,
+      "avgWin": 568.7786,
+      "avgLoss": 431.3857,
+      "totalPnl": 22.1499,
+      "maxDrawdown": 3091.2146
+    },
     "breakout": {
       "trades": 41,
       "wins": 12,
@@ -48,21 +60,21 @@
       "avgLoss": 500,
       "totalPnl": 309.3871,
       "maxDrawdown": 500
-    },
-    "mean_reversion": {
-      "trades": 43,
-      "wins": 19,
-      "losses": 24,
-      "winRate": 0.4419,
-      "profitFactor": 1.0508,
-      "expectancy": 12.143,
-      "avgWin": 568.7786,
-      "avgLoss": 428.5268,
-      "totalPnl": 522.1499,
-      "maxDrawdown": 2864.6087
     }
   },
   "byAsset": {
+    "SAP": {
+      "trades": 3,
+      "wins": 1,
+      "losses": 2,
+      "winRate": 0.3333,
+      "profitFactor": 1.2645,
+      "expectancy": 88.1666,
+      "avgWin": 1264.4997,
+      "avgLoss": 500,
+      "totalPnl": 264.4997,
+      "maxDrawdown": 500
+    },
     "NOW": {
       "trades": 3,
       "wins": 1,
@@ -435,18 +447,6 @@
       "totalPnl": -1000,
       "maxDrawdown": 1000
     },
-    "SAP": {
-      "trades": 2,
-      "wins": 1,
-      "losses": 1,
-      "winRate": 0.5,
-      "profitFactor": 2.529,
-      "expectancy": 382.2499,
-      "avgWin": 1264.4997,
-      "avgLoss": 500,
-      "totalPnl": 764.4997,
-      "maxDrawdown": 500
-    },
     "XLV": {
       "trades": 8,
       "wins": 4,
@@ -604,5 +604,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 171
+  "tradeCount": 172
 }
