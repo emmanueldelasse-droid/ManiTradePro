@@ -161,23 +161,23 @@
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 10,
-    "winCount": 7,
+    "totalCount": 9,
+    "winCount": 6,
     "lossCount": 3,
-    "winRate": 0.7,
-    "totalPnl": 21.86856309768665,
-    "avgWin": 4.184834308613217,
+    "winRate": 0.6666666666666666,
+    "totalPnl": 21.732846582343896,
+    "avgWin": 4.859687274158294,
     "avgLoss": 2.4750923542019563,
-    "expectancy": 2.186856309768665,
-    "rrActual": 1.6907790537628373,
+    "expectancy": 2.414760731371544,
+    "rrActual": 1.9634367444544116,
     "openCount": 0,
     "bySetup": [
       {
         "setup": "continuation",
-        "count": 9,
-        "wins": 6,
-        "pnl": 20.83369183066482,
-        "winRate": 0.6666666666666666
+        "count": 8,
+        "wins": 5,
+        "pnl": 20.697975315322065,
+        "winRate": 0.625
       },
       {
         "setup": "pullback_short",
@@ -190,10 +190,10 @@
     "byClass": [
       {
         "class": "stock",
-        "count": 7,
-        "wins": 4,
-        "pnl": 16.782551435448568,
-        "winRate": 0.5714285714285714
+        "count": 6,
+        "wins": 3,
+        "pnl": 16.646834920105814,
+        "winRate": 0.5
       },
       {
         "class": "etf",
