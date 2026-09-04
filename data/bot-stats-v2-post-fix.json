@@ -2,17 +2,29 @@
   "scope": "V2_POST_ANTI_DUP_FIX",
   "cohortStart": "2026-08-16T21:04:47Z",
   "cohortRule": "trade.openedAt >= cohortStart",
-  "tradeCount": 43,
+  "tradeCount": 45,
   "wins": 11,
-  "losses": 32,
-  "winRate": 0.2558,
-  "expectancy": 1.7161,
-  "totalPnl": 73.7934,
+  "losses": 34,
+  "winRate": 0.2444,
+  "expectancy": -20.5824,
+  "totalPnl": -926.2066,
   "avgWin": 1461.254,
   "avgLoss": 500,
-  "profitFactor": 1.0046,
+  "profitFactor": 0.9455,
   "maxDrawdown": 4630.8297,
   "bySetup": {
+    "breakout": {
+      "trades": 12,
+      "wins": 4,
+      "losses": 8,
+      "winRate": 0.3333,
+      "profitFactor": 1.6985,
+      "expectancy": 232.8427,
+      "avgWin": 1698.5282,
+      "avgLoss": 500,
+      "totalPnl": 2794.1127,
+      "maxDrawdown": 3000
+    },
     "pullback": {
       "trades": 24,
       "wins": 7,
@@ -37,18 +49,6 @@
       "totalPnl": -4000.0001,
       "maxDrawdown": 4000.0001
     },
-    "breakout": {
-      "trades": 10,
-      "wins": 4,
-      "losses": 6,
-      "winRate": 0.4,
-      "profitFactor": 2.2647,
-      "expectancy": 379.4113,
-      "avgWin": 1698.5282,
-      "avgLoss": 500,
-      "totalPnl": 3794.1127,
-      "maxDrawdown": 2000
-    },
     "gld_breakout": {
       "trades": 1,
       "wins": 0,
@@ -63,6 +63,30 @@
     }
   },
   "byAsset": {
+    "TSLA": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -500,
+      "maxDrawdown": 500
+    },
+    "AAPL": {
+      "trades": 1,
+      "wins": 0,
+      "losses": 1,
+      "winRate": 0,
+      "profitFactor": 0,
+      "expectancy": -500,
+      "avgWin": 0,
+      "avgLoss": 500,
+      "totalPnl": -500,
+      "maxDrawdown": 500
+    },
     "COIN": {
       "trades": 1,
       "wins": 1,
