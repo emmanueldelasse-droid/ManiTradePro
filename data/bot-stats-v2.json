@@ -1,18 +1,30 @@
 {
   "status": "ok",
   "overall": {
-    "trades": 179,
-    "wins": 60,
+    "trades": 180,
+    "wins": 61,
     "losses": 119,
-    "winRate": 0.3352,
-    "profitFactor": 1.1075,
-    "expectancy": 34.3077,
-    "avgWin": 1054.315,
+    "winRate": 0.3389,
+    "profitFactor": 1.1379,
+    "expectancy": 43.7525,
+    "avgWin": 1065.4633,
     "avgLoss": 479.9816,
-    "totalPnl": 6141.0848,
+    "totalPnl": 7875.4512,
     "maxDrawdown": 11276.3966
   },
   "bySetup": {
+    "breakout": {
+      "trades": 44,
+      "wins": 13,
+      "losses": 31,
+      "winRate": 0.2955,
+      "profitFactor": 1.1649,
+      "expectancy": 55.5913,
+      "avgWin": 1329.1682,
+      "avgLoss": 478.4893,
+      "totalPnl": 2446.0176,
+      "maxDrawdown": 4410.3446
+    },
     "mean_reversion": {
       "trades": 45,
       "wins": 20,
@@ -24,18 +36,6 @@
       "avgLoss": 431.3857,
       "totalPnl": 55.6861,
       "maxDrawdown": 3091.2146
-    },
-    "breakout": {
-      "trades": 43,
-      "wins": 12,
-      "losses": 31,
-      "winRate": 0.2791,
-      "profitFactor": 1.048,
-      "expectancy": 16.55,
-      "avgWin": 1295.4017,
-      "avgLoss": 478.4893,
-      "totalPnl": 711.6512,
-      "maxDrawdown": 4410.3446
     },
     "pullback": {
       "trades": 89,
@@ -63,6 +63,18 @@
     }
   },
   "byAsset": {
+    "BNB": {
+      "trades": 6,
+      "wins": 3,
+      "losses": 3,
+      "winRate": 0.5,
+      "profitFactor": 3.2094,
+      "expectancy": 552.3525,
+      "avgWin": 1604.705,
+      "avgLoss": 500,
+      "totalPnl": 3314.1151,
+      "maxDrawdown": 1500
+    },
     "PLTR": {
       "trades": 3,
       "wins": 2,
@@ -399,18 +411,6 @@
       "totalPnl": -259.2183,
       "maxDrawdown": 1124.8381
     },
-    "BNB": {
-      "trades": 5,
-      "wins": 2,
-      "losses": 3,
-      "winRate": 0.4,
-      "profitFactor": 2.0532,
-      "expectancy": 315.9497,
-      "avgWin": 1539.8744,
-      "avgLoss": 500,
-      "totalPnl": 1579.7487,
-      "maxDrawdown": 1500
-    },
     "AIR": {
       "trades": 10,
       "wins": 4,
@@ -616,5 +616,5 @@
       "maxDrawdown": 1000
     }
   },
-  "tradeCount": 179
+  "tradeCount": 180
 }
