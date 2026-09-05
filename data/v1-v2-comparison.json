@@ -453,20 +453,32 @@
   },
   "v2HistoricalReference": {
     "scope": "V2 lifetime incluant V2_PRE_ANTI_DUP_FIX — référence seulement",
-    "tradeCount": 178,
+    "tradeCount": 179,
     "overall": {
-      "trades": 178,
-      "wins": 59,
+      "trades": 179,
+      "wins": 60,
       "losses": 119,
-      "winRate": 0.3315,
-      "profitFactor": 1.1069,
-      "expectancy": 34.3121,
-      "avgWin": 1071.6163,
+      "winRate": 0.3352,
+      "profitFactor": 1.1075,
+      "expectancy": 34.3077,
+      "avgWin": 1054.315,
       "avgLoss": 479.9816,
-      "totalPnl": 6107.5486,
+      "totalPnl": 6141.0848,
       "maxDrawdown": 11276.3966
     },
     "bySetup": {
+      "mean_reversion": {
+        "trades": 45,
+        "wins": 20,
+        "losses": 25,
+        "winRate": 0.4444,
+        "profitFactor": 1.0052,
+        "expectancy": 1.2375,
+        "avgWin": 542.0165,
+        "avgLoss": 431.3857,
+        "totalPnl": 55.6861,
+        "maxDrawdown": 3091.2146
+      },
       "breakout": {
         "trades": 43,
         "wins": 12,
@@ -490,18 +502,6 @@
         "avgLoss": 500,
         "totalPnl": 5064.3604,
         "maxDrawdown": 9165.2351
-      },
-      "mean_reversion": {
-        "trades": 44,
-        "wins": 19,
-        "losses": 25,
-        "winRate": 0.4318,
-        "profitFactor": 1.0021,
-        "expectancy": 0.5034,
-        "avgWin": 568.7786,
-        "avgLoss": 431.3857,
-        "totalPnl": 22.1499,
-        "maxDrawdown": 3091.2146
       },
       "gld_breakout": {
         "trades": 2,
