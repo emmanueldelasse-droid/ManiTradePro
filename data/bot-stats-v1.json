@@ -2,8 +2,8 @@
   "configured": true,
   "settings": {
     "botMode": "exploration",
-    "learningEnabled": true,
-    "isEnabled": true,
+    "learningEnabled": false,
+    "isEnabled": false,
     "autoOpenEnabled": true,
     "autoCloseEnabled": true,
     "allowLong": true,
@@ -14,235 +14,52 @@
     "minDossierScore": 60
   },
   "stats": {
-    "totalCount": 49,
-    "winCount": 24,
-    "lossCount": 25,
-    "winRate": 0.4897959183673469,
-    "totalPnl": 63.63142715280367,
-    "avgWin": 8.877574038551057,
-    "avgLoss": 5.977213990896867,
-    "expectancy": 1.2986005541388508,
-    "rrActual": 1.4852361070009137,
-    "openCount": 1,
-    "bySetup": [
-      {
-        "setup": "continuation",
-        "count": 48,
-        "wins": 23,
-        "pnl": 62.59655588578181,
-        "winRate": 0.4791666666666667
-      },
-      {
-        "setup": "pullback_short",
-        "count": 1,
-        "wins": 1,
-        "pnl": 1.0348712670218319,
-        "winRate": 1
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 43,
-        "wins": 21,
-        "pnl": 73.42750400592475,
-        "winRate": 0.4883720930232558
-      },
-      {
-        "class": "etf",
-        "count": 6,
-        "wins": 3,
-        "pnl": -9.796076853121098,
-        "winRate": 0.5
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "AAPL",
-        "count": 4,
-        "pnl": 38.88492907084718,
-        "wins": 3
-      },
-      {
-        "symbol": "AIR",
-        "count": 6,
-        "pnl": 37.98909116619774,
-        "wins": 4
-      },
-      {
-        "symbol": "JPM",
-        "count": 11,
-        "pnl": 36.32358729280969,
-        "wins": 6
-      },
-      {
-        "symbol": "V",
-        "count": 7,
-        "pnl": 23.12151071915016,
-        "wins": 4
-      },
-      {
-        "symbol": "MA",
-        "count": 4,
-        "pnl": 12.192226133283409,
-        "wins": 2
-      }
-    ],
-    "bottomSymbols": [
-      {
-        "symbol": "NVDA",
-        "count": 2,
-        "pnl": -23.999098695933938,
-        "wins": 1
-      },
-      {
-        "symbol": "MSFT",
-        "count": 1,
-        "pnl": -20.235841525443117,
-        "wins": 0
-      },
-      {
-        "symbol": "QQQ",
-        "count": 5,
-        "pnl": -11.516903265081261,
-        "wins": 2
-      },
-      {
-        "symbol": "AMD",
-        "count": 4,
-        "pnl": -8.450715084596629,
-        "wins": 1
-      },
-      {
-        "symbol": "GOOGL",
-        "count": 1,
-        "pnl": -8.023694130317706,
-        "wins": 0
-      }
-    ]
-  },
-  "stats7d": {
-    "totalCount": 1,
-    "winCount": 1,
+    "totalCount": 0,
+    "winCount": 0,
     "lossCount": 0,
-    "winRate": 1,
-    "totalPnl": 13.207391152243748,
-    "avgWin": 13.207391152243748,
+    "winRate": null,
+    "totalPnl": 0,
+    "avgWin": 0,
     "avgLoss": 0,
     "expectancy": null,
     "rrActual": null,
     "openCount": 0,
-    "bySetup": [
-      {
-        "setup": "continuation",
-        "count": 1,
-        "wins": 1,
-        "pnl": 13.207391152243748,
-        "winRate": 1
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 1,
-        "wins": 1,
-        "pnl": 13.207391152243748,
-        "winRate": 1
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "AAPL",
-        "count": 1,
-        "pnl": 13.207391152243748,
-        "wins": 1
-      }
-    ],
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
+    "bottomSymbols": []
+  },
+  "stats7d": {
+    "totalCount": 0,
+    "winCount": 0,
+    "lossCount": 0,
+    "winRate": null,
+    "totalPnl": 0,
+    "avgWin": 0,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
+    "openCount": 0,
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
     "bottomSymbols": []
   },
   "stats30d": {
-    "totalCount": 9,
-    "winCount": 6,
-    "lossCount": 3,
-    "winRate": 0.6666666666666666,
-    "totalPnl": 21.732846582343896,
-    "avgWin": 4.859687274158294,
-    "avgLoss": 2.4750923542019563,
-    "expectancy": 2.414760731371544,
-    "rrActual": 1.9634367444544116,
+    "totalCount": 0,
+    "winCount": 0,
+    "lossCount": 0,
+    "winRate": null,
+    "totalPnl": 0,
+    "avgWin": 0,
+    "avgLoss": 0,
+    "expectancy": null,
+    "rrActual": null,
     "openCount": 0,
-    "bySetup": [
-      {
-        "setup": "continuation",
-        "count": 8,
-        "wins": 5,
-        "pnl": 20.697975315322065,
-        "winRate": 0.625
-      },
-      {
-        "setup": "pullback_short",
-        "count": 1,
-        "wins": 1,
-        "pnl": 1.0348712670218319,
-        "winRate": 1
-      }
-    ],
-    "byClass": [
-      {
-        "class": "stock",
-        "count": 6,
-        "wins": 3,
-        "pnl": 16.646834920105814,
-        "winRate": 0.5
-      },
-      {
-        "class": "etf",
-        "count": 3,
-        "wins": 3,
-        "pnl": 5.08601166223808,
-        "winRate": 1
-      }
-    ],
-    "topSymbols": [
-      {
-        "symbol": "AAPL",
-        "count": 1,
-        "pnl": 13.207391152243748,
-        "wins": 1
-      },
-      {
-        "symbol": "NVDA",
-        "count": 1,
-        "pnl": 5.977146205684145,
-        "wins": 1
-      },
-      {
-        "symbol": "JPM",
-        "count": 2,
-        "pnl": 4.319282009801986,
-        "wins": 1
-      },
-      {
-        "symbol": "QQQ",
-        "count": 2,
-        "pnl": 3.3651852502779187,
-        "wins": 2
-      },
-      {
-        "symbol": "SPY",
-        "count": 1,
-        "pnl": 1.720826411960161,
-        "wins": 1
-      }
-    ],
-    "bottomSymbols": [
-      {
-        "symbol": "AIR",
-        "count": 2,
-        "pnl": -6.856984447624063,
-        "wins": 0
-      }
-    ]
+    "bySetup": [],
+    "byClass": [],
+    "topSymbols": [],
+    "bottomSymbols": []
   },
-  "lastClosedAt": "2026-09-02T03:01:13.173Z"
+  "lastClosedAt": null
 }
