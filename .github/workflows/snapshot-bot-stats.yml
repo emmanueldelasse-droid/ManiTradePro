@@ -18,12 +18,14 @@ on:
     paths:
       - '.github/workflows/snapshot-bot-stats.yml'
       - 'tools/v2/snapshot-v1-v2-stats.mjs'
+      - 'tools/v2/lib/history-integrity.mjs'
       - 'tools/v2/test/snapshot-v1-v2-stats.test.mjs'
   push:
     branches: [main]
     paths:
       - '.github/workflows/snapshot-bot-stats.yml'
       - 'tools/v2/snapshot-v1-v2-stats.mjs'
+      - 'tools/v2/lib/history-integrity.mjs'
 
 permissions:
   contents: write
@@ -51,6 +53,7 @@ jobs:
           node tools/v2/test/snapshot-v1-v2-stats.test.mjs
 
       - name: Fetch V1 and V2 snapshots
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           node tools/v2/snapshot-v1-v2-stats.mjs
@@ -59,6 +62,7 @@ jobs:
           test -s data/bot-stats-v2.json
           test -s data/bot-stats-v2-post-fix.json
           test -s data/v1-v2-comparison.json
+          test -s data/history-status.json
 
       - name: Commit and push if changed
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -71,6 +75,7 @@ jobs:
             data/bot-stats-v1.json \
             data/bot-stats-v2.json \
             data/bot-stats-v2-post-fix.json \
+            data/history-status.json \
             data/v1-v2-comparison.json
           if git diff --cached --quiet; then
             echo 'Pas de changement statistique.'
@@ -78,3 +83,16 @@ jobs:
           fi
           git commit -m "snapshot: V1 V2 stats $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
           git push origin HEAD:main
+
+
+      - name: Report source availability
+        if: github.event_name != 'pull_request'
+        run: |
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const s = JSON.parse(readFileSync("data/history-status.json"));
+            if (s.status !== "ok" || s.v1Status !== "ok") {
+              console.error("Source indisponible. Derniers bilans conservés.", s.lastReliableAt);
+              process.exitCode = 1;
+            }
+          '

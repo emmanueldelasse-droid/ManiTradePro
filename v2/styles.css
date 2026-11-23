@@ -104,3 +104,51 @@ td.why { text-align: left; white-space: normal; max-width: 320px; color: var(--m
 .admin-panel button { width: 100%; }
 .error { color: var(--red); font-size: 13px; margin-top: 10px; min-height: 18px; }
 #cycle-result { margin-top: 10px; font-size: 13px; }
+
+[hidden] { display: none; }
+h1 { margin: 26px 0 14px; font-size: clamp(25px, 4vw, 34px); letter-spacing: -.035em; }
+h3 { font-size: 15px; margin: 0; }
+p { line-height: 1.48; }
+button:focus-visible, summary:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.tab, .topbar-actions button, .load-more { min-height: 44px; }
+.section-note, .notice, .details-copy { color: var(--muted); font-size: 14px; line-height: 1.55; }
+.notice { margin: 0; border-left: 3px solid var(--amber); padding: 8px 12px; background: var(--panel); }
+.notice strong { color: var(--text); display: block; }
+.main-result { margin: 0; font-size: clamp(18px, 3vw, 25px); line-height: 1.4; font-weight: 560; letter-spacing: -.025em; }
+.result-intro { border-left: 3px solid var(--accent); padding: 5px 0 4px 14px; }
+.result-intro .section-note { margin-bottom: 0; }
+.book-grid, .decision-list { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 285px), 1fr)); }
+.book, .decision, .panel-block { min-width: 0; border: 1px solid var(--border); background: var(--panel); border-radius: 12px; padding: 16px; overflow-wrap: anywhere; }
+.book-total { display: block; font-size: 24px; margin: 6px 0; font-variant-numeric: tabular-nums; }
+.facts { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 6px 12px; font-size: 13px; line-height: 1.45; margin: 12px 0 0; }
+.facts dt { color: var(--muted); }
+.facts dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+details > summary { cursor: pointer; font-size: 14px; font-weight: 650; padding: 6px 0; }
+.panel-block { margin-top: 12px; }
+.panel-block > :last-child:not(summary) { margin-bottom: 0; }
+.panel-block .cards { margin-top: 12px; }
+.journal-link { border: 0; background: transparent; color: var(--accent); font-weight: 650; padding: 14px 0; }
+.decision { align-self: start; }
+.decision-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; }
+.decision-head h2 { font-size: 19px; margin: 0; }
+.decision-tag { font-size: 12px; border: 1px solid currentColor; color: var(--muted); padding: 3px 8px; border-radius: 20px; font-weight: 650; }
+.decision-tag.enter { color: var(--green); }
+.decision-tag.wait { color: var(--amber); }
+.decision-tag.reject { color: var(--red); }
+.decision .section-note { margin: 6px 0; font-size: 13px; }
+.decision-reason { font-size: 15px; font-weight: 600; margin: 12px 0 6px; }
+.decision details { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 5px; }
+.decision details p { font-size: 13px; margin: 8px 0; }
+.decision-list .facts { margin-top: 8px; }
+.load-more { margin-top: 12px; }
+a { color: var(--accent); }
+@media (max-width: 480px) {
+  .shell { padding-left: 12px; padding-right: 12px; }
+  .topbar-actions { gap: 4px; }
+  .tabs { gap: 0; }
+  .tab { flex: 1; padding: 10px 6px; }
+  h1 { margin-top: 20px; }
+  .book, .decision, .panel-block { padding: 13px; }
+}
+.journal-filter { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin: 0 0 14px; color: var(--muted); font-size: 14px; }
+.journal-filter select { font: inherit; padding: 8px; min-height: 44px; color: var(--text); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; }

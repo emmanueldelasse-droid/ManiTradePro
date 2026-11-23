@@ -32,7 +32,7 @@ test('database enforces one open position per symbol atomically', () => {
 });
 
 test('worker keeps the in-memory first-line guard in addition to DB constraint', () => {
-  assert.match(worker, /const openBySymbol = new Set\(openRows\.map\(\(p\) => p\.symbol\)\)/);
+  assert.match(worker, /const openBySymbol = new Set\(openRows\?\.map\(\(p\) => p\.symbol\) \|\| \[\]\)/);
   assert.match(worker, /if \(openBySymbol\.has\(opp\.symbol\)\) continue;/);
   assert.match(worker, /openBySymbol\.add\(opp\.symbol\)/);
 });

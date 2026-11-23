@@ -19,3 +19,11 @@ kv_namespaces = [
 crons = [
   "0 * * * *"
 ]
+
+[[durable_objects.bindings]]
+name = "PAPER_JOURNAL"
+class_name = "PaperJournal"
+
+[[migrations]]
+tag = "v1-paper-journal"
+new_sqlite_classes = ["PaperJournal"]

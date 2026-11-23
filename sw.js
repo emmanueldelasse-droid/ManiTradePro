@@ -1,4 +1,4 @@
-const CACHE_VERSION = "manitradepro-v8.6";
+const CACHE_VERSION = "manitradepro-v8.7";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const RUNTIME_CACHE = `${CACHE_VERSION}-runtime`;
 
@@ -7,6 +7,7 @@ const APP_SHELL = [
   "./index.html",
   "./manifest.webmanifest",
   "./assets/app.js",
+  "./v2/paper-summary.js",
   "./assets/styles.css"
 ];
 
@@ -27,7 +28,7 @@ self.addEventListener("activate", (event) => {
     const keys = await caches.keys();
     await Promise.all(
       keys
-        .filter((key) => ![STATIC_CACHE, RUNTIME_CACHE].includes(key))
+        .filter((key) => key.startsWith("manitradepro-v") && !key.startsWith("manitradepro-v2-") && ![STATIC_CACHE, RUNTIME_CACHE].includes(key))
         .map((key) => caches.delete(key))
     );
     await self.clients.claim();
@@ -108,6 +109,9 @@ self.addEventListener("fetch", (event) => {
   if (!isHttpRequest(url)) {
     return;
   }
+
+  // La simulation distingue une panne de données fraîches.
+  if (url.pathname.startsWith("/api/v2/") || url.pathname.endsWith("/history-status.json") || url.pathname.endsWith("/bot-stats-v2-post-fix.json")) return;
 
   if (isApiRequest(url)) {
     event.respondWith(networkFirst(request));

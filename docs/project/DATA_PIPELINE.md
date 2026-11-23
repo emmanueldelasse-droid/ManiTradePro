@@ -712,3 +712,7 @@ Objet statique exposant l'état des protections runtime actives dans le worker d
 ### `/api/opportunities?debugCandles=1`
 
 `toOpportunityRow(payload, options={})` : si `options.debugCandles === true`, expose `payload.candles.slice(-20)` au lieu de `[]`. Utile pour auditer les indicateurs techniques (EMA, RSI, ATR) sans déployer un endpoint dédié. Par défaut inchangé.
+
+## Comparaison prospective V2
+
+Le Worker conserve les heures de collecte et de disponibilité des bougies. Son journal SQLite reçoit les observations publiques et les décisions simulées au fil des cycles. La route `/api/v2/paper` expose la couverture, les résultats des trois portefeuilles et les décisions paginées. Une rupture de lecture de la source historique conserve le dernier bilan fiable dans les fichiers de suivi. Voir [le flux V2](../v2/ARCHITECTURE_V2.md) et [l’incident du compteur](../v2/AUDIT_2026-11-23.md).

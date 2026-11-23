@@ -4240,7 +4240,11 @@ function renderDashboard() {
       <div class="screen">
         <div class="screen-header">
           <div class="screen-title">Tableau de bord</div>
-          <div class="screen-subtitle">Vue rapide, lecture simple, priorites utiles.</div>
+          </div>
+        <div class="card" style="margin-bottom:18px">
+          <div class="section-title">Résultats en simulation V2</div>
+          <mtp-paper-summary style="display:block;margin:8px 0 12px">Ouvre le bilan V2 pour consulter les résultats datés.</mtp-paper-summary>
+          <a class="btn" href="./v2/">Résultats après frais et décisions V2 →</a>
         </div>
 
         ${renderMarketRegimeBanner()}

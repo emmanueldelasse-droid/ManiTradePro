@@ -1,0 +1,13 @@
+{
+  "status": "unavailable",
+  "v1Status": "unavailable",
+  "lastReliableAt": "2026-09-06T18:34:09Z",
+  "v1LastReliableAt": "2026-09-06T18:34:09Z",
+  "v1Trades": 49,
+  "v2LifetimeTrades": 180,
+  "v2PostFixTrades": 46,
+  "provenance": "archived_aggregate",
+  "snapshotCommit": "64050de24116fb6b69d859284482e73ee84aebf8",
+  "verificationRun": "https://github.com/emmanueldelasse-droid/ManiTradePro/actions/runs/34052114406/job/101537463437",
+  "message": "Données indisponibles"
+}
