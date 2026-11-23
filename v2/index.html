@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0b1020" />
-  <title>ManiTradePro V2 — Learning Bot</title>
+  <title>ManiTradePro V2 · Simulation</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -16,62 +16,62 @@
         <strong>ManiTradePro</strong><span class="v2">V2</span>
       </div>
       <div class="topbar-actions">
-        <button class="ghost" id="refresh-btn" title="Rafraîchir">↻</button>
-        <button class="ghost" id="theme-btn" title="Thème">◐</button>
+        <button class="ghost" id="refresh-btn" title="Rafraîchir" aria-label="Rafraîchir">↻</button>
+        <button class="ghost" id="theme-btn" title="Thème" aria-label="Changer de thème">◐</button>
         <button class="ghost" id="login-btn">Admin</button>
       </div>
     </header>
 
-    <nav class="tabs">
-      <button class="tab active" data-tab="dashboard">Tableau de bord</button>
-      <button class="tab" data-tab="opportunities">Opportunités</button>
-      <button class="tab" data-tab="trades">Trades</button>
+    <nav class="tabs" aria-label="Navigation du simulateur">
+      <button class="tab active" data-tab="dashboard" aria-current="page">Résultats</button>
+      <button class="tab" data-tab="opportunities">Décisions</button>
+      <button class="tab" data-tab="trades">Historique V2</button>
     </nav>
 
     <main>
-      <!-- DASHBOARD -->
       <section class="view active" id="view-dashboard">
-        <h2>Santé du bot</h2>
-        <div class="cards" id="health-cards"></div>
-
-        <h2>Performance</h2>
-        <div class="cards" id="perf-cards"></div>
-
-        <h2>Setups</h2>
-        <div class="setups" id="setups-grid"></div>
-
-        <h2>Par actif <span class="muted">(les plus actifs)</span></h2>
-        <div class="table-wrap">
-          <table id="assets-table"><thead><tr>
-            <th>Actif</th><th>Trades</th><th>Réussite</th><th>Facteur profit</th><th>Gain/trade</th>
-          </tr></thead><tbody></tbody></table>
-        </div>
+        <h1>Résultats en simulation</h1>
+        <div id="paper-summary" aria-live="polite"><p class="notice">Chargement du bilan…</p></div>
+        <div id="paper-results"></div>
+        <button type="button" class="journal-link" data-open-tab="opportunities">Consulter les décisions <span aria-hidden="true">→</span></button>
+        <section aria-labelledby="archive-heading">
+          <h2 id="archive-heading">Dernier bilan historique vérifié</h2>
+          <div id="history-snapshot">Chargement du bilan historique…</div>
+        </section>
+        <details class="panel-block">
+          <summary>Fonctionnement du moteur V2</summary>
+          <div id="health-cards" class="cards"></div>
+        </details>
       </section>
 
-      <!-- OPPORTUNITES -->
       <section class="view" id="view-opportunities">
-        <div class="view-head">
-          <h2>Opportunités</h2>
-          <span class="muted" id="opp-updated"></span>
-        </div>
-        <p class="hint">Chaque ligne est un trade <strong>réellement ouvrable</strong>. Pas de score, pas de note : un setup détecté avec un plan valide.</p>
-        <div class="table-wrap">
-          <table id="opp-table"><thead><tr>
-            <th>Actif</th><th>Setup</th><th>Sens</th><th>Entrée</th><th>Stop</th><th>Objectif</th><th>Gain/Risque</th><th>Pourquoi</th>
-          </tr></thead><tbody></tbody></table>
-        </div>
-        <div class="empty" id="opp-empty" hidden>Aucune opportunité au dernier scan.</div>
+        <h1>Journal des décisions</h1>
+        <p class="section-note" id="paper-journal-note" aria-live="polite">Chargement des décisions…</p>
+        <label class="journal-filter" for="paper-filter">Décisions chargées
+          <select id="paper-filter"><option value="">Toutes</option><option value="actionable">Entrées encore valides</option><option>Entrée envisageable</option><option>Attendre</option><option>Écarter</option></select>
+        </label>
+        <p class="section-note" id="paper-filter-empty" hidden>Aucune décision de ce type parmi les pages chargées.</p>
+        <div class="decision-list" id="paper-decisions"></div>
+        <button class="ghost load-more" id="paper-more" hidden>Voir les décisions précédentes</button>
       </section>
 
       <!-- TRADES -->
       <section class="view" id="view-trades">
-        <h2>Trades fermés</h2>
+        <h1>Historique V2</h1>
+        <p class="section-note">Résultats bruts du moteur historique, avant estimation des coûts. Le bilan prospectif en euros figure dans Résultats.</p>
+        <div id="legacy-status" class="section-note" aria-live="polite">Chargement de la source…</div>
+        <div id="legacy-stats" hidden>
+          <h2>Performance historique brute</h2><div class="cards" id="perf-cards"></div>
+          <h2>Par stratégie</h2><div class="setups" id="setups-grid"></div>
+          <h2>Par actif</h2><div class="table-wrap"><table id="assets-table"><thead><tr><th>Actif</th><th>Trades</th><th>Réussite</th><th>Facteur profit</th><th>Gain/trade</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <h2>Opérations clôturées</h2>
         <div class="table-wrap">
           <table id="trades-table"><thead><tr>
             <th>Actif</th><th>Setup</th><th>Sens</th><th>Entrée</th><th>Sortie</th><th>Stop</th><th>Objectif</th><th>PnL</th><th>%</th><th>Durée</th><th>Sortie</th>
           </tr></thead><tbody></tbody></table>
         </div>
-        <div class="empty" id="trades-empty" hidden>Aucun trade fermé pour l'instant. Le bot apprend dès qu'il en ferme.</div>
+        <div class="empty" id="trades-empty" hidden>Aucune opération clôturée dans la source vérifiée.</div>
       </section>
     </main>
 
@@ -99,6 +99,7 @@
     </div>
   </div>
 
+  <script src="./paper-summary.js"></script>
   <script src="./app.js"></script>
 </body>
 </html>

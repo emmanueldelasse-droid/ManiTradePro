@@ -21,9 +21,16 @@ import {
   resolvePosition, computePnl, computeStats, riskPerTrade,
 } from "../tools/v2/lib/engine-v2.mjs";
 
+import { HISTORY_ARCHIVE, validateHistoryRows, validateArchiveContinuity } from "../tools/v2/lib/history-integrity.mjs";
+
+import { prepareObservation, makeScanBatch } from "./paper-feed.mjs";
+import { journalBinding } from "./paper-journal.mjs";
+export { PaperJournal } from "./paper-journal.mjs";
+
 const CANDLE_LIMIT = 220;            // ~1 an de bougies daily
 const KV_CANDLE_TTL = 6 * 3600;      // cache bougies 6 h
 const STATE_KEY = "v2:state";        // dernier scan + santé (KV, toujours dispo)
+const PAPER_RELIABLE_KEY = "v2:paper:last-reliable-at";
 const SETTINGS_KEY = "v2:settings";  // overrides réglages (KV)
 
 // ---------- Réponses / CORS ----------
@@ -208,12 +215,20 @@ async function fetchYahoo(sym, klass) {
   const q = result?.indicators?.quote?.[0];
   if (!Array.isArray(ts) || !q) throw new Error("yahoo_shape");
   const out = [];
+  // The FX chart labels midnight in the exchange timezone (e.g. London).
+  // During DST its UTC date can be the previous day.
+  const sessionDate = klass === "forex" && result?.meta?.exchangeTimezoneName
+    ? new Intl.DateTimeFormat("en-CA", { timeZone: result.meta.exchangeTimezoneName, year: "numeric", month: "2-digit", day: "2-digit" })
+    : null;
   for (let i = 0; i < ts.length; i++) {
     const c = +q.close?.[i];
+    const [o, h, l] = [q.open?.[i], q.high?.[i], q.low?.[i]].map(Number);
+    if (![o,h,l].every(x => Number.isFinite(x) && x > 0) || h < Math.max(o,c) || l > Math.min(o,c)) continue;
     if (!Number.isFinite(c) || c <= 0) continue;
     out.push({
       time: new Date(ts[i] * 1000).toISOString(),
-      open: +q.open?.[i] || c, high: +q.high?.[i] || c, low: +q.low?.[i] || c,
+      ...(sessionDate ? { sessionDate: sessionDate.format(ts[i] * 1000) } : {}),
+      open: o, high: h, low: l,
       close: c, volume: Number.isFinite(+q.volume?.[i]) ? +q.volume?.[i] : 0,
     });
   }
@@ -222,12 +237,14 @@ async function fetchYahoo(sym, klass) {
 
 // Dispatch par classe d'actif, avec fallback Yahoo. KV cache 6 h.
 async function getCandles(asset, env) {
-  const cacheKey = `v2:candles:${asset.symbol}`;
+  const cacheKey = `v2:candles:provenance:${asset.symbol}`;
   try {
     const cached = await env.MTP_CACHE?.get(cacheKey);
     if (cached) {
-      const arr = JSON.parse(cached);
-      if (Array.isArray(arr) && arr.length >= 60) return arr;
+      const { bars, source, fetchedAt } = JSON.parse(cached);
+      if (Array.isArray(bars) && bars.length >= 60 && source && fetchedAt) {
+        return Object.assign(bars, { source, fetchedAt });
+      }
     }
   } catch { /* ignore */ }
 
@@ -249,13 +266,14 @@ async function getCandles(asset, env) {
     await tryFetch(() => fetchYahoo(asset.symbol, asset.class), "yahoo");
   } else {
     await tryFetch(() => fetchEodhd(asset.symbol, env), "eodhd");
-    await tryFetch(() => fetchTwelve(asset.symbol, env), "twelve");
+    if (asset.class !== "eu_stock") await tryFetch(() => fetchTwelve(asset.symbol, env), "twelve");
     await tryFetch(() => fetchYahoo(asset.symbol, asset.class), "yahoo");
   }
 
   if (candles) {
-    try { await env.MTP_CACHE?.put(cacheKey, JSON.stringify(candles), { expirationTtl: KV_CANDLE_TTL }); } catch { /* ignore */ }
-    candles._source = source;
+    const fetchedAt = new Date().toISOString();
+    try { await env.MTP_CACHE?.put(cacheKey, JSON.stringify({ bars: candles, source, fetchedAt }), { expirationTtl: KV_CANDLE_TTL }); } catch { /* cache optional */ }
+    Object.assign(candles, { source, fetchedAt });
   }
   return candles ? Object.assign(candles, { source }) : null;
 }
@@ -287,26 +305,59 @@ async function kvPut(env, key, val) {
   try { await env.MTP_CACHE?.put(key, JSON.stringify(val)); } catch { /* ignore */ }
 }
 
-async function getOpenPositions(env) {
-  if (supaConfigured(env)) {
-    return await supa(env, `${TBL.positions}?status=eq.open&select=*&order=opened_at.asc`);
-  }
-  return await kvGet(env, KV.positions, []);
+// The original V2 ledger is in Supabase. A missing KV key or binding is not
+// evidence that its ledger was read successfully. Never initialize on read.
+async function readLedgerKv(env, key) {
+  if (!env.MTP_CACHE) throw new Error("kv_unconfigured");
+  const raw = await env.MTP_CACHE.get(key);
+  if (raw == null) throw new Error("kv_ledger_missing");
+  const rows = JSON.parse(raw);
+  if (!Array.isArray(rows)) throw new Error("kv_ledger_invalid");
+  return rows;
 }
 
-async function getClosedTrades(env, limit = 1000) {
+async function getOpenPositions(env) {
   if (supaConfigured(env)) {
-    return await supa(env, `${TBL.trades}?select=*&order=closed_at.desc&limit=${limit}`);
+    const rows = await supa(env, `${TBL.positions}?status=eq.open&select=*&order=opened_at.asc`);
+    if (!Array.isArray(rows)) throw new Error("source_shape");
+    return rows;
   }
-  const all = await kvGet(env, KV.trades, []);
-  return all.slice().reverse().slice(0, limit);
+  return readLedgerKv(env, KV.positions);
+}
+
+async function getClosedTrades(env, limit = Infinity) {
+  if (!supaConfigured(env)) {
+    return (await readLedgerKv(env, KV.trades)).slice().reverse().slice(0, limit);
+  }
+  // PostgREST caps each range. Read the exact total even if the project cap is
+  // smaller than the requested page. Concurrent additions invalidate the read.
+  const rows = [];
+  let total;
+  do {
+    const size = Math.min(500, limit - rows.length);
+    const path = `${TBL.trades}?select=*&order=closed_at.desc,id.asc&limit=${size}&offset=${rows.length}`;
+    const base = String(env.SUPABASE_URL).replace(/\/$/, "");
+    const res = await fetchWithTimeout(`${base}/rest/v1/${path}`, { headers: supaHeaders(env, { Prefer: "count=exact" }) }, 9000);
+    if (!res.ok) throw new Error("closed_trades_unavailable");
+    const range = res.headers.get("Content-Range") || "";
+    const match = /\/(\d+)$/.exec(range);
+    if (!match || (total != null && total !== Number(match[1]))) throw new Error("ledger_count_changed");
+    total = Number(match[1]);
+    const page = await res.json();
+    if (!Array.isArray(page) || (!page.length && rows.length < total)) throw new Error("ledger_page_incomplete");
+    rows.push(...page);
+  } while (rows.length < Math.min(total, limit));
+  return rows;
 }
 
 async function getCycles(env, limit = 50) {
   if (supaConfigured(env)) {
     return await supa(env, `${TBL.cycles}?select=*&order=started_at.desc&limit=${limit}`);
   }
-  const all = await kvGet(env, KV.cycles, []);
+  if (!env.MTP_CACHE) throw new Error("Stockage indisponible");
+  const raw = await env.MTP_CACHE.get(KV.cycles);
+  if (!raw) throw new Error("Historique des cycles indisponible");
+  const all = JSON.parse(raw);
   return all.slice().reverse().slice(0, limit);
 }
 
@@ -315,22 +366,26 @@ async function insertPosition(env, pos) {
     await supa(env, TBL.positions, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(toPositionRow(pos)) });
     return;
   }
-  const arr = await kvGet(env, KV.positions, []);
+  const arr = await readLedgerKv(env, KV.positions);
   arr.push(pos);
-  await kvPut(env, KV.positions, arr);
+  await env.MTP_CACHE.put(KV.positions, JSON.stringify(arr));
 }
 
 async function closePositionStore(env, pos, trade) {
+  // Write once by position UUID before removing the open position. A retry
+  // after a failed PATCH cannot lose the close or replace its original price.
   if (supaConfigured(env)) {
+    await supa(env, `${TBL.trades}?on_conflict=id`, { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" }, body: JSON.stringify(toTradeRow(trade)) });
     await supa(env, `${TBL.positions}?id=eq.${encodeURIComponent(pos.id)}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "closed" }) });
-    await supa(env, TBL.trades, { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify(toTradeRow(trade)) });
     return;
   }
-  const positions = await kvGet(env, KV.positions, []);
-  await kvPut(env, KV.positions, positions.filter((p) => p.id !== pos.id));
-  const trades = await kvGet(env, KV.trades, []);
-  trades.push(trade);
-  await kvPut(env, KV.trades, trades);
+  const trades = await readLedgerKv(env, KV.trades);
+  if (!trades.some(t => t.id === trade.id)) {
+    trades.push(trade);
+    await env.MTP_CACHE.put(KV.trades, JSON.stringify(trades));
+  }
+  const positions = await readLedgerKv(env, KV.positions);
+  await env.MTP_CACHE.put(KV.positions, JSON.stringify(positions.filter(p => p.id !== pos.id)));
 }
 
 async function insertCycle(env, cycle) {
@@ -425,8 +480,12 @@ function normalizeTrade(row) {
 async function runCycle(env) {
   const startedAt = new Date().toISOString();
   const settings = await loadSettings(env);
-  const openRows = (await getOpenPositions(env).catch(() => [])).map(normalizePosition);
-  const openBySymbol = new Set(openRows.map((p) => p.symbol));
+  // The independent prospective journal can still collect the market tape
+  // during a legacy-store outage. Never open legacy trades against unknown risk.
+  let openRows = null;
+  try { openRows = (await getOpenPositions(env)).map(normalizePosition); } catch { /* protected below */ }
+  const openBySymbol = new Set(openRows?.map((p) => p.symbol) || []);
+  const observations = [];
 
   // 1) Scanner les 47 actifs : données + indicateurs + meilleur setup.
   const scans = [];
@@ -448,9 +507,18 @@ async function runCycle(env) {
     scanned++;
     const last = candles[candles.length - 1];
     latestPriceBySymbol[asset.symbol] = last;
-    const ind = computeIndicators(candles);
+    const observedAt = new Date().toISOString();
+    const observation = prepareObservation(asset, candles, observedAt);
+    const ind = observation?.ind || computeIndicators(candles);
     if (!ind) { scans.push({ symbol: asset.symbol, status: "insufficient" }); continue; }
-    const setup = bestSetup(ind, asset.symbol);
+    const setup = observation ? observation.setup : bestSetup(ind, asset.symbol);
+    // Preserve even a legacy alert based on incomplete/malformed input as a
+    // rejected decision, without admitting its price to the execution tape.
+    observations.push(observation || {
+      asset, ind, setup, bars: [], source: candles.source || null, fetchedAt: candles.fetchedAt || null,
+      barTime: Number.isFinite(Date.parse(last.time)) ? last.time : observedAt,
+      barTimeKnown: Number.isFinite(Date.parse(last.time)), observedAt, dataUsable: false, qualityReason: "invalid_feed",
+    });
     if (!setup) { scans.push({ symbol: asset.symbol, status: "no_setup" }); continue; }
     const v = validatePlan(setup, settings);
     if (!v.valid) { scans.push({ symbol: asset.symbol, status: "invalid_setup", reason: v.reason }); continue; }
@@ -467,6 +535,43 @@ async function runCycle(env) {
     scans.push({ symbol: asset.symbol, status: "opportunity", setupType: setup.setupType });
   }
 
+  const journal = journalBinding(env);
+  let paperJournal = "unavailable";
+  let coverage = null;
+  if (journal) {
+    try {
+      const cursorResponse = await journal.fetch("https://paper.internal/cursor");
+      if (!cursorResponse.ok) throw new Error("cursor_unavailable");
+      const checkpoint = await cursorResponse.json();
+      const observedAt = new Date().toISOString();
+      const batch = makeScanBatch(observations, checkpoint.settings || settings, observedAt, V2_SYMBOLS);
+      coverage = batch.coverage;
+      const warmup = Date.parse(observedAt) - 8 * 86_400_000;
+      batch.bars = batch.bars.filter(bar => checkpoint.cursors[bar.symbol]
+        ? bar.openAt > checkpoint.cursors[bar.symbol] : Date.parse(bar.closeAt) >= warmup);
+      const result = await journal.fetch("https://paper.internal/scan", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(batch),
+      });
+      if (!result.ok) throw new Error("append_failed");
+      const receipt = await result.json();
+      if (receipt.lastReliableAt === observedAt) await kvPut(env, PAPER_RELIABLE_KEY, observedAt);
+      paperJournal = receipt.lastReliableAt === observedAt ? "ok" : "partial";
+    } catch {
+      console.error("v2_paper_journal_unavailable");
+    }
+  }
+  if (!openRows) {
+    // The tape commit is independent of the legacy account. Preserve health
+    // for the completed market scan without fabricating an empty portfolio.
+    const finishedAt = new Date().toISOString();
+    const health = { active: scanned > 0, lastCycle: finishedAt, scanned, detected: opportunities.length,
+      openPositions: null, closedThisCycle: null, errors, legacyUnavailable: true, paperJournal, coverage,
+      store: supaConfigured(env) ? "supabase" : "kv" };
+    const cycle = { started_at: startedAt, finished_at: finishedAt, scanned, detected: opportunities.length,
+      opened: null, closed: null, errors };
+    await kvPut(env, STATE_KEY, { health, opportunities, updatedAt: finishedAt });
+    return { health, cycle, stats: null, opportunities, paperJournal, legacyUnavailable: true };
+  }
   // 2) Gérer les positions ouvertes : stop / target / temps.
   //
   // RÈGLE ANTI « fermeture immédiate » : une position daily/swing ne peut JAMAIS
@@ -544,7 +649,7 @@ async function runCycle(env) {
   } catch (e) { statsError = String(e?.message || e); }
 
   const health = {
-    active: true,
+    active: scanned > 0, paperJournal, coverage, legacyUnavailable: false,
     lastCycle: finishedAt,
     scanned, detected: opportunities.length,
     openPositions: openCount, closedThisCycle: closed, errors,
@@ -565,7 +670,7 @@ async function runCycle(env) {
     statsError,
   };
 
-  return { health, opportunities, cycle, stats, debug };
+  return { health, opportunities, cycle, stats, debug, paperJournal };
 }
 
 // ============================================================
@@ -574,26 +679,51 @@ async function runCycle(env) {
 
 async function handleHealth(request, env) {
   const state = await kvGet(env, STATE_KEY, null);
-  let openPositions = 0;
-  try { openPositions = (await getOpenPositions(env)).length; } catch { /* ignore */ }
-  const cycles = await getCycles(env, 1).catch(() => []);
+  let openPositions = null;
+  try { openPositions = (await getOpenPositions(env)).length; } catch { /* unknown */ }
+  const cycles = await getCycles(env, 1).catch(() => null);
+  const legacyUnavailable = openPositions === null || !cycles;
+  const lastCycle = state?.health?.lastCycle || cycles?.[0]?.finished_at || null;
+  const recent = Number.isFinite(Date.parse(lastCycle)) && Date.now() - Date.parse(lastCycle) <= 7_200_000;
+  const active = recent && state?.health?.scanned > 0;
+  const status = !recent ? "unavailable" : legacyUnavailable || !active || state?.health?.paperJournal !== "ok" ? "partial" : "ok";
   return json({
-    status: "ok",
+    status, legacyUnavailable, paperJournal: state?.health?.paperJournal || "unavailable",
+    coverage: state?.health?.coverage || null,
     bot: "ManiTradePro V2 Learning Bot",
-    active: true,
-    lastCycle: state?.health?.lastCycle || cycles[0]?.finished_at || null,
+    active, lastCycle,
     scanned: state?.health?.scanned ?? null,
     detected: state?.health?.detected ?? null,
     openPositions,
     store: supaConfigured(env) ? "supabase" : "kv",
     universeSize: V2_SYMBOLS.length,
-  }, 200, request, env);
+  }, status === "unavailable" ? 503 : 200, request, env);
 }
 
-async function handleStats(request, env) {
-  const trades = (await getClosedTrades(env, 2000).catch(() => [])).map(normalizeTrade);
-  const stats = computeStats(trades);
-  return json({ status: "ok", ...stats, tradeCount: trades.length }, 200, request, env);
+async function handleHistory(request, env, options) {
+  const markerKey = "v2:verified-legacy-history:v1";
+  const marker = await kvGet(env, markerKey, null);
+  const lastReliableAt = marker?.verifiedAt || HISTORY_ARCHIVE.lastReliableAt;
+  try {
+    const rows = await getClosedTrades(env);
+    validateHistoryRows(rows);
+    validateArchiveContinuity(rows);
+    if (marker && rows.length < marker.tradeCount) throw new Error("ledger_regressed");
+    const trades = rows.map(normalizeTrade);
+    const verifiedAt = new Date().toISOString();
+    const source = supaConfigured(env) ? TBL.trades : KV.trades;
+    if (!marker || marker.tradeCount !== rows.length || marker.verifiedAt.slice(0, 10) !== verifiedAt.slice(0, 10)) {
+      await kvPut(env, markerKey, { tradeCount: rows.length, verifiedAt });
+    }
+    const metadata = { status: "ok", source, verifiedAt, totalCount: trades.length };
+    if (options) {
+      const page = trades.slice(options.offset, options.offset + options.limit);
+      return json({ ...metadata, count: page.length, trades: page }, 200, request, env);
+    }
+    return json({ ...metadata, ...computeStats(trades), tradeCount: trades.length }, 200, request, env);
+  } catch {
+    return json({ status: "unavailable", message: "Données indisponibles", lastReliableAt }, 503, request, env);
+  }
 }
 
 export default {
@@ -609,13 +739,26 @@ export default {
       if (path === "/" || path === "/api/v2" || path === "/api/v2/ping") {
         return json({ status: "ok", bot: "ManiTradePro V2", endpoints: [
           "/api/v2/health", "/api/v2/universe", "/api/v2/opportunities",
-          "/api/v2/positions", "/api/v2/trades", "/api/v2/stats",
+          "/api/v2/positions", "/api/v2/trades", "/api/v2/stats", "/api/v2/paper",
           "POST /api/v2/cycle (admin)", "POST /api/v2/session/login",
-          "POST /api/v2/reset (admin)", "GET/POST /api/v2/settings",
+          "GET/POST /api/v2/settings",
         ] }, 200, request, env);
       }
 
       if (path === "/api/v2/health") return handleHealth(request, env);
+
+      if (path === "/api/v2/paper") {
+        if (request.method !== "GET") return fail("Lecture seule", 405, request, env);
+        const journal = journalBinding(env);
+        if (journal) {
+          try {
+            const report = await journal.fetch("https://paper.internal/report" + url.search);
+            return json(await report.json(), report.status, request, env);
+          } catch { /* durable storage unavailable */ }
+        }
+        return json({ status: "unavailable", message: "Données indisponibles",
+          dashboard: null, decisions: [], asOf: null, lastReliableAt: await kvGet(env, PAPER_RELIABLE_KEY, null) }, 503, request, env);
+      }
 
       if (path === "/api/v2/universe") {
         return json({ status: "ok", count: V2_UNIVERSE.length, assets: V2_UNIVERSE }, 200, request, env);
@@ -623,24 +766,27 @@ export default {
 
       if (path === "/api/v2/opportunities") {
         const state = await kvGet(env, STATE_KEY, null);
-        return json({ status: "ok", updatedAt: state?.updatedAt || null, opportunities: state?.opportunities || [] }, 200, request, env);
+        if (!state?.updatedAt || !Array.isArray(state.opportunities)) return json({
+          status: "unavailable", message: "Données indisponibles", updatedAt: null,
+        }, 503, request, env);
+        return json({ status: "ok", updatedAt: state.updatedAt, opportunities: state.opportunities }, 200, request, env);
       }
 
       if (path === "/api/v2/positions") {
-        const positions = (await getOpenPositions(env).catch(() => [])).map(normalizePosition);
+        const positions = (await getOpenPositions(env)).map(normalizePosition);
         return json({ status: "ok", count: positions.length, positions }, 200, request, env);
       }
 
       if (path === "/api/v2/trades") {
-        const limit = Math.min(Number(url.searchParams.get("limit")) || 200, 2000);
-        const trades = (await getClosedTrades(env, limit).catch(() => [])).map(normalizeTrade);
-        return json({ status: "ok", count: trades.length, trades }, 200, request, env);
+        const limit = Math.min(2000, Math.max(1, parseInt(url.searchParams.get("limit"), 10) || 200));
+        const offset = Math.max(0, parseInt(url.searchParams.get("offset"), 10) || 0);
+        return await handleHistory(request, env, { offset, limit });
       }
 
-      if (path === "/api/v2/stats") return handleStats(request, env);
+      if (path === "/api/v2/stats") return await handleHistory(request, env);
 
       if (path === "/api/v2/cycles") {
-        const cycles = await getCycles(env, 50).catch(() => []);
+        const cycles = await getCycles(env, 50);
         return json({ status: "ok", count: cycles.length, cycles }, 200, request, env);
       }
 
@@ -677,21 +823,11 @@ export default {
       if (path === "/api/v2/cycle" && request.method === "POST") {
         if (!(await isAdmin(request, env))) return fail("Admin requis", 403, request, env);
         const result = await runCycle(env);
-        return json({ status: "ok", ...result }, 200, request, env);
+        return json({ status: result.legacyUnavailable || result.paperJournal !== "ok" ? "partial" : "ok", ...result }, 200, request, env);
       }
 
       if (path === "/api/v2/reset" && request.method === "POST") {
-        if (!(await isAdmin(request, env))) return fail("Admin requis", 403, request, env);
-        if (supaConfigured(env)) {
-          // Paper uniquement : on vide les tables V2 (aucun impact V1).
-          await supa(env, `${TBL.positions}?id=neq.00000000-0000-0000-0000-000000000000`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => {});
-          await supa(env, `${TBL.trades}?id=neq.00000000-0000-0000-0000-000000000000`, { method: "DELETE", headers: { Prefer: "return=minimal" } }).catch(() => {});
-        }
-        await kvPut(env, KV.positions, []);
-        await kvPut(env, KV.trades, []);
-        await kvPut(env, KV.cycles, []);
-        await kvPut(env, STATE_KEY, null);
-        return json({ status: "ok", message: "Données paper V2 réinitialisées" }, 200, request, env);
+        return fail("Historique conservé. La réinitialisation destructive est désactivée.", 410, request, env);
       }
 
       return fail("not_found", 404, request, env);

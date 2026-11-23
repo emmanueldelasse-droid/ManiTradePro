@@ -1,103 +1,101 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { run, V2_POST_FIX_START } from "../snapshot-v1-v2-stats.mjs";
+import { run } from "../snapshot-v1-v2-stats.mjs";
+import { computeStats } from "../lib/engine-v2.mjs";
+import { HISTORY_ARCHIVE } from "../lib/history-integrity.mjs";
 
-const previousFetch = globalThis.fetch;
-const previousCwd = process.cwd();
-const tmp = await mkdtemp(path.join(os.tmpdir(), "mtp-v1-v2-monitor-"));
+const tmp = await mkdtemp(path.join(os.tmpdir(), "mtp-report-"));
+const originalCwd = process.cwd();
+const originalFetch = globalThis.fetch;
+const file = name => readFile("data/" + name, "utf8");
 
-const v1 = {
-  data: {
-    configured: true,
-    stats: {
-      totalCount: 2,
-      winCount: 1,
-      lossCount: 1,
-      winRate: 0.5,
-      totalPnl: 3,
-      avgWin: 5,
-      avgLoss: 2,
-      expectancy: 1.5,
-      rrActual: 2.5,
-      openCount: 1,
-      bySetup: [],
-    },
-    lastClosedAt: "2026-08-17T00:00:00Z",
-  },
+// Synthetic rows exercise pagination and continuity. No fixture is published.
+const trades = Array.from({ length: 180 }, (_, i) => ({
+  id: "test-" + i, symbol: "TEST", setupType: "breakout", direction: "long",
+  openedAt: i < 134 ? "2026-08-01" : "2026-08-18", closedAt: "2026-08-20",
+  pnl: i < 134 ? 1 : i < 146 ? (i === 145 ? 48.1598 : 100) : -10,
+}));
+// 11 * 100 + 48.1598 - 34 * 10 = 808.1598
+const verifiedAt = "2026-11-23T21:00:00Z";
+const source = "mtp_v2_trades";
+const v1 = { status: "ok", data: { configured: true, ledgerSource: "mtp_trades", verifiedAt, stats: { totalCount: 49 } } };
+let sourceRows = trades;
+let apiStats = {};
+let unavailable = false;
+let v1Offline = false;
+let truncate = false;
+const refreshStats = () => {
+  apiStats = { ...computeStats(sourceRows), status: "ok", source, verifiedAt, tradeCount: sourceRows.length };
 };
-
-const v2Stats = {
-  status: "ok",
-  tradeCount: 2,
-  overall: { trades: 2, totalPnl: 100 },
-  bySetup: { breakout: { trades: 2 } },
-};
-
-const beforeFix = new Date(Date.parse(V2_POST_FIX_START) - 1000).toISOString();
-const afterFix = new Date(Date.parse(V2_POST_FIX_START) + 1000).toISOString();
-const v2Trades = {
-  status: "ok",
-  count: 2,
-  trades: [
-    {
-      id: "pre",
-      symbol: "AAA",
-      setupType: "breakout",
-      direction: "long",
-      pnl: -10,
-      pnlPct: -1,
-      openedAt: beforeFix,
-      closedAt: "2026-08-17T00:00:00Z",
-    },
-    {
-      id: "post",
-      symbol: "BBB",
-      setupType: "mean_reversion",
-      direction: "long",
-      pnl: 20,
-      pnlPct: 2,
-      openedAt: afterFix,
-      closedAt: "2026-08-17T01:00:00Z",
-    },
-  ],
-};
-
-globalThis.fetch = async (url) => {
-  const text = String(url);
-  const body = text.includes("/api/public/bot-stats")
-    ? v1
-    : text.includes("/api/v2/trades")
-      ? v2Trades
-      : v2Stats;
-  return new Response(JSON.stringify(body), {
-    status: 200,
-    headers: { "content-type": "application/json" },
-  });
+globalThis.fetch = async url => {
+  const request = new URL(url);
+  if (request.pathname.endsWith("/bot-stats")) return Response.json(v1, { status: v1Offline ? 503 : 200 });
+  if (unavailable) throw new Error("source unreachable");
+  if (request.pathname.endsWith("/stats")) return Response.json(apiStats);
+  const offset = Number(request.searchParams.get("offset"));
+  const page = truncate && offset ? [] : sourceRows.slice(offset, offset + 35);
+  return Response.json({ status: "ok", verifiedAt, source, totalCount: sourceRows.length, count: page.length, trades: page });
 };
 
 try {
   process.chdir(tmp);
-  await run();
+  await mkdir("data");
+  const seed = {
+    "history-status.json": { ...HISTORY_ARCHIVE, v1Status: "unavailable", status: "unavailable", v1LastReliableAt: HISTORY_ARCHIVE.lastReliableAt },
+    "bot-stats-v1.json": { stats: { totalCount: 49 } },
+    "bot-stats.json": { stats: { totalCount: 49 } },
+    "bot-stats-v2.json": { tradeCount: 180, overall: {} },
+    "bot-stats-v2-post-fix.json": { tradeCount: 46 },
+    "v1-v2-comparison.json": {},
+  };
+  for (const [name, contents] of Object.entries(seed)) await writeFile("data/" + name, JSON.stringify(contents));
+  // Replaying last positive archive and then restating the old false "ok, zero".
+  const archived = await file("bot-stats-v2-post-fix.json");
+  refreshStats();
+  apiStats = { status: "ok", tradeCount: 0, overall: { trades: 0 } };
+  let state = await run();
+  assert.equal(state.status, "unavailable");
+  assert.equal(state.lastReliableAt, HISTORY_ARCHIVE.lastReliableAt);
+  assert.equal(await file("bot-stats-v2-post-fix.json"), archived);
 
-  const comparison = JSON.parse(await readFile("data/v1-v2-comparison.json", "utf8"));
-  const legacyV1 = JSON.parse(await readFile("data/bot-stats.json", "utf8"));
-  const postFix = JSON.parse(await readFile("data/bot-stats-v2-post-fix.json", "utf8"));
+  refreshStats();
+  v1Offline = true;
+  state = await run();
+  assert.equal(state.status, "ok");
+  assert.equal(state.v1Status, "unavailable");
+  assert.equal(state.v2PostFixTrades, 46);
+  assert.equal(state.lastReliableAt, verifiedAt);
+  const verified = await file("bot-stats-v2-post-fix.json");
+  assert.equal(JSON.parse(verified).totalPnl, 808.1598);
+  assert.equal(JSON.parse(await file("v1-v2-comparison.json")).v1.tradeCount, 49);
+  v1Offline = false;
 
-  assert.equal(comparison.v1.tradeCount, 2);
-  assert.equal(comparison.v2HistoricalReference.tradeCount, 2);
-  assert.equal(comparison.v2PostFix.tradeCount, 1);
-  assert.equal(comparison.v2PostFix.totalPnl, 20);
-  assert.equal(comparison.v2PostFix.bySetup.mean_reversion.trades, 1);
-  assert.equal(comparison.v2PostFix.bySetup.breakout, undefined);
-  assert.equal(comparison.methodology.v2PostFixStart, V2_POST_FIX_START);
-  assert.equal(legacyV1.stats.totalCount, 2);
-  assert.equal(postFix.cohortRule, "trade.openedAt >= cohortStart");
-
+  for (const problem of ["read_error", "legitimate_empty_table_after_reset", "partial_page", "api_disagrees", "duplicate", "rewrite"]) {
+    unavailable = problem === "read_error";
+    truncate = problem === "partial_page";
+    sourceRows = problem === "legitimate_empty_table_after_reset" ? [] : trades.map(row => ({ ...row }));
+    if (problem === "duplicate") sourceRows[1].id = sourceRows[0].id;
+    if (problem === "rewrite") sourceRows[1].entry = 5000;
+    refreshStats();
+    if (problem === "api_disagrees") apiStats.overall.totalPnl++;
+    state = await run();
+    assert.equal(state.status, "unavailable", problem);
+    assert.equal(state.v1Status, "ok", problem);
+    assert.equal(state.lastReliableAt, verifiedAt, problem);
+    assert.equal(await file("bot-stats-v2-post-fix.json"), verified, problem);
+  }
+  unavailable = truncate = false;
+  sourceRows = [...trades, { ...trades[0], id: "new", openedAt: "2026-11-10", closedAt: "2026-11-12", pnl: 5 }];
+  refreshStats();
+  state = await run();
+  assert.equal(state.status, "ok");
+  assert.equal(state.v2PostFixTrades, 47);
+  assert.equal(JSON.parse(await file("bot-stats-v2-post-fix.json")).totalPnl, 813.1598);
   console.log("snapshot-v1-v2-stats.test: OK");
 } finally {
-  globalThis.fetch = previousFetch;
-  process.chdir(previousCwd);
+  globalThis.fetch = originalFetch;
+  process.chdir(originalCwd);
   await rm(tmp, { recursive: true, force: true });
 }

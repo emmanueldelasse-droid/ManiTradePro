@@ -342,3 +342,7 @@ Snapshot quotidien lisible par Claude — stats globales pour aider à l'analyse
 - Les chiffres de lignes ci-dessus sont la mesure du jour. À recroiser avec `wc -l` à chaque session importante.
 - La liste des routes API est tirée du code actuel mais peut être incomplète si des routes admin ont été ajoutées sans documentation. À grepper `url.pathname ===` ou `url.pathname.startsWith` dans `cloudflare-worker/worker.js` pour confirmation exhaustive.
 - Les schemas Supabase listés sont les colonnes connues via les migrations 001-016. Toute colonne ajoutée hors migration documentée n'est pas dans ce fichier.
+
+## Espace V2 en simulation
+
+Depuis `/v2/`, le tableau de bord consulte `manitradepro-v2` et son journal prospectif SQLite. La page principale donne accès à cet espace. Le Worker V1, le Worker V2 et les deux services de cache de la PWA sont versionnés séparément. Voir [la description du journal](../v2/ARCHITECTURE_V2.md).

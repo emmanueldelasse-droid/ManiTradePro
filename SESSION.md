@@ -1,9 +1,15 @@
 # SESSION.md — ManiTradePro
 
 > Carnet de bord court et exploitable. Les règles détaillées restent dans les fichiers canoniques spécialisés.
-> Dernière mise à jour : 2026-08-17.
+> Dernière mise à jour : 2026-11-23.
 
-## État actuel
+## 23 novembre 2026 · Suivi en simulation
+
+La page `v2/` présente le compte prospectif en euros, la variante sans retour à la moyenne et la référence de tendance. Le calcul applique les coûts estimés, valorise les positions et suit la baisse du capital aux observations disponibles. La première décision enregistrée démarre la période de mesure. Le moteur historique continue de produire ses signaux.
+
+Le dernier contrôle positif du journal historique date du 6 septembre à 18 h 34 UTC. Il portait sur 180 clôtures V2, dont 46 dans la cohorte post-correction. L’archive de cette cohorte affiche +808,16 unités brutes et −2 037,51 sans le gain sur NOW. Le projet ne dispose pas d’un bilan historique net en euros. Voir [l’audit et les traces](docs/v2/AUDIT_2026-11-23.md).
+
+## Situation documentée en août 2026
 
 - **Objectif produit** : détecter les trades les plus sûrs possibles, apprendre uniquement à partir de paper trades fiables, améliorer progressivement le moteur avant tout argent réel.
 - **Mode** : paper trading uniquement. Aucun broker réel, aucun capital réel.

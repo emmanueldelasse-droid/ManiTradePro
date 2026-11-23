@@ -165,3 +165,11 @@ drawdown. **Invariant testé** : tout setup détecté et validé est ouvrable.
 ## 15. Déploiement
 
 Voir `docs/v2/README_V2.md`.
+
+## Suivi prospectif en euros — novembre 2026
+
+Le cycle horaire reprend les détecteurs V2. Il inscrit les observations horodatées, la source, les niveaux, les hypothèses et l’explication initiale dans le Durable Object SQLite `PaperJournal`. Les lectures publiques passent par `GET /api/v2/paper`. Le curseur retourné par l’API permet de remonter le journal. Les bougies de valorisation sont conservées séparément des décisions. Ce stockage est indépendant du journal historique Supabase.
+
+Chaque bras suit le même calendrier et le même budget de risque. A suit les signaux V2 admissibles. B exclut uniquement `mean_reversion`. La référence achète au-dessus de la moyenne exponentielle à 50 séances, avec stop et cible exprimés en multiples de la volatilité ATR. Les hypothèses d’exécution et leurs limites sont affichées sur la page. Les coûts sont des estimations sans barème de courtier associé. Seules les nouvelles observations alimentent l’expérience.
+
+Le bilan brut d’origine est conservé à part. Les routes d’historique signalent une lecture indisponible si la source échoue ou si la cohorte vérifiée manque. Le [rapport d’audit](AUDIT_2026-11-23.md) contient la provenance des agrégats. Le résultat net ne peut pas être reconstruit à partir de ces seuls agrégats.

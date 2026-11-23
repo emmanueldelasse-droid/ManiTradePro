@@ -7509,14 +7509,35 @@ function computeTrainingStats(closed, open) {
 // individuelle, aucun réglage modifiable, aucune action déclenchable. Cache
 // 5 min côté worker pour borner le coût si scrapé.
 async function handlePublicBotStats(env) {
-  if (!supabaseConfigured(env)) {
-    return okCached({ configured: false, stats: null, settings: null }, "worker_public", nowIso(), "recent", "Supabase non configure", 300);
-  }
+  const archivedAt = "2026-09-06T18:34:09Z";
+  const markerKey = "v1:verified-history";
+  let marker;
+  try { marker = JSON.parse(await env.MTP_CACHE?.get(markerKey)); } catch { /* archive remains available */ }
+  const unavailable = () => json({ status: "unavailable", message: "Données indisponibles", lastReliableAt: marker?.verifiedAt || archivedAt, data: null }, 503);
+  if (!supabaseConfigured(env)) return unavailable();
   try {
+    const readClosed = async () => {
+      const rows = [];
+      const ids = new Set();
+      for (;;) {
+        const path = `${TRADE_TABLES.trades}?mode=in.(training,exploration,core)&status=eq.closed&order=closed_at.desc,id.asc&limit=500&offset=${rows.length}`;
+        const page = await supabaseFetch(env, path);
+        if (!Array.isArray(page)) throw new Error("source_shape");
+        if (!page.length) break;
+        for (const row of page) {
+          if (!row.id || ids.has(row.id) || row.pnl == null || !Number.isFinite(Number(row.pnl)) || !Number.isFinite(Date.parse(row.closed_at))) throw new Error("invalid_closed_row");
+          ids.add(row.id);
+          rows.push(row);
+        }
+      }
+      if (rows.filter(row => Date.parse(row.closed_at) <= Date.parse(archivedAt)).length !== 49
+          || (marker && rows.length < marker.tradeCount)) throw new Error("v1_history_missing");
+      return rows;
+    };
     const [closedRaw, openRaw, settings] = await Promise.all([
-      getClosedTrainingTradesRaw(env, 1000).catch(() => []),
-      getOpenTrainingPositionsRaw(env).catch(() => []),
-      getTrainingSettings(env).catch(() => null)
+      readClosed(), getOpenTrainingPositionsRaw(env),
+      supabaseFetch(env, `${TRAINING_SETTINGS_TABLE}?mode=eq.training&limit=1`)
+        .then(rows => rows?.[0] ? normalizeTrainingSettingsRow(rows[0]) : null).catch(() => null)
     ]);
     const closed = normalizeTrainingTrades(closedRaw);
     const open = normalizeTrainingPositions(openRaw);
@@ -7546,8 +7567,14 @@ async function handlePublicBotStats(env) {
       minDossierScore: settings.min_dossier_score
     } : null;
 
+    const verifiedAt = nowIso();
+    if (!marker || marker.tradeCount !== stats.totalCount || marker.verifiedAt?.slice(0, 10) !== verifiedAt.slice(0, 10)) {
+      try { await env.MTP_CACHE?.put(markerKey, JSON.stringify({ tradeCount: stats.totalCount, verifiedAt })); } catch { /* retain archived checkpoint */ }
+    }
     return okCached({
       configured: true,
+      verifiedAt,
+      ledgerSource: "mtp_trades",
       settings: publicSettings,
       stats,
       stats7d,
@@ -7555,7 +7582,7 @@ async function handlePublicBotStats(env) {
       lastClosedAt
     }, "worker_public", nowIso(), "recent", null, 300);
   } catch (e) {
-    return fail(`Erreur public stats : ${e.message || "supabase"}`, "error", 500);
+    return unavailable();
   }
 }
 
